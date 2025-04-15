@@ -30,13 +30,19 @@ from plugins.streaming_media_service.Link_parsing.core.xhs import XHS_REQ_LINK
 from plugins.streaming_media_service.Link_parsing.core.bangumi_core import claendar_bangumi_get_json,bangumi_subject_post_json,bangumi_subjects_get_json_PIL
 import inspect
 from asyncio import sleep
-from bilibili_api import settings
+try:
+    from bilibili_api import select_client
+    select_client("httpx")
+except ImportError:
+    #旧版本兼容问题，整合包更新后删除此部分代码
+    pass
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-settings.http_client = settings.HTTPClient.HTTPX
+
+
 import random
 import os
-
+from bs4 import BeautifulSoup
 
 
 json_init={'status':False,'content':{},'reason':{},'pic_path':{},'url':{},'video_url':False,'soft_type':False}
@@ -48,7 +54,24 @@ from plugins.resource_search_plugin.engine_search import html_read
 logger=get_logger()
 
 name_qq_list={'漫朔':1270858640,'枫与岚':2319804644,'Lemony':2424378897,'forandsix':1004704649,'魏咸哲':1431631009}
-card_url_list=['https://gal.manshuo.ink/usr/uploads/galgame/img/zhenhong.png']
+card_url_list=['https://gal.manshuo.ink/usr/uploads/galgame/img/zhenhong.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/suki.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/sega.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/teto.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/tianli.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/keai.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/keai2.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/miku.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/milk.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/xiaoqizou.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/maimai.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/mimi2.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/mimi.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/hyro1.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/salt1.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/zhenhong2.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/guangguang.png',
+               ]
 
 async def bilibili(url,filepath=None,is_twice=None):
     """
@@ -87,7 +110,7 @@ async def bilibili(url,filepath=None,is_twice=None):
         url: str = str(resp.url)
         #print(f'url:{url}')
     # AV/BV处理
-    if "av" in url:url= 'https://www.bilibili.com/video/' + av_to_bv(url)
+    #if "av" in url:url= 'https://www.bilibili.com/video/' + av_to_bv(url)
     if re.match(r'^BV[1-9a-zA-Z]{10}$', url):
         url = 'https://www.bilibili.com/video/' + url
     json_check['url'] = url
@@ -99,67 +122,73 @@ async def bilibili(url,filepath=None,is_twice=None):
         dynamic_id = int(re.search(r'[^/]+(?!.*/)', url)[0])
         #logger.info(dynamic_id)
         dy = dynamic.Dynamic(dynamic_id, credential)
-        is_opus = dy.is_opus()#判断动态是否为图文
+        is_opus = await dy.is_opus()#判断动态是否为图文
         json_check['url'] = f'https://t.bilibili.com/{dynamic_id}'
+        #is_opus=True
+        try:
+            if is_opus is False:#若判断为图文则换另一种方法读取
+                logger.info('not opus')
+                #print(dynamic_id)
 
-        if is_opus is False:#若判断为图文则换另一种方法读取
-            #logger.info('not opus')
-            dynamic_info = await Opus(dynamic_id, credential).get_info()
-            avatar_json = await info_search_bili(dynamic_info, is_opus,filepath=filepath)
-            tags = ''
-            number=0
-            text_list_check=''
-            if dynamic_info is not None:
-                title = dynamic_info['item']['basic']['title']
-                paragraphs = []
-                for module in dynamic_info['item']['modules']:
-                    if 'module_content' in module:
-                        paragraphs = module['module_content']['paragraphs']
-                        break
-                #print(json.dumps(paragraphs, indent=4))
-                for desc_check in paragraphs[0]['text']['nodes']:
-                    if 'word' in desc_check:
-                        desc = desc_check['word']['words']
-                        if f'{desc}' not in {'',' '}:
-                            text_list_check+=f"{desc}"
-                    elif desc_check['type'] =='TEXT_NODE_TYPE_RICH':
-                        if desc_check['rich']['type'] =='RICH_TEXT_NODE_TYPE_EMOJI':
-                            emoji_list.append(desc_check['rich']['emoji']['icon_url'])
-                            text_list_check += f'![{number}'
-                            number += 1
-                        else:
-                            tags+=desc_check['rich']['text'] + ' '
-                if text_list_check != '':
-                    contents.append(text_list_check)
-                if tags != '':
-                    contents.append(f'tag:{tags}')
+                dynamic_info = await Opus(dynamic_id).get_info()
+                avatar_json = await info_search_bili(dynamic_info, is_opus,filepath=filepath,card_url_list=card_url_list)
 
-                #获取头像以及名字
-                for module in dynamic_info['item']['modules']:
-                    if 'module_author' in module:
-                        modules = module['module_author']
-                        owner_cover,owner_name,pub_time = modules['face'],modules['name'],modules['pub_time']
-                        avatar_path =(await asyncio.gather(*[asyncio.create_task(download_img(owner_cover, f'{filepath}'))]))[0]
-                        break
-                try:
-                    pics_context=paragraphs[1]['pic']['pics']
-                except IndexError:
-                    pics_context=dynamic_info['item']['modules'][0]['module_top']['display']['album']['pics']
+                tags = ''
+                number=0
+                text_list_check=''
+                if dynamic_info is not None:
+                    title = dynamic_info['item']['basic']['title']
+                    paragraphs = []
+                    for module in dynamic_info['item']['modules']:
+                        if 'module_content' in module:
+                            paragraphs = module['module_content']['paragraphs']
+                            break
+                    #print(json.dumps(paragraphs, indent=4))
+                    for desc_check in paragraphs[0]['text']['nodes']:
+                        if 'word' in desc_check:
+                            desc = desc_check['word']['words']
+                            if f'{desc}' not in {'',' '}:
+                                text_list_check+=f"{desc}"
+                        elif desc_check['type'] =='TEXT_NODE_TYPE_RICH':
+                            if desc_check['rich']['type'] =='RICH_TEXT_NODE_TYPE_EMOJI':
+                                emoji_list.append(desc_check['rich']['emoji']['icon_url'])
+                                text_list_check += f'![{number}'
+                                number += 1
+                            else:
+                                tags+=desc_check['rich']['text'] + ' '
+                    if text_list_check != '':
+                        contents.append(text_list_check)
+                    if tags != '':
+                        contents.append(f'tag:{tags}')
 
-                contents = await add_append_img(contents, await asyncio.gather(*[asyncio.create_task(download_img(item['url'], f'{filepath}', len=len(pics_context))) for item in pics_context]))
-                if is_twice is not True:
-                    out_path=draw_adaptive_graphic_and_textual(contents, avatar_path=avatar_path, name=owner_name,
-                                                  Time=f'{pub_time}',filepath=filepath,type_software='BiliBili 动态',emoji_list=emoji_list,
-                                      color_software=(251,114,153,80),output_path_name=f'{dynamic_id}',avatar_json=avatar_json)
-                    json_check['pic_path'] = out_path
-                    json_check['time'] = pub_time
-                    return json_check
-                return contents,avatar_path,owner_name,pub_time,type,introduce,emoji_list
+                    #获取头像以及名字
+                    for module in dynamic_info['item']['modules']:
+                        if 'module_author' in module:
+                            modules = module['module_author']
+                            owner_cover,owner_name,pub_time = modules['face'],modules['name'],modules['pub_time']
+                            avatar_path =(await asyncio.gather(*[asyncio.create_task(download_img(owner_cover, f'{filepath}'))]))[0]
+                            break
+                    try:
+                        pics_context=paragraphs[1]['pic']['pics']
+                    except :
+                        pics_context=dynamic_info['item']['modules'][0]['module_top']['display']['album']['pics']
+
+                    contents = await add_append_img(contents, await asyncio.gather(*[asyncio.create_task(download_img(item['url'], f'{filepath}', len=len(pics_context))) for item in pics_context]))
+                    if is_twice is not True:
+                        out_path=draw_adaptive_graphic_and_textual(contents, avatar_path=avatar_path, name=owner_name,
+                                                      Time=f'{pub_time}',filepath=filepath,type_software='BiliBili 动态',emoji_list=emoji_list,
+                                          color_software=(251,114,153,80),output_path_name=f'{dynamic_id}',avatar_json=avatar_json)
+                        json_check['pic_path'] = out_path
+                        json_check['time'] = pub_time
+                        return json_check
+                    return contents,avatar_path,owner_name,pub_time,type,introduce,emoji_list
+        except Exception as e:
+            logger.error(f"{e}, 尝试使用其他方式解析")
+            is_opus=True
 
 
         if is_opus is True:
             dynamic_info = await dy.get_info()
-
             logger.info('is opus')
             #print(json.dumps(dynamic_info, indent=4))
             orig_check=1        #判断是否为转发，转发为2
@@ -184,7 +213,7 @@ async def bilibili(url,filepath=None,is_twice=None):
                 pub_time=dynamic_info['item']['modules']['module_author']['pub_time']
                 avatar_path = (await asyncio.gather(*[asyncio.create_task(download_img(owner_cover, f'{filepath}'))]))[0]
                 if orig_check ==1:
-                    avatar_json = await info_search_bili(dynamic_info, is_opus, filepath=filepath)
+                    avatar_json = await info_search_bili(dynamic_info, is_opus, filepath=filepath,card_url_list=card_url_list)
                     #print('非转发')
                     type_software='BiliBili 动态'
                     if 'opus' in dynamic_info['item']['modules']['module_dynamic']['major']:
@@ -403,9 +432,12 @@ async def bilibili(url,filepath=None,is_twice=None):
     download_url_data = await v.get_download_url(page_index=page_num)
     detecter = VideoDownloadURLDataDetecter(download_url_data)
     streams = detecter.detect_best_streams()
-    video_url, audio_url = streams[0].url, streams[1].url
-    json_check['video_url']=video_url
-    json_check['audio_url']=audio_url
+    try:
+        video_url, audio_url = streams[0].url, streams[1].url
+        json_check['video_url']=video_url
+        json_check['audio_url']=audio_url
+    except Exception as e:
+        json_check['video_url'] = False
 
 
 
@@ -851,13 +883,15 @@ async def Galgame_manshuo(url,filepath=None):
         avatar_name = '有希日记 - 读书可以改变人生！'
         json_check['soft_type'] = '有希日记'
         try:
-            from plugins.streaming_media_service.Link_parsing.core.selenium_core import scrape_images_get_url
-            links_url_list = scrape_images_get_url(url)
-            links_url = links_url_list[0]
-            #print(f'links_url:{links_url}')
+            #from plugins.streaming_media_service.Link_parsing.core.selenium_core import scrape_images_get_url
+            #links_url_list = scrape_images_get_url(url)
+            #links_url = links_url_list[0]
+            pass
         except Exception as e:
             links_url = None
-            #print(f"链接获取失败，错误: {e}")
+            traceback.print_exc()
+            print(f"链接获取失败，错误: {e}")
+
 
     for context_check in context:
         #print(context_check)
@@ -886,7 +920,8 @@ async def Galgame_manshuo(url,filepath=None):
                 avatar_name=match.group(1).replace(" ", "")
 
         if '故事介绍' in context_check or '<img src="https://img-static.hikarinagi.com/uploads/2024/08/aca2d187ca20240827180105.jpg"' in context_check:
-            desc_flag=1
+            if desc_flag == 0:
+                desc_flag=1
         elif '[关于](' in context_check and time_flag==2:
             desc_flag=3
         elif 'Hello!有希日記へようこそ!' in context_check:
@@ -899,8 +934,9 @@ async def Galgame_manshuo(url,filepath=None):
             if not ('https:'in context_check or 'data:image/svg+xml' in context_check or '插画欣赏' in context_check):
                 for i in context_check:
                     desc_number+=1
-                if 'ePub格式-连载' in context_check or '作者:' == context_check or '文章链接:' == context_check:
+                if 'ePub格式-连载' in context_check or '作者:' == context_check or '文章链接:' == context_check or '游戏资源' in context_check:
                     desc_flag = 0
+                #print(context_check,desc_flag)
                 if desc_number > 200 and desc_flag != 0:
                     desc_flag = 0
                     desc +=f'{context_check}…\n'
@@ -909,15 +945,19 @@ async def Galgame_manshuo(url,filepath=None):
         elif desc_flag != 1:
             desc_flag-=1
         flag = 0
-
-
-        if 'https://gal.manshuo.ink/usr/uploads/galgame/' in context_check:
+        #print(desc_flag)
+        if '登陆后才可以评论获取资源哦～～' in context_check:
+            hikarinagi_flag = 1
+        elif 'https://gal.manshuo.ink/usr/uploads/galgame/' in context_check:
             if hikarinagi_flag == 0:
                 for name_check in {'chara', 'title_page', '图片'}:
                     if f'{name_check}' in context_check: flag = 1
                 if flag == 1: continue
-                links = re.findall(r"https?://[^\s\]\)]+", context_check)
-                links_url=links[0]
+                links_url = (re.findall(r"https?://[^\s\]\)]+", context_check))[0]
+                image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp')
+                if not links_url.lower().endswith(image_extensions):
+                    links = re.findall(r'\((https?://[^\)]+)\)', context_check)
+                    links_url=links[0]
                 hikarinagi_flag = 1
         elif 'https://img-static.hikarinagi.com/uploads/' in context_check:
             if hikarinagi_flag == 0:
@@ -925,7 +965,7 @@ async def Galgame_manshuo(url,filepath=None):
                 Title = context_check.replace(" ", "").replace(f"{links_url}", "").replace("[", "").replace("]", "").replace(" - Hikarinagi", "").replace("(", "").replace(")", "")
                 hikarinagi_flag=1
 
-    #print(links_url)
+    #print(f'links_url:{links_url}')
     if links_url is None:
         try:
             for context_check in context:
@@ -934,7 +974,9 @@ async def Galgame_manshuo(url,filepath=None):
                     for name_check in {'chara', 'title_page', '图片'}:
                         if f'{name_check}' in context_check: flag = 1
                     if flag == 1: continue
+                    #print(f'context_check:{context_check}')
                     links = re.findall(r"https?://[^\s\]\)]+", context_check)
+                    #print(f'links:{links}')
                     links_url = links[0]
                     break
         except:
@@ -945,7 +987,7 @@ async def Galgame_manshuo(url,filepath=None):
     contents.append(f"title:{Title}")
     contents.append(desc)
     contents = await add_append_img(contents, await asyncio.gather(*[asyncio.create_task(download_img(links_url, f'{filepath}'))]))
-
+    #print(f'final links_url:{links_url}')
     if avatar_name in name_qq_list:
         for name_check in name_qq_list:
             if avatar_name in name_check:
@@ -971,6 +1013,76 @@ async def Galgame_manshuo(url,filepath=None):
                                                  color_software=type_color, output_path_name=f'{int(time.time())}',)
     json_check['pic_path'] = out_path
     return json_check
+
+async def youxi_pil_new_text(filepath=None):
+    contents=[]
+    json_check = copy.deepcopy(json_init)
+    json_check['status'] = True
+    json_check['video_url'] = False
+    if filepath is None: filepath = filepath_init
+    async with httpx.AsyncClient() as client:
+        try:
+            url_rss = f"https://www.mysqil.com/wp-json/wp/v2/posts"
+            response = await client.get(url_rss)
+            if response.status_code:
+                data = response.json()
+                #print(data)
+                #print(json.dumps(data[0], indent=4))
+                rss_context=data[0]
+        except Exception as e:
+            json_check['status'] = False
+            return json_check
+        for rss_text in rss_context:
+            #print(rss_text,rss_context[rss_text])
+            pass
+        #print(rss_context['_links']['author'][0]['href'])
+        Title=rss_context['title']['rendered']
+        desc = BeautifulSoup(rss_context['excerpt']['rendered'], 'html.parser').get_text().replace(" [&hellip;]", "")
+        desc=desc.replace("插画欣赏 作品简介 ", "")
+        truncated_text = desc[:200]
+        if len(desc) > 200:truncated_text += "..."
+        words = truncated_text.split(' ')
+        desc_result=''
+        for word in words:
+            if word !='':
+                desc_result+=f'{word}\n'
+        #print(desc_result)
+        contents.append(f"title:{Title}")
+        contents.append(desc_result)
+
+        soup = BeautifulSoup(rss_context['content']['rendered'], 'html.parser')
+        data_src_values = [img['data-src'] for img in soup.find_all('img', {'data-src': True})]
+        contents = await add_append_img(contents, await asyncio.gather(*[asyncio.create_task(download_img(data_src_values[0], f'{filepath}'))]))
+
+        time_gal=rss_context['date']
+        type_software = '有希日记'
+        type_color = (241, 87, 178, 80)
+        json_check['soft_type'] = '有希日记'
+        response = await client.get(rss_context['_links']['author'][0]['href'])
+        if response.status_code:
+            author_data = response.json()
+            #print(json.dumps(author_data, indent=4))
+            author_url=author_data['avatar_urls']['96']
+            #print(author_url)
+            avatar_name=author_data['name']
+        avatar_path = (await asyncio.gather(*[asyncio.create_task(download_img(author_url, f'{filepath}'))]))[0]
+
+        json_dy = {'status': False, 'pendant_path': False, 'card_path': False, 'card_number': False,
+                   'card_color': False,
+                   'card_is_fan': False}
+
+        card_url = card_url_list[random.randint(0, len(card_url_list) - 1)]
+        json_dy['card_path'] = (await asyncio.gather(*[asyncio.create_task(download_img(card_url, f'{filepath}'))]))[0]
+        out_path = draw_adaptive_graphic_and_textual(contents, avatar_path=avatar_path, name=avatar_name,
+                                                     Time=f'{time_gal}', type=11,
+                                                     filepath=filepath, type_software=type_software,
+                                                     avatar_json=json_dy,
+                                                     color_software=type_color,
+                                                     output_path_name=f'{int(time.time())}', )
+        json_check['pic_path'] = out_path
+        #print(json.dumps(json_check, indent=4))
+        return json_check
+
 
 async def bangumi_PILimg(text=None,img_context=None,filepath=None,proxy=None,type_soft='Bangumi 番剧',name=None,url=None,
                          type=None,target=None,search_type=None):
@@ -1041,9 +1153,15 @@ async def bangumi_PILimg(text=None,img_context=None,filepath=None,proxy=None,typ
                 contents = await add_append_img(contents, await asyncio.gather(*[asyncio.create_task(download_img(item, f'{filepath}', len=len(img_add_context))) for item in img_add_context]))
                 text_add = ''
                 count_1=count
-        if count < 10 :
+
+
+        if count % 10 < 10  and count % 10 !=0 and text_add!='':
+            img_add_context=[]
             contents.append(text_add)
-            contents = await add_append_img(contents, await asyncio.gather(*[asyncio.create_task(download_img(item, f'{filepath}', len=len(img_context))) for item in img_context]))
+            for i in range(count % 10):
+                img_add_context.append(img_context[i + count_1])
+            contents = await add_append_img(contents, await asyncio.gather(*[asyncio.create_task(download_img(item, f'{filepath}', len=len(img_add_context))) for item in img_add_context]))
+
         out_path = draw_adaptive_graphic_and_textual(contents,type=11,filepath=filepath, type_software=type_soft,
                                                          color_software=(251, 114, 153, 80),canvas_width=1000,
                                                          output_path_name=name,per_row_pic=5)
@@ -1108,11 +1226,13 @@ async def bangumi_PILimg(text=None,img_context=None,filepath=None,proxy=None,typ
                       img_add_context]))
                 text_add = ''
                 count_1 = count
-        if count < 10:
+        if count % 10 < 10  and count % 10 !=0 and text_add!='':
+            img_add_context=[]
             contents.append(text_add)
-            contents = await add_append_img(contents, await asyncio.gather(
-                *[asyncio.create_task(download_img(item, f'{filepath}', len=len(img_context))) for item in
-                  img_context]))
+            for i in range(count % 10):
+                img_add_context.append(img_context[i + count_1])
+            contents = await add_append_img(contents, await asyncio.gather(*[asyncio.create_task(download_img(item, f'{filepath}', len=len(img_add_context))) for item in img_add_context]))
+
         out_path = draw_adaptive_graphic_and_textual(contents, type=11, filepath=filepath, type_software=type_soft,
                                                      color_software=(251, 114, 153, 80), canvas_width=1000,
                                                      output_path_name=name, per_row_pic=5)
@@ -1164,6 +1284,44 @@ async def gal_PILimg(text=None,img_context=None,filepath=None,proxy=None,type_so
                                                          output_path_name=name,per_row_pic=5)
         json_check['pic_path'] = out_path
         return json_check
+
+
+async def majsoul_PILimg(text=None,img_context=None,filepath=None,type_soft='雀魂牌谱屋',canvas_width=1200):
+    contents=[]
+    json_check = copy.deepcopy(json_init)
+    json_check['soft_type'] = '雀魂牌谱屋'
+    json_check['status'] = True
+    json_check['video_url'] = False
+    if filepath is None: filepath = filepath_init
+
+    text_total = ''
+    words = text.split("\n")  # 按换行符分割文本，逐行处理
+    for line in words:  # 遍历每一行（处理换行符的部分）
+        if '昵称：' in line:
+            title = line.split("当前段位")[0]
+            rating=line.replace(title,'').split('当前pt')[0].replace('当前段位：','').replace(' ','')
+            if '当前pt' in line:
+                pt_check=line.split('当前pt')[1]
+            else:pt_check='未知'
+            contents.append(f"title:{title.replace('昵称：','玩家：')}")
+            contents.append(f"段位：【{rating}】当前pt{pt_check}")
+        elif '查询到多条角色昵称呢~，若输出不是您想查找的昵称，请补全查询昵称' in line:
+            contents.append(f'tag:{line}')
+        else:
+            text_total += f"{line}\n"
+
+    contents.append(text_total)
+    if img_context is not None:
+        contents = await add_append_img(contents, await asyncio.gather(
+            *[asyncio.create_task(download_img(item, f'{filepath}', len=len(img_context))) for item in img_context]))
+
+    out_path = draw_adaptive_graphic_and_textual(contents, type=11, filepath=filepath, type_software=type_soft,
+                                                 color_software=(161, 23, 21, 80), canvas_width=canvas_width,
+                                                 output_path_name=f'{int(time.time())}', per_row_pic=5)
+    json_check['pic_path'] = out_path
+    return json_check
+
+
 
 
 async def download_video_link_prising(json,filepath=None,proxy=None):
@@ -1218,8 +1376,11 @@ async def link_prising(url,filepath=None,proxy=None,type=None):
                 link_prising_json = await xiaohongshu(url, filepath=filepath)
             case url if 'x.com' in url:
                 link_prising_json = await twitter(url, filepath=filepath, proxy=proxy)
-            case url if 'gal.manshuo.ink' in url or 'www.hikarinagi.com' in url or 'www.mysqil.com' in url:
+            case url if 'gal.manshuo.ink/archives/' in url or 'www.hikarinagi.com' in url :
                 link_prising_json = await Galgame_manshuo(url, filepath=filepath)
+            case url if 'www.mysqil.com' in url:
+                #link_prising_json = await youxi_pil(url, filepath=filepath)
+                pass
             case _:
                 pass
 
@@ -1291,11 +1452,11 @@ if __name__ == "__main__":#测试用，不用管
     url='https://gal.manshuo.ink/archives/297/'
     url = 'https://www.hikarinagi.com/p/21338'
     url='https://live.bilibili.com/26178650'
-    url='https://gal.manshuo.ink/archives/212/'
-    url='https://www.bilibili.com/read/cv40866200/'
+    url='https://gal.manshuo.ink/archives/451/'
+    url='0.28 复制打开抖音，看看【空空子SAMA✨的作品】说你喜不喜欢玩抽象！ # 精神状态belike #... https://v.douyin.com/DwN6YB4s8pk/ qEh:/ 04/23 G@i.Cu '
 
-    #asyncio.run(link_prising(url))
-    asyncio.run(bangumi_PILimg(type='search',target='败犬',search_type=2))
+    asyncio.run(link_prising(url))
+    #asyncio.run(youxi_pil_new_text())
 
 
     url='44 【来抄作业✨早秋彩色衬衫叠穿｜时髦知识分子风 - 杨意子_ | 小红书 - 你的生活指南】 😆 Inw56apL6vWYuoS 😆 https://www.xiaohongshu.com/discovery/item/64c0e9c0000000001201a7de?source=webshare&xhsshare=pc_web&xsec_token=AB8GfF7dOtdlB0n_mqoz61fDayAXpCqWbAz9xb45p6huE=&xsec_source=pc_share'
