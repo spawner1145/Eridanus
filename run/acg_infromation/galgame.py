@@ -1,18 +1,13 @@
-import random
-import os
 import datetime
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-from developTools.event.events import GroupMessageEvent, FriendRequestEvent, PrivateMessageEvent, startUpMetaEvent, \
-    ProfileLikeEvent, PokeNotifyEvent
-from developTools.message.message_components import Record, Node, Text, Image
-from plugins.core.aiReplyCore import aiReplyCore
-from plugins.core.userDB import update_user, add_user, get_user
-from plugins.game_plugin.galgame import Get_Access_Token,Get_Access_Token_json,flag_check,params_check,get_game_image,remove_game_image,\
-    context_assemble,developers_check,character_check,get_introduction
-from plugins.streaming_media_service.Link_parsing.Link_parsing import gal_PILimg
+from developTools.event.events import GroupMessageEvent
+from developTools.message.message_components import Node, Text, Image
+from run.acg_infromation.service.galgame import Get_Access_Token,Get_Access_Token_json,flag_check,params_check,get_game_image, \
+    context_assemble, get_introduction
+from run.streaming_media.service.Link_parsing.Link_parsing import gal_PILimg
 
 def main(bot,config):
     @bot.on(GroupMessageEvent)
@@ -283,13 +278,13 @@ def main(bot,config):
                     gid=data["gid"]
                     introduction = await get_introduction(gid)
                     mainImg_state = 'https://store.ymgal.games/'+data["mainImg"]
-                    if config.settings["basic_plugin"]["绘图框架"]['gal_recommend'] is False:
+                    if config.acg_infromation.config["绘图框架"]['gal_recommend'] is False:
                         img_path = await get_game_image(mainImg_state, filepath)
                         cmList.append(Node(content=[Image(file=img_path)]))
                         cmList.append(Node(content=[Text(f'{context}')]))
                         cmList.append(Node(content=[Text(f'{introduction}')]))
 
-                    elif config.settings["basic_plugin"]["绘图框架"]['gal_recommend'] is True:
+                    elif config.acg_infromation.config["绘图框架"]['gal_recommend'] is True:
                         text=f"{context}\n{introduction}"
                         bangumi_json = await gal_PILimg(text, [mainImg_state], 'data/pictures/cache/',type_soft=f'Galgame 推荐')
                         if bangumi_json['status']:
