@@ -40,7 +40,15 @@ def main(bot,config):
                     tools
                 ]
                 print(tools)
-
+            
+        else:
+            if tools is None:
+                tools=[{"type": "function","function":{ "name": "googleSearch" }] 
+            else:
+                tools=[
+                    {"type": "function","function":{ "name": "googleSearch" },
+                    tools
+                ]       
 
     locks = {}
     queues = {}
