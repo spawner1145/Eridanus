@@ -1,6 +1,7 @@
 # encoding: utf-8
 import asyncio
 import functools
+import importlib
 import json
 import logging
 import shutil
@@ -9,7 +10,7 @@ import threading
 from io import StringIO
 
 import websockets
-from flask import Flask, request, jsonify, render_template, make_response, redirect, url_for
+from flask import Flask, request, jsonify, render_template, make_response, redirect, url_for, send_from_directory
 from flask_cors import CORS
 from cryptography.fernet import Fernet
 from ruamel.yaml import YAML, comments
@@ -24,8 +25,7 @@ from logger import get_logger
 
 
 
-
-
+# app = Flask(__name__,static_folder="dist", static_url_path="",template_folder="dist")
 app = Flask(__name__,static_folder="websources", static_url_path="",template_folder='websources')
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)  # 只显示 ERROR 级别及以上的日志（隐藏 INFO 和 DEBUG）
@@ -63,12 +63,40 @@ REPO_SOURCES = [
 ]
 
 # 配置文件路径
-YAML_FILES = {
-    "basic_config.yaml": "Eridanus/config/basic_config.yaml",
-    "api.yaml": "Eridanus/config/api.yaml",
-    "settings.yaml": "Eridanus/config/settings.yaml",
-    "controller.yaml": "Eridanus/config/controller.yaml"
-}
+def get_plugin_description(plugin_dir):
+    init_file = os.path.join(plugin_dir, '__init__.py')
+    if not os.path.exists(init_file):
+        return None
+    spec = importlib.util.spec_from_file_location("plugin_init", init_file)
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+        return getattr(module, 'plugin_description', None)
+    except Exception:
+        return None
+
+def build_yaml_file_map(run_dir):
+    yaml_map = {}
+    run_dir = os.path.abspath(run_dir)
+    for root, _, files in os.walk(run_dir):
+        for file in files:
+            if not file.endswith('.yaml'):
+                continue
+            abs_path = os.path.join(root, file)
+            rel_path = os.path.relpath(abs_path, run_dir).replace("\\", "/")
+            parts = rel_path.split("/")
+            if len(parts) < 2:
+                continue  # 不处理 run 目录下直接放的文件
+            plugin_dir = os.path.join(run_dir, parts[0])
+            plugin_desc = get_plugin_description(plugin_dir)
+            if not plugin_desc:
+                continue  # 没有 plugin_description 就跳过
+            filename = os.path.splitext(parts[-1])[0]
+            key = f"{plugin_desc}.{filename}"
+            yaml_map[key] = abs_path
+    return yaml_map
+RUN_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'run'))
+YAML_FILES = build_yaml_file_map(RUN_DIR)
 
 #鉴权
 def auth(func):
@@ -219,14 +247,6 @@ def save_yaml(file_path, data):
     #print(f"数据: {data}")
     return conflict_file_dealer(data["data"], file_path)
 
-def has_eridanus():
-    """判断是否安装了Eridanus"""
-    #测试不存在的路径
-    dir_path = "Eridanus"
-    if os.path.isdir(dir_path):
-        return True
-    else:
-        return False
 
 @app.route("/api/load/<filename>", methods=["GET"])
 @auth
@@ -355,11 +375,11 @@ def profile():
 
 @app.route("/")  # 定义根路由
 def index():
-    if not has_eridanus():
-        return redirect("./setup.html")  # 返回 setup.html
-    else:
-        return redirect("./dashboard.html") # 返回 dashboard.html
+    return redirect("./dashboard.html") # 返回 dashboard.html
 
+@app.errorhandler(404)
+def not_found(e):
+    return send_from_directory(app.static_folder, 'index.html')
 
 import base64
 
@@ -545,11 +565,8 @@ def run_websocket_server():
     asyncio.set_event_loop(loop)
     loop.run_until_complete(start_server())
     loop.run_forever()
-
-#启动Eridanus并捕获输出，反馈到前端。
-#不会写，不写！
-if __name__ == "__main__":
-    #初始化用户登录信息
+def start_webui():
+    # 初始化用户登录信息
 
     try:
         with open(user_file, 'r', encoding="utf-8") as file:
@@ -571,3 +588,8 @@ if __name__ == "__main__":
     print("浏览器访问 http://localhost:5007")
     print("浏览器访问 http://localhost:5007")
     app.run(debug=True, host="0.0.0.0", port=5007)
+#启动Eridanus并捕获输出，反馈到前端。
+#不会写，不写！
+
+if __name__ == "__main__":
+    start_webui()
