@@ -151,10 +151,10 @@ def bot_thread_function(loop_for_scheduler, global_cfg_manager):
         ws_link = global_cfg_manager.common_config.basic_config["adapter"]["ws_client"]["ws_link"]
         master_id = str(global_cfg_manager.common_config.basic_config["master"]["id"])
 
-        bot_instance_for_thread = ExtendBot(
+        from developTools.adapters.websocket_adapter import WebSocketBot
+        bot_instance_for_thread = WebSocketBot(
             ws_link,
-            global_cfg_manager,
-            blocked_loggers=["DEBUG", "INFO_MSG","INFO"]
+            blocked_loggers=["DEBUG", "INFO_MSG"]
         )
         logger.info(f"[BotThread] 机器人实例初始化完毕，将连接到: {ws_link}")
         logger.info(f"[BotThread] 管理员ID配置为: {master_id}")
@@ -186,7 +186,7 @@ def bot_thread_function(loop_for_scheduler, global_cfg_manager):
                     await bot_instance_for_thread.send(event, "Pong! 启动器机器人线程存活", True)
                 except Exception as send_exc:
                     logger.error(f"[BotThread] 发送 /ping 回复失败: {send_exc}", exc_info=True)
-
+#
     try:
         bot_instance_for_thread.run()
     except Exception as e:
