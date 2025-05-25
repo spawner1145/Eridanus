@@ -3,7 +3,6 @@ import base64
 import os
 import random
 import time
-from asyncio import sleep
 
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, FriendRequestEvent, GroupRequestEvent, \
     LifecycleMetaEvent
@@ -232,9 +231,6 @@ async def send_contract(bot, event, config):
 
 
 def main(bot, config):
-    global send_next_message
-    send_next_message = False
-
     @bot.on(LifecycleMetaEvent)
     async def _(event):
         group_list = await bot.get_group_list()
@@ -269,22 +265,7 @@ def main(bot, config):
         while True:
             await garbage_collection(bot, event, config)
             await asyncio.sleep(5400)  # 每1.5h清理一次缓存
-    @bot.on(GroupMessageEvent)
-    async def groups_send(event: GroupMessageEvent):
-        global send_next_message
-        if event.user_id==config.common_config.basic_config["master"]['id'] and event.pure_text=="notice":
-            send_next_message = True
-            await bot.send(event,"下一条消息将被转发至所有群")
-        elif send_next_message and event.user_id==config.common_config.basic_config["master"]['id']:
-            send_next_message = False
-            groups = await bot.get_group_list()
-            for group in groups["data"]:
-                try:
-                    bot.logger.info(f"转发消息至群{group['group_id']}")
-                    await bot.send_group_message(group["group_id"],event.message_chain)
-                    await sleep(4)
-                except Exception as e:
-                    bot.logger.error(f"发送群消息失败：{group['group_id']} 原因: {e}")
+
     @bot.on(GroupMessageEvent)
     async def _(event):
         if event.pure_text == "/gc":
