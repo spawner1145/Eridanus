@@ -39,7 +39,6 @@ class MessageComponent(BaseModel, ABC):
 class File(MessageComponent):
     comp_type: str = "file"
     file: str = Field(description="文件路径")
-    name: str= Field(default="",description="文件名")
     url: Annotated[Optional[str], OnlySend] = Field(default="",description="文件 URL")
     file_id: Annotated[Optional[str],OnlySend] = Field(default="",description="图片类型")
     path: Annotated[Optional[str], OnlySend] = Field(default="",description="文件路径")
@@ -53,8 +52,7 @@ class File(MessageComponent):
             # 将相对路径转换为绝对路径并添加 file:// 前缀
             abs_path = os.path.abspath(self.file).replace("\\", "/")
             self.file = f"file://{abs_path}"
-        file_name = os.path.basename(self.file)
-        self.name = file_name
+
 class Text(MessageComponent):
     comp_type: str = "text"
     text: str = Field(description="纯文本")
@@ -225,8 +223,9 @@ class Forward(MessageComponent):
 
 class Node(MessageComponent):
     comp_type: str = "node"
-    user_id: str = Field(default="",description="发送者 QQ 号")
-    nickname: str = Field(default="",description="发送者昵称")
+    id: str = Field(default="*",description="转发的消息 ID")
+    user_id: str = Field(default="*",description="发送者 QQ 号")
+    nickname: str = Field(default="*",description="发送者昵称")
     content: str | list[MessageComponent] = Field(description="消息内容")
 
 
