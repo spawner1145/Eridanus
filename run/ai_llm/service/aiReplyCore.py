@@ -105,7 +105,10 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"][
                     "enable_proxy"] else None,
             )
-            reply_message = response_message['content']
+            if not response_message:
+                reply_message = "NetWork Error!"
+            else:
+                reply_message = response_message['content']
             await prompt_database_updata(user_id, response_message, config)
 
         elif config.ai_llm.config["llm"]["model"] == "openai":
@@ -147,6 +150,8 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 response_message = await openaiRequest_official(**kwargs)
             else:
                 response_message = await openaiRequest(**kwargs)
+            logger.info(response_message)
+            response_message=response_message["choices"][0]["message"]
             if "content" in response_message:
                 reply_message = response_message["content"]
                 if reply_message is not None:
@@ -203,7 +208,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                     else:
                         try:
                             r = await call_func(bot, event, config, func_name, json.loads(args))  # 真是到处都不想相互兼容。
-                            if r == False:
+                            if not r:
                                 await end_chat(user_id)
                             if r:
                                 func_call = True
@@ -275,7 +280,8 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 temperature=config.ai_llm.config["llm"]["gemini"]["temperature"],
                 maxOutputTokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"]
             )
-
+            logger.info(response_message)
+            response_message=response_message['candidates'][0]["content"]
             # print(response_message)
             try:
                 reply_message = response_message["parts"][0]["text"]  # 函数调用可能不给你返回提示文本，只给你整一个调用函数。
@@ -347,7 +353,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                         try:
 
                             r = await call_func(bot, event, config, func_name, args)
-                            if r == False:
+                            if not r:
                                 await end_chat(user_id)
                             if r:
                                 func_r = {
@@ -363,7 +369,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                             traceback.print_exc()
                     await add_self_rep(bot, event, config, reply_message)
                     reply_message = None
-            if new_func_prompt != []:
+            if new_func_prompt:
                 await prompt_database_updata(user_id, {"role": "function", "parts": new_func_prompt}, config)
                 # await add_gemini_standard_prompt({"role": "function","parts": new_func_prompt},user_id)# 更新prompt
                 final_response = await aiReplyCore(None, user_id, config, tools=tools, bot=bot, event=event,
@@ -543,8 +549,8 @@ def remove_mface_filenames(reply_message, config, directory="data/pictures/Mface
             matched_files = matched_files[:config.ai_llm.config["llm"]["单次发送表情包数量"]]
             logger.info(f"mface 匹配到的文件名: {matched_files}")
 
-        logger.info(f"mface 处理后的文本: {cleaned_text}")
-        if matched_files == []:
+        #logger.info(f"mface 处理后的文本: {cleaned_text}")
+        if not matched_files:
             return cleaned_text, []
         return cleaned_text, matched_files
     except Exception as e:
