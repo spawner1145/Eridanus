@@ -100,7 +100,7 @@ def tarotChoice(mode):
     ints = random.choice([0,0,1])
     if ints == 0:
         tarots = random.choice(tarot)
-        txt = tarots[0] + '\n' + '正位' + '\n' + tarots[1]
+        txt = f'[title]{tarots[0]}[/title]' + '\n' + '正位' + '\n' + tarots[1] + '\n[des]仅供娱乐，切勿迷信[/des]'
         mode_to_folder = {
             "2233": "TarotImages",
             "blueArchive": "blueArchive",  # 注意: 原代码是 'buleArchive'，可能是拼写错误，这里修正为 'blueArchive'
@@ -112,7 +112,7 @@ def tarotChoice(mode):
         return txt, img
     if ints == 1:
         tarots = random.choice(tarot)
-        txt = tarots[0] + '\n' + '逆位' + '\n' + tarots[2]
+        txt = f'[title]{tarots[0]}[/title]' + '\n' + '逆位' + '\n' + tarots[2] + '\n[des]仅供娱乐，切勿迷信[/des]'
         mode_to_folder = {
             "bilibili": "TarotImages",
             "blueArchive": "blueArchive",
