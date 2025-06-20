@@ -16,7 +16,7 @@ from run.ai_llm.service.aiReplyCore import aiReplyCore
 from run.basic_plugin.service.life_service import bingEveryDay, danxianglii
 from run.basic_plugin.service.nasa_api import get_nasa_apod
 from run.basic_plugin.service.weather_query import free_weather_query
-from run.group_fun.service.lex_burner_Ninja import Lexburner_Ninja
+from run.group_fun.service.lex_burner_Ninja import LexburnerNinja
 from run.resource_collector.service.asmr.asmr100 import random_asmr_100
 from run.streaming_media.service.Link_parsing.Link_parsing import bangumi_PILimg
 from run.system_plugin.func_collection import trigger_tasks
@@ -91,7 +91,7 @@ def main(bot: ExtendBot, config):
             text = await aiReplyCore(
                 [{"text": f"翻译下面的文本，直接发送结果，不要发送'好的'之类的命令应答提示。要翻译的文本为：{text}"}],
                 random.randint(1000000, 99999999),
-                config, bot=bot, tools=None,system_instruction="你是一个翻译机器人，请完成高效且准确的翻译。我给你文本，你需要直接给出翻译结果")
+                config, bot=bot, tools=None)
             for group_id in config.scheduled_tasks.sheduled_tasks_push_groups_ordinary["每日天文"]["groups"]:
                 if group_id == 0: continue
                 try:
@@ -204,7 +204,7 @@ def main(bot: ExtendBot, config):
             logger.info_func("获取忍术大学习")
 
             async def get_random_renshu():
-                ninja = Lexburner_Ninja()
+                ninja = LexburnerNinja()
                 ninjutsu = await ninja.random_ninjutsu()
                 tags = ""
                 for tag in ninjutsu['tags']:
