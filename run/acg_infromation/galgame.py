@@ -7,7 +7,7 @@ from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Node, Text, Image
 from run.acg_infromation.service.galgame import Get_Access_Token,Get_Access_Token_json,flag_check,params_check,get_game_image, \
     context_assemble, get_introduction
-from run.streaming_media.service.Link_parsing.Link_parsing import gal_PILimg
+from run.streaming_media.service.Link_parsing import *
 
 def main(bot,config):
     @bot.on(GroupMessageEvent)

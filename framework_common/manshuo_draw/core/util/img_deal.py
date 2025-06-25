@@ -68,7 +68,10 @@ def backdrop_process(params,canves,limit=(0, 0)):
         if params['background'][0].width < limit_x:
             params['background'][0] = params['background'][0].resize(
                 (int(limit_x), int(limit_x * params['background'][0].height / params['background'][0].width)))
-        params['background'][0] = params['background'][0].crop((0, 0, limit_x, limit_y))
+        offest_x= (params['background'][0].width - limit_x ) // 2
+        offest_y= (params['background'][0].height - limit_y) // 2
+        #print(offest_x,offest_y)
+        params['background'][0] = params['background'][0].crop((offest_x, offest_y, limit_x+offest_x, limit_y+offest_y))
 
         width, height = params['background'][0].size
         center_x, center_y = width // 2, height // 2
@@ -76,7 +79,7 @@ def backdrop_process(params,canves,limit=(0, 0)):
         # 创建空白遮罩图像
         mask = Image.new("L", (width, height), 0)  # 单通道（L模式）
         draw = ImageDraw.Draw(mask)
-        max_alpha,intensity = 100,1.5
+        max_alpha,intensity = 100,3
         # 创建径向渐变（非线性）
         max_distance = math.sqrt(center_x ** 2 + center_y ** 2)  # 从中心到角落的最大距离
         for y in range(height):
