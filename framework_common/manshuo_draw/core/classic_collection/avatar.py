@@ -72,8 +72,8 @@ class AvatarModule:
         pure_backdrop = backdrop_process(self.__dict__,pure_backdrop,(self.img_width, current_y + self.padding_up_bottom))
 
 
-        upshift+=self.upshift
-        return {'canvas': pure_backdrop, 'canvas_bottom': current_y + self.padding_up_bottom - self.upshift ,'upshift':upshift,'downshift':0}
+        upshift+=self.upshift_extra
+        return {'canvas': pure_backdrop, 'canvas_bottom': current_y + self.padding_up_bottom - self.upshift_extra ,'upshift':upshift,'downshift':0}
 
 
 
@@ -81,6 +81,10 @@ class AvatarModule:
         if self.type_software is None or self.type_software == 'None' or len(self.processed_img) != 1: return
         for content_check in self.software_list:
             if self.type_software == content_check['type'] :
-                self.background,self.right_icon = content_check['background'],content_check['right_icon']
-                self.font_name_color,self.font_time_color = '(255,255,255)', '(255,255,255)'
-                self.is_shadow_font = True
+                if self.right_icon == 'None':
+                    self.right_icon = content_check['right_icon']
+                if content_check['background'] and self.background == 'None':
+                    self.background = content_check['background']
+                if self.background != 'None' and self.background:
+                    self.font_name_color,self.font_time_color = '(255,255,255)', '(255,255,255)'
+                    self.is_shadow_font = True
