@@ -12,6 +12,8 @@ import aiofiles
 import httpx
 import requests
 from PIL import Image
+from .bili import bili_init
+import inspect
 
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -25,9 +27,17 @@ COMMON_HEADER = {
 # 插件名字
 PLUGIN_NAME = "nonebot-plugin-resolver"
 
+GLOBAL_NICKNAME='Bot'
+
 GENERAL_REQ_LINK = "http://47.99.158.118/video-crack/v2/parse?content={}"
 # 解析列表文件名
 RESOLVE_SHUTDOWN_LIST_NAME = "resolver_shutdown_list"
+
+json_init={'status':False,'content':{},'reason':{},'pic_path':{},'url':{},'video_url':False,'soft_type':False}
+filepath_init=f'{os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(bili_init))))}/data/cache/'
+if not os.path.exists(filepath_init):  # 初始化检测文件夹
+    os.makedirs(filepath_init)
+
 
 async def download_video(url, proxy: str = None, ext_headers=None,filepath=None) -> str:
     """

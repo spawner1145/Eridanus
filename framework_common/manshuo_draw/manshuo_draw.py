@@ -29,8 +29,8 @@ if __name__ == '__main__':
 
         {'type': 'backdrop', 'subtype': 'gradient'},
 
-        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift':25,
-         'content':[ {'name': '漫朔_manshuo❤️♡🥰😭🤔🤪😇', 'time': '2025年 05月27日 20:32'}] },
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift_extra':25,
+         'content':[ {'name': '漫朔_manshuo', 'time': '2025年 05月27日 20:32'}] },
 
         {'type': 'img', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg'],
          'label': ['BiliBili', 'dy', 'manshuo']},
@@ -39,13 +39,12 @@ if __name__ == '__main__':
          'content': ['这里是manshuo[title]！这部分是测manshuo！[/title]这manshuo！[des]这里是介绍[/des]'] },
     ]
 
-    contents_not=[        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],
-         'content':[ {'name': '漫朔_manshuo', 'time': '2025年 05月27日 20:32'}] },]
+    contents_not=['对，你是什么啊丁发了快递给发卡号给反馈哈广发卡好几个地方看见啊还是国防科技哈规范对不起，没有找到该标签对不起，没有找到该标签']
 
 
     contentsWithNoTag=[
         {'type': 'basic_set', 'debug': True,'img_width':1000},
-        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift': 25,
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift_extra': 25,
          'content': [{'name': '漫朔_manshuo', 'time': '2025年 05月27日 20:32'},],'type_software':'bilibili',},
         {'type': 'img', 'subtype': 'common_with_des_right','img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'label':['BiliBili'],
          'content': ['这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]']},

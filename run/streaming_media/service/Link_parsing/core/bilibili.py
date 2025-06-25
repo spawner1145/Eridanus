@@ -1,0 +1,415 @@
+import httpx
+import re
+import copy
+from .login_core import ini_login_Link_Prising
+from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME
+from urllib.parse import urlparse
+from urllib.parse import parse_qs
+from datetime import datetime, timedelta
+from developTools.utils.logger import get_logger
+logger=get_logger()
+import json
+from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
+import asyncio
+import sys
+from bilibili_api import video, live, article
+from bilibili_api import dynamic
+from bilibili_api.opus import Opus
+from bilibili_api.video import VideoDownloadURLDataDetecter
+from .bili import bili_init,av_to_bv,download_b,info_search_bili
+try:
+    from bilibili_api import select_client
+    select_client("httpx")
+except ImportError:
+    #旧版本兼容问题，整合包更新后删除此部分代码
+    pass
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+
+async def bilibili(url,filepath=None,is_twice=None):
+    """
+        哔哩哔哩解析
+    :param bot:
+    :param event:
+    :return:
+    """
+    # 消息
+    #url: str = str(event.message).strip()
+    BILIBILI_HEADER, credential,BILI_SESSDATA=bili_init()#获取构建credential
+    json_check = copy.deepcopy(json_init)
+    json_check['soft_type'] = 'bilibili'
+    json_check['status'] = True
+    json_check['video_url'] = False
+    #logger.info(f'credential: {credential}')
+    if not ( 'bili' in url or 'b23' in url ):return
+    #构建绘图消息链
+    if filepath is None:
+        filepath = filepath_init
+    contents=[]
+    contents_dy=[]
+    emoji_list = []
+    orig_desc=None
+    type=None
+    introduce=None
+    desc=None
+    avatar_json=None
+    url_reg = r"(http:|https:)\/\/(space|www|live).bilibili.com\/[A-Za-z\d._?%&+\-=\/#]*"
+    b_short_rex = r"(https?://(?:b23\.tv|bili2233\.cn)/[A-Za-z\d._?%&+\-=\/#]+)"
+    # 处理短号、小程序问题
+    if "b23.tv" in url or "bili2233.cn" in url or "QQ小程序" in url :
+        b_short_url = re.search(b_short_rex, url.replace("\\", ""))[0]
+        #logger.info(f'b_short_url:{b_short_url}')
+        resp = httpx.get(b_short_url, headers=BILIBILI_HEADER, follow_redirects=True)
+        url: str = str(resp.url)
+        #print(f'url:{url}')
+    # AV/BV处理
+    if "av" in url:url= 'https://www.bilibili.com/video/' + av_to_bv(url)
+    if re.match(r'^BV[1-9a-zA-Z]{10}$', url):
+        url = 'https://www.bilibili.com/video/' + url
+    json_check['url'] = url
+    # ===============发现解析的是动态，转移一下===============
+    if ('t.bilibili.com' in url or '/opus' in url or '/space' in url ) and BILI_SESSDATA != '':
+        # 去除多余的参数
+        if '?' in url:
+            url = url[:url.index('?')]
+        dynamic_id = int(re.search(r'[^/]+(?!.*/)', url)[0])
+        #logger.info(dynamic_id)
+        dy = dynamic.Dynamic(dynamic_id, credential)
+        is_opus =await dy.is_opus()#判断动态是否为图文
+        json_check['url'] = f'https://t.bilibili.com/{dynamic_id}'
+        #is_opus=True
+        try:
+            if not is_opus:#若判断为图文则换另一种方法读取
+                logger.info('not opus')
+                #print(dynamic_id)
+
+                dynamic_info = await Opus(dynamic_id).get_info()
+                avatar_json = await info_search_bili(dynamic_info, is_opus,filepath=filepath,card_url_list=card_url_list)
+
+                tags = ''
+                number=0
+                text_list_check=''
+                if dynamic_info is not None:
+                    title = dynamic_info['item']['basic']['title']
+                    paragraphs = []
+                    for module in dynamic_info['item']['modules']:
+                        if 'module_content' in module:
+                            paragraphs = module['module_content']['paragraphs']
+                            break
+                    #print(json.dumps(paragraphs, indent=4))
+                    for desc_check in paragraphs[0]['text']['nodes']:
+                        if 'word' in desc_check:
+                            desc = desc_check['word']['words']
+                            if f'{desc}' not in {'',' '}:
+                                text_list_check+=f"{desc}"
+                        elif desc_check['type'] =='TEXT_NODE_TYPE_RICH':
+                            if desc_check['rich']['type'] =='RICH_TEXT_NODE_TYPE_EMOJI':
+                                emoji_list.append(desc_check['rich']['emoji']['icon_url'])
+                                text_list_check += f'![{number}'
+                                number += 1
+                            else:
+                                tags+=desc_check['rich']['text'] + ' '
+                    if text_list_check != '':
+                        contents.append(text_list_check)
+                    if tags != '':
+                        contents.append(f'tag:{tags}')
+
+                    #获取头像以及名字
+                    for module in dynamic_info['item']['modules']:
+                        if 'module_author' in module:
+                            modules = module['module_author']
+                            owner_cover,owner_name,pub_time = modules['face'],modules['name'],modules['pub_time']
+                            avatar_path =(await asyncio.gather(*[asyncio.create_task(download_img(owner_cover, f'{filepath}'))]))[0]
+                            break
+                    try:
+                        pics_context=paragraphs[1]['pic']['pics']
+                    except :
+                        pics_context=dynamic_info['item']['modules'][0]['module_top']['display']['album']['pics']
+
+                    contents = await add_append_img(contents, await asyncio.gather(*[asyncio.create_task(download_img(item['url'], f'{filepath}', len=len(pics_context))) for item in pics_context]))
+                    if is_twice is not True:
+                        out_path=draw_adaptive_graphic_and_textual(contents, avatar_path=avatar_path, name=owner_name,
+                                                      Time=f'{pub_time}',filepath=filepath,type_software='BiliBili 动态',emoji_list=emoji_list,
+                                          color_software=(251,114,153,80),output_path_name=f'{dynamic_id}',avatar_json=avatar_json)
+                        json_check['pic_path'] = out_path
+                        json_check['time'] = pub_time
+                        return json_check
+                    return contents,avatar_path,owner_name,pub_time,type,introduce,emoji_list
+        except Exception as e:
+            logger.error(f"{e}, 尝试使用其他方式解析")
+            is_opus=True
+
+
+        if is_opus:
+            dynamic_info = await dy.get_info()
+            logger.info('is opus')
+            #print(json.dumps(dynamic_info, indent=4))
+            orig_check=1        #判断是否为转发，转发为2
+            type_set=None
+            if dynamic_info is not None:
+                paragraphs = []
+                for module in dynamic_info['item']:
+                    if 'orig' in module:
+                        orig_check=2
+                        orig_context=dynamic_info['item'][module]
+                for module in dynamic_info['item']['modules']:
+                    if 'module_dynamic' in module:
+                        if orig_check==1:
+                            type_set=13
+                        elif orig_check==2:
+                            paragraphs = dynamic_info['item']['modules']['module_dynamic']
+                            type_set=14
+                        break
+                #获取头像以及名字
+                owner_cover=dynamic_info['item']['modules']['module_author']['face']
+                owner_name=dynamic_info['item']['modules']['module_author']['name']
+                pub_time=dynamic_info['item']['modules']['module_author']['pub_time']
+                avatar_path = (await asyncio.gather(*[asyncio.create_task(download_img(owner_cover, f'{filepath}'))]))[0]
+                if orig_check ==1:
+                    avatar_json = await info_search_bili(dynamic_info, is_opus, filepath=filepath,card_url_list=card_url_list)
+                    #print('非转发')
+                    type_software='BiliBili 动态'
+                    if 'opus' in dynamic_info['item']['modules']['module_dynamic']['major']:
+                        opus_paragraphs = dynamic_info['item']['modules']['module_dynamic']['major']['opus']
+                        text_list_check = ''
+                        number=0
+                        pics_context=[]
+                        #print(json.dumps(opus_paragraphs, indent=4))
+
+
+                        for text_check in opus_paragraphs['summary']['rich_text_nodes']:
+                            #print('\n\n')
+                            if 'emoji' in text_check:
+                                #print(text_check['emoji']['icon_url'])
+                                text_list_check += f'![{number}'
+                                number += 1
+                                emoji_list.append(text_check['emoji']['icon_url'])
+                            elif 'orig_text' in text_check:
+                                text_list_check += text_check['orig_text']
+                        #print(text_list_check)
+                        if dynamic_info['item']['type'] == 'DYNAMIC_TYPE_ARTICLE':
+                            type_software = 'BiliBili 专栏'
+                            contents.append(f"title:{opus_paragraphs['title']}")
+                            contents.append(text_list_check)
+                            for pic_check in opus_paragraphs['pics']:
+                                pics_context.append(pic_check['url'])
+                            contents = await add_append_img(contents, await asyncio.gather(*[asyncio.create_task(download_img(item, f'{filepath}', len=len(pics_context))) for item in pics_context]))
+                        else:
+                            contents.append(text_list_check)
+                            for pic_check in opus_paragraphs['pics']:
+                                pics_context.append(pic_check['url'])
+                            contents = await add_append_img(contents, await asyncio.gather(*[asyncio.create_task(download_img(item, f'{filepath}', len=len(pics_context))) for item in pics_context]))
+                    elif 'live_rcmd' in dynamic_info['item']['modules']['module_dynamic']['major']:
+                        live_paragraphs = dynamic_info['item']['modules']['module_dynamic']['major']['live_rcmd']
+                        content = json.loads(live_paragraphs['content'])
+                        title,cover,pub_time = content['live_play_info']['title'],content['live_play_info']['cover'],content['live_play_info']['live_start_time']
+                        contents.append((await asyncio.gather(*[asyncio.create_task(download_img(cover, f'{filepath}'))]))[0])
+                        contents.append(title)
+                        pub_time = datetime.fromtimestamp(pub_time).astimezone().strftime("%Y-%m-%d %H:%M:%S")
+                        type_software = 'BiliBili 直播'
+                    else:
+
+                        paragraphs = dynamic_info['item']['modules']['module_dynamic']['major']['archive']
+                        title,desc,cover,bvid=paragraphs['title'],paragraphs['desc'],paragraphs['cover'],paragraphs['bvid']
+                        contents.append((await asyncio.gather(*[asyncio.create_task(download_img(cover, f'{filepath}'))]))[0])
+                        contents.append(title)
+
+
+
+                    if is_twice is not True:
+                        out_path=draw_adaptive_graphic_and_textual(contents, avatar_path=avatar_path, name=owner_name,
+                                                          Time=f'{pub_time}', type=type_set, introduce=desc,
+                                                      filepath=filepath,type_software=type_software,emoji_list=emoji_list,
+                                      color_software=(251,114,153,80),output_path_name=f'{dynamic_id}',avatar_json=avatar_json)
+                        json_check['pic_path'] = out_path
+                        json_check['time'] = pub_time
+                        return json_check
+                    return contents, avatar_path, owner_name, pub_time, type, desc,emoji_list
+                elif orig_check ==2:
+                    #print(json.dumps(paragraphs, indent=4))
+
+                    text_list_check = ''
+                    number = 0
+                    for text_check in paragraphs['desc']['rich_text_nodes']:
+                        if 'emoji' in text_check:
+                            # print(text_check['emoji']['icon_url'])
+                            text_list_check += f'![{number}'
+                            number += 1
+                            emoji_list.append(text_check['emoji']['icon_url'])
+                        elif 'orig_text' in text_check:
+                            text_list_check += text_check['orig_text']
+                    contents.append(text_list_check)
+                    #print(text_list_check)
+
+                    for module in orig_context['modules']:
+                        if 'module_dynamic' in module:
+                            if 'opus' in orig_context['modules']['module_dynamic']['major']:
+                                opus_orig_paragraphs=orig_context['modules']['module_dynamic']['major']['opus']
+                                orig_title=opus_orig_paragraphs['summary']['text']
+                                contents_dy.append(orig_title)
+                                #logger.info(opus_orig_paragraphs)
+                                contents_dy = await add_append_img(contents_dy, await asyncio.gather(*[
+                                    asyncio.create_task(download_img(item['url'], f'{filepath}', len=len(opus_orig_paragraphs['pics'])))
+                                    for item in opus_orig_paragraphs['pics']]))
+                            else:
+                                orig_paragraphs = orig_context['modules']['module_dynamic']['major']['archive']
+                                orig_title, orig_desc, orig_cover, orig_bvid = orig_paragraphs['title'], orig_paragraphs['desc'], orig_paragraphs['cover'], orig_paragraphs['bvid']
+                                contents_dy.append((await asyncio.gather(*[asyncio.create_task(download_img(orig_cover, f'{filepath}'))]))[0])
+                                contents_dy.append(orig_title)
+                                try:
+                                    pics_context = paragraphs[1]['pic']['pics']
+                                except KeyError:
+                                    pics_context = []
+                                contents_dy = await add_append_img(contents_dy, await asyncio.gather(*[
+                                    asyncio.create_task(download_img(item['url'], f'{filepath}', len=len(pics_context)))for item in pics_context]))
+
+                    orig_pub_time=orig_context['modules']['module_author']['pub_time']
+                    orig_owner_name = orig_context['modules']['module_author']['name']
+                    orig_owner_cover = orig_context['modules']['module_author']['face']
+
+                    if is_twice is True:
+                        avatar_path =(await asyncio.gather(*[asyncio.create_task(download_img(orig_owner_cover, f'{filepath}'))]))[0]
+                        if orig_pub_time == '':
+                            return contents_dy, avatar_path, orig_owner_name, pub_time, type, orig_desc,emoji_list
+                        else:
+                            return contents_dy, avatar_path, orig_owner_name, orig_pub_time, type, orig_desc,emoji_list
+                    orig_url= 'orig_url:'+'https://t.bilibili.com/' + orig_context['id_str']
+                    orig_contents,orig_avatar_path,orig_name,orig_Time,orig_type,orig_introduce,orig_emoji_list=await bilibili(orig_url,f'{filepath}orig_',is_twice=True)
+                    #print(f'contents:{contents}\norig_contents:{orig_contents}\n')
+                    #print(f'emoji_list:{emoji_list}\norig_emoji_list:{orig_emoji_list}')
+                    out_path=draw_adaptive_graphic_and_textual(contents, avatar_path=avatar_path,
+                                                    name=owner_name, Time=f'{pub_time}', type=type_set,
+                                                    introduce=orig_desc,filepath=filepath,
+                                                    contents_dy=orig_contents, orig_avatar_path=orig_avatar_path,
+                                                    orig_name=orig_name,orig_Time=orig_Time,
+                                                    type_software='BiliBili 动态',
+                                                    color_software=(251, 114, 153, 80),
+                                                    output_path_name=f'{dynamic_id}',avatar_json=avatar_json,
+                                                    orig_type_software='转发动态',emoji_list=emoji_list,orig_emoji_list=orig_emoji_list
+                                                    )
+                    json_check['pic_path'] = out_path
+                    json_check['time'] = pub_time
+                    return json_check
+        return None
+    # 直播间识别
+    if 'live' in url:
+        room_id = re.search(r'\/(\d+)$', url).group(1)
+        room = live.LiveRoom(room_display_id=int(room_id))
+        data_get_url_context=await room.get_room_info()
+
+        room_info = data_get_url_context['room_info']
+        title, cover, keyframe = room_info['title'], room_info['cover'], room_info['keyframe']
+        owner_name,owner_cover = data_get_url_context['anchor_info']['base_info']['uname'], data_get_url_context['anchor_info']['base_info']['face']
+        area_name,parent_area_name=room_info['area_name'],room_info['parent_area_name']
+
+        #print(f'owner_cover:{owner_cover}\ncover:{cover}')
+
+        if cover =='':
+            cover='https://gal.manshuo.ink/usr/uploads/galgame/img/bili-logo.webp'
+        introduce=f'{parent_area_name} {area_name}'
+        avatar_path = (await asyncio.gather(*[asyncio.create_task(download_img(owner_cover, f'{filepath}'))]))[0]
+        contents.append((await asyncio.gather(*[asyncio.create_task(download_img(cover, f'{filepath}'))]))[0])
+        contents.append(f"{title}")
+
+        if f'{room_info["live_status"]}' == '1':
+            live_status, live_start_time = room_info['live_status'], room_info['live_start_time']
+            video_time = datetime.fromtimestamp(live_start_time).astimezone().strftime("%Y-%m-%d %H:%M:%S")
+        else:video_time='暂未开启直播'
+        #logger.info(room_info['online'])
+        if is_twice is not True:
+            out_path=draw_adaptive_graphic_and_textual(contents, avatar_path=avatar_path, name=owner_name,
+                                          Time=f'{video_time}',type=12,introduce=introduce,filepath=filepath,type_software='BiliBili 直播',
+                                      color_software=(251,114,153,80),output_path_name=f'{room_id}',avatar_json=avatar_json)
+            json_check['pic_path'] = out_path
+
+            return json_check
+        return contents, avatar_path, owner_name, video_time, type, introduce,emoji_list
+    # 专栏识别
+    if 'read' in url:
+        read_id = re.search(r'read\/cv(\d+)', url).group(1)
+        ar = article.Article(read_id)
+        # 如果专栏为公开笔记，则转换为笔记类
+        # NOTE: 笔记类的函数与专栏类的函数基本一致
+        if ar.is_note():
+            ar = ar.turn_to_note()
+        # 加载内容
+        await ar.fetch_content()
+        #print(ar.markdown())
+        markdown_path = f'{filepath}{read_id}.md'
+        with open(markdown_path, 'w', encoding='utf8') as f:
+            f.write(ar.markdown())
+        logger.info('专栏未做识别，跳过，欢迎催更')
+
+        return None
+    # 收藏夹识别
+    if 'favlist' in url and BILI_SESSDATA != '':
+
+        logger.info('收藏夹未做识别，跳过，欢迎催更')
+        return None
+
+
+
+    try:
+        video_id = re.search(r"video\/[^\?\/ ]+", url)[0].split('/')[1]
+        v = video.Video(video_id, credential=credential)
+        video_info = await v.get_info()
+    except Exception as e:
+        logger.info('无法获取视频内容，该进程已退出')
+        json_check['status'] = False
+        return json_check
+    #print(json.dumps(video_info, indent=4))
+    owner_cover_url=video_info['owner']['face']
+    owner_name = video_info['owner']['name']
+    #logger.info(owner_cover)
+    if video_info is None:
+        logger.info(f"识别：B站，出错，无法获取数据！")
+        return None
+    video_title, video_cover, video_desc, video_duration = video_info['title'], video_info['pic'], video_info['desc'], \
+        video_info['duration']
+    video_time = datetime.utcfromtimestamp(video_info['pubdate']) + timedelta(hours=8)
+    video_time=video_time.strftime('%Y-%m-%d %H:%M:%S')
+    # 校准 分p 的情况
+    page_num = 0
+    if 'pages' in video_info:
+        # 解析URL
+        parsed_url = urlparse(url)
+        # 检查是否有查询字符串
+        if parsed_url.query:
+            # 解析查询字符串中的参数
+            query_params = parse_qs(parsed_url.query)
+            # 获取指定参数的值，如果参数不存在，则返回None
+            page_num = int(query_params.get('p', [1])[0]) - 1
+        else:
+            page_num = 0
+        if 'duration' in video_info['pages'][page_num]:
+            video_duration = video_info['pages'][page_num].get('duration', video_info.get('duration'))
+        else:
+            # 如果索引超出范围，使用 video_info['duration'] 或者其他默认值
+            video_duration = video_info.get('duration', 0)
+    download_url_data = await v.get_download_url(page_index=page_num)
+    detecter = VideoDownloadURLDataDetecter(download_url_data)
+    streams = detecter.detect_best_streams()
+    try:
+        video_url, audio_url = streams[0].url, streams[1].url
+        json_check['video_url']=video_url
+        json_check['audio_url']=audio_url
+    except Exception as e:
+        json_check['video_url'] = False
+
+
+
+    contents.append((await asyncio.gather(*[asyncio.create_task(download_img(video_cover, f'{filepath}'))]))[0])
+    avatar_path = (await asyncio.gather(*[asyncio.create_task(download_img(owner_cover_url, f'{filepath}'))]))[0]
+
+    contents.append(f"{video_title}")
+    introduce=f'{video_desc}'
+
+    type=11
+    if is_twice is not True:
+        out_path=draw_adaptive_graphic_and_textual(contents, avatar_path=avatar_path, name=owner_name,Time=f'{video_time}',type=type,introduce=introduce,
+                                    filepath=filepath,type_software='BiliBili',avatar_json=avatar_json,
+                                    color_software=(251,114,153,80),output_path_name=f'{video_id}')
+        json_check['pic_path'] = out_path
+        return json_check
+    return contents, avatar_path, owner_name, video_time, type, introduce,emoji_list
