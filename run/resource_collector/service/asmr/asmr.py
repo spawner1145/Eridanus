@@ -1,12 +1,14 @@
+import httpx
 import random
 
-import httpx
 import yaml
 from pytubefix import Channel, YouTube
+from ruamel.yaml import YAML
 
 from developTools.utils.logger import get_logger
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.utils import get_headers
+
 
 yaml_manager = YAMLManager.get_instance()
 
@@ -16,7 +18,7 @@ try:
 except:
     proxy = None
 if not proxy:
-    proxy = None
+    proxy=None
 
 proxies = {
     "http://": proxy,
@@ -27,11 +29,12 @@ pyproxies = {  # pytubefix代理
     "https": proxy
 }
 
-ASMR_channels = yaml_manager.resource_collector.config["asmr"]["channels"]
-
-logger = get_logger()
 
 
+
+ASMR_channels =yaml_manager.resource_collector.config["asmr"]["channels"]
+
+logger=get_logger()
 async def ASMR_today():
     global ASMR_channels  # ASMR频道列表
     global pushed_videos  # 已推送ASMR列表
@@ -73,10 +76,11 @@ def ASMR_random():
 def get_audio(video_id):
     url = f"https://www.youtube.com/watch?v={video_id}"
     #
-    yt = YouTube(url=url, client='IOS', proxies=pyproxies, use_oauth=True, allow_oauth_cache=True)
+    yt = YouTube(url=url, client='IOS', proxies=pyproxies,use_oauth=True, allow_oauth_cache=True)
 
     ys = yt.streams.get_audio_only()
     ys.download(output_path="data/voice/cache/", filename=f"{video_id}.mp3")
+
 
     return f"data/voice/cache/{video_id}.mp3"
 
@@ -110,6 +114,8 @@ async def get_img(video_id):
     with open(path, 'wb') as f:
         f.write(response.content)
     return path
+
+
 
 
 '''athor, title, video_id, length = asyncio.run(ASMR_random())

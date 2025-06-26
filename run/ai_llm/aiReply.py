@@ -8,7 +8,7 @@ from framework_common.database_util.Group import clear_group_messages
 from framework_common.database_util.Group import get_group_messages
 from framework_common.database_util.User import get_user, update_user
 from framework_common.database_util.llmDB import delete_user_history, clear_all_history, change_folder_chara, \
-    get_folder_chara, set_all_users_chara, delete_latest2_history
+    get_folder_chara, set_all_users_chara, clear_all_users_chara, clear_user_chara, delete_latest2_history
 from framework_common.framework_util.func_map_loader import gemini_func_map, openai_func_map
 from run.ai_llm.service.aiReplyCore import aiReplyCore, end_chat, judge_trigger, send_text, count_tokens_approximate
 from run.ai_llm.service.auto_talk import check_message_similarity
@@ -28,6 +28,7 @@ def main(bot, config):
         if config.ai_llm.config["llm"]["model"] == "gemini":
             if tools is None:
                 tools = [
+
                     {"googleSearch": {}},
                 ]
             else:
@@ -44,15 +45,16 @@ def main(bot, config):
                     tools
                 ]
 
+    global user_state
     user_state = {}
 
     @bot.on(GroupMessageEvent)
     async def aiReply(event: GroupMessageEvent):
         await check_commands(event)
         if (event.message_chain.has(At) and event.message_chain.get(At)[0].qq == bot.id
-                or prefix_check(str(event.pure_text), config.ai_llm.config["llm"]["prefix"])  # 前缀判断
+                or prefix_check(str(event.pure_text), config.ai_llm.config["llm"]["prefix"])  #前缀判断
                 or await judge_trigger(event.processed_message, event.user_id, config, tools=tools, bot=bot,
-                                       event=event)):  # 触发cd判断
+                                       event=event)):  #触发cd判断
             bot.logger.info(f"接受消息{event.processed_message}")
 
             ## 权限判断
@@ -61,7 +63,7 @@ def main(bot, config):
                 await bot.send(event, "你没有足够的权限使用该功能~")
                 return
             if event.group_id == 913122269 and not user_info.permission >= 66:
-                # await bot.send(event,"你没有足够的权限使用该功能哦~")
+                #await bot.send(event,"你没有足够的权限使用该功能哦~")
                 return
             if not user_info.permission >= config.ai_llm.config["core"]["ai_token_limt"]:
                 if user_info.ai_token_record >= config.ai_llm.config["core"]["ai_token_limt_token"]:
@@ -109,7 +111,7 @@ def main(bot, config):
                 await handle_message(event)
 
     async def handle_message(event):
-        nonlocal user_state
+        global user_state
         # 锁机制
         uid = event.user_id
         user_info = await get_user(event.user_id)
@@ -158,22 +160,21 @@ def main(bot, config):
                     bot.logger.exception(f"用户 {uid} 处理出错: {e}")
                 finally:
                     user_state[uid]["queue"].task_done()
-                    # print(user_state[uid]["queue"])
+                    #print(user_state[uid]["queue"])
                     """
                     总结用户特征，伪长期记忆人格
                     """
                     if config.ai_llm.config["llm"]["长期记忆"]:
                         if user_info.portrait_update_time == "" or (
                                 datetime.datetime.now() - datetime.datetime.fromisoformat(
-                            user_info.portrait_update_time)).total_seconds() > config.ai_llm.config["llm"][
+                                user_info.portrait_update_time)).total_seconds() > config.ai_llm.config["llm"][
                             "记忆更新间隔"]:
                             bot.logger.info(f"更新用户 {event.user_id} 设定")
                             reply_message = await aiReplyCore(
                                 [{
-                                    'text': 'system: 对以上聊天内容做出总结，描绘出当前对话的用户画像，总结出当前用户的人物性格特征以及偏好。不要回复，直接给出结果'}],
+                                     'text': 'system: 对以上聊天内容做出总结，描绘出当前对话的用户画像，总结出当前用户的人物性格特征以及偏好。不要回复，直接给出结果'}],
                                 current_event.user_id,
                                 config,
-                                system_instruction="请总结上下文",
                                 bot=bot,
                                 event=current_event,
                             )
@@ -214,7 +215,7 @@ def main(bot, config):
             "ai_change_character"]:
             chara_file = str(event.pure_text).replace("/切人设 ", "")
             if chara_file == "0":
-                reply = await change_folder_chara(config.ai_llm.config["llm"]["chara_file_name"], event.user_id)
+                reply = await clear_user_chara(event.user_id)
             else:
                 reply = await change_folder_chara(chara_file, event.user_id)
             await bot.send(event, reply, True)
@@ -222,7 +223,7 @@ def main(bot, config):
             "id"]:
             chara_file = str(event.pure_text).replace("/全切人设 ", "")
             if chara_file == "0":
-                reply = await set_all_users_chara(config.ai_llm.config["llm"]["chara_file_name"])
+                reply = await clear_all_users_chara()
             else:
                 reply = await set_all_users_chara(chara_file)
             await bot.send(event, reply, True)
@@ -249,6 +250,7 @@ def main(bot, config):
             await clear_all_history()
             await bot.send(event, "已清理所有用户的对话记录")
         else:
+
             bot.logger.info(f"私聊接受消息{event.processed_message}")
             user_info = await get_user(event.user_id, event.sender.nickname)
             if not user_info.permission >= config.ai_llm.config["core"]["ai_reply_private"]:

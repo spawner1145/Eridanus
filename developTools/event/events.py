@@ -2,7 +2,7 @@
 from typing import Literal, Optional, Dict, Union, List, Any
 
 from pydantic import BaseModel, ConfigDict
-from pydantic.v1 import validator
+from pydantic.v1 import root_validator, validator
 
 from developTools.event.base import EventBase
 from developTools.message.message_chain import MessageChain
@@ -68,15 +68,12 @@ class Status(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-
 class LifecycleMetaEvent(BaseModel):
     time: int
     sender: int
     post_type: str
     meta_event_type: str
     sub_type: str
-
-
 # Message Events
 class MessageEvent(BaseModel):
     """消息事件"""
@@ -96,10 +93,11 @@ class MessageEvent(BaseModel):
 
     processed_message: List[Dict[str, Union[str, Dict]]] = []
 
-    message_chain: MessageChain = []
+    message_chain: MessageChain=[]
     pure_text: str = ""
 
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+    model_config = ConfigDict(extra="allow",arbitrary_types_allowed=True)
+
 
     @property
     def raw_message(self):
@@ -108,7 +106,7 @@ class MessageEvent(BaseModel):
     @raw_message.setter
     def raw_message(self, value: str):
         self._raw_message = value
-        if not value:
+        if value == "":
             self.processed_message = parse_message_2processed_message(self.message)
         else:
             self.processed_message = parse_message_with_cq_codes_to_list(value)
@@ -118,13 +116,12 @@ class MessageEvent(BaseModel):
         super().__init__(**kwargs)
         # 如果 raw_message 在初始化时已经赋值，确保 processed_message 被设置
         if hasattr(self, 'raw_message'):
-            if not self.raw_message:
+            if self.raw_message == "":
                 self.processed_message = parse_message_2processed_message(self.message)
             else:
                 self.processed_message = parse_message_with_cq_codes_to_list(self.raw_message)
-        self.message_chain = MessageChain(self.message)
-        self.pure_text = self.message_chain.fetch_text()
-
+        self.message_chain=MessageChain(self.message)
+        self.pure_text=self.message_chain.fetch_text()
     def get(self, message_type: str):
         """
         按指定类型获取 processed_message 中的消息。
@@ -133,10 +130,9 @@ class MessageEvent(BaseModel):
         :return: 包含该类型消息的列表，或者 None（如果没有该类型的消息）。
         """
         result = [msg[message_type] for msg in self.processed_message if message_type in msg]
-        if result and message_type == "image" and "url" not in result[0]:
-            result[0]["url"] = result[0]["file"]
+        if result and message_type=="image" and "url" not in result[0]:
+            result[0]["url"]=result[0]["file"]
         return result if result else None
-
 
 class PrivateMessageEvent(MessageEvent):
     """私聊消息"""
@@ -239,8 +235,8 @@ class NotifyEvent(NoticeEvent):
 
     notice_type: Literal["notify"]
     sub_type: str
-    user_id: int = None
-    group_id: int = None
+    user_id: int=None
+    group_id: int=None
 
 
 class PokeNotifyEvent(NotifyEvent):
@@ -249,7 +245,7 @@ class PokeNotifyEvent(NotifyEvent):
     sub_type: Literal["poke"]
     target_id: int
     group_id: Optional[int] = None
-    raw_info: list = None
+    raw_info: list =None
 
 
 class LuckyKingNotifyEvent(NotifyEvent):
@@ -258,14 +254,11 @@ class LuckyKingNotifyEvent(NotifyEvent):
     sub_type: Literal["lucky_king"]
     target_id: int
 
-
 class ProfileLikeEvent(NotifyEvent):
     sub_type: Literal["profile_like"]
     operator_id: int
     operator_nick: str
     times: int
-
-
 class HonorNotifyEvent(NotifyEvent):
     """群荣誉变更提醒事件"""
 
@@ -314,8 +307,6 @@ class LifecycleMetaEvent(MetaEvent):
 
     meta_event_type: Literal["lifecycle"]
     sub_type: str
-
-
 class startUpMetaEvent(MetaEvent):
     meta_event_type: Literal["startUp"]
 

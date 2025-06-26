@@ -1,3 +1,4 @@
+
 import asyncio
 import os.path
 from io import BytesIO
@@ -8,13 +9,13 @@ from PIL import Image
 
 
 async def stageStrategy(aim):
-    url = f"https://arona.diyigemt.com/api/v2/image?method=3&name={aim}"
-    path = f"data/pictures/blueArchive/arona/{aim}.png"
+    url = "https://arona.diyigemt.com/api/v2/image?method=3&name=" + aim
+    path = "data/pictures/blueArchive/arona/" + aim + ".png"
     with open("data/pictures/blueArchive/hash.yaml", 'r', encoding='utf-8') as f:
         result = yaml.load(f.read(), Loader=yaml.FullLoader)
 
-    async with httpx.AsyncClient(timeout=100) as client:  # 100s超时
-        r = await client.get(url)  # 发起请求
+    async with httpx.AsyncClient(timeout=100) as client:  #100s超时
+        r = await client.get(url)  #发起请求
         r = r.json()
         url2 = "https://arona.cdn.diyigemt.com/image" + r.get("data")[0].get("content")
         if os.path.exists(path):

@@ -9,7 +9,7 @@ from developTools.message.message_components import MessageComponent, Text, Repl
 from developTools.utils.logger import get_logger
 
 
-class HttpMailman:
+class http_mailman:
     def __init__(self, http_server, access_token=""):
         self.http_server = http_server
         self.logger = get_logger()
@@ -17,9 +17,9 @@ class HttpMailman:
             "Authorization": f"Bearer {access_token}"
         }
         try:
-            self.get_login_info()
+            self.info = self.get_login_info()
         except:
-            pass
+            self.info = None
 
     async def get_status(self):
         """

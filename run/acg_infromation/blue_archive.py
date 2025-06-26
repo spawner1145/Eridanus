@@ -5,13 +5,18 @@ import httpx
 import yaml
 
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
-from developTools.message.message_components import Image, Text
+from developTools.message.message_components import Image,Text
 from run.acg_infromation.service.arona_api import stageStrategy
 
 
+
+
+
+
 def main(bot, config):
-    logger = bot.logger
-    activated = False
+    logger=bot.logger
+    activated=False
+
 
     @bot.on(GroupMessageEvent)
     async def selectMission(event: GroupMessageEvent):
@@ -41,7 +46,7 @@ def main(bot, config):
                     for ia in result9.get(i).get("hash"):
                         logger.info_func("检查" + ia + "更新")
                         await sleep(25)
-                        url1 = f"https://arona.diyigemt.com/api/v2/image?name={ia}"
+                        url1 = "https://arona.diyigemt.com/api/v2/image?name=" + ia
                         async with httpx.AsyncClient(timeout=100) as client:  # 100s超时
                             try:
                                 r = await client.get(url1)  # 发起请求
@@ -65,7 +70,7 @@ def main(bot, config):
                             result9[i]["hash"][ia] = str(newHash)
                             with open('data/pictures/blueArchive/aronaSub.yaml', 'w', encoding="utf-8") as file:
                                 yaml.dump(result9, file, allow_unicode=True)
-            await sleep(600)  # 600秒更新一次
+            await sleep(600)  #600秒更新一次
 
     @bot.on(GroupMessageEvent)
     async def addSUBgroup(event: GroupMessageEvent):
@@ -84,7 +89,7 @@ def main(bot, config):
         with open("data/pictures/blueArchive/aronaSub.yaml", 'r', encoding='utf-8') as f:
             result9 = yaml.load(f.read(), Loader=yaml.FullLoader)
             bsg = result9.get(a).get("groups")
-
+            
             if event.group_id in bsg:
                 await bot.send(event, "本群已订阅过")
                 return
@@ -101,14 +106,14 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)
     async def aronad(event):
-        if event.pure_text in ["/arona", "/攻略"]:
+        if event.pure_text == "/arona" or event.pure_text == "/攻略":
             url = "杂图"
             logger.info_func("查询攻略：" + url)
             try:
                 p = await stageStrategy(url)
                 await bot.send(event, [
-                    "根据图中列出的项目，发送/arona 项目 即可查询，不需要艾特\n示例如下：\n/arona 国服人权\n/arona H11-2",
-                    Image(file=p)])
+                "根据图中列出的项目，发送/arona 项目 即可查询，不需要艾特\n示例如下：\n/arona 国服人权\n/arona H11-2",
+                Image(file=p)])
             except:
                 logger.error("无效的角色或网络连接错误")
                 await bot.send(event, "无效的角色 或网络连接出错")

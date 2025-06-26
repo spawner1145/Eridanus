@@ -94,7 +94,7 @@ def find_plugins(plugin_dir=PLUGIN_DIR):
                     yield plugin_name, module_name, module
                     num_plugin += 1
                 else:
-                    if plugin_name != "func_collection" and "service" not in module_name:
+                    if plugin_name != "func_collection" and f"service" not in module_name:
                         bot1.logger.warning(
                             f"⚠️ The plugin `{module_path} {plugin_name}` does not have a main() method. If this plugin is a function collection, please ignore this warning.")
 
@@ -156,8 +156,8 @@ def webui_bot():
     bot2_thread = threading.Thread(target=run_bot2, daemon=True)
     bot2_thread.start()
 
-if __name__ == '__main__':
-    if config.common_config.basic_config["webui"]["enable"]:
-        webui_bot()
-    load_plugins(bot1, config)
-    bot1.run()
+
+if config.common_config.basic_config["webui"]["enable"]:
+    webui_bot()
+load_plugins(bot1, config)
+bot1.run()

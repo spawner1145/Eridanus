@@ -1,13 +1,13 @@
 import asyncio
-import sys
 import threading
 from asyncio import sleep
 from concurrent.futures import ThreadPoolExecutor
-
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Image
 from run.streaming_media.service.Link_parsing.Link_parsing import link_prising
 from run.streaming_media.service.bilibili.bili import fetch_latest_dynamic_id, fetch_dynamic
+import sys
+
 from run.system_plugin.func_collection import operate_group_push_tasks
 
 if sys.platform == "win32":
@@ -83,11 +83,12 @@ def main(bot, config):
 
 
 def bili_main(bot, config):
+    global bili_activate
     bili_activate = False
 
     @bot.on(LifecycleMetaEvent)
     async def _(event):
-        nonlocal bili_activate
+        global bili_activate
         if not bili_activate:
             bili_activate = True
             loop = asyncio.get_running_loop()
