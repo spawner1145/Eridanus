@@ -1,14 +1,15 @@
 import asyncio
-from typing import Type
+import json
+from typing import Type, Union
 
-import uvicorn
 from fastapi import FastAPI, Request
+import uvicorn
 
 from developTools.event.base import EventBase
 from developTools.event.eventFactory import EventFactory
-from developTools.interface.http_sendMes import HttpMailman
-from developTools.utils.logger import get_logger
+from developTools.interface.http_sendMes import http_mailman
 
+from developTools.utils.logger import get_logger
 
 class EventBus:
     def __init__(self) -> None:
@@ -34,7 +35,7 @@ class EventBus:
             pass
             #print(f"未找到处理 {event_type} 的监听器")
 
-class HTTPBot(HttpMailman):
+class HTTPBot(http_mailman):
     def __init__(self,http_sever,access_token="",host="0.0.0.0",port=8000):
         super().__init__(http_sever,access_token)
         self.logger = get_logger()
