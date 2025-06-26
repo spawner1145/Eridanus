@@ -1,13 +1,11 @@
-import asyncio
-import io
-import os
-from concurrent.futures import ThreadPoolExecutor
-
-import aiofiles  # 添加 aiofiles 导入
-import numpy as np
 from PIL import Image, ImageSequence  # 添加 ImageSequence
-
-
+from concurrent.futures import ThreadPoolExecutor
+import os
+import numpy as np
+import asyncio
+import tempfile  # 添加 tempfile 导入
+import aiofiles  # 添加 aiofiles 导入
+import io
 # ...existing code...
 
 # 移除 imageio 的导入

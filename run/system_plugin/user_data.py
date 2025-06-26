@@ -138,13 +138,10 @@ def main(bot, config):
             if match:  # f
                 target_qq = match.group(1)
                 if '用户' in event.raw_message:
-                    level = 1
+                    await call_permit(bot, event, config, target_qq, 1)
                 elif '贡献者' in event.raw_message:
-                    level = 2
+                    await call_permit(bot, event, config, target_qq, 2)
                 elif '信任' in event.raw_message:
-                    level = 3
+                    await call_permit(bot, event, config, target_qq, 3)
                 elif '管理员' in event.raw_message:
-                    level = 10
-                else:
-                    return None
-                await call_permit(bot, event, config, target_qq, level)
+                    await call_permit(bot, event, config, target_qq, 10)

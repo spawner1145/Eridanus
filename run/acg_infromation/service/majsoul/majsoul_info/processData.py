@@ -205,7 +205,7 @@ def judgeRoom(room_level):
 
 
 def removeNull(data):
-    if data is None:
+    if data == None:
         return "0"
     else:
         return data

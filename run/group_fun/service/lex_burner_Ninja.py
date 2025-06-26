@@ -1,6 +1,7 @@
 import asyncio
-
 import httpx
+from bs4 import BeautifulSoup
+import re
 
 
 class Lexburner_Ninja:

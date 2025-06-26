@@ -1,11 +1,11 @@
-import base64
-
 import httpx
+import ruamel.yaml
+import base64
 
 from framework_common.framework_util.yamlLoader import YAMLManager
 
 same_manager = YAMLManager.get_instance()
-# print(same_manager.ai_generated_art.config,type(same_manager.ai_generated_art.config))
+#print(same_manager.ai_generated_art.config,type(same_manager.ai_generated_art.config))
 aiDrawController = same_manager.ai_generated_art.config.get("ai绘画")
 tag_model = aiDrawController.get("反推和审核使用模型") if aiDrawController else "wd14-vit-v2-git"
 
@@ -15,7 +15,6 @@ tag_model = aiDrawController.get("反推和审核使用模型") if aiDrawControl
 前提是你安装的插件是spawner1145的https://github.com/spawner1145/stable-diffusion-webui-wd14-tagger.git
 否则只能使用'wd14-vit-v2-git'
 '''
-
 
 def parse_custom_url_auth(input_string: str):
     parts = input_string.split(' ', 1)
@@ -31,13 +30,12 @@ def parse_custom_url_auth(input_string: str):
 
     return clean_url, auth_header
 
-
 async def pic_audit_standalone(
         img_base64,
         is_return_tags=False,
         audit=False,
         return_none=False,
-        url="http://server.20020026.xyz:7865"
+        url = "http://server.20020026.xyz:7865"
 ):
     url, auth_header = parse_custom_url_auth(url)
 
@@ -46,19 +44,19 @@ async def pic_audit_standalone(
         "Accept": "application/json",
         "Authorization": auth_header
     }
-
+    
     async def get_caption(payload):
         async with httpx.AsyncClient(timeout=1000) as client:
             try:
                 response = await client.post(
-                    url=f"{url}/tagger/v1/interrogate",  # http://server.20020026.xyz:7865
+                    url=f"{url}/tagger/v1/interrogate",# http://server.20020026.xyz:7865
                     json=payload,
                     headers=headers
                 )
                 response.raise_for_status()  # 抛出异常，如果请求失败
                 return response.json()
             except httpx.HTTPStatusError as e:
-                print(f"API失败，错误信息: {e.response.status_code}, {e.response.text}")
+                print(f"API失败，错误信息: {e.response.status_code}, {await e.response.text()}")
                 return None
 
     payload = {"image": img_base64, "model": tag_model, "threshold": 0.35}
@@ -84,8 +82,8 @@ async def pic_audit_standalone(
     value = list(to_user_dict.values())
     value.sort(reverse=True)
     reverse_dict = {v: k for k, v in to_user_dict.items()}
-    message += f"最终结果为:{reverse_dict[value[0]].rjust(5)}"
-
+    message += (f"最终结果为:{reverse_dict[value[0]].rjust(5)}")
+    
     keys = list(tags.keys())
     tags_str = ",".join(keys)
     tags_str = tags_str.replace("general,sensitive,questionable,explicit,", "")
@@ -94,8 +92,8 @@ async def pic_audit_standalone(
         value = list(possibilities.values())
         value.sort(reverse=True)
         reverse_dict = {v: k for k, v in possibilities.items()}
-        # logger.info(message)
-        return reverse_dict[value[0]] == "questionable" or reverse_dict[value[0]] == "explicit"
+        #logger.info(message)
+        return True if reverse_dict[value[0]] == "questionable" or reverse_dict[value[0]] == "explicit" else False
 
     if is_return_tags:
         return message, tags, tags_str

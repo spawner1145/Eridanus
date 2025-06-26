@@ -1,3 +1,5 @@
+import os
+
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Text, Node, File, Image
 from framework_common.database_util.User import get_user

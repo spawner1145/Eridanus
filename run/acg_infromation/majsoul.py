@@ -54,7 +54,7 @@ def main(bot, config):
         list_record_personal_info = ['战绩', '记录', '历史记录', '历史']
 
         check_flag = False
-        if not check_flag:
+        if check_flag is False:
             for check_personal_info in list_check_personal_info:
                 if context.startswith(check_personal_info):
                     check_flag = 0
