@@ -1,11 +1,12 @@
+
 # -*- coding: utf-8 -*-
 
 import datetime
 import os
 import random
+import requests
 import time
 
-import requests
 from cffi.backend_ctypes import unicode
 
 USER_INFO = [
@@ -139,3 +140,4 @@ if __name__ == "__main__":
             user["profile_name"] if "profile_name" in user else None,
         )
         time.sleep(3)
+

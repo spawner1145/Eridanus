@@ -1,12 +1,12 @@
-plugin_description = "资源搜集(r18)"
+plugin_description="资源搜集(r18)"
 dynamic_imports = {
     "run.resource_collector.resource_search": [
-        "search_book_info", "call_asmr", "call_download_book", "call_jm"
+        "search_book_info", "call_asmr", "call_download_book","call_jm"
     ],
     "run.resource_collector.engine_search": ["search_net", "read_html"],
     "run.resource_collector.func_collection": ["iwara_search", "iwara_tendency"],
 }
-function_declarations = [
+function_declarations=[
     {
         "name": "call_jm",
         "description": "jmcomic漫画查询、预览、下载。“验车”是预览的另一种称呼",
@@ -14,8 +14,7 @@ function_declarations = [
             "type": "object",
             "properties": {
                 "mode": {
-                    "type": "string", "enum": ["preview", "download", "search"],
-                    "description": "预览和下载需要comic_id，搜索需要query_target"
+                    "type": "string", "enum": ["preview","download","search"],"description": "预览和下载需要comic_id，搜索需要query_target"
                 },
                 "comic_id": {
                     "type": "integer",
@@ -32,21 +31,21 @@ function_declarations = [
         }
     },
     {
-        "name": "search_book_info",
-        "description": "search book information by book_name or author_name",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "info": {
-                    "type": "string",
-                    "description": "book_name or author_name"
+                "name": "search_book_info",
+                "description": "search book information by book_name or author_name",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "info": {
+                            "type": "string",
+                            "description": "book_name or author_name"
+                        }
+                    },
+                    "required": [
+                        "info"
+                    ]
                 }
             },
-            "required": [
-                "info"
-            ]
-        }
-    },
     {
         "name": "call_asmr",
         "description": "向用户发送asmr助眠音频。",
