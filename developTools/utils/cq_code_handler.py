@@ -1,13 +1,9 @@
-import html
 import re
-from typing import Generator
-
+import html
+from typing import List, Dict, Union
 
 # 定义通用解析 CQ 码的函数
-def parse_message_with_cq_codes_to_list(message: str) -> Generator:
-    """
-    对于已经在很多地方应用了的sdk，不要随便动。Generator会出现报错导致无法启动。
-    """
+def parse_message_with_cq_codes_to_list(message: str) -> List[Dict[str, Union[str, Dict]]]:
     cq_pattern = r'\[CQ:(\w+),(.*?)\]'
     parsed_result = []
     last_end = 0
@@ -39,13 +35,15 @@ def parse_message_with_cq_codes_to_list(message: str) -> Generator:
             "text": unescape_cq_value(message[last_end:])
         })
 
+    result = []
     for item in parsed_result:
         if item['type'] == "text":
-            yield {"text": item["text"]}
+            result.append({"text": item["text"]})
         else:
             cq_type = item['type']
-            yield {cq_type: item}
+            result.append({cq_type: item})
 
+    return result
 
 def unescape_cq_value(text: str) -> str:
     """反转义 CQ 码中的 &, [, ] 和 ,"""
@@ -53,10 +51,12 @@ def unescape_cq_value(text: str) -> str:
     text = text.replace("]", "]")
     text = text.replace(",", ",")
     return html.unescape(text)
-def parse_message_2processed_message(message: dict) -> Generator:
+def parse_message_2processed_message(message: dict) -> List[Dict[str, Union[str, Dict]]]:
+    result = []
     for item in message:
         type = item["type"]
         if type == "text":
-            yield {"text": item["data"]["text"]}
+            result.append({"text": item["data"]["text"]})
         else:
-            yield {type: item["data"]}
+            result.append({type: item["data"]})
+    return result
