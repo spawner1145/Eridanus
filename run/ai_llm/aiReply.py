@@ -175,6 +175,7 @@ def main(bot, config):
                                      'text': 'system: 对以上聊天内容做出总结，描绘出当前对话的用户画像，总结出当前用户的人物性格特征以及偏好。不要回复，直接给出结果'}],
                                 current_event.user_id,
                                 config,
+                                system_instruction="请总结上下文",
                                 bot=bot,
                                 event=current_event,
                             )
@@ -215,7 +216,7 @@ def main(bot, config):
             "ai_change_character"]:
             chara_file = str(event.pure_text).replace("/切人设 ", "")
             if chara_file == "0":
-                reply = await clear_user_chara(event.user_id)
+                reply = await change_folder_chara(config.ai_llm.config["llm"]["chara_file_name"], event.user_id)
             else:
                 reply = await change_folder_chara(chara_file, event.user_id)
             await bot.send(event, reply, True)
@@ -223,7 +224,7 @@ def main(bot, config):
             "id"]:
             chara_file = str(event.pure_text).replace("/全切人设 ", "")
             if chara_file == "0":
-                reply = await clear_all_users_chara()
+                reply = await set_all_users_chara(config.ai_llm.config["llm"]["chara_file_name"])
             else:
                 reply = await set_all_users_chara(chara_file)
             await bot.send(event, reply, True)

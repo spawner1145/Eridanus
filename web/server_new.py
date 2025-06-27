@@ -4,29 +4,33 @@ import functools
 import importlib
 import json
 import logging
+import os
+import shutil
 import sys
+import time
 from io import StringIO
-from datetime import datetime
+
+from cryptography.fernet import Fernet
 from flask import Flask, request, jsonify, make_response, send_file, send_from_directory
 from flask_cors import CORS
-from cryptography.fernet import Fernet
 from ruamel.yaml import YAML, comments
-import os
-import time
 from ruamel.yaml.scalarint import ScalarInt
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString, SingleQuotedScalarString
-import shutil
-import colorlog
+import traceback
+
+from run.acg_infromation.service.majsoul.majsoul_info.processData import convertTime
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from developTools.utils.logger import get_logger
-from utils import install_and_import
+from framework_common.utils.install_and_import import install_and_import
 from userdb_query import get_users_range, get_users_count, search_users_by_id, get_user_signed_days
+from chatdb_manage import get_msg, update_msg, delete_specified_msg, delete_all_msg, get_file_storage, update_file_storage
 
 flask_sock = install_and_import("flask_sock")
 from flask_sock import Sock
 
 psutil = install_and_import("psutil")
+httpx = install_and_import("httpx")
 
 # 全局变量，用于存储 logger 实例和屏蔽的日志类别
 _logger = None
@@ -37,7 +41,7 @@ app.json.sort_keys = False  # 不要对json排序
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)  # 只显示 ERROR 级别及以上的日志（隐藏 INFO 和 DEBUG）
-logger = get_logger()
+logger = get_logger(blocked_loggers=["DEBUG", "INFO_MSG"])
 
 CORS(app, supports_credentials=True)  # 启用跨域支持
 sock = Sock(app)  # 初始化Flask sock
@@ -60,8 +64,14 @@ user_info = {
     "groups": 0,
 }
 
+# ip白名单，白名单不需要登录，便于不看文档的用户和远程开发调试使用
+ip_whitelist = ["127.0.0.1","192.168.195.128","192.168.195.137"]
+
+# 合法的消息事件，其余不储存进数据库。
+valid_message_actions = ['send_group_forward_msg','send_group_msg','upload_group_file']
+
 # 用户信息文件
-user_file = "../user_info.yaml"
+user_file = "./user_info.yaml"
 
 # 会话信息字典（token跟expires）
 auth_info = {}
@@ -260,11 +270,13 @@ def save_yaml(file_path, data):
     # logger.server(f"数据: {data}")
     return conflict_file_dealer(data["data"], file_path)
 
-
 # 鉴权
 def auth(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        #白名单直接放行
+        if request.remote_addr in ip_whitelist:
+            return func(*args, **kwargs)
         global auth_info
         recv_token = request.cookies.get('auth_token')
         try:
@@ -273,7 +285,6 @@ def auth(func):
         except:  # 不存在token
             return jsonify({"error": "Unauthorized"})
         return func(*args, **kwargs)
-
     return wrapper
 
 
@@ -310,7 +321,7 @@ def save_file(filename):
         return jsonify({"error": "无效数据"})
 
     result = save_yaml(file_path, data)
-    if result is True:
+    if result:
         return jsonify({"message": "文件保存成功"})
     else:
         return jsonify(result)
@@ -510,75 +521,133 @@ def basic_info():
 
 # API外的路由（404）完全交给React前端处理,根路由都不用了
 @app.errorhandler(404)
-def not_found(e):
+def index(e):
     return send_from_directory(app.static_folder, 'index.html')
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # 普通运行环境
 
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "websources", "uploads")
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "chat_files")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # 确保目录存在
+ALLOWED_EXTENSIONS = {'gif', 'png', 'jpg', 'jpeg', 'bmp', 'webp', 'tif', 'tiff' , 'heif', 'ico' , 'heic' , 'svg' , 'avif' , 'jfif'}
+def allowed_file(filename):
+    return '.' in filename and \
+        filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def gen_file_name(filename):
+    """
+    如果文件存在，加后缀重命名。
+    """
+    i = 1
+    print(filename)
+    while os.path.exists(os.path.join(UPLOAD_FOLDER, filename)):
+        name, extension = os.path.splitext(filename)
+        name = str(name).rstrip(f"_{i-1}")
+        filename = '%s_%s%s' % (name, str(i), extension)
+        i += 1
+    print(filename)
+    return filename
 
-@app.route("/api/move_file", methods=["POST"])
+#上传文件
+@app.route("/api/chat/uploadFile", methods=["POST"])
 @auth
-def move_file():
-    """移动本地文件到可访问目录，并返回 URL"""
-    data = request.json
-    file_path = data.get("path")
+def upload_file():
+    if request.method == 'POST':
+        files = request.files['file']
 
-    if not file_path:
-        return jsonify({"error": "Missing file path"})
+        if files:
+            filename = gen_file_name(files.filename)
+            mime_type = files.content_type
 
-    if file_path.startswith("file://"):
-        file_path = file_path[7:]  # 去掉 "file://"
+            if not allowed_file(files.filename):
+                return jsonify({"files": [{"error": "不支持的文件格式"}]})
+            else:
+                # save file to disk
+                uploaded_file_path = os.path.join(UPLOAD_FOLDER, filename)
+                files.save(uploaded_file_path)
 
-    if not os.path.exists(file_path):
-        return jsonify({"error": "File not found"})
+                # size = os.path.getsize(uploaded_file_path)
 
-    try:
-        # 确保文件不会覆盖已有文件
-        filename = os.path.basename(file_path)
-        dest_path = os.path.join(UPLOAD_FOLDER, filename)
-
-        logger.server(f"目标路径: {dest_path} 原始路径: {file_path}")
-        shutil.move(file_path, dest_path)  # 移动文件
-
-        # 生成可访问的 URL
-        relative_path = os.path.relpath(dest_path, app.static_folder)  # 计算相对路径
-        file_url = f"/{relative_path}"  # Flask 已去掉 static_url_path，所以直接返回相对路径
-        return jsonify({"url": file_url})
-
-    except Exception as e:
-        return jsonify({"error": str(e)})
+            return jsonify({"files": [{
+                        "name": filename,
+                        "type": mime_type,
+                        # "size": size,
+                        "path": "file://"+uploaded_file_path}]})
 
 
-#
-# 考虑到webui对话需要保存聊天记录，但是媒体文件不能保存到浏览器缓存，以后参考上面移动文件到目录下的操作，所有聊天文件通过webUI的一个文件管理器管理(todo)
 
+# webui对话需要保存聊天记录，从缓存文件夹移动文件到聊天文件文件夹(done)；聊天文件可以通过webUI的文件管理器管理(todo)
 @app.route("/api/chat/file", methods=["GET"])
 @auth
 def get_file():
-    # data = request.json
-    file_path = request.args.get("path")
-
-    if not file_path:
-        return jsonify({"error": "缺少文件路径"})
-
-    if file_path.startswith("file://"):
-        file_path = file_path[7:]  # 去掉 "file://"
-
-    if not os.path.exists(file_path):
-        return jsonify({"error": "文件不存在"})
-
     try:
-        return send_file(file_path)
+        origin_file_path = request.args.get("path")
+        if origin_file_path.startswith("file://"):
+            # 查询数据库有没有存入文件
+            file_name = asyncio.run(get_file_storage(origin_file_path))
+            # 若有
+            if file_name:
+                return send_file(os.path.join(UPLOAD_FOLDER, file_name))
+            else :
+                file_path = origin_file_path[7:]  # 去掉 "file://"
+            # 从指定目录移动文件
+                file_name = os.path.basename(file_path)
+                dest_path = os.path.join(UPLOAD_FOLDER, file_name)
+            # logger.server(f"目标路径: {dest_path} 原始路径: {file_path}")
+                if file_path != dest_path:
+                    dest_path = os.path.join(UPLOAD_FOLDER, gen_file_name(file_name))
+                    shutil.move(file_path, dest_path)  # 移动文件
+            # 储存文件信息到键值对
+                asyncio.run(update_file_storage(origin_file_path,file_name))
+            # 返回文件
+                return send_file(os.path.join(UPLOAD_FOLDER, file_name))
     except Exception as e:
-        return jsonify({"error": str(e)})
+        return jsonify({"error":str(e)})
 
+# 获取音乐卡片，如果能解决前端请求不发options就不用这个。
+@app.route("/api/chat/music", methods=["POST"])
+@auth
+def get_music():
+    try:
+        response = httpx.post(
+            "https://ss.xingzhige.com/music_card/card",
+            json = request.json
+        )
+        # 解析返回的JSON数据
+        result = response.json()
+        music_data = result['meta']['music']
+        return jsonify(music_data)
+    except Exception as e:
+        return jsonify({"error": f"请求时出错: {str(e)}"})
+
+# 获取聊天历史记录
+@app.route("/api/chat/get_history", methods=["GET"])
+@auth
+def get_history():
+    try:
+        start = int(request.args.get("start"))
+        end = int(request.args.get("end"))
+        result = asyncio.run(get_msg(start,end))
+        return jsonify({"data": result})
+    except Exception as e:
+        return jsonify({"error":e})
+
+# 删除历史聊天记录
+@app.route("/api/chat/del_history", methods=["POST","GET"])
+@auth
+def del_history():
+    try:
+        # 带msg_id就是删除特定id聊天记录。应当返回一个数组。不该用args，要换成json。多选bubble还没有实现，等antd x更新(todo)
+        msg_id = request.args.get("msg_id")
+        if msg_id:
+            asyncio.run(delete_specified_msg(msg_id))
+        else:
+            asyncio.run(delete_all_msg())
+        return jsonify({"message": "删除成功"})
+    except Exception as e:
+        return jsonify({"error":e})
 
 clients = set()
-
 
 # WebSocket路由
 @sock.route('/api/ws')
@@ -589,7 +658,7 @@ def handle_websocket(ws):
     try:
         # 对非本地的访问鉴权
         try:
-            if request.remote_addr != "127.0.0.1":
+            if request.remote_addr not in ip_whitelist:
                 recv_token = request.args.get('auth_token')
                 if auth_info[recv_token] > int(time.time()):
                     logger.server("WebSocket 客户端鉴权成功")
@@ -612,22 +681,33 @@ def handle_websocket(ws):
                     except Exception:
                         clients.discard(client)
                         # 获取前端消息的id
-            time_now = int(time.time())
-
-            # 是否@，有些指令不能用@
-            # isat = message[0]["isat"] if "id" in message[0] else True
-            # 删除消息中的id和isat字段
-            # 删除消息中的id和isat字段
-            if "id" in message:
-                message_id = message["id"]
-                isat = message["isat"]
-                del message["isat"]
-                del message["id"]
-                message = [message]
-                if isat:
-                    message.insert(0, {'type': 'at', 'data': {'qq': '1000000', 'name': 'Eridanus'}})
-            else:
+            # 毫秒时间戳
+            time_now = int(time.time() * 1000)
+            message_id = time_now
+            is_update = False
+            # 前端渲染气泡用。end是用户，start是机器人
+            role = 'end'
+            # 如果是webui发来的信息（一个列表），提取里面的消息id（发送时间戳）
+            if isinstance(message,list):
+                is_update = True
+                message_id = message[0]["msg_id"]
+                # 删除第0项：包含msg_id的字典
+                del message[0]
+            #如果不是webui发来的消息，以收到消息的时间为id
+            elif message.get("action") in valid_message_actions:
+                is_update = True
                 message_id = time_now
+                role = 'start'
+
+            # 存入聊天记录到数据库
+            if is_update:
+                asyncio.run(
+                    update_msg(
+                        time_now,json.dumps(
+                        {"role" : role,
+                        "message_id" : message_id,
+                        "message" : message}
+                )))
 
             # logger.server(message, type(message))
 
@@ -649,6 +729,7 @@ def handle_websocket(ws):
                 'post_type': 'message',
                 'group_id': 879886836}
 
+
             def send_mes(onebot_event):
                 event_json = json.dumps(onebot_event, ensure_ascii=False)
 
@@ -661,57 +742,13 @@ def handle_websocket(ws):
                         clients.discard(client)
 
                 logger.server(f"已发送 OneBot v11 事件: {event_json}")
-            def is_valid_messages_structure(data):
-                # 检查字典是否包含 message 键
-                if not isinstance(data, dict) or 'message' not in data:
-                    return False
-
-                # 检查 message 是否包含 action 和 params
-                message = data.get('message')
-                if not isinstance(message, dict) or 'action' not in message or 'params' not in message:
-                    return False
-
-                # 检查 action 是否为 send_group_forward_msg
-                if message['action'] != 'send_group_forward_msg':
-                    return False
-
-                # 检查 params 是否包含 messages
-                params = message.get('params')
-                if not isinstance(params, dict) or 'messages' not in params:
-                    return False
-
-                # 检查 messages 是否为列表
-                messages = params.get('messages')
-                if not isinstance(messages, list):
-                    return False
-                # 检查 messages 中的每个元素是否为 node 类型
-                for msg in messages:
-                    if not isinstance(msg, dict) or 'type' not in msg or msg['type'] != 'node':
-                        return False
-                    # 进一步检查 node 是否包含 data 且 data 包含 content
-                    if 'data' not in msg or not isinstance(msg['data'], dict):
-                        return False
-                    if 'content' not in msg['data'] or not isinstance(msg['data']['content'], list):
-                        return False
-
-                return True
-            if is_valid_messages_structure(onebot_event):
-                """
-                对Node消息进行处理
-                """
-                back_event = onebot_event.copy()
-                for node in onebot_event['message']["params"]["messages"]:
-                    content=node['data']['content']
-                    back_event["message"]["action"] ="send_group_msg"
-                    back_event['message']["params"]["message"] = content
-                    send_mes(back_event)
-            else:
-                send_mes(onebot_event)
+            send_mes(onebot_event)
     except Exception as e:
-        logger.server(f"WebSocket事件: {e}")
+        logger.server(f"WebSocket事件: {str(e)}")
+        # traceback.print_exc()
     finally:
         # 总有人看见红色就害怕
-        # logger.server("WebSocket 客户端断开连接")
+        logger.server("WebSocket 客户端断开连接")
         clients.discard(ws)
 
 
