@@ -19,7 +19,7 @@ class basicimgset:
         for key, value in self.default_keys_values.items():
             if not hasattr(self, key):  # 如果属性不存在，则设置默认值
                 setattr(self, key, value)
-
+        if self.img_name_save:self.img_path_save=f'{self.img_path_save}/{self.img_name_save}'
         #是否获取其绝对路径
         if self.is_abs_path_convert is True:
             for key, value in vars(self).items():

@@ -1,6 +1,8 @@
 import re
 from PIL import Image, ImageDraw, ImageFilter, ImageOps,ImageFont
 import platform
+from .download_img import process_img_download
+from .common import add_append_img
 
 def deal_text_with_tag(input_string):
     pattern = r'\[(\w+)\](.*?)\[/\1\]'
@@ -14,16 +16,24 @@ def deal_text_with_tag(input_string):
             non_tag_content = input_string[last_end:start]
             if non_tag_content:
                 result.append({'content': non_tag_content,'tag': 'common'})
-        # 处理标签内容
+
+        # 处理标签内容,若标签内还有标签，则继续递归处理
         tag = match.group(1)  # 标签名
         content = match.group(2)
-        result.append({'content': content, 'tag': tag})
+        content_tag=list(re.finditer(pattern, content, flags=re.DOTALL))
+        if content_tag:
+            result=add_append_img(result,deal_text_with_tag(content),'last_tag',tag,'common')
+        else:
+            result.append({'content': content, 'tag': tag})
+
         last_end = end
+
     # 处理最后的非标签内容（在最后一个标签结束到字符串末尾之间的部分）
     if last_end < len(input_string):
         non_tag_content = input_string[last_end:]
         if non_tag_content:
             result.append({'content': non_tag_content,'tag': 'common'})
+
 
     return result
 
@@ -34,7 +44,7 @@ def can_render_character(font, character):
     此处受限于pillow自身的绘制缺陷
     在无法绘制后让另一个模块进行处理
     """
-    if character==' ':return True
+    if character==' ' or character=='':return True
     try:
         # 获取字符的掩码
         mask = font.getmask(character)
@@ -45,7 +55,7 @@ def can_render_character(font, character):
         character_width,character_height = bbox[2] - bbox[0],bbox[3] - bbox[1]
         bbox = font.getbbox("\uFFFD")
         placeholder_width, placeholder_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
-        if character_width == placeholder_width and character_height == placeholder_height:
+        if character_width == placeholder_width and character_height == placeholder_height and character not in {'常'}:
             return False
         return True
     except Exception as e:
@@ -74,7 +84,7 @@ def color_emoji_maker(text,color,size=40):
 
 
 
-def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=False):
+def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=False,ellipsis=True):
     """
     #此方法不同于其余绘制方法
     #其余绘制方法仅返回自身绘制画面
@@ -91,24 +101,46 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
         return {'canvas': canvas, 'canvas_bottom': y}
 
     content_list = deal_text_with_tag(content)
-    #print(content_list)
+
+    #将所有的emoji转换成pillow对象
+    content_list_convert,emoji_list=[],[]
+    for item in content_list:
+        if item['tag'] == 'emoji':
+            if not isinstance(item['content'], dict):emoji_list=[item['content']]
+            else:emoji_list=item['content']
+            for pillow_emoji in process_img_download(emoji_list, params['is_abs_path_convert']):
+                if 'last_tag' not in item: item['last_tag']='common'
+                content_list_convert.append({'content': [pillow_emoji.convert("RGBA")], 'tag': 'emoji','last_tag': item['last_tag']})
+        else:content_list_convert.append(item)
+    content_list=content_list_convert
 
     # 这一部分检测每行的最大高度
-    last_tag,line_height_list,per_max_height = 'Nothing',[],0
+    last_tag,line_height_list,per_max_height = 'common',[],0
+    font = ImageFont.truetype(params[f'font_{last_tag}'], params[f'font_{last_tag}_size'])
     for content in content_list:
-        if last_tag != content['tag']:
+        emoji_list=[]
+        if content['tag'] == 'emoji':
+            for item in content['content']:
+                emoji_x,emoji_y=int(params[f'font_{content["last_tag"]}_size']*item.width/item.height),int(params[f'font_{content["last_tag"]}_size'])
+                emoji_list.append(item.resize((emoji_x,emoji_y)))
+            content['content']=emoji_list
+
+        elif last_tag != content['tag']:
             last_tag = content['tag']
-            try:
-                font = ImageFont.truetype(params[f'font_{last_tag}'], params[f'font_{last_tag}_size'])
-            except OSError:
-                font = ImageFont.load_default()
+            font = ImageFont.truetype(params[f'font_{last_tag}'], params[f'font_{last_tag}_size'])
+
         i = 0
         # 对文字进行逐个绘制
         text = content['content']
         while i < len(text):  # 遍历每一个字符
             if text[i] == '': continue
-            char_width = font.getbbox(text[i])[2] - font.getbbox(text[i])[0]
-            if params[f'font_{last_tag}_size'] > per_max_height: per_max_height = params[f'font_{last_tag}_size']
+            if content['tag'] == 'emoji':
+                char_width=emoji_x
+                if emoji_y > per_max_height: per_max_height = emoji_y
+            else:
+                char_width = font.getbbox(text[i])[2] - font.getbbox(text[i])[0]
+                if params[f'font_{last_tag}_size'] > per_max_height: per_max_height = params[f'font_{last_tag}_size']
+
             x += char_width + 1
             i += 1
             if (x + char_width > x_limit and i < len(text)) or text[i - 1] == '\n':
@@ -118,27 +150,26 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
                     per_max_height=0
                 if x == box[0] + char_width + 1 and text[i - 1] == '\n' :#检测是否在一行最开始换行，若是则修正
                     x -= char_width + 1
+    line_height_list.append(params[f'font_common_size'])
+    line_height_list.append(params[f'font_common_size'])
 
-    line_height_list.append(params[f'font_common_size'])
-    line_height_list.append(params[f'font_common_size'])
+
     #这一部分开始进行实际绘制
     if box is None: box = (params['padding'], 0)  # 初始位置
     x, y = box
-    should_break, last_tag, line_count = False, 'Nothing',0
+    should_break, last_tag, line_count = False, 'common',0
+    font = ImageFont.truetype(params[f'font_{last_tag}'], params[f'font_{last_tag}_size'])
     #对初始位置进行修正
-    y += line_height_list[0] - params[f'font_common_size']
-
+    if ellipsis: y += line_height_list[0] - params[f'font_common_size']
     for content in content_list:
         # 依据字符串处理的字典加载对应的字体
-        if last_tag != content['tag']:
+        if content['tag'] == 'emoji':
+            pass
+        elif last_tag != content['tag']:
             last_tag = content['tag']
-            # 设置字体和大小（需要确保字体文件路径正确）
-            try:
-                font = ImageFont.truetype(params[f'font_{last_tag}'], params[f'font_{last_tag}_size'])
-            except OSError:
-                font = ImageFont.load_default()
+            font = ImageFont.truetype(params[f'font_{last_tag}'], params[f'font_{last_tag}_size'])
         # 在循环之前进行判断返回，避免过多处理字段
-        if y > y_limit - (font.getbbox('的')[3] - font.getbbox('的')[1]):
+        if y > y_limit - (font.getbbox('的')[3] - font.getbbox('的')[1]) and ellipsis:
             return {'canvas': canvas, 'canvas_bottom': y}
         if should_break:  # 检查标志并跳出外层循环
             break
@@ -149,10 +180,18 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
         text = content['content']
         while i < len(text):  # 遍历每一个字符
             if text[i] == '': continue
-            bbox = font.getbbox(text[i])
-            char_width = bbox[2] - bbox[0]
-            upshift_font = params[f'font_{last_tag}_size'] - params[f'font_common_size']
-            if can_render_character(font, text[i]):
+            if content['tag'] == 'emoji':
+                emoji_x, emoji_y = int(params[f'font_{content["last_tag"]}_size'] * text[i] .width / text[i] .height), int(params[f'font_{content["last_tag"]}_size'])
+                upshift_font,char_width = emoji_y - params[f'font_common_size'],emoji_x
+            else:
+                char_width = font.getbbox(text[i])[2] - font.getbbox(text[i])[0]
+                upshift_font = params[f'font_{last_tag}_size'] - params[f'font_common_size']
+
+
+            #绘制文字与图片
+            if content['tag'] == 'emoji':
+                canvas.paste(text[i], (int(x), int(y - upshift_font + 3)), mask=text[i])
+            elif can_render_character(font, text[i]):
                 if is_shadow: draw.text((x + 2, y - upshift_font + 2), text[i], font=font, fill=(148, 148,148))
                 draw.text((x, y - upshift_font), text[i], font=font, fill=eval(params[f'font_{last_tag}_color']))
             else:
@@ -166,12 +205,12 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
 
             x += char_width + 1
             i += 1
-            if (x + char_width * 2 > x_limit and i < len(text)) or text[i - 1] == '\n':
+            if (x + char_width * 2 > x_limit and i < len(text) and ellipsis) or text[i - 1] == '\n':
                 if y > y_limit - (params[f'font_common_size'])  - params['padding_up'] - line_height_list[line_count + 1]:
                     draw.text((x, y), '...', font=font, fill=eval(params[f'font_{last_tag}_color']))
                     should_break = True
                     break
-            if (x + char_width > x_limit and i < len(text)) or text[i - 1] == '\n':
+            if (x + char_width > x_limit and i - 1 < len(text)) or text[i - 1] == '\n':
                 if x != box[0] + char_width + 1 :
                     line_count += 1
                     y += params[f'font_common_size'] + params['padding_up'] + line_height_list[line_count] - params[f'font_common_size']

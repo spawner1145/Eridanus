@@ -42,6 +42,19 @@ def json_check(json_img):
         json_check_reload.append({'type': 'basic_set'})
     if 'backdrop' not in [per_json_check['type'] for per_json_check in json_check_reload]:
         json_check_reload.append({'type': 'backdrop', 'subtype': 'gradient'})
+
+    #进行轻量级绘图设置
+    try:
+        from framework_common.framework_util.yamlLoader import YAMLManager
+        for item in json_check_reload:
+            if 'type' in item and item['type'] in ['basic_set']:
+                if 'config_path' not in item:
+                    if YAMLManager("run").system_plugin.config['draw_frame']['is_lightweight'] is True:
+                        item['config_path']='framework_common/manshuo_draw/data/config/lightweight_config.yaml'
+                    else:
+                        item['config_path'] = 'framework_common/manshuo_draw/data/config/manshuodraw_config.yaml'
+    except:pass
+
     return json_check_reload
 
 
