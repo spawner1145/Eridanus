@@ -38,6 +38,25 @@ filepath_init=f'{os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile
 if not os.path.exists(filepath_init):  # 初始化检测文件夹
     os.makedirs(filepath_init)
 
+name_qq_list={'漫朔':1270858640,'枫与岚':2319804644,'Lemony':2424378897,'forandsix':1004704649,'魏咸哲':1431631009}
+card_url_list=['https://gal.manshuo.ink/usr/uploads/galgame/img/zhenhong.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/suki.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/sega.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/teto.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/tianli.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/keai.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/keai2.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/miku.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/milk.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/xiaoqizou.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/maimai.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/mimi2.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/mimi.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/hyro1.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/salt1.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/zhenhong2.png',
+               'https://gal.manshuo.ink/usr/uploads/galgame/img/guangguang.png',
+               ]
 
 async def download_video(url, proxy: str = None, ext_headers=None,filepath=None) -> str:
     """
@@ -83,9 +102,11 @@ async def download_video(url, proxy: str = None, ext_headers=None,filepath=None)
         print(f"下载视频错误原因是: {e}")
         return None
 
-async def add_append_img(contents,links_path):
+async def add_append_img(contents,links_path,layer=None):
     for link in links_path:
-        if link not in {' '}:
+        if link != ' ':
+            if isinstance(link, dict) and layer is not None:
+                link['layer']=layer
             contents.append(link)
     return contents
 

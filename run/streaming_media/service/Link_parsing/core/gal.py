@@ -17,27 +17,10 @@ import random
 from bs4 import BeautifulSoup
 import os
 import time
+from .common import name_qq_list,card_url_list
 
-name_qq_list={'漫朔':1270858640,'枫与岚':2319804644,'Lemony':2424378897,'forandsix':1004704649,'魏咸哲':1431631009}
 
-card_url_list=['https://gal.manshuo.ink/usr/uploads/galgame/img/zhenhong.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/suki.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/sega.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/teto.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/tianli.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/keai.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/keai2.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/miku.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/milk.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/xiaoqizou.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/maimai.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/mimi2.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/mimi.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/hyro1.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/salt1.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/zhenhong2.png',
-               'https://gal.manshuo.ink/usr/uploads/galgame/img/guangguang.png',
-               ]
+
 
 
 
@@ -201,7 +184,7 @@ async def Galgame_manshuo(url,filepath=None):
 
     json_check['pic_path'] = await manshuo_draw([
         {'type': 'avatar', 'subtype': 'common', 'img': [avatar_path_url], 'upshift_extra': 25,
-         'content': [{'name': avatar_name, 'time': f'{time_gal}'}]},
+         'content': [f"[name]{avatar_name}[/name]\n[time]{time_gal}[/time]"]},
         {'type': 'img', 'subtype': 'common_with_des_right', 'img': [links_url], 'content': [context]}])
     return json_check
 
@@ -262,7 +245,7 @@ async def youxi_pil_new_text(filepath=None):
 
         json_check['pic_path'] = await manshuo_draw([
             {'type': 'avatar', 'subtype': 'common', 'img': [author_url], 'upshift_extra': 25,
-             'content': [{'name': avatar_name, 'time': f'{time_gal}'}]},
+             'content': [f"[name]{avatar_name}[/name]\n[time]{time_gal}[/time]"]},
             {'type': 'img', 'subtype': 'common_with_des_right', 'img': [data_src_values[0]], 'content': [context]}])
 
         #print(json.dumps(json_check, indent=4))
