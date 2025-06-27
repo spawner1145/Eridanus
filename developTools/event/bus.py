@@ -1,6 +1,8 @@
 import asyncio
 from typing import Callable, Coroutine
 
+from developTools.utils import logger
+
 
 class EventBus:
     def __init__(self) -> None:

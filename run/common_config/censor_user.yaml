@@ -3,7 +3,7 @@ blacklist:
 - 1
 - 3377428814
 - 65888444
-whitelist:
+whitelist:  #
 - 2
 - 3
 - 1840094972

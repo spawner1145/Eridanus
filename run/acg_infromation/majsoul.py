@@ -54,7 +54,7 @@ def main(bot, config):
 
 
         check_flag = False
-        if not check_flag:
+        if check_flag is False:
             for check_personal_info in list_check_personal_info:
                 if context.startswith(check_personal_info):
                     check_flag=0
