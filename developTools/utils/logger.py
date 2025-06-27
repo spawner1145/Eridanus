@@ -1,11 +1,13 @@
 import logging
 import os
 from datetime import datetime
+from logging import Logger
+
 import colorlog
 
 # 全局变量，用于存储 logger 实例和屏蔽的日志类别
 _logger = None
-_blocked_loggers = []
+_blocked_loggers = ["INFO_MSG"]
 
 
 def createLogger(blocked_loggers=None):
@@ -135,7 +137,7 @@ def createLogger(blocked_loggers=None):
     _logger = logger
 
 
-def get_logger(blocked_loggers=None):
+def get_logger(blocked_loggers=None) -> Logger:
     global _logger
     if _logger is None:
         createLogger(blocked_loggers)
@@ -146,7 +148,7 @@ def get_logger(blocked_loggers=None):
 # 使用示例
 if __name__ == "__main__":
     # 精确屏蔽 INFO_MSG 和 DEBUG 类型日志
-    logger = get_logger(blocked_loggers=["DEBUG", "INFO_MSG"])
+    logger = get_logger(blocked_loggers=["INFO_MSG"])
     logger.debug("This is a debug message.")  # 不会显示
     logger.info("This is an info message.")  # 会显示
     logger.warning("This is a warning message.")  # 会显示

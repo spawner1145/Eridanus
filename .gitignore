@@ -3,3 +3,4 @@ __pycache__/
 user_info.yaml
 log/
 .idea/
+chat_files/
