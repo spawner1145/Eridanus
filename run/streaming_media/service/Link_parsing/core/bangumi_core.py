@@ -1,13 +1,11 @@
 import asyncio
-import datetime
 import json
 import os
 import time
 import httpx
 import re
 import copy
-from .login_core import ini_login_Link_Prising
-from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME
+from run.streaming_media.service.Link_parsing.core.common import json_init
 from urllib.parse import urlparse
 from urllib.parse import parse_qs
 from datetime import datetime, timedelta
@@ -17,15 +15,21 @@ import json
 from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 
 
-async def claendar_bangumi_get_json():
+async def claendar_bangumi_get_json(calender=None):
     async with httpx.AsyncClient() as client:
         url = "https://api.bgm.tv/calendar"
         response = await client.get(url)
         if response.status_code:
             data = response.json()
-            weekday = datetime.datetime.today().weekday()
+            if calender:
+                weekday=calender
+            else:
+                weekday = datetime.today().weekday()
+            #print(weekday)
             week=data[weekday]['weekday']['cn']
             calendar_json_init=data[weekday]['items']
+            try:calendar_json_init = sorted(calendar_json_init, key=lambda x:x.get("rank", float("inf")))
+            except TypeError:pass
             #print(week)
             #print(json.dumps(data, indent=4))
         return calendar_json_init,week
@@ -92,20 +96,12 @@ async def bangumi_subjects_get_json_PIL(subject_id=None):
 
 
 async def bangumi_PILimg(text=None,img_context=None,filepath=None,proxy=None,type_soft='Bangumi 番剧',name=None,url=None,
-                         type=None,target=None,search_type=None,config=None):
+                         type=None,target=None,search_type=None,config=None,bot_id=None):
     contents=[]
     json_check = copy.deepcopy(json_init)
     json_check['soft_type'] = 'bangumi'
     json_check['status'] = True
     json_check['video_url'] = False
-    if filepath is None: filepath = filepath_init
-    if name is not None:
-        if os.path.isfile(f'{filepath}{name}.png'):
-            json_check['pic_path'] = f'{filepath}{name}.png'
-            return json_check
-    else:
-        name = f'{int(time.time())}'
-
 
     if type is None:
         count=0
@@ -129,7 +125,7 @@ async def bangumi_PILimg(text=None,img_context=None,filepath=None,proxy=None,typ
         json_check['pic_path'] = await manshuo_draw(contents)
         return json_check
     elif type == 'calendar':
-        calendar_json,week = await claendar_bangumi_get_json()
+        calendar_json,week = await claendar_bangumi_get_json(target)
         #print(week)
         #print(json.dumps(calendar_json, indent=4))
         text_total=[]
@@ -147,9 +143,9 @@ async def bangumi_PILimg(text=None,img_context=None,filepath=None,proxy=None,typ
             except:
                 pass
 
-        json_check['pic_path'] = await manshuo_draw([{'type': 'basic_set', 'img_width': 1500},
-                            {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={config.common_config.basic_config['master']['id']}&s=640"],'upshift': 25,
-                             'content': [{'name': name, 'time': datetime.now().strftime("%Y年%m月%d日 %H:%M")}, ], 'type_software': 'bangumi', },
+        json_check['pic_path'] = await manshuo_draw([{'type': 'basic_set', 'img_width': 1500,'img_name_save':f'{name}.png'},
+                            {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={bot_id}&s=640"],'upshift_extra': 25,
+                             'content': [f"[name]{name}[/name]\n[time]{datetime.now().strftime('%Y年%m月%d日 %H:%M')}[/time]" ], 'type_software': 'bangumi', },
                             {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': text_total}])
         json_check['soft_type'] = 'bangumi_calendar'
         return json_check
@@ -166,8 +162,8 @@ async def bangumi_PILimg(text=None,img_context=None,filepath=None,proxy=None,typ
             id = search_json_init['list'][0]['id']
             contents,img_url,contents_other =await bangumi_subjects_get_json_PIL(subject_id=id)
             json_check['pic_path'] = await manshuo_draw([{'type': 'basic_set', 'img_width': 1500},
-                {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={config.common_config.basic_config['master']['id']}&s=640"],
-                                                          'upshift': 25,'content': [{'name': name, 'time': datetime.now().strftime("%Y年%m月%d日 %H:%M")}, ], 'type_software': 'bangumi', },
+                {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={bot_id}&s=640"],
+                                                          'upshift': 25,'content': [f"[name]{name}[/name]\n[time]{datetime.now().strftime('%Y年%m月%d日 %H:%M')}[/time]"  ], 'type_software': 'bangumi', },
                                                          {'type': 'img', 'subtype': 'common_with_des_right','img': [img_url], 'content': [contents]},contents_other])
             json_check['next_choice'] = False
             json_check['soft_type'] = 'bangumi_search'
@@ -226,7 +222,8 @@ async def bangumi_PILimg(text=None,img_context=None,filepath=None,proxy=None,typ
     elif type == 'search_accurate':
         contents, img_url, contents_other = await bangumi_subjects_get_json_PIL(subject_id=target)
         json_check['pic_path'] = await manshuo_draw([{'type': 'basic_set', 'img_width': 1500},
-            {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={config.common_config.basic_config['master']['id']}&s=640"],'upshift': 25, 'content': [{'name': config.common_config.basic_config['master']['name'], 'time': datetime.now().strftime("%Y年%m月%d日 %H:%M")}, ], 'type_software': 'bangumi', },
+            {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={bot_id}&s=640"],'upshift': 25,
+             'content': [f"[name]{config.common_config.basic_config['bot']}[/name]\n[time]{datetime.now().strftime('%Y年%m月%d日 %H:%M')}[/time]" ], 'type_software': 'bangumi', },
                                                      {'type': 'img', 'subtype': 'common_with_des_right','img': [img_url], 'content': [contents]},
                                                      contents_other])
         json_check['next_choice'] = False

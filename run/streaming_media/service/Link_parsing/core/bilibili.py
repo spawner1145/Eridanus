@@ -12,11 +12,13 @@ import json
 from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 import asyncio
 import sys
+import time
 from bilibili_api import video, live, article
 from bilibili_api import dynamic
 from bilibili_api.opus import Opus
 from bilibili_api.video import VideoDownloadURLDataDetecter
 from .bili import bili_init,av_to_bv,download_b,info_search_bili
+from .common import name_qq_list,card_url_list,add_append_img,download_video,get_file_size_mb
 try:
     from bilibili_api import select_client
     select_client("httpx")
@@ -49,6 +51,7 @@ async def bilibili(url,filepath=None,is_twice=None):
     contents=[]
     contents_dy=[]
     emoji_list = []
+    label_list,image_list,context=[],[],''
     orig_desc=None
     type=None
     introduce=None
@@ -85,7 +88,7 @@ async def bilibili(url,filepath=None,is_twice=None):
                 #print(dynamic_id)
 
                 dynamic_info = await Opus(dynamic_id).get_info()
-                avatar_json = await info_search_bili(dynamic_info, is_opus,filepath=filepath,card_url_list=card_url_list)
+                #avatar_json = await info_search_bili(dynamic_info, is_opus,filepath=filepath,card_url_list=card_url_list)
 
                 tags = ''
                 number=0
@@ -103,39 +106,47 @@ async def bilibili(url,filepath=None,is_twice=None):
                             desc = desc_check['word']['words']
                             if f'{desc}' not in {'',' '}:
                                 text_list_check+=f"{desc}"
+
                         elif desc_check['type'] =='TEXT_NODE_TYPE_RICH':
                             if desc_check['rich']['type'] =='RICH_TEXT_NODE_TYPE_EMOJI':
-                                emoji_list.append(desc_check['rich']['emoji']['icon_url'])
-                                text_list_check += f'![{number}'
+                                text_list_check += f"[emoji]{desc_check['rich']['emoji']['icon_url']}[/emoji]"
                                 number += 1
                             else:
                                 tags+=desc_check['rich']['text'] + ' '
-                    if text_list_check != '':
-                        contents.append(text_list_check)
-                    if tags != '':
-                        contents.append(f'tag:{tags}')
+                    if text_list_check != '':context += text_list_check
+                    if tags != '':context += f'\n[tag]{tags}[/tag]'
 
                     #获取头像以及名字
                     for module in dynamic_info['item']['modules']:
                         if 'module_author' in module:
                             modules = module['module_author']
                             owner_cover,owner_name,pub_time = modules['face'],modules['name'],modules['pub_time']
-                            avatar_path =(await asyncio.gather(*[asyncio.create_task(download_img(owner_cover, f'{filepath}'))]))[0]
                             break
                     try:
                         pics_context=paragraphs[1]['pic']['pics']
                     except :
                         pics_context=dynamic_info['item']['modules'][0]['module_top']['display']['album']['pics']
+                    image_list=[item['url'] for item in pics_context]
 
-                    contents = await add_append_img(contents, await asyncio.gather(*[asyncio.create_task(download_img(item['url'], f'{filepath}', len=len(pics_context))) for item in pics_context]))
+
+                    if len(image_list) != 1:
+                        manshuo_draw_json=[
+                            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 25,
+                             'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
+                             'type_software': 'bilibili', 'label': label_list}, {'type': 'text','content': [context]},{'type': 'img','img': image_list}]
+                    else:
+                        manshuo_draw_json=[
+                            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 25,
+                             'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
+                             'type_software': 'bilibili', },
+                            {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list,
+                             'content': [context]}]
                     if is_twice is not True:
-                        out_path=draw_adaptive_graphic_and_textual(contents, avatar_path=avatar_path, name=owner_name,
-                                                      Time=f'{pub_time}',filepath=filepath,type_software='BiliBili 动态',emoji_list=emoji_list,
-                                          color_software=(251,114,153,80),output_path_name=f'{dynamic_id}',avatar_json=avatar_json)
-                        json_check['pic_path'] = out_path
+                        json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
                         json_check['time'] = pub_time
                         return json_check
-                    return contents,avatar_path,owner_name,pub_time,type,introduce,emoji_list
+                    return manshuo_draw_json
+
         except Exception as e:
             logger.error(f"{e}, 尝试使用其他方式解析")
             is_opus=True
@@ -165,15 +176,13 @@ async def bilibili(url,filepath=None,is_twice=None):
                 owner_cover=dynamic_info['item']['modules']['module_author']['face']
                 owner_name=dynamic_info['item']['modules']['module_author']['name']
                 pub_time=dynamic_info['item']['modules']['module_author']['pub_time']
-                avatar_path = (await asyncio.gather(*[asyncio.create_task(download_img(owner_cover, f'{filepath}'))]))[0]
                 if orig_check ==1:
-                    avatar_json = await info_search_bili(dynamic_info, is_opus, filepath=filepath,card_url_list=card_url_list)
+                    #avatar_json = await info_search_bili(dynamic_info, is_opus, filepath=filepath,card_url_list=card_url_list)
                     #print('非转发')
-                    type_software='BiliBili 动态'
+                    type_software='bilibili 动态'
                     if 'opus' in dynamic_info['item']['modules']['module_dynamic']['major']:
                         opus_paragraphs = dynamic_info['item']['modules']['module_dynamic']['major']['opus']
                         text_list_check = ''
-                        number=0
                         pics_context=[]
                         #print(json.dumps(opus_paragraphs, indent=4))
 
@@ -181,65 +190,73 @@ async def bilibili(url,filepath=None,is_twice=None):
                         for text_check in opus_paragraphs['summary']['rich_text_nodes']:
                             #print('\n\n')
                             if 'emoji' in text_check:
-                                #print(text_check['emoji']['icon_url'])
-                                text_list_check += f'![{number}'
-                                number += 1
-                                emoji_list.append(text_check['emoji']['icon_url'])
+                                text_list_check += f"[emoji]{text_check['emoji']['icon_url']}[/emoji]"
                             elif 'orig_text' in text_check:
                                 text_list_check += text_check['orig_text']
                         #print(text_list_check)
                         if dynamic_info['item']['type'] == 'DYNAMIC_TYPE_ARTICLE':
                             type_software = 'BiliBili 专栏'
-                            contents.append(f"title:{opus_paragraphs['title']}")
-                            contents.append(text_list_check)
+                            context += f"[title]{opus_paragraphs['title']}[/title]\n"
+                            context += text_list_check
                             for pic_check in opus_paragraphs['pics']:
                                 pics_context.append(pic_check['url'])
-                            contents = await add_append_img(contents, await asyncio.gather(*[asyncio.create_task(download_img(item, f'{filepath}', len=len(pics_context))) for item in pics_context]))
+                            image_list = [item for item in pics_context]
                         else:
-                            contents.append(text_list_check)
+                            context += text_list_check
                             for pic_check in opus_paragraphs['pics']:
                                 pics_context.append(pic_check['url'])
-                            contents = await add_append_img(contents, await asyncio.gather(*[asyncio.create_task(download_img(item, f'{filepath}', len=len(pics_context))) for item in pics_context]))
+                            image_list = [item for item in pics_context]
                     elif 'live_rcmd' in dynamic_info['item']['modules']['module_dynamic']['major']:
                         live_paragraphs = dynamic_info['item']['modules']['module_dynamic']['major']['live_rcmd']
                         content = json.loads(live_paragraphs['content'])
+                        #print(json.dumps(content['live_play_info'], indent=4))
                         title,cover,pub_time = content['live_play_info']['title'],content['live_play_info']['cover'],content['live_play_info']['live_start_time']
-                        contents.append((await asyncio.gather(*[asyncio.create_task(download_img(cover, f'{filepath}'))]))[0])
-                        contents.append(title)
+                        parent_area_name,area_name=content['live_play_info']['parent_area_name'],content['live_play_info']['area_name']
+                        image_list = [cover]
+                        context += f"[title]{title}[/title]\n[des]{parent_area_name} {area_name}[/des]"
                         pub_time = datetime.fromtimestamp(pub_time).astimezone().strftime("%Y-%m-%d %H:%M:%S")
-                        type_software = 'BiliBili 直播'
+                        type_software = '直播'
                     else:
-
                         paragraphs = dynamic_info['item']['modules']['module_dynamic']['major']['archive']
                         title,desc,cover,bvid=paragraphs['title'],paragraphs['desc'],paragraphs['cover'],paragraphs['bvid']
-                        contents.append((await asyncio.gather(*[asyncio.create_task(download_img(cover, f'{filepath}'))]))[0])
-                        contents.append(title)
-
+                        image_list = [cover]
+                        context += f"[title]{title}[/title]\n[des]{desc}[/des]"
+                        type_software = 'BiliBili 投稿'
+                    if len(image_list) == 1 and type_software in {'直播',}:
+                        manshuo_draw_json=[
+                                {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 25,
+                                 'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
+                                 'type_software': 'bilibili', },
+                                {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list, 'label': [type_software],
+                                 'content': [context]}]
+                    elif len(image_list) == 1 and type_software in {'BiliBili 投稿'}:
+                        manshuo_draw_json=[
+                                {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 25,
+                                 'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
+                                 'type_software': 'bilibili', },
+                                {'type': 'img', 'subtype': 'common_with_des', 'img': image_list, 'label': [type_software],
+                                 'content': [context]}]
+                    else:
+                        manshuo_draw_json=[
+                            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 25,
+                             'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
+                             'type_software': 'bilibili'},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
 
 
                     if is_twice is not True:
-                        out_path=draw_adaptive_graphic_and_textual(contents, avatar_path=avatar_path, name=owner_name,
-                                                          Time=f'{pub_time}', type=type_set, introduce=desc,
-                                                      filepath=filepath,type_software=type_software,emoji_list=emoji_list,
-                                      color_software=(251,114,153,80),output_path_name=f'{dynamic_id}',avatar_json=avatar_json)
-                        json_check['pic_path'] = out_path
+                        json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
                         json_check['time'] = pub_time
                         return json_check
-                    return contents, avatar_path, owner_name, pub_time, type, desc,emoji_list
+                    return manshuo_draw_json
                 elif orig_check ==2:
                     #print(json.dumps(paragraphs, indent=4))
-
                     text_list_check = ''
-                    number = 0
                     for text_check in paragraphs['desc']['rich_text_nodes']:
                         if 'emoji' in text_check:
-                            # print(text_check['emoji']['icon_url'])
-                            text_list_check += f'![{number}'
-                            number += 1
-                            emoji_list.append(text_check['emoji']['icon_url'])
+                            text_list_check += f"[emoji]{text_check['emoji']['icon_url']}[/emoji]"
                         elif 'orig_text' in text_check:
                             text_list_check += text_check['orig_text']
-                    contents.append(text_list_check)
+                    #contents.append(text_list_check)
                     #print(text_list_check)
 
                     for module in orig_context['modules']:
@@ -247,51 +264,55 @@ async def bilibili(url,filepath=None,is_twice=None):
                             if 'opus' in orig_context['modules']['module_dynamic']['major']:
                                 opus_orig_paragraphs=orig_context['modules']['module_dynamic']['major']['opus']
                                 orig_title=opus_orig_paragraphs['summary']['text']
-                                contents_dy.append(orig_title)
+                                context += f"{orig_title}"
                                 #logger.info(opus_orig_paragraphs)
-                                contents_dy = await add_append_img(contents_dy, await asyncio.gather(*[
-                                    asyncio.create_task(download_img(item['url'], f'{filepath}', len=len(opus_orig_paragraphs['pics'])))
-                                    for item in opus_orig_paragraphs['pics']]))
+                                image_list = [item['url'] for item in opus_orig_paragraphs['pics']]
                             else:
                                 orig_paragraphs = orig_context['modules']['module_dynamic']['major']['archive']
                                 orig_title, orig_desc, orig_cover, orig_bvid = orig_paragraphs['title'], orig_paragraphs['desc'], orig_paragraphs['cover'], orig_paragraphs['bvid']
-                                contents_dy.append((await asyncio.gather(*[asyncio.create_task(download_img(orig_cover, f'{filepath}'))]))[0])
-                                contents_dy.append(orig_title)
+                                image_list=[orig_cover]
+                                context += f"[title]{orig_title}[/title]\n{orig_desc}"
                                 try:
                                     pics_context = paragraphs[1]['pic']['pics']
                                 except KeyError:
                                     pics_context = []
-                                contents_dy = await add_append_img(contents_dy, await asyncio.gather(*[
-                                    asyncio.create_task(download_img(item['url'], f'{filepath}', len=len(pics_context)))for item in pics_context]))
+                                image_list = await add_append_img(image_list,[item['url'] for item in pics_context])
 
                     orig_pub_time=orig_context['modules']['module_author']['pub_time']
                     orig_owner_name = orig_context['modules']['module_author']['name']
                     orig_owner_cover = orig_context['modules']['module_author']['face']
 
+
                     if is_twice is True:
-                        avatar_path =(await asyncio.gather(*[asyncio.create_task(download_img(orig_owner_cover, f'{filepath}'))]))[0]
-                        if orig_pub_time == '':
-                            return contents_dy, avatar_path, orig_owner_name, pub_time, type, orig_desc,emoji_list
+                        if orig_pub_time == '': orig_pub_time = pub_time
+                        if len(image_list) != 1:
+                            manshuo_draw_json = [
+                                {'type': 'avatar', 'subtype': 'common', 'img': [orig_owner_cover], 'upshift_extra': 25,
+                                 'content': [f"[name]{orig_owner_name}[/name]\n[time]{orig_pub_time}[/time]"],
+                                 'type_software': 'bilibili', 'label': label_list},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
                         else:
-                            return contents_dy, avatar_path, orig_owner_name, orig_pub_time, type, orig_desc,emoji_list
+                            manshuo_draw_json = [
+                                {'type': 'avatar', 'subtype': 'common', 'img': [orig_owner_cover], 'upshift_extra': 25,
+                                 'content': [f"[name]{orig_owner_name}[/name]\n[time]{orig_pub_time}[/time]"],
+                                 'type_software': 'bilibili', },
+                                {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list,
+                                 'content': [context]}]
+                        return manshuo_draw_json
+
                     orig_url= 'orig_url:'+'https://t.bilibili.com/' + orig_context['id_str']
-                    orig_contents,orig_avatar_path,orig_name,orig_Time,orig_type,orig_introduce,orig_emoji_list=await bilibili(orig_url,f'{filepath}orig_',is_twice=True)
-                    #print(f'contents:{contents}\norig_contents:{orig_contents}\n')
-                    #print(f'emoji_list:{emoji_list}\norig_emoji_list:{orig_emoji_list}')
-                    out_path=draw_adaptive_graphic_and_textual(contents, avatar_path=avatar_path,
-                                                    name=owner_name, Time=f'{pub_time}', type=type_set,
-                                                    introduce=orig_desc,filepath=filepath,
-                                                    contents_dy=orig_contents, orig_avatar_path=orig_avatar_path,
-                                                    orig_name=orig_name,orig_Time=orig_Time,
-                                                    type_software='BiliBili 动态',
-                                                    color_software=(251, 114, 153, 80),
-                                                    output_path_name=f'{dynamic_id}',avatar_json=avatar_json,
-                                                    orig_type_software='转发动态',emoji_list=emoji_list,orig_emoji_list=orig_emoji_list
-                                                    )
-                    json_check['pic_path'] = out_path
+                    manshuo_draw_json2=await bilibili(orig_url,f'{filepath}orig_',is_twice=True)
+
+                    manshuo_draw_json = [
+                        {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 25,
+                         'content': [f"[name]{owner_name}[/name]  [time]{pub_time}[/time]"],'avatar_size':50,
+                         'label': label_list}, {'type': 'text','content': [text_list_check]}]
+
+                    json_check['pic_path'] = await manshuo_draw(await add_append_img(manshuo_draw_json,manshuo_draw_json2,layer=2))
                     json_check['time'] = pub_time
                     return json_check
+
         return None
+
     # 直播间识别
     if 'live' in url:
         room_id = re.search(r'\/(\d+)$', url).group(1)
@@ -307,24 +328,24 @@ async def bilibili(url,filepath=None,is_twice=None):
 
         if cover =='':
             cover='https://gal.manshuo.ink/usr/uploads/galgame/img/bili-logo.webp'
-        introduce=f'{parent_area_name} {area_name}'
-        avatar_path = (await asyncio.gather(*[asyncio.create_task(download_img(owner_cover, f'{filepath}'))]))[0]
-        contents.append((await asyncio.gather(*[asyncio.create_task(download_img(cover, f'{filepath}'))]))[0])
-        contents.append(f"{title}")
+        context += f'[title]{title}[/title]\n[des]{parent_area_name} {area_name}[/des]'
 
         if f'{room_info["live_status"]}' == '1':
             live_status, live_start_time = room_info['live_status'], room_info['live_start_time']
-            video_time = datetime.fromtimestamp(live_start_time).astimezone().strftime("%Y-%m-%d %H:%M:%S")
-        else:video_time='暂未开启直播'
-        #logger.info(room_info['online'])
+            pub_time = datetime.fromtimestamp(live_start_time).astimezone().strftime("%Y-%m-%d %H:%M:%S")
+        else:pub_time='暂未开启直播'
+        manshuo_draw_json = [
+            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 25,
+             'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
+             'type_software': 'bilibili', },
+            {'type': 'img', 'subtype': 'common_with_des_right', 'img': [cover],'label': ['直播'],
+             'content': [context]}]
+
         if is_twice is not True:
-            out_path=draw_adaptive_graphic_and_textual(contents, avatar_path=avatar_path, name=owner_name,
-                                          Time=f'{video_time}',type=12,introduce=introduce,filepath=filepath,type_software='BiliBili 直播',
-                                      color_software=(251,114,153,80),output_path_name=f'{room_id}',avatar_json=avatar_json)
-            json_check['pic_path'] = out_path
+            json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
 
             return json_check
-        return contents, avatar_path, owner_name, video_time, type, introduce,emoji_list
+        return manshuo_draw_json
     # 专栏识别
     if 'read' in url:
         read_id = re.search(r'read\/cv(\d+)', url).group(1)
@@ -344,7 +365,6 @@ async def bilibili(url,filepath=None,is_twice=None):
         return None
     # 收藏夹识别
     if 'favlist' in url and BILI_SESSDATA != '':
-
         logger.info('收藏夹未做识别，跳过，欢迎催更')
         return None
 
@@ -367,8 +387,8 @@ async def bilibili(url,filepath=None,is_twice=None):
         return None
     video_title, video_cover, video_desc, video_duration = video_info['title'], video_info['pic'], video_info['desc'], \
         video_info['duration']
-    video_time = datetime.utcfromtimestamp(video_info['pubdate']) + timedelta(hours=8)
-    video_time=video_time.strftime('%Y-%m-%d %H:%M:%S')
+    pub_time = datetime.utcfromtimestamp(video_info['pubdate']) + timedelta(hours=8)
+    pub_time=pub_time.strftime('%Y-%m-%d %H:%M:%S')
     # 校准 分p 的情况
     page_num = 0
     if 'pages' in video_info:
@@ -396,20 +416,46 @@ async def bilibili(url,filepath=None,is_twice=None):
         json_check['audio_url']=audio_url
     except Exception as e:
         json_check['video_url'] = False
+    context += f'[title]{video_title}[/title]\n[des]{video_desc} [/des]'
+    manshuo_draw_json = [
+        {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover_url], 'upshift_extra': 25,
+         'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
+         'type_software': 'bilibili', },
+        {'type': 'img', 'subtype': 'common_with_des', 'img': [video_cover],'label': ['视频'],
+         'content': [context]}]
 
-
-
-    contents.append((await asyncio.gather(*[asyncio.create_task(download_img(video_cover, f'{filepath}'))]))[0])
-    avatar_path = (await asyncio.gather(*[asyncio.create_task(download_img(owner_cover_url, f'{filepath}'))]))[0]
-
-    contents.append(f"{video_title}")
-    introduce=f'{video_desc}'
-
-    type=11
     if is_twice is not True:
-        out_path=draw_adaptive_graphic_and_textual(contents, avatar_path=avatar_path, name=owner_name,Time=f'{video_time}',type=type,introduce=introduce,
-                                    filepath=filepath,type_software='BiliBili',avatar_json=avatar_json,
-                                    color_software=(251,114,153,80),output_path_name=f'{video_id}')
-        json_check['pic_path'] = out_path
+        json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
         return json_check
-    return contents, avatar_path, owner_name, video_time, type, introduce,emoji_list
+    return manshuo_draw_json
+
+
+
+async def download_video_link_prising(json,filepath=None,proxy=None):
+    if filepath is None:filepath = filepath_init
+    video_json={}
+    if json['soft_type'] == 'bilibili':
+        video_path=await download_b(json['video_url'], json['audio_url'], int(time.time()), filepath=filepath)
+    elif json['soft_type'] == 'dy':
+        video_path = await download_video(json['video_url'], filepath=filepath)
+    elif json['soft_type'] == 'wb':
+        video_path = await download_video(json['video_url'], filepath=filepath, ext_headers={
+                "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+                "referer": "https://weibo.com/"
+            })
+    elif json['soft_type'] == 'x':
+        video_path = await download_video(json['video_url'], filepath=filepath,proxy=proxy)
+    elif json['soft_type'] == 'xhs':
+        video_path = await download_video(json['video_url'], filepath=filepath)
+    video_json['video_path'] = video_path
+    file_size_in_mb = get_file_size_mb(video_path)
+    if file_size_in_mb < 10:
+        video_type='video'
+    elif file_size_in_mb < 30:
+        video_type='video_bigger'
+    elif file_size_in_mb < 100:
+        video_type='file'
+    else:
+        video_type = 'too_big'
+    video_json['type']=video_type
+    return video_json
