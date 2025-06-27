@@ -145,7 +145,7 @@ def main(bot,config):
                     cmList.append(cover)
             text=text.replace(' ','')
             bot.logger.info("获取番剧排行成功")
-            bangumi_json=await bangumi_PILimg(text, cmList,'data/pictures/cache/',type_soft=f'bangumi {month}月新番',config=config,name=f'bangumi {month}月新番')
+            bangumi_json=await bangumi_PILimg(text, cmList,'data/pictures/cache/',type_soft=f'bangumi {month}月新番',config=config,name=f'bangumi {month}月新番',bot_id=event.self_id)
             if bangumi_json['status']:
                 bot.logger.info('番剧排行图片制作成功，开始推送~~~')
                 await bot.send(event, Image(file=bangumi_json['pic_path']))
@@ -159,11 +159,17 @@ def main(bot,config):
     @bot.on(GroupMessageEvent)
     async def bangumi_search_week(event: GroupMessageEvent):
         context=event.pure_text
-        if ( "今日" in context) and ("新番" in context or "番剧" in context or "动画" in context or "bangumi" in context or "放送" in context):
+
+        if "新番" in context or "番剧" in context or "动画" in context or "bangumi" in context or "放送" in context:
             weekday = datetime.datetime.today().weekday()
+            if "今日" in context: pass
+            elif "明日" in context: weekday +=1
+            elif "昨日" in context: weekday -=1
+            else: return
+
             weekdays = ["一", "二", "三", "四", "五", "六", "日"]
             #print(f'bangumi 周{weekdays[weekday]}放送')
-            bangumi_json = await bangumi_PILimg(filepath='data/pictures/cache/', type_soft=f'bangumi 周{weekdays[weekday]}放送',name=f'bangumi 周{weekdays[weekday]}放送',type='calendar',config=config)
+            bangumi_json = await bangumi_PILimg(name=f'bangumi 周{weekdays[weekday]}放送',type='calendar',config=config,target=weekday,bot_id=event.self_id)
             #print(json.dumps(bangumi_json, indent=4))
             if bangumi_json['status']:
                 bot.logger.info('今日番剧图片制作成功，开始推送~~~')
@@ -211,7 +217,7 @@ def main(bot,config):
         nonlocal searchtask,recall_id,switch  # 变量提前，否则可能未定义
         try:
             bangumi_json = await bangumi_PILimg(filepath='data/pictures/cache/',config=config,
-                                                type_soft=f'bangumi 查询', type='search',target=keywords,search_type=search_type)
+                                                type_soft=f'bangumi 查询', type='search',target=keywords,search_type=search_type,bot_id=event.self_id)
             if bangumi_json['status']:
                 bot.logger.info('bangumi搜索成功，开始推送~~~')
                 if bangumi_json['next_choice'] is True:
@@ -260,7 +266,7 @@ def main(bot,config):
                     return
 
                 try:
-                    bangumi_json = await bangumi_PILimg(filepath='data/pictures/cache/',type_soft=f'bangumi 查询', type='search_accurate',config=config, target=subject_id)
+                    bangumi_json = await bangumi_PILimg(filepath='data/pictures/cache/',type_soft=f'bangumi 查询', type='search_accurate',config=config, target=subject_id,bot_id=event.self_id)
                     if bangumi_json['status']:
                         bot.logger.info('bangumi搜索成功，开始推送~~~')
                         await bot.send(event, [f"这是{botname}为您查询到的结果～～",Image(file=bangumi_json['pic_path'])])
