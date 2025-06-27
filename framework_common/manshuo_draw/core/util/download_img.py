@@ -27,9 +27,12 @@ def download_img_sync(url,gray_layer=False,proxy=None):
         proxies = None
 
     with httpx.Client(proxies=proxies) as client:
-        response = client.get(url)  # 同步 GET 请求
-        if response.status_code!= 200:
+        try:
+            response = client.get(url)  # 同步 GET 请求
+        except httpx.ConnectError:
             response = client.get('https://gal.manshuo.ink/usr/uploads/galgame/zatan.png')  # 同步 GET 请求
+        if response.status_code!= 200:
+            response = client.get('https://gal.manshuo.ink/usr/uploads/galgame/img/%E4%B8%96%E4%BC%8AGalgame.png')  # 同步 GET 请求
 
         if gray_layer:
             img = Image.open(BytesIO(response.content))  # 从二进制数据创建图片对象
