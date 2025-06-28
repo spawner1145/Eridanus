@@ -24,12 +24,13 @@ async def call_bili_download_video(bot, event, config):
     try:
         video_json = await download_video_link_prising(json, filepath='data/pictures/cache/', proxy=proxy)
         if 'video' in video_json['type']:
-            if video_json['type'] == 'video_bigger':
-                await bot.send(event, f'视频有些大，请耐心等待喵~~')
+            if video_json['type'] == 'video_bigger':recall_id =await bot.send(event, f'视频有些大，请耐心等待喵~~')
             await bot.send(event, Video(file=video_json['video_path']))
+            if video_json['type'] == 'video_bigger':await bot.recall(recall_id['data']['message_id'])
         elif video_json['type'] == 'file':
-            await bot.send(event, f'好大的视频，小的将发送至群文件喵~')
+            recall_id =await bot.send(event, f'好大的视频，小的将发送至群文件喵~')
             await bot.send(event, File(file=video_json['video_path']))
+            await bot.recall(recall_id['data']['message_id'])
         elif video_json['type'] == 'too_big':
             await bot.send(event, f'太大了，罢工！')
     except Exception as e:
@@ -88,7 +89,7 @@ def main(bot, config):
                     await bot.send(event, '该类型视频暂未提供下载支持，敬请期待')
                     teamlist.pop(event.group_id)
                 else:
-                    #teamlist.pop(event.group_id)
+                    bot.logger.info('视频下载ing')
                     await call_bili_download_video(bot, event, config)
 
         link_prising_json = await link_prising(url, filepath='data/pictures/cache/', proxy=proxy)
@@ -97,11 +98,16 @@ def main(bot, config):
         if link_prising_json['status']:
             bot.logger.info('链接解析成功，开始推送~~')
             if link_prising_json['video_url']:
-                send_context = f'该视频可下载，发送“下载视频”以推送'
                 teamlist[event.group_id] = link_prising_json
-                if "QQ小程序" in url and config.streaming_media.config["bili_dynamic"]["is_QQ_chek"] is not True:
-                    await bot.send(event, [f'{send_context}'])
+                if event.pure_text.startswith('下载视频'):
+                    bot.logger.info('视频下载ing')
+                    await call_bili_download_video(bot, event, config)
                     return
+                else:
+                    send_context = f'该视频可下载，发送“下载视频”以推送'
+                    if "QQ小程序" in url and config.streaming_media.config["bili_dynamic"]["is_QQ_chek"] is not True:
+                        await bot.send(event, [f'{send_context}'])
+                        return
             await bot.send(event, [f'{send_context}\n', Image(file=link_prising_json['pic_path'])])
         else:
             if link_prising_json['reason']:
