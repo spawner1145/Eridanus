@@ -15,6 +15,9 @@ async def call_bili_download_video(bot, event, config):
     if event.group_id in teamlist:
         json = teamlist[event.group_id]
         teamlist.pop(event.group_id)
+        if f'{event.group_id}_recall' in teamlist:
+            await bot.recall(teamlist[f'{event.group_id}_recall']['data']['message_id'])
+            teamlist.pop(f'{event.group_id}_recall')
     else:
         return {"status": "当前群聊没有已缓存的解析结果。"}
     if json['soft_type'] not in {'bilibili', 'dy', 'wb', 'xhs', 'x'}:
@@ -106,9 +109,9 @@ def main(bot, config):
                 else:
                     send_context = f'该视频可下载，发送“下载视频”以推送'
                     if "QQ小程序" in url and config.streaming_media.config["bili_dynamic"]["is_QQ_chek"] is not True:
-                        await bot.send(event, [f'{send_context}'])
+                        teamlist[f'{event.group_id}_recall'] = await bot.send(event, [f'{send_context}'])
                         return
-            await bot.send(event, [f'{send_context}\n', Image(file=link_prising_json['pic_path'])])
+            teamlist[f'{event.group_id}_recall'] = await bot.send(event, [f'{send_context}\n', Image(file=link_prising_json['pic_path'])])
         else:
             if link_prising_json['reason']:
                 #print(link_prising_json)
