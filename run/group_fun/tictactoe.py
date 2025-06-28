@@ -7,72 +7,59 @@ from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Node, Text, Image, At
 from framework_common.utils.utils import delay_recall
 
+"""
+输入"创建棋局 5x6 5 2"代表创建一个5行6列的棋盘，5连子胜利，2人游玩
+"""
+
 def _create_board_image(board_str):
-    """
-    Creates a PNG image of the Tic-Tac-Toe board from a string representation.
-    Adds row and column numbers and uses a larger font for the pieces.
-    """
-    cell_size = 60  # Increased cell size for better spacing
-    padding = 20    # Increased padding
+    cell_size = 60
+    padding = 20
     line_width = 3
-    
-    # Split the board string into rows
+
     rows = board_str.strip().split('\n')
     board_height = len(rows)
     board_width = len(rows[0].split(' '))
-    
-    # Calculate image dimensions, adding space for row/column numbers
-    img_width = board_width * cell_size + 2 * padding + 30 # Extra space for row numbers
-    img_height = board_height * cell_size + 2 * padding + 30 # Extra space for column numbers
+
+    img_width = board_width * cell_size + 2 * padding + 30
+    img_height = board_height * cell_size + 2 * padding + 30
     image = PIL.Image.new('RGB', (img_width, img_height), 'white')
     draw = ImageDraw.Draw(image)
     
     try:
-        # Use a larger font for pieces and numbers
         font_piece = ImageFont.truetype("arial.ttf", size=40)
         font_num = ImageFont.truetype("arial.ttf", size=20)
     except IOError:
         font_piece = ImageFont.load_default()
         font_num = ImageFont.load_default()
 
-    # Draw grid lines
-    # Horizontal lines
     for i in range(board_height + 1):
         y_pos = padding + i * cell_size + 30
         draw.line([(padding + 30, y_pos), (img_width - padding, y_pos)], fill='black', width=line_width)
-    # Vertical lines
     for j in range(board_width + 1):
         x_pos = padding + j * cell_size + 30
         draw.line([(x_pos, padding + 30), (x_pos, img_height - padding)], fill='black', width=line_width)
 
-    # Draw row numbers on the left
     for r_idx in range(board_height):
         y_pos = padding + r_idx * cell_size + (cell_size // 2) + 30
         draw.text((padding, y_pos), str(r_idx + 1), fill='black', font=font_num)
 
-    # Draw column numbers on the top
     for c_idx in range(board_width):
         x_pos = padding + c_idx * cell_size + (cell_size // 2) + 30
         draw.text((x_pos, padding), str(c_idx + 1), fill='black', font=font_num)
 
-    # Draw pieces (X, O) on the board
     for r_idx, row in enumerate(rows):
         pieces = row.split(' ')
         for c_idx, piece in enumerate(pieces):
-            if piece != 'O':  # Assuming 'O' is an empty cell in the string
-                # Center the piece within the cell
+            if piece != 'O':
                 bbox = font_piece.getbbox(piece)
                 text_width = bbox[2] - bbox[0]
                 text_height = bbox[3] - bbox[1]
-                
-                # Adjust position to account for padding and numbering
+
                 text_x = padding + c_idx * cell_size + (cell_size - text_width) // 2 + 30
                 text_y = padding + r_idx * cell_size + (cell_size - text_height) // 2 + 30
-                
-                # Use a specific color for the piece for better visibility
+
                 draw.text((text_x, text_y), piece, fill='red' if piece == 'X' else 'blue', font=font_piece)
                 
-    # Save the image to a temporary file
     temp_dir = 'data/pictures/cache'
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
