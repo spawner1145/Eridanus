@@ -204,7 +204,7 @@ class TicTacToeManager:
         game.add_player(creator_id)
         self.player_to_game[creator_id] = game_id
 
-        return f"棋局#{game_id}创建成功，棋盘尺寸{a}x{b}，{n}连子获胜，最多{l}名玩家，发送加入棋局 {game_id}来加入"
+        return f"棋局#{game_id}创建成功，棋盘尺寸{a}x{b}，{n}连子获胜，最多{l}名玩家，发送:\n加入棋局 {game_id}\n来加入"
 
     def join_game(self, player_id, game_id):
         if player_id in self.player_to_game:
@@ -278,7 +278,7 @@ class TicTacToeManager:
             elif current_players < total_players:
                 game_status = "等待玩家"
             lines.append(f"[{game_id}] 创建者:|{creator}| ({current_players}/{total_players}) 状态: {game_status}")
-        return f"{'\n'.join(lines)}\n使用加入棋局 n来加入指定的棋局"
+        return ("\n".join(lines)) + "\n使用：\n加入棋局 n\n来加入指定的棋局"
 
     def place_piece(self, player_id, position):
         if player_id not in self.player_to_game:
