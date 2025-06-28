@@ -98,7 +98,7 @@ class TicTacToeGame:
         if self.check_win(x, y, piece_num):
             self.game_over = True
             self.winner = player_id
-            return f"玩家{player_id}获胜！"
+            return f"玩家|{player_id}|获胜！棋盘：\n||{self.get_board_str()}||"
 
         if self.is_board_full():
             self.game_over = True
@@ -274,7 +274,7 @@ class TicTacToeManager:
             total_players = game.max_players
             game_status = "进行中"
             if game.game_over:
-                game_status = f"已结束 ({game.winner} 获胜)" if game.winner != "平局" else "已结束 (平局)"
+                game_status = f"已结束 (|{game.winner}| 获胜)" if game.winner != "平局" else "已结束 (平局)"
             elif current_players < total_players:
                 game_status = "等待玩家"
             lines.append(f"[{game_id}] 创建者:|{creator}| ({current_players}/{total_players}) 状态: {game_status}")
