@@ -108,7 +108,8 @@ class TicTacToeGame:
         self.current_turn_index = (self.current_turn_index + 1) % len(self.players)
         
         next_player_id = list(self.players.keys())[self.current_turn_index]
-        return f"落子成功，当前棋盘：\n||{self.get_board_str()}||\n现在轮到玩家|{next_player_id}|落子"
+        next_player_piece = self.players[next_player_id]
+        return f"落子成功，当前棋盘：\n||{self.get_board_str()}||\n现在轮到玩家|{next_player_id}|落子，你的棋子是{next_player_piece}"
 
     def check_win(self, x, y, piece):
         board_height = len(self.board)
@@ -219,7 +220,8 @@ class TicTacToeManager:
             self.player_to_game[player_id] = game_id
             if len(game.players) == game.max_players:
                 current_turn_player = list(game.players.keys())[game.current_turn_index]
-                return f"{result}\n当前棋盘：\n||{game.get_board_str()}||\n玩家已满，现在轮到玩家|{current_turn_player}|落子"
+                current_turn_piece = game.players[current_turn_player]
+                return f"{result}\n当前棋盘：\n||{game.get_board_str()}||\n玩家已满，现在轮到玩家|{current_turn_player}|落子，你的棋子是{current_turn_piece}"
             else:
                 return f"{result}\n棋局#{game_id}等待更多玩家加入... ({len(game.players)}/{game.max_players})"
         else:
@@ -337,8 +339,8 @@ if __name__ == "__main__":
     print("\n" + "=" * 40)
     print("测试2: 可配置游戏 (5x5, 4连子, 3人) - 获胜")
     print(manager.create_game("userA", "创建棋局 5x5 4 3")) # 创建棋局#2
-    print(manager.join_game("userB", 1))
-    print(manager.join_game("userC", 1))
+    print(manager.join_game("userB", 2))
+    print(manager.join_game("userC", 2))
 
     moves_for_win = [
         ("userA", "1,1"), ("userB", "2,2"), ("userC", "3,3"),
