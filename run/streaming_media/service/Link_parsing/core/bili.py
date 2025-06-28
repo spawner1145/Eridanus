@@ -256,6 +256,7 @@ async def fetch_latest_dynamic_id_api(uid):
 
 
 async def download_b(video_url,audio_url,video_id,filepath=None):
+    if video_id is None:video_id='1234567'
     path = filepath  + str(video_id)
     #print('start video downloading')
     try:
