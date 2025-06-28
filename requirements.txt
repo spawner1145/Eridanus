@@ -31,3 +31,4 @@ jieba
 scikit-learn
 psutil
 pyzipper
+pycairo
