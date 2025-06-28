@@ -4,9 +4,9 @@ basic_set:
   img_height: 3000                  #图像默认最大长度
   padding_left_common: 25           #层级的左间距，注意，修改此处仅会影响部分间距，每个模块内可能有各自的间距设置
   padding_up_common: 20             #层级的上间距，注意，修改此处仅会影响部分间距，每个模块内可能有各自的间距设置
-  is_rounded_corners_front: True    #是否对模块进行圆角处理
-  is_stroke_front: True             #是否对模块进行描边处理
-  is_shadow_front: True             #是否对模块进行阴影处理
+  is_rounded_corners_front: True    #是否对模块进行圆角处理（此处为前置条件，必要不充分）
+  is_stroke_front: True             #是否对模块进行描边处理（此处为前置条件，必要不充分）
+  is_shadow_front: True             #是否对模块进行阴影处理（此处为前置条件，必要不充分）
   img_path_save: data/pictures/cache  #若有图片保存需求，则会将文件保存在此处，基于‘Eridanus’文件夹
   img_name_save: None
   debug: False                      #是否开启debug，开启后控制台会输出相应处理过程
