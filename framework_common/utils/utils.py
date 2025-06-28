@@ -128,6 +128,36 @@ async def download_file(url,path,proxy=None):
         with open(path, 'wb') as f:
             f.write(response.content)
         return path
+    
+def convert_list_to_type(input_list, target_type_str="int"):
+    """
+    将列表中的每个元素尝试转换为指定类型, 返回转换后的列表
+    input_list: 原始列表，包含各种可转换的元素。
+    target_type_str: 目标类型名称，例如 "int", "float", "str" 等。
+    """
+    type_mapping = {
+        'int': int,
+        'float': float,
+        'str': str,
+        'bool': bool,
+        'complex': complex,
+    }
+    convert_func = type_mapping.get(target_type_str.lower())
+    if not convert_func:
+        raise ValueError(f"不支持的类型: {target_type_str}")
+    converted_list = []
+    error_occurred = False
+    for index, item in enumerate(input_list):
+        try:
+            converted_item = convert_func(item)
+            converted_list.append(converted_item)
+        except (ValueError, TypeError):
+            print(f"转换失败：元素 '{item}'（位置索引 {index}）无法转换为 {target_type_str}")
+            error_occurred = True
+    if error_occurred:
+        return input_list
+    else:
+        return converted_list
 
 from pydub import AudioSegment
 def merge_audio_files(audio_files: list, output_file: str) -> str:
