@@ -1,12 +1,12 @@
-import asyncio
+from bs4 import BeautifulSoup
+import httpx
 import random
 
-import httpx
-import requests
-from PIL import Image, ImageDraw, ImageFont
 from bilibili_api import hot, sync
-from bs4 import BeautifulSoup
-
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
+import os
+import requests
+import asyncio
 
 def get_headers():
     user_agent_list = [

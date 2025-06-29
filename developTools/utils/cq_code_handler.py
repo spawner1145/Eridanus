@@ -4,6 +4,9 @@ from typing import List, Dict, Union
 
 # 定义通用解析 CQ 码的函数
 def parse_message_with_cq_codes_to_list(message: str) -> List[Dict[str, Union[str, Dict]]]:
+    """
+    对于已经在很多地方应用了的sdk，不要随便动。Generator会出现报错导致无法启动。
+    """
     cq_pattern = r'\[CQ:(\w+),(.*?)\]'
     parsed_result = []
     last_end = 0
