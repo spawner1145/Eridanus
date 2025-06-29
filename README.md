@@ -42,21 +42,22 @@ _🎊 基于 [OneBot](https://github.com/howmanybots/onebot/blob/master/README.m
 # 交流
 QQ群：913122269
 # 更新计划
-- [ ] galgame查询，同步请求部分修改为异步
+- [x] galgame查询，同步请求部分修改为异步
 - [x] ai对话功能，群聊上下文读取方式优化，人设读取方式优化，提高兼容性
 - [ ] 自定义问答，微调训练
 - [X] 点歌功能修复
 - [ ] 输出内容自我审核
-- [ ] 抖音视频下载
+- [x] 抖音视频下载
 - [ ] jmcomic功能优化
 - [ ] 定时任务完善。用函数调用实现事项提醒效果。
 - [ ] 更多主动触发功能
 - [ ] 函数调用func_map描述优化，降低tokens消耗
 - [ ] 其他平台适配器
-- [ ] webui重构，提高兼容性，界面美化。webui与项目本体合并
+- [x] webui重构，提高兼容性，界面美化。webui与项目本体合并
 - [ ] ai绘画冗余、重复代码优化
 - [ ] 接入petpet
 - [X] 开发文档优化，插件模板
+- [X] 重构自身绘图框架
 # 派生项目
 - [Achernar](https://github.com/avilliai/Achernar) cpolar隧道本地反向代理，kaggle自动切换账号运行指定脚本。(用于在kaggle持久化部署ai绘画等服务)
 - [vits api](https://github.com/avilliai/vits_api) 本地部署vits语音合成服务端，已打包。

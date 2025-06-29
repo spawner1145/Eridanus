@@ -11,7 +11,9 @@ from jmcomic import *
 
 from framework_common.utils.random_str import random_str
 from run.ai_generated_art.service.antiSFW import process_folder, compress_gifs
+from datetime import date
 
+jm_save={}
 
 class MyDownloader(jmcomic.JmDownloader):
     start = 0
@@ -73,10 +75,14 @@ def JM_search(name):
 
 
 def JM_search_week():
+    global jm_save
     op = JmOption.default()
     cl = op.new_jm_client()
     page: JmCategoryPage = cl.week_ranking(1)
     result = ''
+    today = date.today()
+    if f'{today}_week' in jm_save:
+        return jm_save[f'{today}_week']
     for page in cl.categories_filter_gen(page=1,  # 起始页码
                                          # 下面是分类参数
                                          time=JmMagicConstants.TIME_WEEK,
@@ -90,23 +96,30 @@ def JM_search_week():
             number += 1
             if number == 20: break
         break
+    jm_save[f'{today}_week'] = result
     return result
 
 
 def JM_search_comic_id():
+    global jm_save
     op = JmOption.default()
     cl = op.new_jm_client()
     page: JmCategoryPage = cl.week_ranking(1)
     result = []
+    today = date.today()
+    if f'{today}_month' in jm_save:
+        return jm_save[f'{today}_month']
     for page in cl.categories_filter_gen(page=1,  # 起始页码
                                          # 下面是分类参数
                                          time=JmMagicConstants.TIME_MONTH,
                                          category=JmMagicConstants.CATEGORY_ALL,
                                          order_by=JmMagicConstants.ORDER_BY_VIEW,
                                          ):
+
         for aid, atitle in page:
             result.append(aid)
-        # print(result)
+        if len(result) > 50:break
+    jm_save[f'{today}_month']=result
     return result
 
 

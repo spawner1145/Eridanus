@@ -2,8 +2,7 @@ from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Image
 from run.acg_infromation.service.majsoul.majsoul_plugin import check_for_majsoul_personal_info
 from run.group_fun.service.wife_you_want import manage_group_status
-from run.streaming_media.service.Link_parsing.Link_parsing import majsoul_PILimg
-
+from run.streaming_media.service.Link_parsing import majsoul_PILimg
 def main(bot, config):
     logger=bot.logger
 

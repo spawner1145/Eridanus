@@ -25,12 +25,12 @@ if __name__ == '__main__':
     :is_crop:表示是否裁剪图片，如True表示裁剪图片为一个正方形
     """
     contents=[
-        {'type': 'basic_set', 'debug': True,'is_abs_path_convert':True},
+        {'type': 'basic_set', 'debug': True},
 
         {'type': 'backdrop', 'subtype': 'gradient'},
 
-        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift':25,
-         'content':[ {'name': '漫朔_manshuo❤️♡🥰😭🤔🤪😇', 'time': '2025年 05月27日 20:32'}] },
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift_extra':25,
+         'content':[ {'name': '漫朔_manshuo', 'time': '2025年 05月27日 20:32'}] },
 
         {'type': 'img', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg'],
          'label': ['BiliBili', 'dy', 'manshuo']},
@@ -39,14 +39,37 @@ if __name__ == '__main__':
          'content': ['这里是manshuo[title]！这部分是测manshuo！[/title]这manshuo！[des]这里是介绍[/des]'] },
     ]
 
-    contents_not=[        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],
-         'content':[ {'name': '漫朔_manshuo', 'time': '2025年 05月27日 20:32'}] },]
+    contents2=[
+        {'type': 'basic_set', 'debug': True},
+
+        {'type': 'backdrop', 'subtype': 'gradient'},
+
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift_extra':25,'layer':1,
+         'content':[ f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]"] },
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],
+         'upshift_extra': 25, 'layer': 1,
+         'content': [f"[name]漫朔_manshuo[/name] [time]2025年 05月27日 20:32[/time]"]},
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],
+         'upshift_extra': 25,'layer':1,
+         'content': [ f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]"]},
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],
+         'upshift_extra': 25,'layer':3,
+         'content': [ f"[name]漫朔_manshuo[/name]  [time]2025年 05月27日 20:32[/time]"]},
+    ]
+
+    contents_not=[{'type': 'basic_set', 'debug': True},{'type':'text','content':['manshuo']},
+        '这部分[emoji]framework_common/manshuo_draw/data/cache/manshuo.jpg[/emoji]是uo！\n'
+                  '[title]标题[emoji]framework_common/manshuo_draw/data/cache/manshuo.jpg[/emoji]是测试！[/title]'
+                  '这里是测试！这里是测试！这里是测试！这里是测试'
+                  '[title]这里[emoji]framework_common/manshuo_draw/data/cache/manshuo.jpg[/emoji]是测试！[/title]\n'
+                   '这部分[emoji]framework_common/manshuo_draw/data/cache/manshuo.jpg[/emoji]是测manshuo！\n'
+                  '[des]\n这里是[emoji]framework_common/manshuo_draw/data/cache/manshuo.jpg[/emoji]介绍[/des]']
 
 
     contentsWithNoTag=[
         {'type': 'basic_set', 'debug': True,'img_width':1000},
-        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift': 25,
-         'content': [{'name': '漫朔_manshuo', 'time': '2025年 05月27日 20:32'},],'type_software':'bilibili',},
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift_extra': 25,
+         'content': [f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]"],'type_software':'bilibili',},
         {'type': 'img', 'subtype': 'common_with_des_right','img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'label':['BiliBili'],
          'content': ['这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]']},
         {'type': 'img', 'subtype': 'common_with_des_right', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg'],
@@ -66,5 +89,5 @@ if __name__ == '__main__':
     img_path_set='data/cache'
 
 
-    asyncio.run(manshuo_draw(contents_not))
+    asyncio.run(manshuo_draw(contentsWithNoTag))
     #asyncio.run(manshuo_draw(contents_not))

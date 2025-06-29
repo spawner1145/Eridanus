@@ -29,7 +29,13 @@ def random_str(length=10):
     random_string = ''.join(random.choice(characters) for _ in range(length))
     return random_string
 
-
+def add_append_img(contents,contents2,tag=None,tag_item=None,replace_item=None):
+    for item in contents2:
+        if isinstance(item, dict) and tag is not None and tag_item is not None:
+            item[f'{tag}']=tag_item
+            if replace_item is not None and item[f'tag']==replace_item: item[f'tag']=tag_item
+        contents.append(item)
+    return contents
 
 
 def get_abs_path(path,is_ignore_judge=False):

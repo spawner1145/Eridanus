@@ -80,12 +80,22 @@ async def layer_deal(basic_img_info,json_img,layer=1):
 async def deal_img(json_img): #此函数将逐个解析json文件中的每个字典并与之对应的类相结合
     printf_check(json_img)
     printf('开始处理图片')
+
+
+
     basic_json_set= json_img.copy()
     for per_json_img in basic_json_set:               #优先将图片的基本信息创建好，以免出错
         if 'basic_set' in per_json_img['type']:
             basic_img_info = basicimgset(per_json_img)
             basic_img = basic_img_info.creatbasicimgnobackdrop()
             break
+    if basic_img_info.is_abs_path_convert is True:
+        basic_img_info.img_path_save = get_abs_path(basic_img_info.img_path_save,is_ignore_judge=True)
+    if basic_img_info.img_name_save is not None :
+        img_path = basic_img_info.img_path_save
+        if os.path.isfile(img_path):return img_path
+    else:
+        img_path = basic_img_info.img_path_save+"/" + random_str() + ".png"
 
 
     layer_img_canvas=(await layer_deal(basic_img_info,json_img))['layer_img_canvas']
@@ -101,9 +111,7 @@ async def deal_img(json_img): #此函数将逐个解析json文件中的每个字
 
 
 
-    if basic_img_info.is_abs_path_convert is True:
-        basic_img_info.img_path_save = get_abs_path(basic_img_info.img_path_save,is_ignore_judge=True)
-    img_path = basic_img_info.img_path_save+"/" + random_str() + ".png"
+
     basic_img.save(img_path, "PNG")
     if basic_img_info.debug is True:
         basic_img.show()

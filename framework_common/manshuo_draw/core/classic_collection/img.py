@@ -162,20 +162,19 @@ class ImageModule:
 
     def label_process(self,img,number_count,new_width):
         font_label = ImageFont.truetype(self.font_label, self.font_label_size)
-        label_width, label_height,upshift = self.padding * 4, self.padding,0
+        label_width, label_height,upshift = self.padding * 4, self.padding + self.font_label_size,0
         if number_count  >= len(self.label) or self.label[number_count] == '':
             return img
         label_content = self.label[number_count]
         #计算标签的实际长度
         for per_label_font in label_content:
             label_width += font_label.getbbox(per_label_font)[2] - font_label.getbbox(per_label_font)[0]
-            if font_label.getbbox(per_label_font)[3] - font_label.getbbox(per_label_font)[1] > label_height:
-                label_height += font_label.getbbox(per_label_font)[3] - font_label.getbbox(per_label_font)[1]
         if label_width > new_width: label_width = new_width
         label_canvas = Image.new("RGBA", (int(label_width), int(label_height)), eval(self.label_color))
         #调用方法绘制文字并判断是否需要描边和圆角
+        #print(label_width,label_height)
         label_canvas = basic_img_draw_text(label_canvas, f'[label] {label_content} [/label]', self.__dict__,
-                                                                        box=(self.padding*1.3, self.padding*0.6),
-                                                                        limit_box=(label_width,label_height))['canvas']
+                                                                        box=(self.padding*1.3, self.padding*0.8),
+                                                                        limit_box=(label_width,label_height),ellipsis=False)['canvas']
         img = img_process(self.__dict__, img, label_canvas, int(new_width - label_width), 0, upshift,'label')
         return img

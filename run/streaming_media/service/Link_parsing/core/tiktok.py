@@ -4,6 +4,17 @@ import urllib.parse
 import os
 import shutil
 import httpx
+import re
+import copy
+from .login_core import ini_login_Link_Prising
+from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME
+from urllib.parse import urlparse
+from urllib.parse import parse_qs
+from datetime import datetime, timedelta
+from developTools.utils.logger import get_logger
+logger=get_logger()
+import json
+from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 
 """以下为抖音/TikTok类型代码/Type code for Douyin/TikTok"""
 URL_TYPE_CODE_DICT = {
@@ -105,6 +116,124 @@ async def dou_transfer_other(dou_url):
             return cover, author, title, images
 
     return None, None, None, None
+
+
+
+async def dy(url,filepath=None):
+    """
+        抖音解析
+    :param bot:
+    :param event:
+    :return:
+    """
+    if filepath is None:filepath = filepath_init
+    contents=[]
+    # 消息
+    msg=url
+    json_check = copy.deepcopy(json_init)
+    json_check['status'] = True
+    json_check['video_url'] = False
+    json_check['soft_type'] = 'dy'
+    #logger.info(msg)
+    # 正则匹配
+    reg = r"(http:|https:)\/\/v.douyin.com\/[A-Za-z\d._?%&+\-=#]*"
+    dou_url = re.search(reg, msg, re.I)[0]
+    dou_url_2 = httpx.get(dou_url).headers.get('location')
+    json_check['url'] = dou_url
+    logger.info(f'dou_url:{dou_url}')
+    #logger.info(f'dou_url_2:{dou_url_2}')
+
+    # 实况图集临时解决方案，eg.  https://v.douyin.com/iDsVgJKL/
+    if "share/slides" in dou_url_2:
+        cover, author, title, images = await dou_transfer_other(dou_url)
+        # 如果第一个不为None 大概率是成功
+        if author is not None:
+            pass
+            #logger.info(f"{GLOBAL_NICKNAME}识别：【抖音】\n作者：{author}\n标题：{title}")
+            #logger.info(url for url in images)
+        # 截断后续操作
+        return
+    # logger.error(dou_url_2)
+    reg2 = r".*(video|note)\/(\d+)\/(.*?)"
+    # 获取到ID
+    dou_id = re.search(reg2, dou_url_2, re.I)[2]
+    douyin_ck=ini_login_Link_Prising(type=2)
+    if douyin_ck is None:
+        logger.warning("无法获取到管理员设置的抖音ck！,启用默认配置，若失效请登录")
+        douyin_ck='odin_tt=xxx;passport_fe_beating_status=xxx;sid_guard=xxx;uid_tt=xxx;uid_tt_ss=xxx;sid_tt=xxx;sessionid=xxx;sessionid_ss=xxx;sid_ucp_v1=xxx;ssid_ucp_v1=xxx;passport_assist_user=xxx;ttwid=1%7CKPNpSlm-sMOACobI2T3-9GpRhKYzXoy07j_S-KjqxBU%7C1737658644%7Cbec487261896df392f3fe61ed66fa449bbf3f6a88866a7185d2cb17bfc2b8397;'
+    # API、一些后续要用到的参数
+    headers = {
+                  'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
+                  'referer': f'https://www.douyin.com/video/{dou_id}',
+                  'cookie': douyin_ck
+              } | COMMON_HEADER
+    api_url = DOUYIN_VIDEO.replace("{}", dou_id)
+    #logger.info(f'api_url: {api_url}')
+    api_url = generate_x_bogus_url(api_url, headers)  # 如果请求失败直接返回
+    async with httpx.AsyncClient(headers=headers, timeout=10) as client:
+        response = await client.get(api_url)
+        detail=response.json()
+        if detail is None:
+            logger.info(f"{GLOBAL_NICKNAME}识别：抖音，解析失败！")
+            # await douyin.send(Message(f"{GLOBAL_NICKNAME}识别：抖音，解析失败！"))
+            return
+        # 获取信息
+
+        detail = detail['aweme_detail']
+        formatted_json = json.dumps(detail, indent=4)
+        #print(formatted_json)
+        #print(detail['author']['signature'])
+        # 判断是图片还是视频
+        url_type_code = detail['aweme_type']
+        url_type = URL_TYPE_CODE_DICT.get(url_type_code, 'video')
+        # 根据类型进行发送
+        avatar_url, cover_url = detail['author']['avatar_thumb']['url_list'][0], \
+        detail['author']['cover_url'][0]['url_list'][1]
+        owner_name = detail['author']['nickname']
+        #logger.info(f'avatar_url: {avatar_url}\ncover_url: {cover_url}')
+        video_time = datetime.utcfromtimestamp(detail['create_time']) + timedelta(hours=8)
+        video_time = video_time.strftime('%Y-%m-%d %H:%M:%S')
+
+        if url_type == 'video':
+            # 识别播放地址
+            player_uri = detail.get("video").get("play_addr")['uri']
+            player_real_addr = DY_TOUTIAO_INFO.replace("{}", player_uri)
+            cover_url = detail.get("video").get("dynamic_cover")['url_list'][0]
+            img_context=[cover_url]
+            context = detail.get("desc").replace('#', '\n[tag]#', 1)
+            if '#' in context: context += '[/tag]'
+
+            player_uri = detail.get("video").get("play_addr")['uri']
+            player_real_addr = DY_TOUTIAO_INFO.replace("{}", player_uri)
+            #print(player_real_addr)
+            json_check['video_url'] = player_real_addr
+            #video_path = await download_video(player_real_addr, filepath=filepath)
+
+        elif url_type == 'image':
+            # 无水印图片列表/No watermark image list
+            no_watermark_image_list = []
+            for i in detail['images']:
+                no_watermark_image_list.append(i['url_list'][0])
+            # logger.info(no_watermark_image_list)
+            img_context=no_watermark_image_list
+
+            # await send_forward_both(bot, event, make_node_segment(bot.self_id, no_watermark_image_list))
+            context = detail.get("desc").replace('#', '\n[tag]#', 1)
+            if '#' in context: context += '[/tag]'
+        context += f"\n--------------\n作者简介：\n{detail['author']['signature']}"
+        if len(img_context) != 1:
+            json_check['pic_path'] = await manshuo_draw([
+                            {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url],'upshift_extra': 25,
+                             'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]" ], 'type_software': 'dy', 'label':['视频']},img_context,[context]])
+        else:
+            json_check['pic_path'] = await manshuo_draw([
+                            {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url],'upshift_extra': 25,
+                             'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]" ], 'type_software': 'dy', },
+                            {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': [context]}])
+        #print(out_path)
+        return json_check
+
+
 
 if __name__ == '__main__':
     node_path = shutil.which("node")  # 自动查找 Node.js 可执行文件路径
