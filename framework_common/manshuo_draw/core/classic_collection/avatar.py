@@ -39,15 +39,15 @@ class AvatarModule:
         pure_backdrop = Image.new("RGBA", (self.img_width, self.img_height), (0, 0, 0, 0))
         number_count,upshift,downshift,current_y,x_offset = 0,0,0,self.padding_up_bottom,self.padding
         #若有描边，则将初始粘贴位置增加一个描边宽度
-        if self.is_stroke_front and self.is_stroke_avatar:current_y += self.stroke_avatar_width / 2
-        if self.is_shadow_front and self.is_shadow_avatar:upshift +=self.shadow_offset_avatar*2
+        if self.is_stroke_front and self.is_stroke_img:current_y += self.stroke_img_width / 2
+        if self.is_shadow_front and self.is_shadow_img:upshift +=self.shadow_offset*2
         new_width=(((self.img_width - self.padding*2 ) - (self.number_per_row - 1) * self.padding_with) // self.number_per_row)
         self.icon_backdrop_check()
         for img in self.processed_img:
             img.thumbnail((self.avatar_size, self.avatar_size))
 
             # 对每个图像进行处理
-            pure_backdrop = img_process(self.__dict__,pure_backdrop, img, x_offset, current_y, upshift,'avatar')
+            pure_backdrop = img_process(self.__dict__,pure_backdrop, img, x_offset, current_y, upshift)
 
 
             # 绘制名字和时间等其他信息
@@ -70,6 +70,8 @@ class AvatarModule:
 
         pure_backdrop = icon_process(self.__dict__, pure_backdrop,(self.img_width - self.padding , current_y ))
         pure_backdrop = backdrop_process(self.__dict__,pure_backdrop,(self.img_width, current_y + self.padding_up_bottom))
+
+
         upshift+=self.upshift_extra
         return {'canvas': pure_backdrop, 'canvas_bottom': current_y + self.padding_up_bottom - self.upshift_extra ,'upshift':upshift,'downshift':0}
 

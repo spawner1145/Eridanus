@@ -1,17 +1,16 @@
-#此配置文件为默认存储回滚文件，非专业人员请勿乱动！！！！
 basic_set:
   img_width: 1000                   #图像默认宽度
   img_height: 3000                  #图像默认最大长度
   padding_left_common: 25           #层级的左间距，注意，修改此处仅会影响部分间距，每个模块内可能有各自的间距设置
   padding_up_common: 20             #层级的上间距，注意，修改此处仅会影响部分间距，每个模块内可能有各自的间距设置
-  is_rounded_corners_front: True    #是否对模块进行圆角处理（此处为前置条件，必要不充分）
-  is_stroke_front: True             #是否对模块进行描边处理（此处为前置条件，必要不充分）
-  is_shadow_front: True             #是否对模块进行阴影处理（此处为前置条件，必要不充分）
+  is_rounded_corners_front: true    #是否对模块进行圆角处理
+  is_stroke_front: true             #是否对模块进行描边处理
+  is_shadow_front: true             #是否对模块进行阴影处理
   img_path_save: data/pictures/cache  #若有图片保存需求，则会将文件保存在此处，基于‘Eridanus’文件夹
   img_name_save: None
-  debug: False                      #是否开启debug，开启后控制台会输出相应处理过程
+  debug: false                      #是否开启debug，开启后控制台会输出相应处理过程
   config_path: framework_common/manshuo_draw/data/config/save_config.yaml  #默认配置文件地址
-  is_abs_path_convert: True        #将文件路径转换为绝对路径（默认关闭，可能会有bug，但建议开发者打开以便于测试）
+  is_abs_path_convert: true        #将文件路径转换为绝对路径（默认关闭，可能会有bug，但建议开发者打开以便于测试）
                                     #注意：此处同时对传入的img路径进行转换，绝对路径初始值为‘Eridanus’，即bot所在文件夹
 
   #以下为层级的部分处理
@@ -23,14 +22,14 @@ basic_set:
     'color1': (235, 239, 253)
     'color2': (236, 255, 252)
 
-  is_rounded_corners_layer: True    #是否对层级进行圆角处理
+  is_rounded_corners_layer: true    #是否对层级进行圆角处理
   rounded_layer_radius: 20        #层级的圆角弧度
 
-  is_stroke_layer: True             #是否对层级进行描边处理
+  is_stroke_layer: true             #是否对层级进行描边处理
   stroke_layer_radius: 23           #描边的圆角弧度
   stroke_layer_width: 10            #描边的圆角宽度
 
-  is_shadow_layer: True             #是否对层级进行阴影处理
+  is_shadow_layer: true             #是否对层级进行阴影处理
   shadow_offset_layer: 10           #阴影的偏移量
   shadow_opacity_layer: 30          #阴影的透明度
   blur_radius_layer: 7              #阴影模糊半径
@@ -56,14 +55,14 @@ basic_set:
   font_tag_size: 24                     #字体大小
   font_tag_color: (9, 132, 204)               #字体颜色
 
-  is_rounded_corners_img: True      #是否对模块进行圆角处理
+  is_rounded_corners_img: true      #是否对模块进行圆角处理
   rounded_img_radius: 20            #圆角处理半径
 
-  is_stroke_img: True               #是否对模块进行描边处理
+  is_stroke_img: true               #是否对模块进行描边处理
   stroke_img_radius: 23             #描边的圆角弧度
   stroke_img_width: 10              #描边的圆角宽度
 
-  is_shadow_img: True               #是否对模块进行阴影处理
+  is_shadow_img: true               #是否对模块进行阴影处理
   shadow_offset_img: 10                 #阴影的偏移量
   shadow_opacity_img: 50                #阴影的透明度
   blur_radius_img: 10                   #阴影模糊半径
@@ -77,7 +76,7 @@ backdrop:
     right_color: (185, 246, 236)
 
 text:
-  must_required_keys: {'content'}
+  must_required_keys: {'content': null}
   common:
     spacing: 1                       #每个字之间的间距
 
@@ -88,33 +87,33 @@ img:
   label: []                           #默认的label内容
   label_color: (251,114,153,255)      #默认label颜色
 
-  is_rounded_corners_label: True      #是否对标签进行圆角处理
+  is_rounded_corners_label: true      #是否对标签进行圆角处理
   rounded_label_radius: 10            #圆角处理半径
 
-  is_stroke_label: True               #是否对标签进行描边处理
+  is_stroke_label: true               #是否对标签进行描边处理
   stroke_label_radius: 12             #描边的圆角弧度
   stroke_label_width: 10              #描边的圆角宽度
 
-  is_shadow_label: False               #是否对标签进行阴影处理
+  is_shadow_label: false               #是否对标签进行阴影处理
   shadow_offset_label: 10                 #阴影的偏移量
   shadow_opacity_label: 50                #阴影的透明度
   blur_radius_label: 10                   #阴影模糊半径
 
-  must_required_keys: {'img'}
+  must_required_keys: {'img': null}
 
   number_per_row: default           #每行图片个数，默认即为九宫格，可自定义
   is_crop: default                    #是否裁剪
 
   common:
-    must_required_keys: {'img'}
+    must_required_keys: {'img': null}
 
   common_with_des:
-    must_required_keys: {'img','content'}
+    must_required_keys: {'img': null, 'content': null}
     description_color: (255,255,255,255)  #放置介绍区域的颜色
     max_des_length: 300
 
   common_with_des_right:
-    must_required_keys: {'img','content'}
+    must_required_keys: {'img': null, 'content': null}
     description_color: (255,255,255,255)  #放置介绍区域的颜色
 
 
@@ -130,14 +129,14 @@ avatar:
   font_time_color: (148,148,148)
 
   #以下为层级的部分处理，示例：可进行自定义
-  is_rounded_corners_img: True    #是否对层级进行圆角处理
+  is_rounded_corners_img: true    #是否对层级进行圆角处理
   rounded_img_radius: 50
 
-  is_stroke_img: True             #是否对层级进行描边处理
+  is_stroke_img: true             #是否对层级进行描边处理
   stroke_img_width: 10
   stroke_img_radius: 55
 
-  is_shadow_img: False             #是否对层级进行阴影处理
+  is_shadow_img: false             #是否对层级进行阴影处理
   shadow_offset_img: 10                 #阴影的偏移量
   shadow_opacity_img: 50                #阴影的透明度
   blur_radius_img: 8                   #阴影模糊半径
@@ -145,18 +144,18 @@ avatar:
   background: None
   right_icon: None
   type_software: None
-  is_shadow_font: False
+  is_shadow_font: false
   software_list:
-    - {'type': 'bilibili','background':framework_common/manshuo_draw/data/img/type_software/bili.png,'right_icon':framework_common/manshuo_draw/data/img/type_software/bili_icon.png}
-    - {'type': 'dy','background':framework_common/manshuo_draw/data/img/type_software/dy.jpeg,'right_icon':framework_common/manshuo_draw/data/img/type_software/dy_icon.png}
-    - {'type': 'lu','background':framework_common/manshuo_draw/data/img/type_software/lu.jpg,'right_icon':framework_common/manshuo_draw/data/img/type_software/lu_icon.png}
-    - {'type': 'bangumi','background':framework_common/manshuo_draw/data/img/type_software/bangumi.jpeg,'right_icon':framework_common/manshuo_draw/data/img/type_software/bangumi_icon.png}
-    - {'type': 'xhs','background':framework_common/manshuo_draw/data/img/type_software/xhs.jpeg,'right_icon':framework_common/manshuo_draw/data/img/type_software/xhs_icon.png}
-    - {'type': 'wb','background':,'right_icon':framework_common/manshuo_draw/data/img/type_software/wb_icon.png}
+    - {'type': 'bilibili', 'background': framework_common/manshuo_draw/data/img/type_software/bili.png, 'right_icon': framework_common/manshuo_draw/data/img/type_software/bili_icon.png}
+    - {'type': 'dy', 'background': framework_common/manshuo_draw/data/img/type_software/dy.jpeg, 'right_icon': framework_common/manshuo_draw/data/img/type_software/dy_icon.png}
+    - {'type': 'lu', 'background': framework_common/manshuo_draw/data/img/type_software/lu.jpg, 'right_icon': framework_common/manshuo_draw/data/img/type_software/lu_icon.png}
+    - {'type': 'bangumi', 'background': framework_common/manshuo_draw/data/img/type_software/bangumi.jpeg, 'right_icon': framework_common/manshuo_draw/data/img/type_software/bangumi_icon.png}
+    - {'type': 'xhs', 'background': framework_common/manshuo_draw/data/img/type_software/xhs.jpeg, 'right_icon': framework_common/manshuo_draw/data/img/type_software/xhs_icon.png}
+    - {'type': 'wb', 'background': null, 'right_icon': framework_common/manshuo_draw/data/img/type_software/wb_icon.png}
 
 
   common:
-    must_required_keys: {'img','content'}
+    must_required_keys: {'img': null, 'content': null}
     number_per_row: 1         #默认一个，可以指定每行多少个头像
     is_name: Ture                   #是否在头像右侧旁添加名字
     avatar_size: 100
@@ -176,4 +175,4 @@ games:
     font_date_color: (0,0,0)
     number_per_row: 7           #每行图片个数，默认即为九宫格，可自定义
     background: framework_common/manshuo_draw/data/img/games/lu/background_LU.jpg
-    img: False
+    img: false

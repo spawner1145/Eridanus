@@ -148,7 +148,7 @@ async def bangumi_PILimg(text=None,img_context=None,filepath=None,proxy=None,typ
         json_check['pic_path'] = await manshuo_draw([{'type': 'basic_set', 'img_width': 1500,'img_name_save':f'{name}.png'},
                             {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={bot_id}&s=640"],'upshift_extra': 25,
                              'content': [f"[name]{name}[/name]\n[time]{datetime.now().strftime('%Y年%m月%d日 %H:%M')}[/time]" ], 'type_software': 'bangumi', },
-                            {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': text_total,'is_shadow_img':False}])
+                            {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': text_total}])
         json_check['soft_type'] = 'bangumi_calendar'
         return json_check
 

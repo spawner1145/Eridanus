@@ -48,10 +48,11 @@ def json_check(json_img):
         from framework_common.framework_util.yamlLoader import YAMLManager
         for item in json_check_reload:
             if 'type' in item and item['type'] in ['basic_set']:
-                if YAMLManager("run").system_plugin.config['draw_frame']['is_lightweight'] is True:
-                    item['is_rounded_corners_front'],item['is_stroke_front'],item['is_shadow_front'] = False,False,False
                 if 'config_path' not in item:
-                    item['config_path'] = 'framework_common/manshuo_draw/data/config/manshuodraw_config.yaml'
+                    if YAMLManager("run").system_plugin.config['draw_frame']['is_lightweight'] is True:
+                        item['config_path']='framework_common/manshuo_draw/data/config/lightweight_config.yaml'
+                    else:
+                        item['config_path'] = 'framework_common/manshuo_draw/data/config/manshuodraw_config.yaml'
     except:pass
 
     return json_check_reload
