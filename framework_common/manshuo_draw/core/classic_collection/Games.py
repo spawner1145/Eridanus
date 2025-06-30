@@ -82,8 +82,6 @@ class GamesModule:
             x_offset_week += new_width + self.padding_with
         current_y += img_week.height + self.padding_with
 
-
-
         #对每个图片进行单独处理
         for img in self.processed_img:
             img = img.resize((new_width, int(new_width * img.height / img.width)))
@@ -117,7 +115,7 @@ class GamesModule:
 
 
 
-
+    #标签绘制模块
     def label_process(self,img,number_count,new_width):
         font_label = ImageFont.truetype(self.font_label, self.font_label_size)
         label_width, label_height,upshift = self.padding * 4, self.padding,0
@@ -137,3 +135,27 @@ class GamesModule:
                                                                         limit_box=(label_width,label_height))['canvas']
         img = img_process(self.__dict__, img, label_canvas, int(new_width - label_width), 0, upshift,'label')
         return img
+
+    #以下函数为模块内关系处理函数，请不要乱动
+    def init(self):#对模块的参数进行初始化
+        self.pure_backdrop = Image.new("RGBA", (self.img_width, self.img_height), (0, 0, 0, 0))
+        self.new_width = (((self.img_width - self.padding * 2) - (self.number_per_row - 1) * self.padding_with) // self.number_per_row)
+        self.per_number_count, self.number_count, self.upshift, self.downshift, self.current_y, self.x_offset, self.max_height = 0, 0, 0, 0, 0, self.padding, 0
+        # 若有描边，则将初始粘贴位置增加一个描边宽度
+        if self.is_stroke_front and self.is_stroke_img: self.current_y += self.stroke_img_width / 2
+        if self.is_shadow_front and self.is_shadow_img: self.upshift += self.shadow_offset_img * 2
+
+    def per_img_deal(self,img):#绘制完该模块后处理下一个模块的关系
+        if img.height > self.max_height: self.max_height = img.height
+        self.x_offset += self.new_width + self.padding_with
+        self.per_number_count += 1
+        self.number_count += 1
+        if self.per_number_count == self.number_per_row:
+            self.current_y += self.max_height + self.padding_with
+            self.per_number_count, self.x_offset, self.max_height = 0, self.padding, 0
+
+    def final_img_deal(self):#判断是否需要增减
+        if self.per_number_count != 0:
+            self.current_y += self.max_height
+        else:
+            self.current_y -= self.padding_with

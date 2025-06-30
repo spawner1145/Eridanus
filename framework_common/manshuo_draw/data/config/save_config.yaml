@@ -130,17 +130,17 @@ avatar:
   font_time_color: (148,148,148)
 
   #以下为层级的部分处理，示例：可进行自定义
-  is_rounded_corners_img: true    #是否对层级进行圆角处理
-  rounded_img_radius: 50
+  is_rounded_corners_avatar: true    #是否对层级进行圆角处理
+  rounded_avatar_radius: 50
 
-  is_stroke_img: true             #是否对层级进行描边处理
-  stroke_img_width: 10
-  stroke_img_radius: 55
+  is_stroke_avatar: true             #是否对层级进行描边处理
+  stroke_avatar_width: 10
+  stroke_avatar_radius: 55
 
-  is_shadow_img: false             #是否对层级进行阴影处理
-  shadow_offset_img: 10                 #阴影的偏移量
-  shadow_opacity_img: 50                #阴影的透明度
-  blur_radius_img: 8                   #阴影模糊半径
+  is_shadow_avatar: false             #是否对层级进行阴影处理
+  shadow_offset_avatar: 10                 #阴影的偏移量
+  shadow_opacity_avatar: 50                #阴影的透明度
+  blur_radius_avatar: 8                   #阴影模糊半径
 
   background: None
   right_icon: None
@@ -163,6 +163,7 @@ avatar:
     padding: 30
     padding_up_bottom: 15
     upshift_extra: 0                     #上偏移量
+    test_mashuo: 'nihao'    #wobuzhidao aoihfaiohf
 
 
 
@@ -177,4 +178,4 @@ games:
     number_per_row: 7           #每行图片个数，默认即为九宫格，可自定义
     background: framework_common/manshuo_draw/data/img/games/lu/background_LU.jpg
     img: false
-    is_shadow_img: False
+    is_shadow_img: false
