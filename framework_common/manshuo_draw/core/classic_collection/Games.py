@@ -71,6 +71,19 @@ class GamesModule:
                 elif self.content[f'{i}']['type'] == 'nolu': self.processed_img.append(background_make)
             else:self.processed_img.append(background_make_L)
 
+        weeky=['周日','周一','周二','周三','周四','周五','周六','周日']
+        x_offset_week=self.padding
+        for i in range(int(self.number_per_row)):
+            week_img_canves = Image.new("RGBA", background_make.size, (255, 255, 255, 255)).resize(
+                (new_width, int(new_width * background_make.height / background_make.width)))
+            img_week = basic_img_draw_text(week_img_canves, f"[title]{weeky[i]}[/title]", self.__dict__,
+                                      box=(int(self.padding*1.2), week_img_canves.height//2 - self.font_title_size//2 + 2), )['canvas']
+            pure_backdrop = img_process(self.__dict__, pure_backdrop, img_week, x_offset_week, current_y, upshift)
+            x_offset_week += new_width + self.padding_with
+        current_y += img_week.height + self.padding_with
+
+
+
         #对每个图片进行单独处理
         for img in self.processed_img:
             img = img.resize((new_width, int(new_width * img.height / img.width)))
