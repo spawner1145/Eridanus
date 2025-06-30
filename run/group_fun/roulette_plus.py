@@ -8,7 +8,7 @@ from framework_common.utils.utils import delay_recall
 from developTools.message.message_components import Node, Text, Image, At
 
 START_GAME_ANNOUNCEMENTS = [
-    "寂静的房间里，左轮手枪被重重地拍在冰冷的铁桌上。一场赌上生死的对决，由 {nickname} 发起。规则已定，敢来赴死者，请坐到桌前。",
+    "寂静的房间里，左轮手枪被重重地拍在冰冷的铁桌上。一场赌上生死的决斗，由 {nickname} 发起。规则已定，敢来赴死者，请坐到桌前。",
     "空气中弥漫着威士忌和硝烟的味道。赌局已开，这是命运的邀请函，由 {nickname} 亲手递上。想活到最后？那就加入我们，用你的生命做筹码。",
     "心跳声，呼吸声，都在这一刻变得清晰可闻。轮盘赌的号角已经吹响，由 {nickname} 开启。欢迎来到这场狩猎游戏，你是猎人，还是猎物？",
 ]
@@ -74,6 +74,13 @@ RELOAD_MESSAGES = [
     "死亡的阴影刚刚散去，但新的挑战已经到来。弹巢重新上满子弹并转动，发出机械的咔嗒声。这一次，你的运气还会像之前一样好吗？",
 ]
 
+REVIVE_MESSAGES = [
+    "{player_nickname} 在倒下的一瞬间，猛地灌下了剩下的所有饮料！一股神秘的力量涌入他的体内，伤口以肉眼可见的速度愈合，他重重地喘息着，竟奇迹般地站了起来！他回到了赌局，生命值恢复到 1！",
+    "死亡的边缘，{player_nickname} 凭借着手中最后几瓶饮料，硬生生地把自己从鬼门关拉了回来！咕咚咕咚... 饮料见底，他的生命之火重新燃起，虽然只剩 1 点生命值，但他还在！",
+    "没有人想到，{player_nickname} 居然还有这种底牌！在致命的打击下，他将所有饮料一饮而尽，生命如同被强行续上了弦！虽然代价是所有的饮料，但他的身影再次出现在赌桌旁，苟延残喘的生命值回到了 1。",
+]
+
+
 game_session: Dict[str, Any] = {
     "is_active": False,
     "admin": None,
@@ -85,6 +92,8 @@ game_session: Dict[str, Any] = {
     "current_round": 0,
     "tools_available": ["短锯", "放大镜", "饮料"],
     "waiting_for_action": False,
+    "turn_order": [],
+    "current_turn_index": -1,
 }
 
 TOOL_EFFECTS = {
@@ -95,9 +104,6 @@ TOOL_EFFECTS = {
 
 def main(bot, config):
     def parse_game_params(text: str) -> Dict[str, int]:
-        """
-        解析游戏指令，提取参数
-        """
         params = {
             "hp": 1,
             "bullets": 1,
@@ -172,6 +178,11 @@ def main(bot, config):
             "current_round": 0,
             "tools_available": ["短锯", "放大镜", "饮料"],
             "waiting_for_action": False,
+            "turn_order": [],
+            "current_turn_index": -1,
+            "initial_hp": 0,
+            "initial_bullets": 0,
+            "tool_count": 0,
         })
         
     def get_player_info(user_id: int) -> Optional[Dict[str, Any]]:
@@ -184,42 +195,93 @@ def main(bot, config):
         alive_players = [uid for uid, info in game_session["players"].items() if info["is_alive"]]
         return alive_players
 
-    def move_to_next_turn():
+    def move_to_next_turn(previous_shooter_id: int, target_id: int, is_live_round: bool):
         if "turn_order" not in game_session or not game_session["turn_order"]:
             bot.logger.warning("回合顺序列表不存在或为空，无法切换回合")
+            game_session["current_turn"] = None
             return
         
-        current_player_id = game_session["current_turn"]
-        if current_player_id and current_player_id in game_session["players"]:
-            game_session["players"][current_player_id]["shot_damage_bonus"] = 0
+        if previous_shooter_id and previous_shooter_id in game_session["players"]:
+            game_session["players"][previous_shooter_id]["shot_damage_bonus"] = 0
+
+        alive_players_in_order = [uid for uid in game_session["turn_order"] if get_player_info(uid) and get_player_info(uid)["is_alive"]]
+
+        if not alive_players_in_order:
+            game_session["current_turn"] = None
+            bot.logger.info("所有玩家都已死亡，无法切换回合")
+            return
+
+        next_player_id = None
+
+        if previous_shooter_id == target_id:
+            if not is_live_round:  # 射击自己且是空枪，继续自己回合
+                next_player_id = previous_shooter_id
+                bot.logger.info(f"玩家 {previous_shooter_id} 对自己空枪，继续其回合。")
+            else:  # 射击自己且是实弹，如果还活着，继续自己回合；如果死了，按照加入决斗次序的下一个还活着的人的回合
+                shooter_info = get_player_info(previous_shooter_id)
+                if shooter_info and shooter_info["is_alive"]:
+                    next_player_id = previous_shooter_id
+                    bot.logger.info(f"玩家 {previous_shooter_id} 对自己实弹但存活，继续其回合。")
+                else:
+                    # 查找顺序列表中的下一个存活玩家
+                    current_index_in_order = game_session["turn_order"].index(previous_shooter_id)
+                    next_index_in_order = (current_index_in_order + 1) % len(game_session["turn_order"])
+                    count = 0
+                    while count < len(game_session["turn_order"]):
+                        player_id_candidate = game_session["turn_order"][next_index_in_order]
+                        if get_player_info(player_id_candidate) and get_player_info(player_id_candidate)["is_alive"]:
+                            next_player_id = player_id_candidate
+                            break
+                        next_index_in_order = (next_index_in_order + 1) % len(game_session["turn_order"])
+                        count += 1
+                    bot.logger.info(f"玩家 {previous_shooter_id} 对自己实弹并死亡，切换到下一个存活玩家 {next_player_id} 的回合。")
+        # 射击别人
+        else:
+            target_player_info = get_player_info(target_id)
+            if target_player_info and target_player_info["is_alive"]: # 目标没死，下一个回合是被射击那个人的
+                next_player_id = target_id
+                bot.logger.info(f"玩家 {previous_shooter_id} 射击玩家 {target_id} 且目标存活，切换到目标 {target_id} 的回合。")
+            else: # 目标死了，下一个回合还是射击者
+                next_player_id = previous_shooter_id
+                bot.logger.info(f"玩家 {previous_shooter_id} 射击玩家 {target_id} 且目标死亡，继续其回合。")
         
-        next_index = (game_session["current_turn_index"] + 1) % len(game_session["turn_order"])
-        
-        count = 0
-        while count < len(game_session["turn_order"]):
-            player_info = get_player_info(game_session["turn_order"][next_index])
-            if player_info and player_info["is_alive"]:
-                game_session["current_turn_index"] = next_index
-                game_session["current_turn"] = game_session["turn_order"][next_index]
-                return
+        if next_player_id and (not get_player_info(next_player_id) or not get_player_info(next_player_id)["is_alive"]):
+            bot.logger.warning(f"计算出的下一回合玩家 {next_player_id} 已经死亡，重新查找下一个存活玩家。")
+            current_index_in_order = game_session["turn_order"].index(previous_shooter_id)
+            start_index = (current_index_in_order + 1) % len(game_session["turn_order"])
             
-            next_index = (next_index + 1) % len(game_session["turn_order"])
-            count += 1
+            found_next = False
+            for _ in range(len(game_session["turn_order"])):
+                player_id_candidate = game_session["turn_order"][start_index]
+                if get_player_info(player_id_candidate) and get_player_info(player_id_candidate)["is_alive"]:
+                    next_player_id = player_id_candidate
+                    found_next = True
+                    break
+                start_index = (start_index + 1) % len(game_session["turn_order"])
+            
+            if not found_next:
+                next_player_id = None
         
-        game_session["current_turn"] = None
+        game_session["current_turn"] = next_player_id
+        if next_player_id:
+            game_session["current_turn_index"] = game_session["turn_order"].index(next_player_id)
+        else:
+            game_session["current_turn_index"] = -1
 
     async def send_game_status_message(event: GroupMessageEvent):
-        status_text = "对决状态\n"
+        status_text = "决斗状态\n"
         for uid, player in game_session["players"].items():
-            status_text += f"\n◆ 玩家: {player['nickname']}\n - HP: {player['hp']}\n - 工具: {', '.join(player['tools']) or '无'}"
+            status = "存活" if player["is_alive"] else "已淘汰"
+            status_text += f"\n◆ 玩家: {player['nickname']} ({status})\n - HP: {player['hp']}\n - 工具: {', '.join(player['tools']) or '无'}"
             if player["shot_damage_bonus"] > 0:
                 status_text += f"\n - 状态: 伤害加成 +{player['shot_damage_bonus']}"
         
         status_text += f"\n弹仓信息\n"
         shots_left = game_session['total_chambers'] - game_session['total_shots_fired']
         status_text += f"当前回合: {game_session['current_round']}\n"
-        status_text += f"剩余子弹: {game_session['bullet_chamber'][game_session['total_shots_fired']:].count(1)}\n"
-        status_text += f"剩余弹孔: {shots_left}\n"
+        status_text += f"剩余实弹: {game_session['bullet_chamber'][game_session['total_shots_fired']:].count(1)}\n"
+        status_text += f"剩余空弹: {shots_left - game_session['bullet_chamber'][game_session['total_shots_fired']:].count(1)}\n"
+        status_text += f"剩余弹孔: {shots_left}"
         
         msg = await bot.send(event, [Text(text=status_text)])
         if msg:
@@ -272,13 +334,27 @@ def main(bot, config):
         shooter_info["shot_damage_bonus"] = 0 
         game_session["total_shots_fired"] += 1
         
+        response_text = ""
         if is_live_round:
             target_info["hp"] -= shot_damage
             response_text = random.choice(LIVE_SHOT_MESSAGES).format(target_nickname=target_nickname)
             
+            # 复活：当前饮料数 > 0 时触发
             if target_info["hp"] <= 0:
-                target_info["is_alive"] = False
-                response_text += f"\n{target_nickname} 痛苦地倒下了... 他被淘汰了！"
+                drink_count = target_info["tools"].count("饮料")
+
+                if drink_count > 0: 
+                    response_text += f"\n{target_nickname} 血量归零！但ta拥有 {drink_count} 瓶饮料！"
+                    target_info["hp"] = 1
+                    target_info["tools"] = [tool for tool in target_info["tools"] if tool != "饮料"]
+                    response_text += "\n" + random.choice(REVIVE_MESSAGES).format(player_nickname=target_nickname)
+                    bot.logger.info(f"玩家 {target_id} ({target_nickname}) 濒死时消耗所有饮料复活，HP设为1。")
+                else:
+                    # 饮料不足以将HP恢复到大于0，玩家死亡
+                    target_info["is_alive"] = False
+                    response_text += f"\n{target_nickname} 痛苦地倒下了... 他被淘汰了！"
+                    bot.logger.info(f"玩家 {target_id} ({target_nickname}) HP归零且饮料不足，被淘汰。")
+
         else:
             response_text = random.choice(MISS_SHOT_MESSAGES)
             
@@ -286,20 +362,49 @@ def main(bot, config):
         if msg:
             await delay_recall(bot, msg, 30)
 
-        alive_players = get_alive_players_ids()
-        
-        if game_session["total_shots_fired"] >= game_session["total_chambers"] or game_session['bullet_chamber'][game_session['total_shots_fired']:].count(1) <= 0:
-            if len(alive_players) > 1:
+        # 检查弹仓是否打空或只剩空弹
+        if game_session["total_shots_fired"] >= game_session["total_chambers"] or game_session['bullet_chamber'][game_session['total_shots_fired']:].count(1) == 0:
+            if len(get_alive_players_ids()) > 1: # 还有多于1个存活玩家，重装弹
                 reload_message = random.choice(RELOAD_MESSAGES)
                 msg_reload = await bot.send(event, [Text(text=reload_message)])
                 if msg_reload:
                     await delay_recall(bot, msg_reload, 30)
                 
+                # 给每个存活的玩家分发工具
+                alive_players_ids = get_alive_players_ids()
+                tool_count_per_player = game_session["tool_count"]
+                if tool_count_per_player > 0:
+                    tool_distribution_message = "新一轮工具已分发给所有幸存者:\n"
+                    for player_id in alive_players_ids:
+                        player_info = get_player_info(player_id)
+                        if player_info and player_info["is_alive"]:
+                            new_tools = [random.choice(game_session["tools_available"]) for _ in range(tool_count_per_player)]
+                            player_info["tools"].extend(new_tools)
+                            tool_distribution_message += f" - {player_info['nickname']} 获得了：{', '.join(new_tools)}\n"
+                            bot.logger.info(f"玩家 {player_id} ({player_info['nickname']}) 获得了 {tool_count_per_player} 个工具: {new_tools}")
+                    
+                    msg_tools = await bot.send(event, [Text(text=tool_distribution_message)])
+                    if msg_tools:
+                        await delay_recall(bot, msg_tools, 30)
+
                 prepare_game(game_session["initial_bullets"], game_session["chamber_size"])
                 bot.logger.info("弹仓打空，重新装弹并开始新一轮")
             else:
                 bot.logger.info("弹仓打空，但玩家不足2人，游戏即将结束")
-                
+
+        await check_game_end(event)
+        if not game_session["is_active"]: # 游戏已经结束，不再切换回合
+            bot.logger.info("游戏已结束，停止回合切换和信息发送")
+            return
+        
+        # 回合切换逻辑
+        move_to_next_turn(shooter_id, target_id, is_live_round)
+        
+        # 延迟发送下一回合信息，确保子弹结果消息已发出
+        await asyncio.sleep(1) 
+        await send_turn_info(event)
+
+
     async def check_game_end(event: GroupMessageEvent):
         alive_players = get_alive_players_ids()
         if len(alive_players) <= 1:
@@ -312,7 +417,7 @@ def main(bot, config):
                 if msg:
                     await delay_recall(bot, msg, 30)
             else:
-                msg = await bot.send(event, [Text(text="对决结束，没有赢家")])
+                msg = await bot.send(event, [Text(text="决斗结束，没有赢家")])
                 if msg:
                     await delay_recall(bot, msg, 30)
                 
@@ -335,9 +440,9 @@ def main(bot, config):
                 bot.logger.error(f"解析@消息时发生错误: {e}")
                 traceback.print_exc()
 
-        if pure_text == "对决开始":
+        if pure_text == "决斗开始":
             if not game_session["is_active"]:
-                msg = await bot.send(event, [Text(text="当前没有正在进行的对决，请先创建")])
+                msg = await bot.send(event, [Text(text="当前没有正在进行的决斗，请先创建")])
                 if msg: await delay_recall(bot, msg, 30)
                 return
             if user_id != game_session["admin"]["id"]:
@@ -357,9 +462,8 @@ def main(bot, config):
             admin_id = game_session["admin"]["id"]
             other_players_ids = [uid for uid in all_players_ids if uid != admin_id]
             random.shuffle(other_players_ids)
-            all_players_ids = [admin_id] + other_players_ids
-            
-            game_session["turn_order"] = all_players_ids
+            # 确保发起人是第一个，然后是随机的其他玩家
+            game_session["turn_order"] = [admin_id] + other_players_ids
             game_session["current_turn_index"] = 0
             game_session["current_turn"] = game_session["turn_order"][0]
             
@@ -371,9 +475,9 @@ def main(bot, config):
             game_session["waiting_for_action"] = True
             return
 
-        elif pure_text == "对决结束":
+        elif pure_text == "决斗结束":
             if not game_session["is_active"]:
-                msg = await bot.send(event, [Text(text="当前没有正在进行的对决")])
+                msg = await bot.send(event, [Text(text="当前没有正在进行的决斗")])
                 if msg: await delay_recall(bot, msg, 30)
                 return
             if user_id != game_session["admin"]["id"]:
@@ -382,21 +486,47 @@ def main(bot, config):
                 return
             
             reset_game_session()
-            msg = await bot.send(event, [Text(text="创建者已结束对决，赌局解散")])
+            msg = await bot.send(event, [Text(text="创建者已结束决斗，赌局解散")])
             if msg: await delay_recall(bot, msg, 30)
             return
             
-        elif pure_text == "对决状态":
-            bot.logger.info(f"收到指令: '对决状态'，来自用户: {user_id}")
+        elif pure_text == "决斗状态":
+            bot.logger.info(f"收到指令: '决斗状态'，来自用户: {user_id}")
             if not game_session["is_active"]:
-                msg = await bot.send(event, [Text(text="当前没有正在进行的对决")])
+                msg = await bot.send(event, [Text(text="当前没有正在进行的决斗")])
                 if msg: await delay_recall(bot, msg, 30)
                 return
             
             await send_game_status_message(event)
             return
 
-        elif pure_text.startswith("对决"):
+        elif pure_text == "决斗规则":        
+            rules = """
+决斗规则：
+- 创建者使用"决斗 --hp [初始生命值] --b [每一轮子弹数] --all [每一轮总弹仓数] --tool [道具数]"来创建游戏，这里四个参数都是可选，只发送"决斗"就是标准轮盘赌
+
+- 所有玩家加入完毕后，创建者使用"决斗开始"来开始游戏
+
+- 创建者开始第一个回合，使用"射击自己"或"射击 @[玩家]"来进行射击，在进行射击前可以无限"使用 [工具名]"来使用工具，例如"使用 短锯"来使下一枪的伤害+1
+
+- 射击自己如果没寄下一个回合还是自己，如果自己寄了下一个回合就是根据加入游戏顺序的自己后面一个人
+
+- 射击其他玩家如果目标玩家没寄下一个回合就是目标玩家，如果寄了下一个回合还是射击者
+
+- 每一轮打完(枪膛里没有子弹)但是场上存活玩家大于1人时，会装弹并发放--tool [道具数]这边定义的道具数个新的随机道具给每个活着的玩家
+
+- 如果一个人被打死了，但他还有饮料，则会消耗所有饮料并将hp设为1
+
+- 可以发送"决斗状态"来查看当前游戏状态，包括玩家列表、生命值、工具等信息
+
+- 创建者在任何时候都可以使用"决斗结束"来结束游戏
+            """
+            
+            msg = await bot.send(event, Node(content=[Text(text=rules)]))
+            await delay_recall(bot, msg, 60)
+            return
+
+        elif pure_text.startswith("决斗"):
             if game_session["is_active"]:
                 msg = await bot.send(event, [Text(text="一局游戏正在进行中，请等待其结束")])
                 if msg: await delay_recall(bot, msg, 30)
@@ -416,8 +546,8 @@ def main(bot, config):
                     f"子弹数: {params['bullets']}\n"
                     f"弹仓数: {params['chamber_size']}\n"
                     f"工具数: {params['tool_count']}"
-                    "\n其他玩家可以输入 '加入对决' 来加入游戏"
-                    "\n所有人都加入后，创建者使用 '对决开始' 来拉开序幕！"
+                    "\n其他玩家可以输入 '加入决斗' 来加入游戏"
+                    "\n所有人都加入后，创建者使用 '决斗开始' 来拉开序幕！"
                 )
                 msg = await bot.send(event, [Text(text=response_text)])
                 if msg: await delay_recall(bot, msg, 30)
@@ -427,9 +557,9 @@ def main(bot, config):
                 if msg: await delay_recall(bot, msg, 30)
                 bot.logger.error(f"创建游戏时参数错误: {e}")
 
-        elif pure_text == "加入对决":
+        elif pure_text == "加入决斗":
             if not game_session["is_active"]:
-                msg = await bot.send(event, [Text(text="当前没有正在进行的对决")])
+                msg = await bot.send(event, [Text(text="当前没有正在进行的决斗")])
                 if msg: await delay_recall(bot, msg, 30)
                 bot.logger.warning("游戏未激活，无法加入")
                 return
@@ -502,7 +632,7 @@ def main(bot, config):
                         response_text = random.choice(MAGNIFYING_GLASS_MESSAGES["live"]) + "\n你确定要对准别人吗？"
                     else:
                         response_text = random.choice(MAGNIFYING_GLASS_MESSAGES["miss"]) + "\n你可以考虑对自己开一枪..."
-                    
+
                 elif tool_name == "饮料":
                     player_info["hp"] += 1
                     response_text = random.choice(DRINK_MESSAGES) + f" 当前生命值: {player_info['hp']}"
@@ -533,41 +663,41 @@ def main(bot, config):
                         if msg: await delay_recall(bot, msg, 30)
                         return
 
-                    is_self_shot = pure_text == "射击自己"
+                    # 检查是否是射击自己的文本指令
+                    is_self_shot_text_command = (pure_text == "射击自己")
                     
                     target_id = None
                     target_nickname = None
                     
-                    if not is_self_shot:
-                        if at_qq:
-                            bot.logger.info(f"检测到射击@指令，目标QQ: {at_qq}")
-                            if at_qq in game_session["players"]:
-                                target_id = at_qq
-                                target_info = game_session["players"][target_id]
-                                if not target_info["is_alive"]:
-                                    msg = await bot.send(event, [Text(text="你不能射击一个已经被淘汰的玩家")])
-                                    if msg: await delay_recall(bot, msg, 30)
-                                    return
-                                target_nickname = target_info["nickname"]
-                                bot.logger.info(f"目标玩家 {target_id} 存在于游戏会话中")
-                                if target_id == event.sender.user_id:
-                                    target_id = user_id
-                                    target_nickname = nickname
-                                    is_self_shot = True
-                            else:
-                                msg = await bot.send(event, [Text(text="你射击了一个不在游戏中的玩家")])
+                    if at_qq: # 如果消息链中含有@
+                        bot.logger.info(f"检测到射击@指令，目标QQ: {at_qq}")
+                        if at_qq == user_id: # @自己等同于射击自己
+                            target_id = user_id
+                            target_nickname = nickname
+                            bot.logger.info(f"玩家 {user_id} @了自己，视为射击自己。")
+                        elif at_qq in game_session["players"]: # @了其他玩家
+                            target_id = at_qq
+                            target_info = game_session["players"][target_id]
+                            if not target_info["is_alive"]:
+                                msg = await bot.send(event, [Text(text="你不能射击一个已经被淘汰的玩家")])
                                 if msg: await delay_recall(bot, msg, 30)
-                                bot.logger.warning(f"玩家 {user_id} 试图射击不在游戏中的玩家 {at_qq}")
                                 return
-                        else:
-                            msg = await bot.send(event, [Text(text="请@一个玩家或输入 '射击自己' 来指定目标")])
+                            target_nickname = target_info["nickname"]
+                            bot.logger.info(f"目标玩家 {target_id} 存在于游戏会话中")
+                        else: # @了不在游戏中的人
+                            msg = await bot.send(event, [Text(text="你射击了一个不在游戏中的玩家")])
                             if msg: await delay_recall(bot, msg, 30)
-                            bot.logger.warning(f"玩家 {user_id} 射击指令缺少目标")
+                            bot.logger.warning(f"玩家 {user_id} 试图射击不在游戏中的玩家 {at_qq}")
                             return
-                    else:
-                        bot.logger.info("玩家选择射击自己")
+                    elif is_self_shot_text_command: # 纯文本指令“射击自己”
                         target_id = user_id
                         target_nickname = nickname
+                        bot.logger.info("玩家选择射击自己 (纯文本指令)。")
+                    else: # 既没有@，也不是“射击自己”
+                        msg = await bot.send(event, [Text(text="请@一个玩家或输入 '射击自己' 来指定目标")])
+                        if msg: await delay_recall(bot, msg, 30)
+                        bot.logger.warning(f"玩家 {user_id} 射击指令缺少目标")
+                        return
 
                     if target_id is None:
                         bot.logger.error("无法确定射击目标ID，操作终止")
@@ -577,23 +707,6 @@ def main(bot, config):
                     
                     await perform_shot(event, user_id, target_id, target_nickname)
                     
-                    await check_game_end(event)
-                    if not game_session["is_active"]:
-                        bot.logger.info("游戏已结束，停止回合切换和信息发送")
-                        return
-                    
-                    # 检查射手是否存活，如果射手射击自己且存活，则不切换回合
-                    shooter_info_after_shot = get_player_info(user_id)
-                    is_live_round = game_session["bullet_chamber"][game_session["total_shots_fired"] - 1] == 1
-                    
-                    # 只有当射击自己且是空枪时，才不切换回合
-                    if is_self_shot and not is_live_round:
-                         bot.logger.info("射手对准自己开了一枪空枪，回合不切换。")
-                    else:
-                        move_to_next_turn()
-                        bot.logger.info("切换到下一回合")
-                    
-                    await send_turn_info(event)
                 except Exception as e:
                     bot.logger.error(f"处理射击事件时发生未知错误: {e}")
                     traceback.print_exc()
