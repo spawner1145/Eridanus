@@ -10,7 +10,7 @@ from run.basic_plugin.service.anime_setu import anime_setu, anime_setu1
 from run.basic_plugin.service.cloudMusic import cccdddm
 from run.basic_plugin.service.divination import tarotChoice
 from run.basic_plugin.service.weather_query import weather_query
-
+from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 """
 供func call调用
 """
@@ -157,29 +157,30 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)
     async def cyber_divination(event: GroupMessageEvent):
+        if event.pure_text == "运势":
+            await call_fortune(bot, event, config)
+
+    @bot.on(GroupMessageEvent)
+    async def cyber_divination_tarot(event: GroupMessageEvent):
         if event.pure_text == "今日塔罗":
             if config.basic_plugin.config["tarot"]["彩蛋牌"] and random.randint(1, 100) < \
                     config.basic_plugin.config["tarot"]["彩蛋牌"]["probability"]:
                 cards_ = config.basic_plugin.config["tarot"]["彩蛋牌"]["card_index"]
                 card = random.choice(cards_)
-                card_path, text = list(card.items())[0]
-                if text == "": text = "no description"
-                await bot.send(event, [Text(f"{text}"), Image(file=card_path)])
-                return
-
-            txt, img = tarotChoice(config.basic_plugin.config["tarot"]["mode"])
-            await bot.send(event, [Text(txt), Image(file=img)])  #似乎没必要让这个也走ai回复调用
+                img, txt = list(card.items())[0]
+                if txt == "": txt = "no description"
+            else:txt, img = tarotChoice(config.basic_plugin.config["tarot"]["mode"])
         elif event.pure_text == "抽象塔罗":
             txt, img = tarotChoice('AbstractImages')
-            await bot.send(event, [Text(txt), Image(file=img)])  #似乎没必要让这个也走ai回复调用
         elif event.pure_text == "ba塔罗":
             txt, img = tarotChoice('blueArchive')
-            await bot.send(event, [Text(txt), Image(file=img)])  #似乎没必要让这个也走ai回复调用
         elif event.pure_text == "bili塔罗" or event.pure_text == "2233塔罗":
             txt, img = tarotChoice('bilibili')
-            await bot.send(event, [Text(txt), Image(file=img)])  #似乎没必要让这个也走ai回复调用
-        elif event.pure_text == "运势":
-            await call_fortune(bot, event, config)
+        else:return
+        await bot.send(event, Image(file=(await manshuo_draw([{'type': 'basic_set', 'img_width':750},
+                                                              {'type': 'img', 'subtype': 'common_with_des_right','img': [img],'content': [txt]}]))))
+
+
 
     @bot.on(GroupMessageEvent)
     async def pick_music(event: GroupMessageEvent):

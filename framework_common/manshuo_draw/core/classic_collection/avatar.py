@@ -51,10 +51,10 @@ class AvatarModule:
 
 
             # 绘制名字和时间等其他信息
-            draw_content= f"[name]{self.content[number_count]['name']}[/name]\n[time]{self.content[number_count]['time']}[/time]"
+            draw_content = f"{self.content[number_count]}"
             if self.is_name:
                 pure_backdrop=basic_img_draw_text(pure_backdrop,draw_content,self.__dict__,
-                                                                     box=(x_offset + self.avatar_size*1.1 + self.padding_with, current_y + self.avatar_size//2  - self.font_name_size*1.2),
+                                                                     box=(x_offset + self.avatar_size*1.1 + self.padding_with, current_y + self.padding_with),
                                                                      limit_box=(x_offset + new_width  , current_y  + self.avatar_size ),is_shadow=self.is_shadow_font)['canvas']
 
             x_offset += new_width + self.padding_with
@@ -72,15 +72,19 @@ class AvatarModule:
         pure_backdrop = backdrop_process(self.__dict__,pure_backdrop,(self.img_width, current_y + self.padding_up_bottom))
 
 
-        upshift+=self.upshift
-        return {'canvas': pure_backdrop, 'canvas_bottom': current_y + self.padding_up_bottom - self.upshift ,'upshift':upshift,'downshift':0}
+        upshift+=self.upshift_extra
+        return {'canvas': pure_backdrop, 'canvas_bottom': current_y + self.padding_up_bottom - self.upshift_extra ,'upshift':upshift,'downshift':0}
 
 
 
     def icon_backdrop_check(self):
-        if self.type_software is None or self.type_software == 'None' or len(self.processed_img) != 1: return
+        if self.type_software is None or len(self.processed_img) != 1: return
         for content_check in self.software_list:
             if self.type_software == content_check['type'] :
-                self.background,self.right_icon = content_check['background'],content_check['right_icon']
-                self.font_name_color,self.font_time_color = '(255,255,255)', '(255,255,255)'
-                self.is_shadow_font = True
+                if self.right_icon is None:
+                    self.right_icon = content_check['right_icon']
+                if content_check['background'] and self.background is None:
+                    self.background = content_check['background']
+                if self.background:
+                    self.font_name_color,self.font_time_color = '(255,255,255)', '(255,255,255)'
+                    self.is_shadow_font = True

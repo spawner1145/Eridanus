@@ -2,25 +2,68 @@ import yaml
 import os
 from framework_common.manshuo_draw.core.util import *
 global initialize_yaml_set
+from ruamel.yaml import YAML
 
-def initialize_yaml_must_require(params):
+def initialize_yaml_must_require(params):#对里面的数据进行处理
+    initialize_yaml_load, must_required_keys=initialize_yaml_must_require_core(params)
+    for key in initialize_yaml_load:
+        if initialize_yaml_load[key] == 'None': initialize_yaml_load[key]=None
+    return initialize_yaml_load, must_required_keys
+
+#检测默认配置文件与用户文件的差异，实现自动更新配置文件
+def check_merge_config(default_config_path, user_config_path):
+    # 使用 ruamel.yaml 来读取和写入文件
+    yaml = YAML()
+    yaml.preserve_quotes = True  # 保留引号和格式
+    yaml.indent(sequence=4, offset=2)  # 设置缩进
+    yaml.width = 4096  # 设置行宽防止换行
+
+    # 读取默认配置文件
+    with open(default_config_path, 'r', encoding='utf-8') as default_file:
+        default_config = yaml.load(default_file)
+
+    # 读取用户配置文件（保留注释和格式）
+    with open(user_config_path, 'r', encoding='utf-8') as user_file:
+        user_config = yaml.load(user_file)
+
+    # 定义递归合并函数
+    def merge_dicts(default_dict, user_dict):
+        for key, value in default_dict.items():
+            if key not in user_dict:  # 用户配置中缺少键
+                user_dict[key] = value
+            elif isinstance(value, dict) and isinstance(user_dict[key], dict):  # 如果键对应的值是嵌套字典，递归合并
+                merge_dicts(value, user_dict[key])
+        return user_dict
+
+    # 合并配置文件
+    merge_dicts(default_config, user_config)
+
+    # 将更新后的配置写回用户文件，同时保留注释和排版
+    with open(user_config_path, 'w', encoding='utf-8') as user_file:
+        yaml.dump(user_config, user_file)
+
+def initialize_yaml_must_require_core(params):
     global initialize_yaml_set
+    default_config = get_abs_path('framework_common/manshuo_draw/data/config/save_config.yaml')
     if 'basic_set' == params['type'] :
         if 'config_path' not in params:
-            params['config_path']=get_abs_path('framework_common/manshuo_draw/defalut_config.yaml')
+            params['config_path']=get_abs_path(default_config)
         config_abs_path = get_abs_path(params['config_path'])
         if not os.path.exists(params['config_path']):
-            with open(get_abs_path('framework_common/manshuo_draw/defalut_config.yaml'), 'r', encoding='utf-8') as file:
+            with open(get_abs_path(default_config), 'r', encoding='utf-8') as file:
                 origin_config_set_yaml = yaml.safe_load(file)
             with open(config_abs_path, 'w', encoding='utf-8') as file:
                 yaml.dump(origin_config_set_yaml, file)
             initialize_yaml_set=origin_config_set_yaml
         else:
             try:
+                #判断配置文件与默认配置文件的不同，若键值不同则直接增添后复写
+                check_merge_config(default_config, params['config_path'])
+
                 with open(config_abs_path, 'r', encoding='utf-8') as file:
                     initialize_yaml_set = yaml.safe_load(file)
             except Exception as e:
-                with open('framework_common/manshuo_draw/defalut_config.yaml', 'r', encoding='utf-8') as file:
+                with open(default_config, 'r', encoding='utf-8') as file:
                     origin_config_set_yaml = yaml.safe_load(file)
                 with open(config_abs_path, 'w', encoding='utf-8') as file:
                     yaml.dump(origin_config_set_yaml, file)
