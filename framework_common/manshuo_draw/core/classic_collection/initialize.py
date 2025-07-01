@@ -1,8 +1,8 @@
-import yaml
 import os
 from framework_common.manshuo_draw.core.util import *
 global initialize_yaml_set
 from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap
 
 def initialize_yaml_must_require(params):#对里面的数据进行处理
     initialize_yaml_load, must_required_keys=initialize_yaml_must_require_core(params)
@@ -29,8 +29,15 @@ def check_merge_config(default_config_path, user_config_path):
     # 定义递归合并函数
     def merge_dicts(default_dict, user_dict):
         for key, value in default_dict.items():
-            if key not in user_dict:  # 用户配置中缺少键
+            if key not in user_dict and not isinstance(value, dict):  # 用户配置中缺少键
                 user_dict[key] = value
+                if isinstance(default_dict, CommentedMap):
+                    comment = default_dict.ca.items.get(key)
+                    if comment:
+                        user_dict.ca.items[key] = comment
+            elif key not in user_dict and isinstance(value, dict):
+                user_dict[key] = {}
+                merge_dicts(value, user_dict[key])
             elif isinstance(value, dict) and isinstance(user_dict[key], dict):  # 如果键对应的值是嵌套字典，递归合并
                 merge_dicts(value, user_dict[key])
         return user_dict
@@ -44,6 +51,10 @@ def check_merge_config(default_config_path, user_config_path):
 
 def initialize_yaml_must_require_core(params):
     global initialize_yaml_set
+    yaml = YAML()
+    yaml.preserve_quotes = True  # 保留 YAML 中的引号
+    yaml.indent(sequence=4, offset=2)  # 设置缩进
+    yaml.width = 4096  # 设置行宽防止换行
     default_config = get_abs_path('framework_common/manshuo_draw/data/config/save_config.yaml')
     if 'basic_set' == params['type'] :
         if 'config_path' not in params:
@@ -51,7 +62,7 @@ def initialize_yaml_must_require_core(params):
         config_abs_path = get_abs_path(params['config_path'])
         if not os.path.exists(params['config_path']):
             with open(get_abs_path(default_config), 'r', encoding='utf-8') as file:
-                origin_config_set_yaml = yaml.safe_load(file)
+                origin_config_set_yaml = yaml.load(file)
             with open(config_abs_path, 'w', encoding='utf-8') as file:
                 yaml.dump(origin_config_set_yaml, file)
             initialize_yaml_set=origin_config_set_yaml
@@ -59,12 +70,11 @@ def initialize_yaml_must_require_core(params):
             try:
                 #判断配置文件与默认配置文件的不同，若键值不同则直接增添后复写
                 check_merge_config(default_config, params['config_path'])
-
                 with open(config_abs_path, 'r', encoding='utf-8') as file:
-                    initialize_yaml_set = yaml.safe_load(file)
+                    initialize_yaml_set = yaml.load(file)
             except Exception as e:
                 with open(default_config, 'r', encoding='utf-8') as file:
-                    origin_config_set_yaml = yaml.safe_load(file)
+                    origin_config_set_yaml = yaml.load(file)
                 with open(config_abs_path, 'w', encoding='utf-8') as file:
                     yaml.dump(origin_config_set_yaml, file)
                 initialize_yaml_set = origin_config_set_yaml
