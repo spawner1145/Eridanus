@@ -40,7 +40,7 @@ if __name__ == '__main__':
     ]
 
     contents2=[
-        {'type': 'basic_set', 'debug': True},
+        {'type': 'basic_set', 'debug': True,'img_width':1500},
 
         {'type': 'backdrop', 'subtype': 'gradient'},
 
@@ -49,7 +49,9 @@ if __name__ == '__main__':
 
         {'type': 'avatar', 'subtype': 'list', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',f"https://q1.qlogo.cn/g?b=qq&nk=1280433782&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=3552663628&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=2702495766&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=1687148274&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=1124901768&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=2319804644&s=640"],
          'content': [f"[name]漫朔_manshuo[/name]\n[time]发言次数：230次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]test[/name]\n[time]发言次数：205次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]"],'number_per_row':2,
-         'background':['framework_common/manshuo_draw/data/cache/manshuo.jpg',f"https://q1.qlogo.cn/g?b=qq&nk=1280433782&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=3552663628&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=2702495766&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=1687148274&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=1124901768&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=2319804644&s=640"]},
+         'background':['framework_common/manshuo_draw/data/cache/manshuo.jpg',f"https://q1.qlogo.cn/g?b=qq&nk=1280433782&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=3552663628&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=2702495766&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=1687148274&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=1124901768&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=2319804644&s=640"],
+         'right_icon':['']
+         },
 
     ]
 
@@ -63,7 +65,7 @@ if __name__ == '__main__':
 
 
     contentsWithNoTag=[
-        {'type': 'basic_set', 'debug': True,'img_width':1000},
+        {'type': 'basic_set', 'debug': True,'img_width':1500},
         {'type': 'avatar', 'subtype': 'list', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg','https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'],
          'content': [f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]",f"[name]galgame[/name]\n[time]2025年 05月27日 20:32[/time]"],'background':['framework_common/manshuo_draw/data/cache/manshuo.jpg','https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'],},
         {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],
