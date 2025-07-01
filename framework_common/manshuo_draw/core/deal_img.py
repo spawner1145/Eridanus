@@ -1,18 +1,5 @@
-import asyncio
-from PIL import Image, ImageDraw, ImageFont, ImageOps,ImageFilter
 import os
-import textwrap
-import platform
-import re
-import inspect
-from framework_common.manshuo_draw.core.util.download_img_old import download_img
-import traceback
-import requests
-from urllib.parse import urlparse
 import gc
-
-
-
 from framework_common.manshuo_draw.core.classic_collection import *
 from framework_common.manshuo_draw.core.util import *
 
@@ -39,13 +26,7 @@ async def layer_deal(basic_img_info,json_img,layer=1):
 
         elif layer_check < layer:
             break
-
-
-
-
     #json_img.insert(count_number_layer, {'type': 'nothing'})
-
-
     #printf('\n\n')
     canvas_dict,count_number= {},0
     for per_json_img in json_img_processed:               #处理每个模块之间的关系
@@ -89,6 +70,7 @@ async def deal_img(json_img): #此函数将逐个解析json文件中的每个字
             basic_img_info = basicimgset(per_json_img)
             basic_img = basic_img_info.creatbasicimgnobackdrop()
             break
+
     if basic_img_info.is_abs_path_convert is True:
         basic_img_info.img_path_save = get_abs_path(basic_img_info.img_path_save,is_ignore_judge=True)
     if basic_img_info.img_name_save is not None :

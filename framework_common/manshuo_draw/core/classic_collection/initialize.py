@@ -28,21 +28,18 @@ def check_merge_config(default_config_path, user_config_path):
 
     # 定义递归合并函数
     def merge_dicts(default_dict, user_dict):
-        if isinstance(default_dict, CommentedMap):
-            for key in default_dict:
-                value = default_dict[key]
-                print(f'Key: {key}, Value: {value}')
-                # 在这里可以对键值对进行操作
-
-        else:
-            for key, value in default_dict.items():
-                if key not in user_dict and not isinstance(value, dict):  # 用户配置中缺少键
-                    user_dict[key] = value
-                elif key not in user_dict and isinstance(value, dict):
-                    user_dict[key]={}
-                    merge_dicts(value, user_dict[key])
-                elif isinstance(value, dict) and isinstance(user_dict[key], dict):  # 如果键对应的值是嵌套字典，递归合并
-                    merge_dicts(value, user_dict[key])
+        for key, value in default_dict.items():
+            if key not in user_dict and not isinstance(value, dict):  # 用户配置中缺少键
+                user_dict[key] = value
+                if isinstance(default_dict, CommentedMap):
+                    comment = default_dict.ca.items.get(key)
+                    if comment:
+                        user_dict.ca.items[key] = comment
+            elif key not in user_dict and isinstance(value, dict):
+                user_dict[key] = {}
+                merge_dicts(value, user_dict[key])
+            elif isinstance(value, dict) and isinstance(user_dict[key], dict):  # 如果键对应的值是嵌套字典，递归合并
+                merge_dicts(value, user_dict[key])
         return user_dict
 
     # 合并配置文件

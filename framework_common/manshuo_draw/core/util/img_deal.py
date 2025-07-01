@@ -59,63 +59,74 @@ def img_process(params,pure_backdrop ,img ,x_offset ,current_y ,upshift=0,type='
 
 def backdrop_process(params,canves,limit=(0, 0)):
     limit_x, limit_y = limit
-    if params['background'] is not None and params['background'] != 'None':
-        params['background'] = process_img_download(params['background'], params['is_abs_path_convert'])
-        if params['background'][0].width > limit_x and params['background'][0].height > limit_y:
-            params['background'][0] = params['background'][0].resize((int(limit_x), int(limit_x * params['background'][0].height / params['background'][0].width)))
-        if params['background'][0].height < limit_y:
-            params['background'][0] = params['background'][0].resize((int((limit_y) * params['background'][0].width / params['background'][0].height), int(limit_y)))
-        if params['background'][0].width < limit_x:
-            params['background'][0] = params['background'][0].resize(
-                (int(limit_x), int(limit_x * params['background'][0].height / params['background'][0].width)))
-        offest_x= (params['background'][0].width - limit_x ) // 2
-        offest_y= (params['background'][0].height - limit_y) // 2
-        #print(offest_x,offest_y)
-        params['background'][0] = params['background'][0].crop((offest_x, offest_y, limit_x+offest_x, limit_y+offest_y))
+    if params['background'] is None or params['background'] == []:return canves
+    if not isinstance(params['background'], list):background_list=[params['background']]
+    else:background_list=params['background']
+    if 'number_count' not in params:number_count=0
+    else:number_count=int(params['number_count'])
+    if number_count >= len(background_list):number_count=len(background_list)-1
+    background_img = process_img_download(background_list[number_count], params['is_abs_path_convert'])[0]
+    if background_img.width > limit_x and background_img.height > limit_y:
+        background_img = background_img.resize(
+            (int(limit_x), int(limit_x * background_img.height / background_img.width)))
+    if background_img.height < limit_y:
+        background_img = background_img.resize(
+            (int((limit_y) * background_img.width / background_img.height), int(limit_y)))
+    if background_img.width < limit_x:
+        background_img = background_img.resize(
+            (int(limit_x), int(limit_x * background_img.height / background_img.width)))
+    offest_x = (background_img.width - limit_x) // 2
+    offest_y = (background_img.height - limit_y) // 2
+    # print(offest_x,offest_y)
+    background_img = background_img.crop((offest_x, offest_y, limit_x + offest_x, limit_y + offest_y))
 
-        width, height = params['background'][0].size
-        center_x, center_y = width // 2, height // 2
-        shadow_color = (0, 0, 0)
-        # 创建空白遮罩图像
-        mask = Image.new("L", (width, height), 0)  # 单通道（L模式）
-        draw = ImageDraw.Draw(mask)
-        max_alpha,intensity = 100,0.6
-        # 创建径向渐变（非线性）
-        max_distance = math.sqrt(center_x ** 2 + center_y ** 2)  # 从中心到角落的最大距离
-        for y in range(height):
-            for x in range(width):
-                # 计算像素点到中心的距离
-                dx = x - center_x
-                dy = y - center_y
-                distance = math.sqrt(dx ** 2 + dy ** 2)
+    width, height = background_img.size
+    center_x, center_y = width // 2, height // 2
+    shadow_color = (0, 0, 0)
+    # 创建空白遮罩图像
+    mask = Image.new("L", (width, height), 0)  # 单通道（L模式）
+    draw = ImageDraw.Draw(mask)
+    max_alpha, intensity = 100, 0.6
+    # 创建径向渐变（非线性）
+    max_distance = math.sqrt(center_x ** 2 + center_y ** 2)  # 从中心到角落的最大距离
+    for y in range(height):
+        for x in range(width):
+            # 计算像素点到中心的距离
+            dx = x - center_x
+            dy = y - center_y
+            distance = math.sqrt(dx ** 2 + dy ** 2)
 
-                # 根据距离计算透明度，使用非线性公式
-                normalized_distance = distance / max_distance  # 距离归一化到 [0, 1]
-                alpha = int(max_alpha * (normalized_distance ** intensity))  # 非线性加深
-                if alpha > max_alpha:
-                    alpha = max_alpha
-                mask.putpixel((x, y), alpha)
+            # 根据距离计算透明度，使用非线性公式
+            normalized_distance = distance / max_distance  # 距离归一化到 [0, 1]
+            alpha = int(max_alpha * (normalized_distance ** intensity))  # 非线性加深
+            if alpha > max_alpha:
+                alpha = max_alpha
+            mask.putpixel((x, y), alpha)
 
-        # 创建阴影图层
-        shadow = Image.new("RGBA", params['background'][0].size, shadow_color + (0,))
-        shadow.putalpha(mask)
+    # 创建阴影图层
+    shadow = Image.new("RGBA", background_img.size, shadow_color + (0,))
+    shadow.putalpha(mask)
 
-        # 合并原图和阴影
-        params['background'][0] = Image.alpha_composite(params['background'][0].convert("RGBA"), shadow)
+    # 合并原图和阴影
+    background_img = Image.alpha_composite(background_img.convert("RGBA"), shadow)
 
-        params['background'][0].paste(canves, (0, 0), mask=canves)
-        canves = params['background'][0]
+    background_img.paste(canves, (0, 0), mask=canves)
+    canves = background_img
     return canves
 
 def icon_process(params,canves,box_right=(0, 0)):
     x, y = box_right
-    if params['right_icon'] is None or params['right_icon'] == 'None': return canves
-    icon_img = process_img_download(params['right_icon'], params['is_abs_path_convert'])[0].convert("RGBA")
+    if params['right_icon'] is None or params['right_icon'] == []: return canves
+    if not isinstance(params['right_icon'], list):icon_list=[params['right_icon']]
+    else:icon_list=params['right_icon']
+    if 'number_count' not in params:number_count=0
+    else:number_count=int(params['number_count'])
+    if number_count >= len(icon_list):number_count=len(icon_list)-1
+    icon_img = process_img_download(icon_list[number_count], params['is_abs_path_convert'])[0].convert("RGBA")
     icon_img = icon_img.resize((int(params['avatar_size'] * icon_img.width / icon_img.height), int(params['avatar_size'] )))
     if params['is_shadow_font']:
         color_image = Image.new("RGBA", icon_img.size, (255,255,255,255))
         color_image.putalpha(icon_img.convert('L'))
         canves.paste(color_image, (int(x - icon_img.width + 1), int(y - icon_img.height + 1)))
-
     canves.paste(icon_img, (int(x - icon_img.width), int(y - icon_img.height)), mask=icon_img)
     return canves

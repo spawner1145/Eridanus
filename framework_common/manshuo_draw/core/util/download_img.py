@@ -58,7 +58,8 @@ def process_img_download(img_list,is_abs_path_convert=True,gray_layer=False,prox
             processed_img.append(Image.open(content))
         elif isinstance(content, str) and content.startswith("http"):
             processed_img.append(Image.open(BytesIO(base64.b64decode(download_img_sync(content)))))
-
+        elif isinstance(content, Image.Image):
+            processed_img.append(content)
         else:  # 最后判断是否为base64，若不是，则不添加本次图像
             try:
                 processed_img.append(Image.open(BytesIO(base64.b64decode(content))))
