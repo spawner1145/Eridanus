@@ -56,6 +56,12 @@ basic_set:
   font_tag_size: 24                     #字体大小
   font_tag_color: (9, 132, 204)               #字体颜色
 
+  font_label: framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf
+  font_label_size: 34
+  font_label_color: (255,255,255)
+  label: []                            #默认的label内容
+  label_color: (251,114,153,255)      #默认label颜色
+
   is_rounded_corners_img: true      #是否对模块进行圆角处理
   rounded_img_radius: 20            #圆角处理半径
 
@@ -82,12 +88,6 @@ text:
     spacing: 1                       #每个字之间的间距
 
 img:
-  font_label: framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf
-  font_label_size: 34
-  font_label_color: (255,255,255)
-  label: []                           #默认的label内容
-  label_color: (251,114,153,255)      #默认label颜色
-
   is_rounded_corners_label: true      #是否对标签进行圆角处理
   rounded_label_radius: 10            #圆角处理半径
 
@@ -129,15 +129,15 @@ avatar:
   font_time_size: 24
   font_time_color: (148,148,148)
 
-  #以下为层级的部分处理，示例：可进行自定义
-  is_rounded_corners_avatar: true    #是否对层级进行圆角处理
+  #以下为头像的部分处理，示例：可进行自定义
+  is_rounded_corners_avatar: true    #是否对头像进行圆角处理
   rounded_avatar_radius: 50
 
-  is_stroke_avatar: true             #是否对层级进行描边处理
+  is_stroke_avatar: true             #是否对头像进行描边处理
   stroke_avatar_width: 10
   stroke_avatar_radius: 55
 
-  is_shadow_avatar: false             #是否对层级进行阴影处理
+  is_shadow_avatar: false             #是否对头像进行阴影处理
   shadow_offset_avatar: 10                 #阴影的偏移量
   shadow_opacity_avatar: 50                #阴影的透明度
   blur_radius_avatar: 8                   #阴影模糊半径
@@ -146,6 +146,8 @@ avatar:
   right_icon: None
   type_software: None
   is_shadow_font: false
+  padding_up_font: 10  #头像右侧文字距离上部的距离
+
   software_list:
     - {'type': 'bilibili', 'background': framework_common/manshuo_draw/data/img/type_software/bili.png, 'right_icon': framework_common/manshuo_draw/data/img/type_software/bili_icon.png}
     - {'type': 'dy', 'background': framework_common/manshuo_draw/data/img/type_software/dy.jpeg, 'right_icon': framework_common/manshuo_draw/data/img/type_software/dy_icon.png}
@@ -163,7 +165,16 @@ avatar:
     padding: 30
     padding_up_bottom: 15
     upshift_extra: 0                     #上偏移量
-    test_mashuo: 'nihao'    #wobuzhidao aoihfaiohf
+
+  list:
+    must_required_keys: {'img': null, 'content': null}
+    number_per_row: 2         #默认一个，可以指定每行多少个头像
+    is_name: Ture                   #是否在头像右侧旁添加名字
+    avatar_size: 100
+    padding: 20
+    padding_up_bottom: 15
+    upshift_extra: 0                     #上偏移量
+    avatar_backdrop_color: (235,239,253,255)  #放置介绍区域的颜色
 
 
 
