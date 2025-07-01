@@ -1,9 +1,6 @@
 from PIL import Image, ImageDraw, ImageFont, ImageOps,ImageFilter
 from .initialize import initialize_yaml_must_require
 from framework_common.manshuo_draw.core.util import *
-import os
-import base64
-from io import BytesIO
 
 class ImageModule:
     def __init__(self,layer_img_set,params):
@@ -66,7 +63,7 @@ class ImageModule:
             img_des_canvas.paste(img, (0, 0))
             img_des_canvas_info=basic_img_draw_text(img_des_canvas,self.content[self.number_count],self.__dict__,
                                                                      box=(self.padding , img.height + self.padding),
-                                                                     limit_box=(self.new_width - self.padding, self.max_des_length + img.height))
+                                                                     limit_box=(self.new_width, self.max_des_length + img.height))
             des_length = self.max_des_length + img.height
             if int(img_des_canvas_info['canvas_bottom'] + self.padding_up) < des_length:
                 des_length=int(img_des_canvas_info['canvas_bottom'] + self.padding_up)
@@ -93,7 +90,7 @@ class ImageModule:
             #进行文字绘制
             img = basic_img_draw_text(img_des_canvas, self.content[self.number_count], self.__dict__,
                                                       box=(img_width + self.padding,  self.padding),
-                                                      limit_box=(self.new_width - self.padding, img_height))['canvas']
+                                                      limit_box=(self.new_width, img_height))['canvas']
 
             # 加入label绘制
             img = self.label_process(img, self.number_count, img_width)
