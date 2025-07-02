@@ -43,6 +43,8 @@ def main(bot, config):
             await bot.send(event, '小南娘说话还挺逗')
             return
         else:return
+        bot.logger.info(f"获取到发言排行榜查询需求")
+        recall_id = await bot.send(event, f'收到查询指令，请耐心等待喵')
         year, month, day = today.year, today.month, today.day
         current_day = f'{year}_{month}_{day}'
         all_users = db.read_all_users()
@@ -53,10 +55,14 @@ def main(bot, config):
             if 'number_speeches' in all_users[user] and f'{target_group}' in all_users[user]['number_speeches'] and current_day in all_users[user]['number_speeches'][f'{target_group}']:
                 target_name = (await bot.get_group_member_info(target_group, user))['data']['nickname']
                 number_speeches_check_list.append({'name':user,'nicknime':target_name,'number_speeches_count':all_users[user]['number_speeches'][f'{target_group}'][current_day]})
-                if len(number_speeches_check_list)>=16:break
-        number_speeches_check_list = sorted(number_speeches_check_list, key=lambda x: x["number_speeches_count"], reverse=True)
+        number_speeches_check_list_nolimited = sorted(number_speeches_check_list, key=lambda x: x["number_speeches_count"], reverse=True)
+        number_speeches_check_list=[]
+        for item in number_speeches_check_list_nolimited:
+            number_speeches_check_list.append(item)
+            if len(number_speeches_check_list) >= 16: break
         for idx, item in enumerate(number_speeches_check_list, start=1):
             item["rank"] = idx
+        bot.logger.info(f"进入图片制作")
         number_speeches_check_draw_list = [
             {'type': 'basic_set','img_width':1200},
             {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],'upshift_extra': 25, 'layer': 1,
@@ -66,6 +72,7 @@ def main(bot, config):
              'background': [f"https://q1.qlogo.cn/g?b=qq&nk={list['name']}&s=640" for list in number_speeches_check_list]},
         ]
         await bot.send(event, Image(file=(await manshuo_draw(number_speeches_check_draw_list))))
+        await bot.recall(recall_id['data']['message_id'])
 
 
     @bot.on(GroupMessageEvent)
@@ -83,6 +90,8 @@ def main(bot, config):
             await bot.send(event, '小南娘说话还挺逗')
             return
         else:return
+        bot.logger.info(f"获取到发言排行榜查询需求")
+        recall_id = await bot.send(event, f'收到查询指令，请耐心等待喵')
         year, month, day = today.year, today.month, today.day
         current_month = f'{year}_{month}'
         all_users = db.read_all_users()
@@ -97,9 +106,14 @@ def main(bot, config):
                 target_name = (await bot.get_group_member_info(target_group, user))['data']['nickname']
                 number_speeches_check_list.append({'name':user,'nicknime':target_name,'number_speeches_count':count})
                 if len(number_speeches_check_list)>=16:break
-        number_speeches_check_list = sorted(number_speeches_check_list, key=lambda x: x["number_speeches_count"], reverse=True)
+        number_speeches_check_list_nolimited = sorted(number_speeches_check_list, key=lambda x: x["number_speeches_count"], reverse=True)
+        number_speeches_check_list=[]
+        for item in number_speeches_check_list_nolimited:
+            number_speeches_check_list.append(item)
+            if len(number_speeches_check_list) >= 16: break
         for idx, item in enumerate(number_speeches_check_list, start=1):
             item["rank"] = idx
+        bot.logger.info(f"进入图片制作")
         number_speeches_check_draw_list = [
             {'type': 'basic_set','img_width':1400},
             {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],'upshift_extra': 25, 'layer': 1,
@@ -109,3 +123,4 @@ def main(bot, config):
              'background': [f"https://q1.qlogo.cn/g?b=qq&nk={list['name']}&s=640" for list in number_speeches_check_list]},
         ]
         await bot.send(event, Image(file=(await manshuo_draw(number_speeches_check_draw_list))))
+        await bot.recall(recall_id['data']['message_id'])

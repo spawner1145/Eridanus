@@ -15,6 +15,7 @@ logger=get_logger()
 import json
 from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 
+bot_id_global=2319804644
 
 
 async def claendar_bangumi_get_json(calender=None):
@@ -104,6 +105,9 @@ async def bangumi_PILimg(text=None,img_context=None,filepath=None,proxy=None,typ
     json_check['soft_type'] = 'bangumi'
     json_check['status'] = True
     json_check['video_url'] = False
+    global bot_id_global
+    if bot_id:
+        bot_id_global=bot_id
 
     if type is None:
         count=0
@@ -145,10 +149,13 @@ async def bangumi_PILimg(text=None,img_context=None,filepath=None,proxy=None,typ
             except:
                 pass
 
+        if bot_id is None:
+            bot_id=bot_id_global
+
         json_check['pic_path'] = await manshuo_draw([{'type': 'basic_set', 'img_width': 1500,'img_name_save':f'{name}.png'},
                             {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={bot_id}&s=640"],'upshift_extra': 25,
                              'content': [f"[name]{name}[/name]\n[time]{datetime.now().strftime('%Y年%m月%d日 %H:%M')}[/time]" ], 'type_software': 'bangumi', },
-                            {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': text_total}])
+                            {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': text_total,'is_shadow_img': True},])
         json_check['soft_type'] = 'bangumi_calendar'
         return json_check
 
