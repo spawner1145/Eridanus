@@ -1,5 +1,6 @@
 from PIL import Image, ImageDraw, ImageFont, ImageOps,ImageFilter
 from .download_img import process_img_download
+from .text_deal import basic_img_draw_text
 import math
 
 def img_process(params,pure_backdrop ,img ,x_offset ,current_y ,upshift=0,type='img'):
@@ -86,7 +87,7 @@ def backdrop_process(params,canves,limit=(0, 0)):
     # 创建空白遮罩图像
     mask = Image.new("L", (width, height), 0)  # 单通道（L模式）
     draw = ImageDraw.Draw(mask)
-    max_alpha, intensity = 100, 0.6
+    max_alpha, intensity = 100, 0.5
     # 创建径向渐变（非线性）
     max_distance = math.sqrt(center_x ** 2 + center_y ** 2)  # 从中心到角落的最大距离
     for y in range(height):
@@ -130,3 +131,64 @@ def icon_process(params,canves,box_right=(0, 0)):
         canves.paste(color_image, (int(x - icon_img.width + 1), int(y - icon_img.height + 1)))
     canves.paste(icon_img, (int(x - icon_img.width), int(y - icon_img.height)), mask=icon_img)
     return canves
+
+
+#头像右侧标签以及背景处理
+def icon_backdrop_check(params):
+    if params['type_software'] is None and params['background'] is None and params['right_icon'] is None: return
+    for content_check in params['software_list']:
+        if content_check['right_icon'] and params['type_software'] == content_check['type']:
+            if params['right_icon'] is None:
+                params['right_icon'] = content_check['right_icon']
+            if content_check['background'] and params['background'] is None:
+                params['background'] = content_check['background']
+    if params['background']:
+        params['font_name_color'], params['font_time_color'] = '(255,255,255)', '(255,255,255)'
+        params['is_shadow_font'] = True
+
+#标签绘制
+def label_process(params,img,number_count,new_width):
+    font_label = ImageFont.truetype(params['font_label'], params['font_label_size'])
+    label_width, label_height, upshift = params['padding'] * 4, params['padding'] + params['font_label_size'], 0
+    if number_count >= len(params['label']) or params['label'][number_count] == '':
+        return img
+    label_content = params['label'][number_count]
+    # 计算标签的实际长度
+    for per_label_font in label_content:
+        label_width += font_label.getbbox(per_label_font)[2] - font_label.getbbox(per_label_font)[0]
+    if label_width > new_width: label_width = new_width
+    label_canvas = Image.new("RGBA", (int(label_width), int(label_height)), eval(params['label_color']))
+    # 调用方法绘制文字并判断是否需要描边和圆角
+    # print(label_width,label_height)
+    label_canvas = basic_img_draw_text(label_canvas, f'[label] {label_content} [/label]', params,
+                                       box=(params['padding'] * 1.3, params['padding'] * 0.8),
+                                       limit_box=(label_width, label_height), ellipsis=False)['canvas']
+    img = img_process(params, img, label_canvas, int(new_width - label_width), 0, upshift, 'label')
+    return img
+
+#以下函数为模块内关系处理函数
+def init(params):#对模块的参数进行初始化
+    params['pure_backdrop'] = Image.new("RGBA", (params['img_width'], params['img_height']), (0, 0, 0, 0))
+    params['new_width'] = (((params['img_width'] - params['padding'] * 2) - (
+                params['number_per_row'] - 1) * params['padding_with']) // params['number_per_row'])
+    params['per_number_count'], params['number_count'], params['upshift'], params['downshift'], params['current_y'], params['x_offset'], params['max_height'] ,params['avatar_upshift'] = 0, 0, 0, 0, 0, params['padding'], 0 ,0
+    # 若有描边，则将初始粘贴位置增加一个描边宽度
+    if params['is_stroke_front'] and params['is_stroke_img']: params['current_y'] += params['stroke_img_width'] / 2
+    if params['is_shadow_front'] and params['is_shadow_img']: params['upshift'] += params['shadow_offset_img'] * 2
+    if 'is_shadow_avatar' in params and 'shadow_offset_avatar' in params:
+        if params['is_shadow_front'] and params['is_shadow_avatar']: params['avatar_upshift'] += params['shadow_offset_avatar'] * 2
+
+def per_img_deal(params,img):#绘制完该模块后处理下一个模块的关系
+    if img.height > params['max_height']: params['max_height'] = img.height
+    params['x_offset'] += params['new_width'] + params['padding_with']
+    params['per_number_count'] += 1
+    params['number_count'] += 1
+    if params['per_number_count'] == params['number_per_row']:
+        params['current_y'] += params['max_height'] + params['padding_with']
+        params['per_number_count'], params['x_offset'], params['max_height'] = 0, params['padding'], 0
+
+def final_img_deal(params):#判断是否需要增减
+    if params['per_number_count'] != 0:
+        params['current_y'] += params['max_height']
+    else:
+        params['current_y'] -= params['padding_with']

@@ -50,7 +50,7 @@ if __name__ == '__main__':
         {'type': 'avatar', 'subtype': 'list', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',f"https://q1.qlogo.cn/g?b=qq&nk=1280433782&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=3552663628&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=2702495766&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=1687148274&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=1124901768&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=2319804644&s=640"],
          'content': [f"[name]漫朔_manshuo[/name]\n[time]发言次数：230次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]test[/name]\n[time]发言次数：205次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]"],'number_per_row':2,
          'background':['framework_common/manshuo_draw/data/cache/manshuo.jpg',f"https://q1.qlogo.cn/g?b=qq&nk=1280433782&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=3552663628&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=2702495766&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=1687148274&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=1124901768&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=2319804644&s=640"],
-         'right_icon':['']
+
          },
 
     ]
@@ -92,5 +92,5 @@ if __name__ == '__main__':
     img_path_set='data/cache'
 
 
-    asyncio.run(manshuo_draw(contents2))
+    asyncio.run(manshuo_draw(contentsWithNoTag))
     #asyncio.run(manshuo_draw(contents_not))
