@@ -275,5 +275,5 @@ async def gal_PILimg(text=None,img_context=None,filepath=None,proxy=None,type_so
             developer=text.split("开发商：")[1].replace(desc,'').replace('简介如下：','')
             title +=f'\n开发商：{developer}'
         context = f'[title]{title}[/title]\n{desc}'
-        json_check['pic_path'] = await manshuo_draw([{'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': [context]}])
+        json_check['pic_path'] = await manshuo_draw([{'type': 'img', 'subtype': 'common_with_des', 'img': img_context, 'content': [context],'max_des_length':2000}])
         return json_check
