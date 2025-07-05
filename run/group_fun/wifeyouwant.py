@@ -423,6 +423,7 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)  # 透群友合集
     async def wife_you_want(event: GroupMessageEvent):
+        return
         async with (aiosqlite.connect("data/dataBase/wifeyouwant.db") as db):
             friendlist_check_count = 0
             friendlist = []
@@ -443,6 +444,7 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)  # 透群友合集
     async def wife_you_want(event: GroupMessageEvent):
+        return 
         async with (aiosqlite.connect("data/dataBase/wifeyouwant.db") as db):
             global filepath
             wifePrefix = config.group_fun.config["today_wife"]["wifePrefix"]
