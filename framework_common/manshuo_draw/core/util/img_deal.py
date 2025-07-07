@@ -81,13 +81,18 @@ def backdrop_process(params,canves,limit=(0, 0)):
     # print(offest_x,offest_y)
     background_img = background_img.crop((offest_x, offest_y, limit_x + offest_x, limit_y + offest_y))
 
+    #对图像进行模糊化处理
+    if background_img.mode not in ("RGB", "RGBA"):background_img = background_img.convert("RGBA")
+    background_img = background_img.filter(ImageFilter.GaussianBlur(radius=5))
+
+    #对图像进行边缘阴影化处理
     width, height = background_img.size
     center_x, center_y = width // 2, height // 2
     shadow_color = (0, 0, 0)
     # 创建空白遮罩图像
     mask = Image.new("L", (width, height), 0)  # 单通道（L模式）
     draw = ImageDraw.Draw(mask)
-    max_alpha, intensity = 200, 0.8
+    max_alpha, intensity = 100, 0.8
     # 创建径向渐变（非线性）
     max_distance = math.sqrt(center_x ** 2 + center_y ** 2)  # 从中心到角落的最大距离
     for y in range(height):
@@ -135,16 +140,28 @@ def icon_process(params,canves,box_right=(0, 0)):
 
 #头像右侧标签以及背景处理
 def icon_backdrop_check(params):
-    if params['type_software'] is None and params['background'] is None and params['right_icon'] is None: return
-    for content_check in params['software_list']:
-        if content_check['right_icon'] and params['type_software'] == content_check['type']:
-            if params['right_icon'] is None:
-                params['right_icon'] = content_check['right_icon']
-            if content_check['background'] and params['background'] is None:
-                params['background'] = content_check['background']
-    if params['background']:
-        params['font_name_color'], params['font_time_color'] = '(255,255,255)', '(255,255,255)'
-        params['is_shadow_font'] = True
+    if not (params['type_software'] is None and params['background'] is None and params['right_icon'] is None):
+        for content_check in params['software_list']:
+            if content_check['right_icon'] and params['type_software'] == content_check['type']:
+                if params['right_icon'] is None:params['right_icon'] = content_check['right_icon']
+                if content_check['background'] and params['background'] is None:params['background'] = content_check['background']
+        if params['background']:
+            params['font_name_color'], params['font_time_color'] = '(255,255,255)', '(255,255,255)'
+            params['is_shadow_font'] = True
+    if params['judge_flag'] == 'default':
+        if (params['background'] or params['right_icon']) and (len(params['processed_img']) != 1 or params['number_per_row'] != 1):
+            params['is_shadow_img'], params['is_rounded_corners_img'], params['is_stroke_img'] = True, True, True
+            params['judge_flag'] = 'list'
+        elif (params['background'] or params['right_icon']) and len(params['processed_img']) == 1 and params['number_per_row'] == 1:
+            params['is_shadow_img'], params['is_rounded_corners_img'], params['is_stroke_img'] = False, False, False
+            params['judge_flag'] = 'common'
+        else:
+            params['is_shadow_img'], params['is_rounded_corners_img'], params['is_stroke_img'] = False, False, False
+    elif params['judge_flag'] == 'list':
+        params['is_shadow_img'], params['is_rounded_corners_img'], params['is_stroke_img'] = True, True, True
+    elif params['judge_flag'] == 'common':
+        params['is_shadow_img'], params['is_rounded_corners_img'], params['is_stroke_img'] = False, False, False
+
 
 #标签绘制
 def label_process(params,img,number_count,new_width):
@@ -168,15 +185,31 @@ def label_process(params,img,number_count,new_width):
 
 #以下函数为模块内关系处理函数
 def init(params):#对模块的参数进行初始化
-    params['pure_backdrop'] = Image.new("RGBA", (params['img_width'], params['img_height']), (0, 0, 0, 0))
-    params['new_width'] = (((params['img_width'] - params['padding'] * 2) - (
-                params['number_per_row'] - 1) * params['padding_with']) // params['number_per_row'])
+    if 'number_per_row' in params:
+        params['new_width'] = (((params['img_width'] - params['padding'] * 2) - (params['number_per_row'] - 1) * params['padding_with']) // params['number_per_row'])
     params['per_number_count'], params['number_count'], params['upshift'], params['downshift'], params['current_y'], params['x_offset'], params['max_height'] ,params['avatar_upshift'] = 0, 0, 0, 0, 0, params['padding'], 0 ,0
+    params['img_height_limit_module'] = params['img_height_limit']
     # 若有描边，则将初始粘贴位置增加一个描边宽度
-    if params['is_stroke_front'] and params['is_stroke_img']: params['current_y'] += params['stroke_img_width'] / 2
-    if params['is_shadow_front'] and params['is_shadow_img']: params['upshift'] += params['shadow_offset_img'] * 2
+    if params['is_stroke_front'] and params['is_stroke_img']:
+        params['upshift'] += params['stroke_img_width'] / 2
+    if params['is_shadow_front'] and params['is_shadow_img']: params['upshift'] += params['shadow_offset_img'] * 3
     if 'is_shadow_avatar' in params and 'shadow_offset_avatar' in params:
         if params['is_shadow_front'] and params['is_shadow_avatar']: params['avatar_upshift'] += params['shadow_offset_avatar'] * 2
+    params['pure_backdrop'] = Image.new("RGBA", (params['img_width'], int(params['img_height_limit'] + params['upshift'] + params['padding_up_common']*2)), (0, 0, 0, 0))
+    #params['pure_backdrop'] = Image.new("RGBA",(params['img_width'], int(params['img_height_limit'] + params['upshift'] + params['padding_up_common']*2)),(255, 0, 0, 255))
+
+
+def per_img_limit_deal(params,img,magnification_img=1,type='img'):  #处理每个模块之间图像的限高关系
+    if type == 'img':
+        img_height, img_width = int((params['new_width'] / magnification_img) * img.height / img.width),int(params['new_width'] / magnification_img)
+        img = img.resize((img_width, img_height))
+        if img_height > params['img_height_limit']:img = img.crop((0, 0, img_width, params['img_height_limit']))
+        elif img_height > params['img_height_limit_module']: img = img.crop((0, 0, img_width, params['img_height_limit_module']))
+    elif type == 'avatar':
+        img = img.resize((params['avatar_size'], params['avatar_size']))
+    return img
+
+
 
 def per_img_deal(params,img):#绘制完该模块后处理下一个模块的关系
     if img.height > params['max_height']: params['max_height'] = img.height
@@ -185,10 +218,20 @@ def per_img_deal(params,img):#绘制完该模块后处理下一个模块的关�
     params['number_count'] += 1
     if params['per_number_count'] == params['number_per_row']:
         params['current_y'] += params['max_height'] + params['padding_with']
+        params['img_height_limit_module'] -= (params['padding_with'] + params['max_height'])
+        if params['img_height_limit_module'] <= 0 : params['img_height_limit_module'] = 0
         params['per_number_count'], params['x_offset'], params['max_height'] = 0, params['padding'], 0
+
 
 def final_img_deal(params):#判断是否需要增减
     if params['per_number_count'] != 0:
         params['current_y'] += params['max_height']
     else:
         params['current_y'] -= params['padding_with']
+    #处理限制高度
+    if params['current_y'] >= params['img_height_limit']:
+        if params['img_height_limit_flag'] :
+            params['current_y'] = params['img_height_limit'] - params['padding_up_common']
+        elif params['img_height_limit_flag'] is False:
+            params['current_y'] = params['img_height_limit']
+    #print(params['img_height_limit'],params['current_y'])

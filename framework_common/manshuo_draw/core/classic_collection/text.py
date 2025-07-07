@@ -27,12 +27,15 @@ class TextModule:
                 setattr(self, key, get_abs_path(value))
 
     def common(self):
-        pure_backdrop = Image.new("RGBA", (self.img_width, self.img_height), (0, 0, 0, 0))
-        img_des_canvas_info = basic_img_draw_text(pure_backdrop, self.content[0], self.__dict__,
-                                                  box=(self.padding, 0))
+        init(self.__dict__)  # 对该模块进行初始化
+        img_des_canvas_info = basic_img_draw_text(self.pure_backdrop, self.content[0], self.__dict__,
+                                                  box=(self.padding, 0),
+                                                  limit_box=(self.pure_backdrop.width, self.pure_backdrop.height))
         canvas_bottom=int(img_des_canvas_info['canvas_bottom'] )
-        pure_text_canvas = pure_backdrop.crop((0,0,self.img_width,canvas_bottom))
-        return {'canvas':pure_text_canvas,'canvas_bottom':canvas_bottom,'upshift':0,'downshift':0}
+        #print(canvas_bottom,self.pure_backdrop.height)
+        self.pure_text_canvas = self.pure_backdrop.crop((0,0,self.img_width,canvas_bottom))
+        #self.pure_text_canvas.show()
+        return {'canvas':self.pure_text_canvas,'canvas_bottom':canvas_bottom,'upshift':0,'downshift':0}
 
 
 
