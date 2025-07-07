@@ -148,6 +148,8 @@ avatar:
   is_shadow_font: false
   padding_up_font: 10  #头像右侧文字距离上部的距离
 
+  judge_flag: default #此处判断头像的背景处理方式，目前有：'common'平铺样式、'list'列表样式、'default'自动判断
+
   software_list:
     - {'type': 'bilibili', 'background': framework_common/manshuo_draw/data/img/type_software/bili.png, 'right_icon': framework_common/manshuo_draw/data/img/type_software/bili_icon.png}
     - {'type': 'dy', 'background': framework_common/manshuo_draw/data/img/type_software/dy.jpeg, 'right_icon': framework_common/manshuo_draw/data/img/type_software/dy_icon.png}
@@ -162,20 +164,12 @@ avatar:
     number_per_row: 1         #默认一个，可以指定每行多少个头像
     is_name: Ture                   #是否在头像右侧旁添加名字
     avatar_size: 100
-    padding: 30
-    padding_up_bottom: 15
-    upshift_extra: 0                     #上偏移量
-
-  list:
-    must_required_keys: {'img': null, 'content': null}
-    number_per_row: 2         #默认一个，可以指定每行多少个头像
-    is_name: Ture                   #是否在头像右侧旁添加名字
-    avatar_size: 100
     padding: 20
     padding_up_bottom: 15
     upshift_extra: 0                     #上偏移量
     avatar_backdrop_color: (235,239,253,255)  #放置介绍区域的颜色
-    is_shadow_img: false
+
+
 
 
 

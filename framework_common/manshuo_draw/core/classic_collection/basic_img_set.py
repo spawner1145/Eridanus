@@ -20,6 +20,8 @@ class basicimgset:
             if not hasattr(self, key):  # 如果属性不存在，则设置默认值
                 setattr(self, key, value)
         if self.img_name_save:self.img_path_save=f'{self.img_path_save}/{self.img_name_save}'
+        self.img_height_limit = self.img_height - self.padding_up_common * 2
+        #self.img_height_limit = self.img_height
         #是否获取其绝对路径
         if self.is_abs_path_convert is True:
             for key, value in vars(self).items():
@@ -30,21 +32,26 @@ class basicimgset:
         """创建一个同名空白画布并返回。"""
         # 创建一个指定大小和颜色的画布
         canvas = Image.new("RGBA", (self.img_width, self.img_height), (0, 0, 0, 0))
+        #canvas = Image.new("RGBA", (self.img_width, self.img_height), (255, 0, 0, 255))
         return canvas
 
 
     def combine_layer_basic(self,basic_img,layer_img_canvas):
 
         width, height = layer_img_canvas.size
-        if height > self.img_height - self.padding_up_common * 2:
-            height = self.img_height - self.padding_up_common * 2
-            layer_img_canvas = layer_img_canvas.crop((0, 0, width, height))
+        if height > self.img_height:
+            height = self.img_height
+            layer_img_canvas = layer_img_canvas.crop((0, 0, width, height + self.stroke_img_width / 2))
+            basic_img.paste(layer_img_canvas, (0, -int(self.padding_up_common ) ,width,height - int(self.padding_up_common - self.stroke_img_width / 2)), mask=layer_img_canvas)
+            basic_img = basic_img.crop((0, 0, self.img_width, height))
+        else:
+            basic_img.paste(layer_img_canvas, (0, -int(self.padding_up_common), width, height - int(self.padding_up_common)),mask=layer_img_canvas)
+            basic_img = basic_img.crop((0, 0, width, height - int(self.padding_up_common) ))
 
-        basic_img.paste(layer_img_canvas, (0, 0,width,height), mask=layer_img_canvas)
 
 
 
-        basic_img=basic_img.crop((0, 0, self.img_width, height))
+        #basic_img=basic_img.crop((0, 0, self.img_width, height))
 
         return basic_img
 

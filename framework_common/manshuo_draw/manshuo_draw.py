@@ -29,14 +29,14 @@ if __name__ == '__main__':
 
         {'type': 'backdrop', 'subtype': 'gradient'},
 
-        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift_extra':25,
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift_extra':25,'layer':2,
          'content':[ {'name': '漫朔_manshuo', 'time': '2025年 05月27日 20:32'}] },
 
         {'type': 'img', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg'],
-         'label': ['BiliBili', 'dy', 'manshuo']},
+         'label': ['BiliBili', 'dy', 'manshuo'],'layer':3,},
 
         {'type': 'img', 'subtype': 'common_with_des_right', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],
-         'content': ['这里是manshuo[title]！这部分是测manshuo！[/title]这manshuo！[des]这里是介绍[/des]'] },
+         'content': ['这里是manshuo[title]！这部分是测manshuo！[/title]这manshuo！[des]这里是介绍[/des]'],'layer':4, },
     ]
 
     contents2=[
@@ -65,31 +65,55 @@ if __name__ == '__main__':
 
 
     contentsWithNoTag=[
-        {'type': 'basic_set', 'debug': True,'img_width':1500},
-        {'type': 'avatar', 'subtype': 'list', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg','https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'],
-         'content': [f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]",f"[name]galgame[/name]\n[time]2025年 05月27日 20:32[/time]"],'background':['framework_common/manshuo_draw/data/cache/manshuo.jpg','https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'],},
-        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],
-         'upshift_extra': 0,
-         'content': [f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]"],
-         'type_software': 'bilibili', },
-        ['framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg'],
-        {'type': 'img', 'subtype': 'common_with_des_right','img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'label':['BiliBili'],
+        {'type': 'basic_set', 'debug': True,'img_width':1000,'img_height':1100},
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'layer':1,
+         'content': [f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]"]},
+        '这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]',
+        ['framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg',],
+        '这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]',
+        ['framework_common/manshuo_draw/data/cache/manshuo.jpg', 'framework_common/manshuo_draw/data/cache/manshuo.jpg',
+         'framework_common/manshuo_draw/data/cache/manshuo.jpg', ],
+        ['framework_common/manshuo_draw/data/cache/manshuo.jpg', 'framework_common/manshuo_draw/data/cache/manshuo.jpg',
+         'framework_common/manshuo_draw/data/cache/manshuo.jpg', ],
+        '这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]',
+        {'type': 'img', 'subtype': 'common_with_des_right','img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'label':['BiliBili'],'layer':2,
          'content': ['这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]']},
-        {'type': 'img', 'subtype': 'common_with_des', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg'],
+        {'type': 'img', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg'],'layer':3,
          'content': ['葬送的芙莉莲\n5星','败犬女主太多啦\n4.5星',]
          },
-        '这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]',
-        {'type': 'img', 'subtype': 'common_with_des','img': ['https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'], 'label': ['BiliBili'],
+
+        {'type': 'img', 'subtype': 'common_with_des','img': ['https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'], 'label': ['BiliBili'],'layer':5,
          'content': ['这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]']},
     ]
 
     games_content=[
-        {'type': 'basic_set', 'debug': True, 'img_width': 1000},
-
+        {'type': 'basic_set', 'debug': True, 'img_width': 1500,'img_height':1000},
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',
+                                                      'https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'],
+         'content': [f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]",
+                     f"[name]galgame[/name]\n[time]2025年 05月27日 20:32[/time]"],
+         'background': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',
+                        'https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'], },
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg'],
+         'upshift_extra': 0,'layer':5,
+         'content': [f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]",f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]"],
+         'type_software': 'bilibili', },
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',
+                                                        'https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'],
+         'content': [f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]",
+                     f"[name]galgame[/name]\n[time]2025年 05月27日 20:32[/time]"],
+         'background': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',
+                        'https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'], },
+        '这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]',
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',
+                                                        'https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'],
+         'content': [f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]",
+                     f"[name]galgame[/name]\n[time]2025年 05月27日 20:32[/time]"],
+         'background': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',
+                        'https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'], },
     ]
 
 
-    img_path_set='data/cache'
 
 
     asyncio.run(manshuo_draw(contentsWithNoTag))
