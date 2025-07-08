@@ -1,5 +1,4 @@
 import os
-import emoji
 import aiosqlite
 import httpx
 import aiofiles
