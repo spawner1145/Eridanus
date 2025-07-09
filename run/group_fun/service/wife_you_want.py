@@ -303,7 +303,7 @@ async def PIL_lu_maker(today , target_id,target_name,type='lu',contents=None):
         {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={target_id}&s=640"],'upshift_extra': 25,
          'content': [f"[name]{target_name}[/name]\n[time]{formatted_time}[/time]" ], 'type_software': 'lu', },
         str(content),
-        {'type': 'games', 'subtype': 'LuRecordMake','content': lu_content},
+        {'type': 'games', 'subtype': 'LuRecordMake','content_list': lu_content},
     ]
     img_path=await manshuo_draw(draw_content)
     return img_path

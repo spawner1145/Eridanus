@@ -111,11 +111,11 @@ async def xiaohongshu(url,filepath=None):
     image_list = [item['urlDefault'] for item in note_data['imageList']]
     if len(image_list) != 1:
         json_check['pic_path'] = await manshuo_draw([
-            {'type': 'avatar', 'subtype': 'common', 'img': [note_data['user']['avatar']], 'upshift_extra': 25,
+            {'type': 'avatar', 'subtype': 'common', 'img': [note_data['user']['avatar']], 'upshift_extra': 20,
              'content': [f"[name]{note_data['user']['nickname']}[/name]\n[time]{video_time}[/time]"], 'type_software': 'xhs','label':label_list }, image_list, [context]])
     else:
         json_check['pic_path'] = await manshuo_draw([
-            {'type': 'avatar', 'subtype': 'common', 'img': [note_data['user']['avatar']], 'upshift_extra': 25,
+            {'type': 'avatar', 'subtype': 'common', 'img': [note_data['user']['avatar']], 'upshift_extra': 20,
              'content': [f"[name]{note_data['user']['nickname']}[/name]\n[time]{video_time}[/time]"], 'type_software': 'xhs', },
             {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list, 'content': [context]}])
     return json_check
