@@ -30,6 +30,7 @@ def random_str(length=10):
     return random_string
 
 def add_append_img(contents,contents2,tag=None,tag_item=None,replace_item=None):
+
     for item in contents2:
         if isinstance(item, dict) and tag is not None and tag_item is not None:
             item[f'{tag}']=tag_item
