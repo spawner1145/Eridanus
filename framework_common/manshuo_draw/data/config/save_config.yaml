@@ -1,7 +1,9 @@
 #此配置文件为默认存储回滚文件，非专业人员请勿乱动！！！！
 basic_set:
+  version: 1.0                      #绘图版本
   img_width: 1000                   #图像默认宽度
-  img_height: 3000                  #图像默认最大长度
+  img_height: 1500                  #图像默认最大长度
+  max_num_of_columns: 3             #框架支持多列绘制，此处为最大列数，以免出现无限递归
   padding_left_common: 25           #层级的左间距，注意，修改此处仅会影响部分间距，每个模块内可能有各自的间距设置
   padding_up_common: 20             #层级的上间距，注意，修改此处仅会影响部分间距，每个模块内可能有各自的间距设置
   is_rounded_corners_front: true    #是否对模块进行圆角处理（此处为前置条件，必要不充分）
@@ -39,6 +41,7 @@ basic_set:
   padding: 20                       #模块内间距
   padding_with: 15                  #模块内元素之间的间距
   padding_up: 20                    #模块内元素的上间距
+  spacing: 1                        #文字绘制时候每个字之间的间距
 
   font_common: framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf  #字体路径
   font_common_size: 24                     #字体大小
@@ -85,7 +88,7 @@ backdrop:
 text:
   must_required_keys: {'content': null}
   common:
-    spacing: 1                       #每个字之间的间距
+    must_required_keys: {'content': null}
 
 img:
   is_rounded_corners_label: true      #是否对标签进行圆角处理
@@ -149,6 +152,7 @@ avatar:
   padding_up_font: 10  #头像右侧文字距离上部的距离
 
   judge_flag: default #此处判断头像的背景处理方式，目前有：'common'平铺样式、'list'列表样式、'default'自动判断
+  is_name: Ture                   #是否在头像右侧旁添加名字
 
   software_list:
     - {'type': 'bilibili', 'background': framework_common/manshuo_draw/data/img/type_software/bili.png, 'right_icon': framework_common/manshuo_draw/data/img/type_software/bili_icon.png}
@@ -162,7 +166,6 @@ avatar:
   common:
     must_required_keys: {'img': null, 'content': null}
     number_per_row: 1         #默认一个，可以指定每行多少个头像
-    is_name: Ture                   #是否在头像右侧旁添加名字
     avatar_size: 100
     padding: 20
     padding_up_bottom: 15

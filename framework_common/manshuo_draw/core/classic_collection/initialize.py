@@ -1,8 +1,19 @@
 import os
 from framework_common.manshuo_draw.core.util import *
 global initialize_yaml_set
+version_check=True
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+
+def version_check_core():
+    global version_check
+    version_check=False
+    default_config = get_abs_path('framework_common/manshuo_draw/data/config/save_config.yaml')
+
+
+if version_check:
+    try:version_check_core()
+    except Exception as e:print(e)
 
 def initialize_yaml_must_require(params):#对里面的数据进行处理
     initialize_yaml_load, must_required_keys=initialize_yaml_must_require_core(params)
@@ -50,7 +61,7 @@ def check_merge_config(default_config_path, user_config_path):
         yaml.dump(user_config, user_file)
 
 def initialize_yaml_must_require_core(params):
-    global initialize_yaml_set
+    global initialize_yaml_set,version_check
     yaml = YAML()
     yaml.preserve_quotes = True  # 保留 YAML 中的引号
     yaml.indent(sequence=4, offset=2)  # 设置缩进

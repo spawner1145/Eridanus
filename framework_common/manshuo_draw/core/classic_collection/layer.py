@@ -27,7 +27,7 @@ class LayerSet:
         #layer_canvas.show()
 
         width, height = layer_canvas.size
-        basic_img = Image.new("RGBA", (width + self.padding_left_common * 2,height+ self.padding_up_common * 3), (0, 0, 0, 0))  # 初始化透明图层
+        basic_img = Image.new("RGBA", (width + self.padding_left_common * 2,height+ self.padding_up_common * 3), (0, 0, 0, 0))  # 初始化   透明图层
         basic_img = img_process(self.__dict__,basic_img, layer_canvas,self.padding_left_common,self.padding_up_common,self.padding_up_common,'layer')
         return basic_img
 
