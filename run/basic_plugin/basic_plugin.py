@@ -161,6 +161,19 @@ def main(bot, config):
             await call_fortune(bot, event, config)
 
     @bot.on(GroupMessageEvent)
+    async def help_menu(event: GroupMessageEvent):
+        if "/help" == event.pure_text:
+            help_menu_list,reply_list={},[]
+            for page_number in config.common_config.basic_config['help_menu']['content']:
+                help_menu_list[page_number]=[]
+                for item in config.common_config.basic_config['help_menu']['content'][page_number]:
+                    help_menu_list[page_number].append(item)
+            for page_number in help_menu_list:
+                reply_list.append(Image(file=await manshuo_draw(help_menu_list[page_number])))
+            reply_list.append(f'详细文档请访问以下网址查看喵～\nhttps://eridanus.netlify.app/')
+            await bot.send(event, reply_list)
+
+    @bot.on(GroupMessageEvent)
     async def cyber_divination_tarot(event: GroupMessageEvent):
         if event.pure_text == "今日塔罗":
             if config.basic_plugin.config["tarot"]["彩蛋牌"] and random.randint(1, 100) < \
