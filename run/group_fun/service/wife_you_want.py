@@ -300,7 +300,7 @@ async def PIL_lu_maker(today , target_id,target_name,type='lu',contents=None):
 
     formatted_time = datetime.now().strftime("%Y年%m月%d日 %H:%M")
     draw_content=[
-        {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={target_id}&s=640"],'upshift': 25,
+        {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={target_id}&s=640"],'upshift_extra': 25,
          'content': [f"[name]{target_name}[/name]\n[time]{formatted_time}[/time]" ], 'type_software': 'lu', },
         str(content),
         {'type': 'games', 'subtype': 'LuRecordMake','content_list': lu_content},

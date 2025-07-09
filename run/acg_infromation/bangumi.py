@@ -176,10 +176,11 @@ def main(bot, config):
             elif "明日" in context: weekday +=1
             elif "昨日" in context: weekday -=1
             else: return
-
+            if weekday == 7:weekday=0
             weekdays = ["一", "二", "三", "四", "五", "六", "日"]
             bot.logger.info(f'获取到周{weekdays[weekday]}番剧图片制作指令')
             #print(f'bangumi 周{weekdays[weekday]}放送')
+            #print(event.self_id)
             bangumi_json = await bangumi_PILimg(name=f'bangumi 周{weekdays[weekday]}放送',type='calendar',config=config,target=weekday,bot_id=event.self_id)
             #print(json.dumps(bangumi_json, indent=4))
 
