@@ -113,8 +113,9 @@ if __name__ == "__main__":#测试用，不用管
     url='【【绫地宁宁 / 手书预告】恋爱裁判】https://www.bilibili.com/video/BV1JBMVzVEZr?vd_source=5e640b2c90e55f7151f23234cae319ec'
     url='https://live.bilibili.com/1947172143'
     url='https://t.bilibili.com/1082791822623768624?share_source=pc_native'
-    url='https://t.bilibili.com/1083123230902845449'
+    url='https://t.bilibili.com/1087480567546511368?share_source=pc_native'
     #url='https://t.bilibili.com/1079052679915765778'
+
     asyncio.run(link_prising(url))
     #asyncio.run(youxi_pil_new_text())
 
