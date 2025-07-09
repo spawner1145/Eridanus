@@ -9,6 +9,7 @@ class ImageModule:
         default_keys_values, must_required_keys = initialize_yaml_must_require(params)
         self.must_required_keys = must_required_keys or []  # 必须的键，如果没有提供就默认是空列表
         self.default_keys_values = default_keys_values or {}  # 默认值字典
+        self.params=params
         # 检测缺少的必需键
         missing_keys = [key for key in self.must_required_keys if key not in params]
         if missing_keys:
@@ -46,14 +47,13 @@ class ImageModule:
         #对每个图片进行单独处理
         for img in self.processed_img:
             if self.img_height_limit_module <= 0:break
-            img = per_img_limit_deal(self.__dict__,img)
-            #加入label绘制
-            img=label_process(self.__dict__,img,self.number_count,self.new_width)
-            #对每个图像进行处理
-            self.pure_backdrop = img_process(self.__dict__,self.pure_backdrop, img, self.x_offset, self.current_y, self.upshift)
+            img = per_img_limit_deal(self.__dict__,img)#处理每个图片,您的每张图片绘制自定义区域
+            img=label_process(self.__dict__,img,self.number_count,self.new_width)#加入label绘制
+            self.pure_backdrop = img_process(self.__dict__,self.pure_backdrop, img, self.x_offset, self.current_y, self.upshift)#对每个图像进行处理
             per_img_deal(self.__dict__,img)  # 处理每个图片的位置关系
         final_img_deal(self.__dict__)  # 处理最后的位置关系
-        return {'canvas': self.pure_backdrop, 'canvas_bottom': self.current_y ,'upshift':self.upshift,'downshift':self.downshift}
+        return {'canvas': self.pure_backdrop, 'canvas_bottom': self.current_y ,'upshift':self.upshift,'downshift':self.downshift,
+                'json_img_left_module':self.json_img_left_module,'without_draw':self.without_draw_and_jump}
 
     def common_with_des(self):
         init(self.__dict__)#对该模块进行初始化
@@ -63,6 +63,9 @@ class ImageModule:
             img = per_img_limit_deal(self.__dict__,img)
             img_des_canvas = Image.new("RGBA", (img.width, img.height + self.max_des_length), eval(self.description_color))
             img_des_canvas.paste(img, (0, 0))
+            if self.max_des_length + img.height > self.img_height_limit_module:
+                self.max_des_length = self.img_height_limit_module - img.height
+                if self.max_des_length < 0: self.max_des_length = 0
             img_des_canvas_info=basic_img_draw_text(img_des_canvas,self.content[self.number_count],self.__dict__,
                                                                      box=(self.padding , img.height + self.padding),
                                                                      limit_box=(self.new_width, self.max_des_length + img.height))
@@ -77,7 +80,8 @@ class ImageModule:
             self.pure_backdrop = img_process(self.__dict__,self.pure_backdrop, img, self.x_offset, self.current_y, self.upshift)
             per_img_deal(self.__dict__, img)  # 处理每个图片的位置关系
         final_img_deal(self.__dict__)  # 处理最后的位置关系
-        return {'canvas': self.pure_backdrop, 'canvas_bottom': self.current_y, 'upshift': self.upshift, 'downshift': self.downshift}
+        return {'canvas': self.pure_backdrop, 'canvas_bottom': self.current_y, 'upshift': self.upshift, 'downshift': self.downshift,
+                'json_img_left_module':self.json_img_left_module,'without_draw':self.without_draw_and_jump}
 
 
     def common_with_des_right(self):
@@ -103,7 +107,8 @@ class ImageModule:
         final_img_deal(self.__dict__)  # 处理最后的位置关系
 
 
-        return {'canvas': self.pure_backdrop, 'canvas_bottom': self.current_y, 'upshift': self.upshift, 'downshift': self.downshift}
+        return {'canvas': self.pure_backdrop, 'canvas_bottom': self.current_y, 'upshift': self.upshift, 'downshift': self.downshift,
+                'json_img_left_module':self.json_img_left_module,'without_draw':self.without_draw_and_jump}
 
 
 

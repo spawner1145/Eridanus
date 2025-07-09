@@ -6,6 +6,7 @@ from .common import add_append_img
 
 def deal_text_with_tag(input_string):
     pattern = r'\[(\w+)\](.*?)\[/\1\]'
+    input_string=input_string.replace("\\n", "\n")
     matches = list(re.finditer(pattern, str(input_string), flags=re.DOTALL))
     result = []
     last_end = 0  # 记录上一个匹配结束的位置
@@ -141,8 +142,10 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
         x_limit, y_limit = limit_box
     if content == '' or content is None:
         return {'canvas': canvas, 'canvas_bottom': y}
-
-    content_list = deal_text_with_tag(content)
+    if isinstance(content, list):
+        content_list=content
+    else:content_list = deal_text_with_tag(content)
+    left_content_list=content_list.copy()
 
     #将所有的emoji转换成pillow对象
     content_list_convert,emoji_list=[],[]
@@ -199,11 +202,12 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
     #这一部分开始进行实际绘制
     if box is None: box = (params['padding'], 0)  # 初始位置
     x, y = box
-    should_break, last_tag, line_count = False, 'common',0
+    should_break, last_tag, line_count,text,content_left = False, 'common',0 , None, []
     font = ImageFont.truetype(params[f'font_{last_tag}'], params[f'font_{last_tag}_size'])
     #对初始位置进行修正
     if ellipsis: y += line_height_list[0] - params[f'font_common_size']
     for content in content_list:
+        left_content_list.pop(left_content_list.index(content))
         # 依据字符串处理的字典加载对应的字体
         if content['tag'] == 'emoji':
             pass
@@ -219,7 +223,7 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
         draw = ImageDraw.Draw(canvas)
         i = 0
         # 对文字进行逐个绘制
-        text = content['content']
+        text, content_left = content['content'], content
         while i < len(text):  # 遍历每一个字符
             if text[i] == '': continue
             if content['tag'] == 'emoji':
@@ -260,7 +264,13 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
                 if x == box[0] + char_width + 1 and text[i - 1] == '\n' :#检测是否在一行最开始换行，若是则修正
                     x -= char_width + 1
     canvas_bottom = y + params[f'font_common_size'] + 2
-    return {'canvas': canvas, 'canvas_bottom': canvas_bottom}
+    if text and params["number_count"] < len(params['content']):
+        content_left['content']=text[i:]
+        if content_left['content'] == '':
+            params['content'][params["number_count"]]=left_content_list
+        else:
+            params['content'][params["number_count"]]=add_append_img([content_left],left_content_list)
+    return {'canvas': canvas, 'canvas_bottom': canvas_bottom,}
 
 
 if __name__ == '__main__':
