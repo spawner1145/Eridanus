@@ -133,7 +133,7 @@ def main(bot: ExtendBot, config):
             weekdays = ["一", "二", "三", "四", "五", "六", "日"]
             bangumi_json = await bangumi_PILimg(filepath='data/pictures/cache/',
                                                 type_soft=f'bangumi 周{weekdays[weekday]}放送',
-                                                name=f'bangumi 周{weekdays[weekday]}放送', type='calendar')
+                                                name=f'bangumi 周{weekdays[weekday]}放送', type='calendar',bot_id=None)
             if bangumi_json['status']:
                 logger.info_func("推送bangumi每日番剧")
                 for group_id in config.scheduled_tasks.sheduled_tasks_push_groups_ordinary["bangumi"]["groups"]:
