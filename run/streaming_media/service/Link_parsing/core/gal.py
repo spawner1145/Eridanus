@@ -183,7 +183,7 @@ async def Galgame_manshuo(url,filepath=None):
     card_url=card_url_list[random.randint(0,len(card_url_list)-1)]
 
     json_check['pic_path'] = await manshuo_draw([
-        {'type': 'avatar', 'subtype': 'common', 'img': [avatar_path_url], 'upshift_extra': 25,
+        {'type': 'avatar', 'subtype': 'common', 'img': [avatar_path_url], 'upshift_extra': 20,
          'content': [f"[name]{avatar_name}[/name]\n[time]{time_gal}[/time]"]},
         {'type': 'img', 'subtype': 'common_with_des_right', 'img': [links_url], 'content': [context]}])
     return json_check
@@ -241,10 +241,10 @@ async def youxi_pil_new_text(filepath=None):
                    'card_color': False,
                    'card_is_fan': False}
 
-        card_url = card_url_list[random.randint(0, len(card_url_list) - 1)]
+        #card_url = card_url_list[random.randint(0, len(card_url_list) - 1)]
 
         json_check['pic_path'] = await manshuo_draw([
-            {'type': 'avatar', 'subtype': 'common', 'img': [author_url], 'upshift_extra': 25,
+            {'type': 'avatar', 'subtype': 'common', 'img': [author_url], 'upshift_extra': 20,
              'content': [f"[name]{avatar_name}[/name]\n[time]{time_gal}[/time]"]},
             {'type': 'img', 'subtype': 'common_with_des_right', 'img': [data_src_values[0]], 'content': [context]}])
 
