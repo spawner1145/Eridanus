@@ -2,7 +2,7 @@
 basic_set:
   version: 1.0                      #绘图版本
   img_width: 1000                   #图像默认宽度
-  img_height: 1500                  #图像默认最大长度
+  img_height: 2000                  #图像默认最大长度
   max_num_of_columns: 3             #框架支持多列绘制，此处为最大列数，以免出现无限递归
   padding_left_common: 25           #层级的左间距，注意，修改此处仅会影响部分间距，每个模块内可能有各自的间距设置
   padding_up_common: 20             #层级的上间距，注意，修改此处仅会影响部分间距，每个模块内可能有各自的间距设置
