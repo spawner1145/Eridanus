@@ -9,6 +9,8 @@ webui:
   enable: true #是否开启web ui
 redis: #redis数据库相关设置
   redis_ip: default
+redis: #redis数据库相关设置，如果您不清楚请不要乱动
+  redis_ip: default       #默认即为本机ip，若您使用docker安装，请填您的docker网桥
   redis_port: default
   redis_db: default
 record_mface: true #是否收集主人的表情包
