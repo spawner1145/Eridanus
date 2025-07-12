@@ -105,7 +105,6 @@ def main(bot, config):
                     if current_month in count_check: count += int(all_users[user]['number_speeches'][f'{target_group}'][count_check])
                 target_name = (await bot.get_group_member_info(target_group, user))['data']['nickname']
                 number_speeches_check_list.append({'name':user,'nicknime':target_name,'number_speeches_count':count})
-                if len(number_speeches_check_list)>=16:break
         number_speeches_check_list_nolimited = sorted(number_speeches_check_list, key=lambda x: x["number_speeches_count"], reverse=True)
         number_speeches_check_list=[]
         for item in number_speeches_check_list_nolimited:
