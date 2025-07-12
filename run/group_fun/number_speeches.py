@@ -11,7 +11,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 def main(bot, config):
     # 初始化 Redis 数据库实例
-    db = RedisDatabase()
+    db_json=config.common_config.basic_config['redis']
+    db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
 
     @bot.on(GroupMessageEvent)
     async def number_speeches_count(event: GroupMessageEvent):
@@ -105,7 +106,6 @@ def main(bot, config):
                     if current_month in count_check: count += int(all_users[user]['number_speeches'][f'{target_group}'][count_check])
                 target_name = (await bot.get_group_member_info(target_group, user))['data']['nickname']
                 number_speeches_check_list.append({'name':user,'nicknime':target_name,'number_speeches_count':count})
-                if len(number_speeches_check_list)>=16:break
         number_speeches_check_list_nolimited = sorted(number_speeches_check_list, key=lambda x: x["number_speeches_count"], reverse=True)
         number_speeches_check_list=[]
         for item in number_speeches_check_list_nolimited:

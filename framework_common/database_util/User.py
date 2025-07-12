@@ -24,6 +24,7 @@ if is_running_in_docker():
     REDIS_URL = "redis://redis:6379/1"
 else:
     REDIS_URL = "redis://localhost/1"
+
 REDIS_CACHE_TTL = 60  # 秒
 REDIS_EXECUTABLE = "redis-server.exe"
 REDIS_ZIP_PATH = os.path.join("data", "Redis-x64-5.0.14.1.zip")
