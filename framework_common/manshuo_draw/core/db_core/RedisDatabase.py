@@ -18,7 +18,7 @@ def merge_dicts(dict1, dict2):
     return merged
 
 class RedisDatabase:
-    def __init__(self, host="localhost", port=6379, db=0):
+    def __init__(self, host="default", port='default', db='default'):
         """
         初始化 Redis 数据库连接，并设置数据存储路径和文件名。
         :param host: Redis 服务器地址
@@ -26,7 +26,11 @@ class RedisDatabase:
         :param db: Redis 数据库编号
         """
         # 创建 Redis 连接
-        self.pool = redis.ConnectionPool(host=host, port=port, db=db, decode_responses=True)
+        if host == 'default': host = 'localhost'
+        if port == 'default': port = 6379
+        if db == 'default': db = 0
+        try:self.pool = redis.ConnectionPool(host=host, port=port, db=db, decode_responses=True)
+        except redis.exceptions.ConnectionError:self.pool = redis.ConnectionPool(host=host, port=port, db=db, decode_responses=True)
         self.redis = redis.StrictRedis(connection_pool=self.pool)
 
     def write_user(self, user_id: str, user_data: Dict[str, Any]):
@@ -146,6 +150,7 @@ class RedisDatabase:
         """
         # Redis 自动会在启动时加载 RDB 文件，此处仅提及流程
         print("Redis 数据会在启动时自动加载。确保 RDB 文件存在于指定目录。")
+
 
 # 示例使用
 if __name__ == "__main__":
