@@ -11,7 +11,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 def main(bot, config):
     # 初始化 Redis 数据库实例
-    db = RedisDatabase()
+    db_json=config.common_config.basic_config['redis']
+    db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
 
     @bot.on(GroupMessageEvent)
     async def number_speeches_count(event: GroupMessageEvent):
