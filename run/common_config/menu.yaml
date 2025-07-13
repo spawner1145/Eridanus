@@ -24,12 +24,12 @@ help_menu:
       \n  [des]语音合成自动同ai对话功能联动，请自行选择默认模型[/des]'],'layer':2}
       - '   '
       - {'type': 'text','content': ['[title]用户和群管理[/title]
-      \n  注册 [des]bot有自动注册机制，基本用不到此命令[/des]
       \n  我的信息  [des]check your personal information[/des]
       \n  签到
       \n  修改城市{城市名}  [des]修改城市南阳[/des]
       \n  叫我{xxx}       [des]叫我国服马车[/des]
       \n  授权#{qq号}#{权限级别}  [des]授权#2319804644#10[/des]
+      \n  notice          [des]向所有群发送公告[/des]
       \n  /quit < 10      [des]退出所有人数小于10的群[/des]
       \n  /quit > 10      [des]退出所有人数大于10的群[/des]
       \n  退群{群号}      [des]退群674822468[/des]
