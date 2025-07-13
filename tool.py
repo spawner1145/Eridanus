@@ -490,8 +490,8 @@ def export_yaml(base_dir="run"):
 
     copy_to_old_yamls(yaml_files)
     logger.info("导出yaml文件到old_yamls文件夹完成")
-    logger.info("请将old_yamls文件夹复制到新的Eridanus目录下，放在run目录旁边。路径应当为：Eridanus/old_yamls/{旧文件夹和文件}")
-    logger.info("然后运行Eridanus/tool.py，选择导入旧配置即可。")
+    logger.info("请将old_yamls文件夹复制到新的Eridanus目录下，放在run目录旁边。路径应当为：Eridanus/old_yamls")
+    logger.info("在新目录下运行Eridanus/tool.py或更新脚本，选择导入旧配置即可。")
     return yaml_files
 def import_yaml(base_dir="run"):
     yaml_files = []
