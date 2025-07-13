@@ -43,7 +43,9 @@ async def main():
         [4].开发者工具
         [5].若只的检测相关ai库(如奶龙检测)
         [6].B站 or 抖音 or 小红书 登录。不登也不影响你用
-        [7].退出""")
+        [7].导出配置文件
+        [8].导入配置文件
+        [9].退出""")
     user_input = input("请输入指令序号：")
     if user_input == "1":
         logger.info("youtube登录")
@@ -101,7 +103,15 @@ async def main():
 
         from run.streaming_media.service.Link_parsing.core.login_core import login_core_select
         await login_core_select()
-
+    elif user_input == "7":
+        logger.info("导出配置文件")
+        export_yaml()
+        logger.info("配置文件导出完成")
+        logger.warning("请将old_yamls文件夹复制到新的Eridanus目录下。如有必要，请自行覆盖新的data文件夹")
+    elif user_input == "8":
+        logger.info("导入配置文件")
+        import_yaml()
+        logger.info("配置文件导入完成")
 
 def updaat(f=False, source=None, yamls:dict=None):
     if not yamls:
@@ -455,6 +465,47 @@ def ai_req():
 
     logger.info("ai相关库安装成功完成")
     return
+def export_yaml(base_dir="run"):
+    if not os.path.exists("old_yamls"):
+        os.mkdir("old_yamls")
+    """
+    导出yaml文件到old_yamls文件夹
+    """
 
+    yaml_files = []
+    for root, _, files in os.walk(base_dir):
+        for file in files:
+            if file.endswith(".yaml"):
+                full_path = os.path.join(root, file)
+                relative_path = os.path.relpath(full_path, base_dir)
+                yaml_files.append(relative_path)
+    def copy_to_old_yamls(yaml_files, target_dir="old_yamls"):
+        for rel_path in yaml_files:
+            src_path = os.path.join(base_dir, rel_path)
+            dst_path = os.path.join(target_dir, rel_path)
+
+            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+            shutil.copy2(src_path, dst_path)
+            print(f"Copied: {src_path} -> {dst_path}")
+
+    copy_to_old_yamls(yaml_files)
+    logger.info("导出yaml文件到old_yamls文件夹完成")
+    logger.info("请将old_yamls文件夹复制到新的Eridanus目录下，放在run目录旁边。路径应当为：Eridanus/old_yamls/{旧文件夹和文件}")
+    logger.info("然后运行Eridanus/tool.py，选择导入旧配置即可。")
+    return yaml_files
+def import_yaml(base_dir="run"):
+    yaml_files = []
+    for root, _, files in os.walk(base_dir):
+        for file in files:
+            if file.endswith(".yaml"):
+                full_path = os.path.join(root, file)
+                relative_path = os.path.relpath(full_path, base_dir)
+                yaml_files.append(relative_path)
+    for files in yaml_files:
+        if os.path.exists(os.path.join(base_dir, files)):
+            conflict_file_dealter(os.path.join("old_yamls", files), os.path.join(base_dir, files))
+        else:
+            logger.warning(f"文件{files}在新配置中不存在，跳过")
+            continue
 if __name__ == '__main__':
     asyncio.run(main())
