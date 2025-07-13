@@ -28,7 +28,7 @@ async def delete_old_files_async(folder_path):
     async def process_file(file_path) -> None:
         nonlocal deleted_file_sizes
         try:
-            if file_path.endswith(".py") or file_path.endswith(".ttf"):
+            if file_path.endswith(".py") or file_path.endswith(".ttf") or file_path.startswith("help_menu_page"):
                 #print(f"跳过文件: {file_path}")
                 return None
 

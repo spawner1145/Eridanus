@@ -12,7 +12,7 @@ basic_set:
   img_path_save: data/pictures/cache  #若有图片保存需求，则会将文件保存在此处，基于‘Eridanus’文件夹
   img_name_save: None
   debug: false                      #是否开启debug，开启后控制台会输出相应处理过程
-  config_path: framework_common/manshuo_draw/data/config/save_config.yaml  #默认配置文件地址
+  config_path: framework_common/manshuo_draw/data/config/save_config.yml  #默认配置文件地址
   is_abs_path_convert: true        #将文件路径转换为绝对路径（默认关闭，可能会有bug，但建议开发者打开以便于测试）
                                     #注意：此处同时对传入的img路径进行转换，绝对路径初始值为‘Eridanus’，即bot所在文件夹
 
