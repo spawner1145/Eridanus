@@ -337,7 +337,7 @@ def today_check_api(today_wife_api,header,num_check=None):
         response=requests.get(today_wife_api[num_check], headers=headers)
         return response
     except:
-        return today_check_api(today_wife_api,header,num_check=num_check+1)
+        return None  #接口寄了是
 
 
 if __name__ == '__main__':
