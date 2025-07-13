@@ -3,6 +3,8 @@ from framework_common.framework_util.yamlLoader import YAMLManager
 from developTools.event.events import GroupMessageEvent,LifecycleMetaEvent
 from developTools.message.message_components import Record, Node, Text, Image, At
 from datetime import datetime, timedelta
+from framework_common.utils.install_and_import import install_and_import
+install_and_import('python-dateutil')
 from dateutil.relativedelta import relativedelta
 import time
 from framework_common.manshuo_draw import *
@@ -86,7 +88,9 @@ def main(bot, config):
                 flag=False
         if flag:return
         if '本月' == context or '当月' == context:today = datetime.now()
-        elif '上个月' == context or '上月' == context:today =datetime.now() - relativedelta(months=1)
+        elif '上个月' == context or '上月' == context:
+
+            today =datetime.now() - relativedelta(months=1)
         elif '明月' == context:
             await bot.send(event, '小南娘说话还挺逗')
             return

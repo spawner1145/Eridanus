@@ -43,12 +43,11 @@ async def check_bili_dynamic(bot, config):
                     elif bilibili_type_draw == 2:
                         linking_prising_json = await link_prising(f'https://t.bilibili.com/{latest_dynamic_id}',
                                                                   filepath='data/pictures/cache/', type='dynamic_check')
-                        if not linking_prising_json['status']:
-                            config.streaming_media.bili_dynamic[target_uid]["latest_dynamic_id"] = [latest_dynamic_id1,
-                                                                                                    latest_dynamic_id2]
+                        if linking_prising_json['status']:
+                            config.streaming_media.bili_dynamic[target_uid]["latest_dynamic_id"] = [latest_dynamic_id1,latest_dynamic_id2]
                             config.save_yaml("bili_dynamic", plugin_name="streaming_media")
-
-                        dynamic = linking_prising_json['pic_path']
+                            dynamic = linking_prising_json['pic_path']
+                        else:return
 
                 except Exception as e:
                     bot.logger.error(f"动态获取失败 ：{e} 关注id: {target_uid} 最新动态id: {latest_dynamic_id}")

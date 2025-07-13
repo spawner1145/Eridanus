@@ -24,7 +24,7 @@ def bili_init():
     if ini_login_Link_Prising(type=1) is not None:
         data = ini_login_Link_Prising(type=1)
         BILI_SESSDATA: Optional[str] = f'{data["sessdata"]}'
-        credential = Credential(sessdata=BILI_SESSDATA, bili_jct=data['bili_jct'],ac_time_value=data['ac_time_value'])
+        credential = Credential(sessdata=BILI_SESSDATA, bili_jct=data['bili_jct'])
     else:
         BILI_SESSDATA: Optional[str] = f' '
         credential = Credential(sessdata=BILI_SESSDATA)
