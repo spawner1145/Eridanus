@@ -1,3 +1,4 @@
+import os
 import random
 import traceback
 
@@ -163,15 +164,27 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def help_menu(event: GroupMessageEvent):
         if "/help" == event.pure_text:
-            help_menu_list,reply_list={},[]
-            for page_number in config.common_config.basic_config['help_menu']['content']:
-                help_menu_list[page_number]=[]
-                for item in config.common_config.basic_config['help_menu']['content'][page_number]:
+
+            file_lists = ['help_menu_page1.png', 'help_menu_page2.png', 'help_menu_page3.png', 'help_menu_page4.png']
+            node_list = []
+            for file_name in file_lists:
+                node_list.append(Node(content=[Image(file=os.path.join('data/pictures/cache', file_name))]))
+            await bot.send(event, node_list)
+        if "/remenu"==event.pure_text:
+            file_lists = ['help_menu_page1.png', 'help_menu_page2.png', 'help_menu_page3.png', 'help_menu_page4.png']
+            for file_name in file_lists:
+                if os.path.exists(os.path.join('data/pictures/cache', file_name)):
+                    os.remove(os.path.join('data/pictures/cache', file_name))
+
+            help_menu_list, reply_list = {}, []
+            for page_number in config.common_config.menu['help_menu']['content']:
+                help_menu_list[page_number] = []
+                for item in config.common_config.menu['help_menu']['content'][page_number]:
                     help_menu_list[page_number].append(item)
             for page_number in help_menu_list:
-                reply_list.append(Image(file=await manshuo_draw(help_menu_list[page_number])))
-            reply_list.append(f'详细文档请访问以下网址查看喵～\nhttps://eridanus.netlify.app/')
+                reply_list.append(Node(content=[Image(file=await manshuo_draw(help_menu_list[page_number]))]))
             await bot.send(event, reply_list)
+
 
     @bot.on(GroupMessageEvent)
     async def cyber_divination_tarot(event: GroupMessageEvent):
