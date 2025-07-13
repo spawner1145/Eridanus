@@ -163,13 +163,18 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)
     async def help_menu(event: GroupMessageEvent):
-        if event.pure_text in ["帮助", "菜单", "/help", "/menu"]:
+        if event.pure_text in ["帮助", "菜单", "/help", "/menu"] or event.message_chain.get(Text)[0].text  in ["帮助", "菜单", "/help", "/menu"] :
 
             file_lists = ['help_menu_page1.png', 'help_menu_page2.png', 'help_menu_page3.png', 'help_menu_page4.png']
-            node_list = [Node(content=[Text("项目文档：https://eridanus.netlify.app/\n项目地址：https://github.com/AOrbitron/Eridanus")])]
-            for file_name in file_lists:
-                node_list.append(Node(content=[Image(file=os.path.join('data/pictures/doc', file_name))]))
-            await bot.send(event, node_list)
+            if config.common_config.menu["help_menu"]["send_as_node"]:
+                node_list = [Node(content=[Text("项目文档：https://eridanus.netlify.app/\n项目地址：https://github.com/AOrbitron/Eridanus")])]
+                for file_name in file_lists:
+                    node_list.append(Node(content=[Image(file=os.path.join('data/pictures/doc', file_name))]))
+                await bot.send(event, node_list)
+            else:
+                for file_name in file_lists:
+                    await bot.send(event, Image(file=os.path.join('data/pictures/doc', file_name)))
+                await bot.send(event, "项目文档：https://eridanus.netlify.app/\n项目地址：https://github.com/AOrbitron/Eridanus")
         if "/remenu"==event.pure_text:
             file_lists = ['help_menu_page1.png', 'help_menu_page2.png', 'help_menu_page3.png', 'help_menu_page4.png']
             for file_name in file_lists:

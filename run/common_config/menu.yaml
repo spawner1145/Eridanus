@@ -1,4 +1,5 @@
 help_menu:
+  send_as_node: true
   content:
     page1: #https://q1.qlogo.cn/g?b=qq&nk=3552663628&s=640这里面可以换成你自己botqq
       - { 'type': 'basic_set', 'img_width': 1000,'img_name_save': 'help_menu_page1.png','img_height': 1500,'max_num_of_columns': 3 ,'font_common_size': 34,'font_des_size': 25, 'font_title_size': 46,'spacing': 3,'padding_up': 30}
