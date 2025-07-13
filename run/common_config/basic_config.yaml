@@ -6,8 +6,7 @@ group_handle_logic_operate_level: 1000 #拉黑、解黑群所需操作权限
 邀请bot加群所需权限: 0
 申请bot好友所需权限: 0
 webui:
-  enable: true #是否开启web ui
-
+  enable: false #是否开启web ui
 redis: #redis数据库相关设置，如果您不清楚请不要乱动
   redis_ip: default       #默认即为本机ip，若您使用docker安装，请填您的docker网桥
   redis_port: default
