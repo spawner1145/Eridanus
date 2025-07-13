@@ -4,7 +4,7 @@ from developTools.event.events import GroupMessageEvent,LifecycleMetaEvent
 from developTools.message.message_components import Record, Node, Text, Image, At
 from datetime import datetime, timedelta
 from framework_common.utils.install_and_import import install_and_import
-install_and_import('python-dateutil', 'dateutil')
+dateutil=install_and_import('python-dateutil', 'dateutil')
 from dateutil.relativedelta import relativedelta
 import time
 from framework_common.manshuo_draw import *
