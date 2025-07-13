@@ -214,7 +214,6 @@ def updaat(f=False, source=None, yamls:dict=None):
                 pass
             logger.warning("移除了" + file)
         elif file.endswith(".yaml"):
-            if file.endswith("framework_common/manshuo_draw/data/config/save_config.yaml") or file.endswith("framework_common\manshuo_draw\data\config\save_config.yaml"):continue
             logger.info("冲突的配置文件" + file)
             logger.warning("开始处理冲突文件.....读取中")
             yamls[file] = f"temp/{file.replace('/', '_')}"
