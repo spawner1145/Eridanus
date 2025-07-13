@@ -163,7 +163,7 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)
     async def help_menu(event: GroupMessageEvent):
-        if "/help" == event.pure_text:
+        if event.pure_text in ["帮助", "菜单", "/help", "/menu"]:
 
             file_lists = ['help_menu_page1.png', 'help_menu_page2.png', 'help_menu_page3.png', 'help_menu_page4.png']
             node_list = []
