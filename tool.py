@@ -270,6 +270,8 @@ def merge_dicts(old, new):
             if k == "api_keys" or k == "sdUrl" or k == "其他默认绘图参数" or k == "card_index":  # 特殊处理, 保留旧值
                 logger.info(f"覆盖列表 key: {k}")
                 new[k] = v  # 使用旧的列表覆盖新的列表
+            elif k.startswith("page"):
+                logger.warning(f"当前任务为菜单，使用最新配置覆盖旧配置。")
             else:
                 logger.info(f"合并列表 key: {k}")
                 new[k] = list(dict.fromkeys(new[k] + v))  # 保持顺序去重
@@ -503,6 +505,7 @@ def import_yaml(base_dir="run"):
                 yaml_files.append(relative_path)
     for files in yaml_files:
         if os.path.exists(os.path.join(base_dir, files)):
+            logger.warning(f"开始处理冲突文件{files}...")
             conflict_file_dealter(os.path.join("old_yamls", files), os.path.join(base_dir, files))
         else:
             logger.warning(f"文件{files}在新配置中不存在，跳过")
