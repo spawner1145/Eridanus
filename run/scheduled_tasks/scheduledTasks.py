@@ -240,7 +240,7 @@ def main(bot: ExtendBot, config):
 
 
 
-                    today = datetime.now()
+                    today = datetime.datetime.now()
 
 
                     year, month, day = today.year, today.month, today.day
