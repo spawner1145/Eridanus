@@ -503,12 +503,19 @@ def import_yaml(base_dir="run"):
                 full_path = os.path.join(root, file)
                 relative_path = os.path.relpath(full_path, base_dir)
                 yaml_files.append(relative_path)
+    failed_files = []
     for files in yaml_files:
         if os.path.exists(os.path.join(base_dir, files)):
             logger.warning(f"开始处理冲突文件{files}...")
-            conflict_file_dealter(os.path.join("old_yamls", files), os.path.join(base_dir, files))
+            try:
+                conflict_file_dealter(os.path.join("old_yamls", files), os.path.join(base_dir, files))
+            except Exception as e:
+                logger.error(f"处理冲突文件{files}失败：{e}")
+                continue
         else:
             logger.warning(f"文件{files}在新配置中不存在，跳过")
             continue
+    if failed_files:
+        logger.warning(f"以下文件处理失败：{failed_files}，建议手动处理")
 if __name__ == '__main__':
     asyncio.run(main())
