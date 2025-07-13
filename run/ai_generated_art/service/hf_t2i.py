@@ -6,11 +6,9 @@ import time
 
 import httpx
 
-
 from developTools.utils.logger import get_logger
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.random_str import random_str
-import ruamel.yaml
 from framework_common.utils.utils import parse_arguments
 from run.ai_generated_art.service.wildcard import replace_wildcards
 
@@ -37,7 +35,7 @@ cookie = "" # 自己去hf开f12搞吧，我的huggingface被刷爆了
 def random_session_hash(random_length):
     return random_str(random_length, "abcdefghijklmnopqrstuvwxyz1234567890")
 
-async def hf_drawer(prompt,proxy,args,negative=None,user_cookie=None):
+async def hf_drawer(prompt, proxy, args):
     height = 1600
     width = 1064
     try:
@@ -125,7 +123,7 @@ async def hf_drawer(prompt,proxy,args,negative=None,user_cookie=None):
                         
                         try:
                             event_data = json.loads(line.replace("data:", "").strip())
-                        except json.JSONDecodeError as decode_error:
+                        except json.JSONDecodeError:
                             continue
                         
                         msg_type = event_data.get('msg')
