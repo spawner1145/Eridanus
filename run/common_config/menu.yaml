@@ -3,11 +3,10 @@ help_menu:
     page1: #https://q1.qlogo.cn/g?b=qq&nk=2319804644&s=640这里面可以换成你自己botqq
       - { 'type': 'basic_set', 'img_width': 1000,'img_name_save': 'help_menu_page1.png','img_height': 1500,'max_num_of_columns': 3 ,'font_common_size': 34,'font_des_size': 25, 'font_title_size': 46,'spacing': 3,'padding_up': 30}
       - { 'type': 'avatar', 'img': ["https://q1.qlogo.cn/g?b=qq&nk=2319804644&s=640"],'content': ["[name]枫与岚[/name]\n[des]很高兴认识你～[/des]"],'padding_up_font': 5,'upshift_extra':20 }
-      - '你好，这里 [title]枫与岚[/title] 哦\n我是一个基于 [title]Eridanus[/title] 的qq机器人，请多关照!!!\n请修改run/common_config/menu.yaml文件来自定义菜单内容哦！,修改后使用/remenu命令即可重新生成菜单'
+      - '你好，我是一个基于 [title]Eridanus[/title] 的qq机器人，请多关照!\n请修改run/common_config/menu.yaml文件来自定义菜单内容哦！,修改后使用/remenu命令即可重新生成菜单'
       #- {'type': 'text','content': ['  现在（敲黑板）！枫与岚也有属于自己的人物形象啦，大家请看！'],'layer':2}
       #- { 'type': 'img', 'subtype': 'common_with_des','layer':2, 'img': ['https://gal.manshuo.ink/usr/uploads/2025/07/977611811.png','https://gal.manshuo.ink/usr/uploads/2025/07/2873643637.png','https://gal.manshuo.ink/usr/uploads/2025/07/4007464159.png'],'content': ["感谢’邪恶饼干‘的绘制","感谢’欢乐阳光‘的绘制","感谢’枫糖松饼’的绘制‘"] }
       #- {'type': 'text','content': ['好耶，这下枫与岚也是变得越来越可爱了呢（嗯！\n那么接下来，就让我们介绍枫与岚的奇妙能力吧！'],'layer':2}
-      - '   '
       - { 'type': 'img', 'subtype': 'common_with_des_right','img': [ "https://q1.qlogo.cn/g?b=qq&nk=1270858640&s=640" ],'label': [ 'B站' ],'content': [ ' \n绘图框架作者\n                 ---漫朔\n \n[des]关注漫朔谢谢喵喵[/des]' ] }
       - '   '
       - {'type': 'text','content': ['[title]AI对话[/title]
@@ -22,7 +21,6 @@ help_menu:
       - {'type': 'text','content': ['[title]语音合成[/title]
       \n  /xx说xxxx [des]/派蒙说该死的旅行者[/des]
       \n  可用角色  [des]列出所有可用的角色[/des]
-      \n  函数调用：用xxx的声音说xxx
       \n  [des]语音合成自动同ai对话功能联动，请自行选择默认模型[/des]'],'layer':2}
       - '   '
       - {'type': 'text','content': ['[title]用户和群管理[/title]
@@ -175,7 +173,7 @@ help_menu:
       - '   '
       - {'type': 'text','content': ['[title]定时任务[/title]
       \n  向指定群/用户定时发送消息。如每天早上播报天气等。
-      \n  可用任务名["每日天文","bing每日图像", "单向历", "bangumi", "nightASMR", "摸鱼人日历", "新闻", "免费游戏喜加一", "早安", "晚安", "午安","忍术大学习"]
+      \n  可用任务名 每日天文, bing每日图像, 单向历, bangumi, nightASMR, 摸鱼人日历, 新闻, 免费游戏喜加一, 早安, 晚安, 午安, 忍术大学习, 每日壁画王
       \n  /cron add 任务名
       \n  /cron remove 任务名
       \n  [des]时间等相关配置，请参考配置文件。 [/des]'],'layer':2}
