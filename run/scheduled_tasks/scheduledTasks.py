@@ -272,7 +272,7 @@ def main(bot: ExtendBot, config):
                         {'type': 'avatar', 'subtype': 'common',
                          'img': [f"https://q1.qlogo.cn/g?b=qq&nk={bot.id}&s=640"],
                          'content': [
-                             f"[name]发言排行榜[/name]\n[time]{datetime.now().strftime('%Y年%m月%d日 %H:%M')}[/time]"]},
+                             f"[name]发言排行榜[/name]\n[time]{datetime.datetime.now().strftime('%Y年%m月%d日 %H:%M')}[/time]"]},
                         {'type': 'avatar', 'subtype': 'common',
                          'img': [f"https://q1.qlogo.cn/g?b=qq&nk={list['name']}&s=640" for list in
                                  number_speeches_check_list],
