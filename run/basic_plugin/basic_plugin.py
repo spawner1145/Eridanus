@@ -1,7 +1,7 @@
 import os
 import random
 import traceback
-
+import shutil
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Node, Text, Image, Music
 from framework_common.database_util.User import get_user
@@ -187,6 +187,9 @@ def main(bot, config):
                     help_menu_list[page_number].append(item)
             for page_number in help_menu_list:
                 reply_list.append(Node(content=[Image(file=await manshuo_draw(help_menu_list[page_number]))]))
+            for file_name in file_lists:
+                if os.path.exists(os.path.join('data/pictures/doc', file_name)):
+                    shutil.copy(os.path.join('data/pictures/cache', file_name), 'data/pictures/doc')
             await bot.send(event, reply_list)
 
 
