@@ -4,9 +4,9 @@ dynamic_imports={
         "call_operate_blandwhite", "garbage_collection",
         "report_to_master", "send", "send_contract"
     ],
-    "run.groupManager.group_manager": [
+    '''"run.groupManager.group_manager": [
         "quit_group"
-    ]
+    ]'''
 }
 function_declarations=[
     {
@@ -84,7 +84,7 @@ function_declarations=[
             ]
         }
     },
-    {
+    '''{
         "name": "quit_group",
         "description": "退出群聊。可选择超出指定人数，或低于指定人数的群",
         "parameters": {
@@ -104,5 +104,5 @@ function_declarations=[
                 "mode"
             ]
         }
-    }
+    }'''
 ]
