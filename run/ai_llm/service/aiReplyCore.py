@@ -106,7 +106,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                     "enable_proxy"] else None,
             )
             if not response_message:
-                reply_message = "NetWork Error!"
+                reply_message = "当前模型设置为default，已失效，请自行配置模型。"
             else:
                 reply_message = response_message['content']
             await prompt_database_updata(user_id, response_message, config)
