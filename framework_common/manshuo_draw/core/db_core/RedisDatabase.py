@@ -159,7 +159,7 @@ if __name__ == "__main__":
     storage_file = "test.rdb"
 
     # 初始化 Redis 数据库实例
-    db = RedisDatabase(data_dir=storage_dir, db_file=storage_file)
+    db = RedisDatabase()
 
     # 写入单个用户数据（嵌套字典形式存储）
     user_data = {
