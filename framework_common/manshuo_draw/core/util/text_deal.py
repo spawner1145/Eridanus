@@ -3,6 +3,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageOps,ImageFont
 import platform
 from .download_img import process_img_download
 from .common import add_append_img
+import copy
 
 def deal_text_with_tag(input_string):
     pattern = r'\[(\w+)\](.*?)\[/\1\]'
@@ -145,7 +146,7 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
     if isinstance(content, list):
         content_list=content
     else:content_list = deal_text_with_tag(content)
-    left_content_list=content_list.copy()
+    left_content_list=copy.deepcopy(content_list)
 
     #将所有的emoji转换成pillow对象
     content_list_convert,emoji_list=[],[]
@@ -207,7 +208,8 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
     #对初始位置进行修正
     if ellipsis: y += line_height_list[0] - params[f'font_common_size']
     for content in content_list:
-        left_content_list.pop(left_content_list.index(content))
+        if content in left_content_list:
+            left_content_list.pop(left_content_list.index(content))
         # 依据字符串处理的字典加载对应的字体
         if content['tag'] == 'emoji':
             pass

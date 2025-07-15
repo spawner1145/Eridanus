@@ -5,232 +5,68 @@ import time
 from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 
 from datetime import datetime
-
+from framework_common.manshuo_draw import *
 import aiosqlite
 import requests
 from PIL import Image, ImageDraw, ImageFont
+from framework_common.framework_util.yamlLoader import YAMLManager
 
-
-DATABASE = "data/dataBase/wifeyouwant.db"  # 修改路径为小写
-
-# 初始化数据库表结构
-async def initialize_db():
-    global DATABASE
-    async with aiosqlite.connect(DATABASE) as db:
-        # 创建类别表
-        await db.execute('''
-            CREATE TABLE IF NOT EXISTS categories (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL
-            )
-        ''')
-
-        # 创建小组表，关联类别
-        await db.execute('''
-            CREATE TABLE IF NOT EXISTS groups (
-                id INTEGER PRIMARY KEY,
-                category_id INTEGER,
-                name TEXT NOT NULL,
-                FOREIGN KEY(category_id) REFERENCES categories(id)
-            )
-        ''')
-
-        # 创建用户表，关联小组
-        await db.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY,
-                username TEXT NOT NULL,
-                group_id INTEGER,
-                times INTEGER NOT NULL DEFAULT 0,
-                FOREIGN KEY(group_id) REFERENCES groups(id)
-            )
-        ''')
-
-        await db.commit()
-
+db_json=YAMLManager("run").common_config.basic_config['redis']
+db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
 
 
 
 # 添加或更新用户数据
 async def add_or_update_user(category_name, group_name, username, times):
-    global DATABASE
-    async with aiosqlite.connect(DATABASE, timeout=10) as db:
-        category = await db.execute('SELECT * FROM categories WHERE name = ?', (category_name,))
-        category_row = await category.fetchone()
+    global db
+    db.write_user("WifeYouWant", {category_name:{group_name:{username:times}}})
 
-        # 如果没有该类别，创建该类别
-        if not category_row:
-            cursor = await db.execute('INSERT INTO categories (name) VALUES (?)', (category_name,))
-            category_id = cursor.lastrowid
-        else:
-            category_id = category_row[0]
-
-        group = await db.execute('SELECT * FROM groups WHERE category_id = ? AND name = ?', (category_id, group_name))
-        group_row = await group.fetchone()
-
-        if not group_row:
-            cursor = await db.execute('INSERT INTO groups (category_id, name) VALUES (?, ?)', (category_id, group_name))
-            group_id = cursor.lastrowid
-        else:
-            group_id = group_row[0]
-
-        # 检查用户是否存在
-        user = await db.execute('SELECT * FROM users WHERE username = ? AND group_id = ?', (username, group_id))
-        user_row = await user.fetchone()
-
-        if user_row:
-            await db.execute('UPDATE users SET times =  ? WHERE id = ?', (times, user_row[0]))
-        else:
-            await db.execute('INSERT INTO users (username, group_id, times) VALUES (?, ?, ?)',(username, group_id, times))
-
-        await db.commit()
-
-
+# 添加或更新整组用户数据
 async def add_or_update_user_collect(queue_check_make):
-    global DATABASE
-    async with aiosqlite.connect(DATABASE, timeout=10) as db:
-
-        for user_info in queue_check_make:
-            category_name, group_name, username, times=user_info[2], user_info[1], user_info[0], user_info[3]
-
-            category = await db.execute('SELECT * FROM categories WHERE name = ?', (category_name,))
-            category_row = await category.fetchone()
-
-            # 如果没有该类别，创建该类别
-            if not category_row:
-                cursor = await db.execute('INSERT INTO categories (name) VALUES (?)', (category_name,))
-                category_id = cursor.lastrowid
-            else:
-                category_id = category_row[0]
-
-            group = await db.execute('SELECT * FROM groups WHERE category_id = ? AND name = ?', (category_id, group_name))
-            group_row = await group.fetchone()
-
-            if not group_row:
-                cursor = await db.execute('INSERT INTO groups (category_id, name) VALUES (?, ?)', (category_id, group_name))
-                group_id = cursor.lastrowid
-            else:
-                group_id = group_row[0]
-
-            # 检查用户是否存在
-            user = await db.execute('SELECT * FROM users WHERE username = ? AND group_id = ?', (username, group_id))
-            user_row = await user.fetchone()
-
-            if user_row:
-                await db.execute('UPDATE users SET times =  ? WHERE id = ?', (times, user_row[0]))
-            else:
-                await db.execute('INSERT INTO users (username, group_id, times) VALUES (?, ?, ?)',(username, group_id, times))
-            #print(f"Updated {username}, {group_name},  {category_name} to {times}")
-
-
-        await db.commit()
-
-
-
+    for user_info in queue_check_make:
+        category_name, group_name, username, times=user_info[2], user_info[1], user_info[0], user_info[3]
+        await add_or_update_user(category_name, group_name, username, times)
 
 # 查询某个小组的用户数据，按照次数排序
 async def query_group_users(category_name, group_name):
-    global DATABASE
-    async with aiosqlite.connect(DATABASE) as db:
-        # 获取类别ID
-        category = await db.execute('SELECT id FROM categories WHERE name = ?', (category_name,))
-        category_row = await category.fetchone()
+    global db
+    content = db.read_user("WifeYouWant")
+    if content and f'{category_name}' in content and f'{group_name}' in content[f'{category_name}']:
+        content_dict = content[f'{category_name}'][f'{group_name}']
+    else:
+        return [(1,1)]
+    sorted_data = sorted(content_dict.items(), key=lambda item: item[1], reverse=True)
+    return sorted_data
 
-        if not category_row:
-            return
-
-        category_id = category_row[0]
-
-        # 获取小组ID
-        group = await db.execute('SELECT id FROM groups WHERE category_id = ? AND name = ?', (category_id, group_name))
-        group_row = await group.fetchone()
-
-        if not group_row:
-            return
-
-        group_id = group_row[0]
-
-        # 查询该小组下所有用户，并按次数排序
-        users = await db.execute('SELECT username, times FROM users WHERE group_id = ? ORDER BY times DESC',
-                                 (group_id,))
-        rows = await users.fetchall()
-
-        if not rows:
-            return None
-        return rows
-
-        for row in rows:
-            print(f"用户名: {row[0]}, 次数: {row[1]}")
 
 
 # 查询某个小组下特定用户的数据
 async def query_user_data(category_name, group_name, username):
-    global DATABASE
-    async with aiosqlite.connect(DATABASE) as db:
-        # 获取类别ID
-        category = await db.execute('SELECT id FROM categories WHERE name = ?', (category_name,))
-        category_row = await category.fetchone()
+    global db
+    content = db.read_user("WifeYouWant")
+    if content and f'{category_name}' in content and f'{group_name}' in content[f'{category_name}'] and f'{username}' in content[f'{category_name}'][f'{group_name}']:
+        user_data = content[f'{category_name}'][f'{group_name}'][f'{username}']
+        return user_data
+    else:
+        return None
 
-        if not category_row:
-            return None
-
-        category_id = category_row[0]
-
-        # 获取小组ID
-        group = await db.execute('SELECT id FROM groups WHERE category_id = ? AND name = ?', (category_id, group_name))
-        group_row = await group.fetchone()
-
-        if not group_row:
-            return None
-
-        group_id = group_row[0]
-
-        # 获取特定用户数据
-        user = await db.execute('SELECT username, times FROM users WHERE group_id = ? AND username = ?',
-                                (group_id, username))
-        user_row = await user.fetchone()
-
-        if user_row:
-            return user_row[1]
-        else:
-            return None
 
 
 # 删除类别及其关联数据
 async def delete_category(category_name):
-    global DATABASE
-    async with aiosqlite.connect(DATABASE) as db:
-        # 查找类别是否存在
-        category = await db.execute('SELECT id FROM categories WHERE name = ?', (category_name,))
-        category_row = await category.fetchone()
+    global db
+    db.delete_user_field("WifeYouWant", f'{category_name}')
 
-        if category_row:
-            # 删除类别（级联删除其关联的小组和用户）
-            await db.execute('DELETE FROM categories WHERE id = ?', (category_row[0],))
-            await db.commit()
 
 
 # 删除组别及其关联用户
 async def delete_group(category_name, group_name):
-    global DATABASE
-    async with aiosqlite.connect(DATABASE) as db:
-        # 获取类别ID
-        category = await db.execute('SELECT id FROM categories WHERE name = ?', (category_name,))
-        category_row = await category.fetchone()
+    global db
+    db.delete_user_field("WifeYouWant", "category_name.group_name")
 
-        if not category_row:
-            return
 
-        category_id = category_row[0]
 
-        # 查找组别是否存在
-        group = await db.execute('SELECT id FROM groups WHERE category_id = ? AND name = ?', (category_id, group_name))
-        group_row = await group.fetchone()
 
-        if group_row:
-            # 删除组别（级联删除其关联用户）
-            await db.execute('DELETE FROM groups WHERE id = ?', (group_row[0],))
-            await db.commit()
 
 
 

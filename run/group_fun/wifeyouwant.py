@@ -16,7 +16,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Node, Text, Image, At
-from run.group_fun.service.wife_you_want import manage_group_status, manage_group_add, initialize_db, \
+from run.group_fun.service.wife_you_want import manage_group_status, manage_group_add, \
     manage_group_check, PIL_lu_maker, \
     run_async_task, today_check_api, query_group_users, add_or_update_user_collect
 
@@ -68,7 +68,6 @@ def main(bot,config):
     filepath = 'data/pictures/cache'
     if not os.path.exists(filepath):
         os.makedirs(filepath)
-    asyncio.run(initialize_db())
     global membercheck
     membercheck = {}
     scheduler = BackgroundScheduler()
@@ -111,7 +110,6 @@ def main(bot,config):
                     pass
                 else:
                     response = today_check_api(today_wife_api,header)
-                    #bot.logger.info("今日老婆开启！")
                     with open(f'{filepath}/today_wife.jpg', 'wb') as file:
                         file.write(response.content)
                     img_path = f'{filepath}/today_wife.jpg'
@@ -408,7 +406,7 @@ def main(bot,config):
                 friendlist_get = await bot.get_group_member_list(event.group_id)
                 data_count = len(friendlist_get["data"])
                 if flag_persona == 2 or flag_persona == 3 or flag_persona == 4 or flag_persona == 5:
-                    if data_count > 500:
+                    if data_count > 1000:
                         await bot.send(event, '抱歉，群聊人数过多，bot服务压力过大，仅开放今日群主功能，谢谢')
                         return
                 for friend in friendlist_get["data"]:
@@ -438,31 +436,11 @@ def main(bot,config):
 
 
 
-    @bot.on(GroupMessageEvent)  # 透群友合集
-    async def wife_you_want(event: GroupMessageEvent):
-        return
-        async with (aiosqlite.connect("data/dataBase/wifeyouwant.db") as db):
-            friendlist_check_count = 0
-            friendlist=[]
-            if 'group_check' ==event.pure_text:
-                target_group = int(event.group_id)
-                friendlist_check = await query_group_users('group_owner_record', target_group)
-                for friendlist_check_member in friendlist_check:
-                    friendlist_check_count += 1
-                    if friendlist_check_count > 50: break
-                    friendlist.append(friendlist_check_member[0])
-                queue_check.append((1270858640, 674822468,'group_owner_record',20))
-                #print('queue_check', queue_check)
-                for friend in friendlist:
-                    #print(friend)
-                    pass
-                #print(len(friendlist))
-                #await bot.send(event, friendlist)
+
 
 
     @bot.on(GroupMessageEvent)  # 透群友合集
     async def wife_you_want(event: GroupMessageEvent):
-        return 
         async with (aiosqlite.connect("data/dataBase/wifeyouwant.db") as db):
             global filepath
             wifePrefix=config.group_fun.config["today_wife"]["wifePrefix"]
@@ -477,9 +455,6 @@ def main(bot,config):
                             target_data = item
                             break
                     if target_data is not None and str(target_data[1]) == str(target_group):
-                        times=target_data[3]
-                        #print(f'times:{times}')
-                        #print(f'times:{times}, target_data:{target_data[1]},target_group:{target_group}')
                         queue_check.remove(target_data)
                     else:
                         try:
@@ -488,12 +463,8 @@ def main(bot,config):
                             pass #大朔老师啥时候有空了加个缓存
                     times += 1
                     queue_check.append((from_id, target_group, 'group_owner_record', times))
-                    #await manage_group_status(from_id, target_group, 'group_owner_record', times)
                 else:
-
-                    times = 1
-                    queue_check.append((from_id, target_group, 'group_owner_record', times))
-                    #await manage_group_status(from_id, target_group, 'group_owner_record', times)
+                    queue_check.append((from_id, target_group, 'group_owner_record', 1))
 
 
             context = event.pure_text
@@ -617,7 +588,7 @@ def main(bot,config):
                         # print(data)
                         data_count = len(friendlist_get["data"])
                         if flag_persona == 2 or flag_persona == 3 or flag_persona == 4:
-                            if data_count > 500:
+                            if data_count > 1000:
                                 await bot.send(event, '抱歉，群聊人数过多，bot服务压力过大，仅开放/透群主功能，谢谢')
                                 return
                         data_check_number = 0
