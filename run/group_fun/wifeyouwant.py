@@ -444,6 +444,8 @@ def main(bot,config):
         async with (aiosqlite.connect("data/dataBase/wifeyouwant.db") as db):
             global filepath
             wifePrefix=config.group_fun.config["today_wife"]["wifePrefix"]
+            if not f'{wifePrefix}' in event.pure_text:
+                return
 
             if config.group_fun.config["today_wife"]["透热门群友"] is True:
                 target_group = int(event.group_id)
