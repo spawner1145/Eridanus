@@ -61,6 +61,7 @@ def main(bot, config):
         number_speeches_check_list_nolimited = sorted(number_speeches_check_list, key=lambda x: x["number_speeches_count"], reverse=True)
         number_speeches_check_list=[]
         for item in number_speeches_check_list_nolimited:
+            if len(item['nicknime']) > 13: item['nicknime']=item['nicknime'][:13]
             number_speeches_check_list.append(item)
             if len(number_speeches_check_list) >= 16: break
         for idx, item in enumerate(number_speeches_check_list, start=1):
@@ -113,6 +114,7 @@ def main(bot, config):
         number_speeches_check_list_nolimited = sorted(number_speeches_check_list, key=lambda x: x["number_speeches_count"], reverse=True)
         number_speeches_check_list=[]
         for item in number_speeches_check_list_nolimited:
+            if len(item['nicknime']) > 13: item['nicknime'] = item['nicknime'][:13]
             number_speeches_check_list.append(item)
             if len(number_speeches_check_list) >= 16: break
         for idx, item in enumerate(number_speeches_check_list, start=1):
