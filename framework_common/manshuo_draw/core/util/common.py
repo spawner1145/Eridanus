@@ -55,7 +55,7 @@ def get_abs_path(path,is_ignore_judge=False):
 
     """获取绝对路径"""
     #判断传入的是否为路径
-    if not (isinstance(path, str) and os.path.splitext(path)[1].lower() in [".jpg", ".png", ".jpeg", '.webp',".ttf",".yaml"]):
+    if not (isinstance(path, str) and os.path.splitext(path)[1].lower() in [".jpg", ".png", ".jpeg", '.webp',".ttf",".yaml",".yml"]):
         return path
     try:
         os.path.normpath(path)  # 尝试规范化路径
