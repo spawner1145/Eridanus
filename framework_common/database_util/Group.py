@@ -44,6 +44,7 @@ def extract_redis_from_local_zip():
 def start_redis_background():
     """在后台启动 Redis（支持 Windows 和 Linux）"""
     system = platform.system()
+    extract_redis_from_local_zip()
     if system == "Windows":
         redis_path = os.path.join(REDIS_FOLDER, REDIS_EXECUTABLE)
         if not os.path.exists(redis_path):
