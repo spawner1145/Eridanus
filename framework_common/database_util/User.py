@@ -36,14 +36,27 @@ redis_client = None
 
 
 def start_redis_background():
-    """在后台启动 Redis（仅支持 Windows）"""
-    redis_path = os.path.join(REDIS_FOLDER, REDIS_EXECUTABLE)
-    if not os.path.exists(redis_path):
-        logger.error(f"❌ 找不到 redis-server.exe 于 {redis_path}")
-        return
+    """在后台启动 Redis（支持 Windows 和 Linux）"""
+    system = platform.system()
+    if system == "Windows":
+        redis_path = os.path.join(REDIS_FOLDER, REDIS_EXECUTABLE)
+        if not os.path.exists(redis_path):
+            logger.error(f"❌ 找不到 redis-server.exe 于 {redis_path}")
+            return
+        logger.info("🚀 启动 Redis 服务中 (Windows)...")
+        subprocess.Popen([redis_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    elif system == "Linux":
+        try:
+            logger.info("🚀 尝试在后台启动 Redis 服务 (Linux)...")
+            # 使用 Popen 在后台启动，它不会阻塞。如果找不到命令，会引发 FileNotFoundError。
+            subprocess.Popen(["redis-server"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except FileNotFoundError:
+            logger.error("❌ 'redis-server' 命令未找到。请确保 Redis 已安装并在系统的 PATH 中。")
+        except Exception as e:
+            logger.error(f"❌ 在 Linux 上启动 Redis 失败: {e}")
+    else:
+        logger.warning(f"⚠️ 不支持在 {system} 系统上自动启动 Redis。")
 
-    logger.info("🚀 启动 Redis 服务中...")
-    subprocess.Popen([redis_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def init_redis():
     global redis_client
@@ -55,18 +68,19 @@ def init_redis():
         logger.info("✅ Redis 连接成功（数据库 db1）")
     except redis.exceptions.ConnectionError:
         logger.warning("⚠️ Redis 未运行，尝试自动启动 Redis...")
-        if platform.system() == "Windows":
+        system = platform.system()
+        if system == "Windows" or system == "Linux":
             start_redis_background()
             time.sleep(2)
             try:
                 redis_client = redis.StrictRedis.from_url(REDIS_URL)
                 redis_client.ping()
-                logger.info("✅ Redis 已自动启动并连接成功（数据库 db1）")
+                logger.info(f"✅ Redis 已在 {system} 上自动启动并连接成功（数据库 db1）")
             except Exception as e:
-                logger.error(f"❌ Redis 启动失败：{e}")
+                logger.error(f"❌ Redis 自动启动后连接失败：{e}")
                 redis_client = None
         else:
-            logger.error("❌ 非 Windows 系统，请手动安装并启动 Redis")
+            logger.error(f"❌ 非 Windows/Linux 系统，请手动安装并启动 Redis")
             redis_client = None
 
 # 初始化数据库，新增注册时间字段
