@@ -143,10 +143,8 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
         x_limit, y_limit = limit_box
     if content == '' or content is None:
         return {'canvas': canvas, 'canvas_bottom': y}
-    if isinstance(content, list):
-        content_list=content
+    if isinstance(content, list):content_list=content
     else:content_list = deal_text_with_tag(content)
-    left_content_list=copy.deepcopy(content_list)
 
     #将所有的emoji转换成pillow对象
     content_list_convert,emoji_list=[],[]
@@ -196,11 +194,13 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
                     per_max_height=0
                 if x == box[0] + char_width + 1 and text[i - 1] == '\n' :#检测是否在一行最开始换行，若是则修正
                     x -= char_width + 1
+
     line_height_list.append(params[f'font_common_size'])
     line_height_list.append(params[f'font_common_size'])
 
 
     #这一部分开始进行实际绘制
+    left_content_list = copy.deepcopy(content_list)
     if box is None: box = (params['padding'], 0)  # 初始位置
     x, y = box
     should_break, last_tag, line_count,text,content_left = False, 'common',0 , None, []
@@ -208,8 +208,7 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
     #对初始位置进行修正
     if ellipsis: y += line_height_list[0] - params[f'font_common_size']
     for content in content_list:
-        if content in left_content_list:
-            left_content_list.pop(left_content_list.index(content))
+        left_content_list.pop(left_content_list.index(content))
         # 依据字符串处理的字典加载对应的字体
         if content['tag'] == 'emoji':
             pass
