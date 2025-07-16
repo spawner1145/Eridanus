@@ -71,8 +71,8 @@ def initialize_yaml_must_require_core(params):
         if 'config_path' not in params:
             params['config_path']=get_abs_path(default_config)
         config_abs_path = get_abs_path(params['config_path'])
-        if not os.path.exists(params['config_path']):
-            with open(get_abs_path(default_config), 'r', encoding='utf-8') as file:
+        if not os.path.exists(config_abs_path):
+            with open(default_config, 'r', encoding='utf-8') as file:
                 origin_config_set_yaml = yaml.load(file)
             with open(config_abs_path, 'w', encoding='utf-8') as file:
                 yaml.dump(origin_config_set_yaml, file)
