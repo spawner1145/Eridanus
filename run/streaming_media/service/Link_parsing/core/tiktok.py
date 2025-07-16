@@ -224,7 +224,7 @@ async def dy(url,filepath=None):
         if len(img_context) != 1:
             json_check['pic_path'] = await manshuo_draw([
                             {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url],'upshift_extra': 20,
-                             'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]" ], 'type_software': 'dy', 'label':['视频']},img_context,[context]])
+                             'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]" ], 'type_software': 'dy'},img_context,[context]])
         else:
             json_check['pic_path'] = await manshuo_draw([
                             {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url],'upshift_extra': 20,

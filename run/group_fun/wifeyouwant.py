@@ -461,10 +461,10 @@ def main(bot,config):
                     else:
                         try:
                             times = int(await manage_group_status(from_id, target_group, 'group_owner_record'))
+                            times += 1
+                            queue_check.append((from_id, target_group, 'group_owner_record', times))
                         except:
                             pass #大朔老师啥时候有空了加个缓存
-                    times += 1
-                    queue_check.append((from_id, target_group, 'group_owner_record', times))
                 else:
                     queue_check.append((from_id, target_group, 'group_owner_record', 1))
 
