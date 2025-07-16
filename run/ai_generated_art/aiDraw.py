@@ -563,6 +563,10 @@ def main(bot, config):
                 if user_info.permission < config.ai_generated_art.config["ai绘画"]["ai绘画所需权限等级"]:
                     bot.logger.info(f"reject text2img request: 权限不足")
                     msg = await bot.send(event, "无绘图功能使用权限", True)
+                    try:
+                        UserGet.remove(event.sender.user_id)
+                    except:
+                        pass
                     await delay_recall(bot, msg)
                     return
                 UserGet[event.sender.user_id] = [prompt]
