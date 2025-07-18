@@ -12,8 +12,8 @@ async def parse_cloud_music(bot:ExtendBot,event,config,url):
     """
     处理代理问题
     """
-    if config.streaming_media.config["网易云解析"]["enable_proxy"] and config.common_config.basic_config["proxy"]:
-        proxies={"http://":config.common_config.basic_config["proxy"],"https://":config.common_config.basic_config["proxy"]}
+    if config.streaming_media.config["网易云解析"]["enable_proxy"] and config.common_config.basic_config["proxy"]["http_proxy"]:
+        proxies={"http://":config.common_config.basic_config["proxy"]["http_proxy"],"https://":config.common_config.basic_config["proxy"]["http_proxy"]}
     else:
         proxies=None
     bot.logger.info(f"开始解析网易云音乐链接:{url}")
