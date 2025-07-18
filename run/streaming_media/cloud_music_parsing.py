@@ -13,7 +13,6 @@ async def parse_cloud_music(bot:ExtendBot,event,config,url):
     async with CloudMusicParsing() as music:
         # 测试参数
         api_type = "api1"
-        url = "https://music.163.com/song?id=123456"  # 替换为实际的网易云音乐链接
         region = "exhigh"  # 音质：standard, exhigh, lossless, hires, jyeffect, sky, jymaster
         audio_type = "song"  # 类型：song, playlist, album, artist
 
