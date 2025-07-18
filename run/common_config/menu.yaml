@@ -1,4 +1,4 @@
-help_menu:
+help_menu: #不要在webui修改本文件！不要在webui修改本文件！
   send_as_node: true
   content:
     page1: #https://q1.qlogo.cn/g?b=qq&nk=3552663628&s=640这里面可以换成你自己botqq
