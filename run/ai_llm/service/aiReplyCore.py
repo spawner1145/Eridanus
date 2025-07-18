@@ -104,6 +104,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 prompt,
                 config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"][
                     "enable_proxy"] else None,
+                config.ai_llm.config["llm"]["default"]["model"],
             )
             if not response_message:
                 reply_message = "当前模型类别设置为default，已失效，请自行配置其他模型。"
