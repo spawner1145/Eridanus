@@ -1,6 +1,7 @@
 plugin_description="媒体服务"
 dynamic_imports ={
     "run.streaming_media.youtube": ["download_video"],
+    "run.streaming_media.cloud_music_parsing": ["parse_cloud_music"]
 }
 function_declarations=[
     {
@@ -24,6 +25,22 @@ function_declarations=[
             "required": [
                 "url",
                 "platform"
+            ]
+        }
+    },
+    {
+        "name": "parse_cloud_music",
+        "description": "解析并下载网易云音乐单曲",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "音频的链接地址"
+                },
+            },
+            "required": [
+                "url"
             ]
         }
     },
