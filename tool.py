@@ -360,12 +360,14 @@ def get_installed_packages():
     """
     使用 pip 获取已安装的包和版本信息。
     """
+
     result = subprocess.run(
-        ['pip', 'freeze'],
+        [sys.executable, '-m', 'pip', 'freeze'],  # 避免找不到 pip
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
+
     installed_packages = {}
     logger.info(f"获取已安装包中...")
     logger.info(f"{result.stdout}")
