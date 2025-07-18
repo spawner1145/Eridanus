@@ -1,3 +1,6 @@
+import os
+
+import aiofiles
 import httpx
 import hashlib
 import re
@@ -118,10 +121,49 @@ class CloudMusicParsing:
         """关闭 HTTP 客户端"""
         await self.client.aclose()
     async def download_music(self, url: str, save_path: str):
-        """下载音乐"""
-        async with self.client.stream("GET", url) as response:
-            response.raise_for_status()
-            with open(save_path, "wb") as f:
-                async for chunk in response.aiter_bytes():
-                    f.write(chunk)
+        """异步下载音频文件到指定路径"""
+        try:
+            # 确保保存路径的目录存在
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+            # 以流式方式下载文件
+            async with self.client.stream("GET", url, follow_redirects=True) as response:
+                response.raise_for_status()
+
+                # 异步写入文件
+                async with aiofiles.open(save_path, "wb") as f:
+                    async for chunk in response.aiter_bytes(chunk_size=8192):
+                        await f.write(chunk)
+
+                print(f"音频文件已下载到: {save_path}")
+                return {"status": "success", "message": f"音频文件已下载到 {save_path}"}
+        except Exception as e:
+            print(f"下载失败: {e}")
+            return {"status": "error", "message": str(e)}
+
+
+async def main():
+    async with CloudMusicParsing() as music:
+        # 测试参数
+        api_type = "api1"
+        url = "https://music.163.com/song?id=2724695022&userid=305143326"  # 替换为实际的网易云音乐链接
+        region = "exhigh"  # 音质：standard, exhigh, lossless, hires, jyeffect, sky, jymaster
+        audio_type = "song"  # 类型：song, playlist, album, artist
+
+        # 解析音乐链接
+        result = await music.parse_music(api_type, url, region, audio_type)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+
+        # 如果解析成功，下载音频文件
+        if result["status"] == "success" and "url_info" in result["data"]:
+            audio_url = result["data"]["url_info"].get("url")
+            if audio_url:
+                save_path = "downloaded_music.mp3"  # 替换为实际保存路径
+                result = result["data"]
+                music_name = result["song_info"]["name"] + " - " + result["song_info"][
+                    "artist"] + f".{result['url_info']['type']}"
+                await music.download_music(result["url_info"]["url"],
+                                           f"./{music_name.replace('/', '_')}")
+                #download_result = await music.download_music(audio_url, save_path)
+                #print(json.dumps(download_result, indent=2, ensure_ascii=False))
 
