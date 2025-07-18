@@ -14,7 +14,7 @@ grok真好用
 class CloudMusicParsing:
     """网易云音乐链接解析类"""
 
-    def __init__(self):
+    def __init__(self,proxies=None):
         self.api_urls = {
             "api1": {
                 "token": "https://api.toubiec.cn/api/get-token.php",
@@ -33,7 +33,7 @@ class CloudMusicParsing:
                 "parse": "https://api3.toubiec.cn/api/music_v1.php"
             }
         }
-        self.client = httpx.AsyncClient()  # 异步 HTTP 客户端
+        self.client = httpx.AsyncClient(proxies=proxies)  # 异步 HTTP 客户端
 
     async def __aenter__(self):
         return self

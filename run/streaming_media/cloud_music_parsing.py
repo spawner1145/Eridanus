@@ -9,9 +9,16 @@ from run.streaming_media.service.cloud_music.cloud_music_parsing import CloudMus
 
 
 async def parse_cloud_music(bot:ExtendBot,event,config,url):
+    """
+    处理代理问题
+    """
+    if config.streaming_media.config["网易云解析"]["enable_proxy"] and config.common_config.basic_config["proxy"]:
+        proxies={"http://":config.common_config.basic_config["proxy"],"https://":config.common_config.basic_config["proxy"]}
+    else:
+        proxies=None
     bot.logger.info(f"开始解析网易云音乐链接:{url}")
     await bot.send(event, [Text("正在解析网易云音乐链接...")])
-    async with CloudMusicParsing() as music:
+    async with CloudMusicParsing(proxies=proxies) as music:
         # 测试参数
         api_type = "api1"
         region = "exhigh"  # 音质：standard, exhigh, lossless, hires, jyeffect, sky, jymaster
