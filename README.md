@@ -11,8 +11,8 @@ _🎊 基于 [OneBot](https://github.com/howmanybots/onebot/blob/master/README.m
 </div>
 
 <p align="center">
-    <a href="https://github.com/avilliai/Eridanus/issues"><img src="https://img.shields.io/github/issues/avilliai/Eridanus?style=flat-square" alt="issues" /></a>
-    <a href="https://github.com/avilliai/Eridanus/blob/master/LICENSE"><img src="https://img.shields.io/github/license/avilliai/Eridanus?style=flat-square" alt="license"></a>
+    <a href="https://github.com/AOrbitron/Eridanus/issues"><img src="https://img.shields.io/github/issues/AOrbitron/Eridanus?style=flat-square" alt="issues" /></a>
+    <a href="https://github.com/AOrbitron/Eridanus/blob/master/LICENSE"><img src="https://img.shields.io/github/license/AOrbitron/Eridanus?style=flat-square" alt="license"></a>
     <a href=""><img src="https://img.shields.io/badge/QQ群-913122269-brightgreen.svg?style=flat-square" alt="qq-group"></a>
     <a href="https://github.com/howmanybots/onebot"><img src="https://img.shields.io/badge/OneBot-v11-blue?style=flat-square&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABABAMAAABYR2ztAAAAIVBMVEUAAAAAAAADAwMHBwceHh4UFBQNDQ0ZGRkoKCgvLy8iIiLWSdWYAAAAAXRSTlMAQObYZgAAAQVJREFUSMftlM0RgjAQhV+0ATYK6i1Xb+iMd0qgBEqgBEuwBOxU2QDKsjvojQPvkJ/ZL5sXkgWrFirK4MibYUdE3OR2nEpuKz1/q8CdNxNQgthZCXYVLjyoDQftaKuniHHWRnPh2GCUetR2/9HsMAXyUT4/3UHwtQT2AggSCGKeSAsFnxBIOuAggdh3AKTL7pDuCyABcMb0aQP7aM4AnAbc/wHwA5D2wDHTTe56gIIOUA/4YYV2e1sg713PXdZJAuncdZMAGkAukU9OAn40O849+0ornPwT93rphWF0mgAbauUrEOthlX8Zu7P5A6kZyKCJy75hhw1Mgr9RAUvX7A3csGqZegEdniCx30c3agAAAABJRU5ErkJggg=="></a>
 </p>
@@ -20,7 +20,7 @@ _🎊 基于 [OneBot](https://github.com/howmanybots/onebot/blob/master/README.m
 <p align="center">
   <a href="https://eridanus.netlify.app">文档</a>
   ·
-  <a href="https://github.com/avilliai/Eridanus/releases">下载</a>
+  <a href="https://github.com/AOrbitron/Eridanus/releases">下载</a>
   ·
   <a href="https://eridanus.netlify.app/getting-started/">快速开始</a>
   ·
@@ -59,9 +59,9 @@ QQ群：913122269
 - [X] 开发文档优化，插件模板
 - [X] 重构自身绘图框架
 # 派生项目
-- [Achernar](https://github.com/avilliai/Achernar) cpolar隧道本地反向代理，kaggle自动切换账号运行指定脚本。(用于在kaggle持久化部署ai绘画等服务)
+- [Achernar](https://github.com/AOrbitron/Achernar) cpolar隧道本地反向代理，kaggle自动切换账号运行指定脚本。(用于在kaggle持久化部署ai绘画等服务)
 - [vits api](https://github.com/avilliai/vits_api) 本地部署vits语音合成服务端，已打包。
-- [Eridanus-dep](https://github.com/avilliai/eridanus-dep) 一个轻量化、易于上手的onebot v11 python SDK。
+- [Eridanus-dep](https://github.com/AOrbitron/eridanus-dep) 一个轻量化、易于上手的onebot v11 python SDK。
 - [material-dashboard](https://github.com/avilliai/material-dashboard) 基于原版material-dashboard项目修改而成的Eridanus webui。
 # 开源协议
 Eridanus is licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) . Everyone is FREE to access, use, modify, and redistribute this project under the same license, but commercial use is strictly prohibited.  
@@ -75,7 +75,7 @@ Eridanus 采用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/
 如果你喜欢这个项目，请给我们一个 Star！
 # Thanks to all contributors for their efforts
 
-<a href="https://github.com/avilliai/Eridanus/graphs/contributors" target="_blank">
-  <img src="https://contrib.rocks/image?repo=avilliai/Eridanus" />
+<a href="https://github.com/AOrbitron/Eridanus/graphs/contributors" target="_blank">
+  <img src="https://contrib.rocks/image?repo=AOrbitron/Eridanus" />
 </a>
 
