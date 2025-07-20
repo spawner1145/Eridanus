@@ -27,14 +27,14 @@ class TextModule:
             for key, value in vars(self).items():
                 setattr(self, key, get_abs_path(value))
 
-    def common(self):
-        init(self.__dict__)  # 对该模块进行初始化
+    async def common(self):
+        await init(self.__dict__)  # 对该模块进行初始化
 
-        img_des_canvas_info = basic_img_draw_text(self.pure_backdrop, self.content[0], self.__dict__,
+        img_des_canvas_info = await basic_img_draw_text(self.pure_backdrop, self.content[0], self.__dict__,
                                                   box=(self.padding, 0),
                                                   limit_box=(self.pure_backdrop.width, self.img_height_limit_module))
         canvas_bottom=int(img_des_canvas_info['canvas_bottom'] )
-        final_img_deal(self.__dict__,'text')  # 处理最后的位置关系
+        await final_img_deal(self.__dict__,'text')  # 处理最后的位置关系
         if self.json_img_left_module_flag:canvas_bottom=self.img_height_limit_module
         return {'canvas':self.pure_backdrop,'canvas_bottom':canvas_bottom,'upshift':0,'downshift':0,
                 'json_img_left_module':self.json_img_left_module,'without_draw':self.without_draw_and_jump}

@@ -11,9 +11,9 @@ class LayerSet:
         self.img_height_limit, self.img_height_limit_flag = self.img_height_limit - self.padding_up_common * 2, False
 
 
-    def paste_img(self,params):
+    async def paste_img(self,params):
         #layer_canvas = Image.new("RGBA", (self.img_width, self.img_height), (103, 195, 243, 255))
-        layer_canvas=self.backdrop_draw(self.backdrop_mode,self.backdrop_color)
+        layer_canvas=await self.backdrop_draw(self.backdrop_mode,self.backdrop_color)
         #layer_canvas.show()
 
         layer_bottom=int(self.padding_up_common)
@@ -28,11 +28,11 @@ class LayerSet:
 
         width, height = layer_canvas.size
         basic_img = Image.new("RGBA", (width + self.padding_left_common * 2,height+ self.padding_up_common * 3), (0, 0, 0, 0))  # 初始化   透明图层
-        basic_img = img_process(self.__dict__,basic_img, layer_canvas,self.padding_left_common,self.padding_up_common,self.padding_up_common,'layer')
+        basic_img = await img_process(self.__dict__,basic_img, layer_canvas,self.padding_left_common,self.padding_up_common,self.padding_up_common,'layer')
         return basic_img
 
 
-    def backdrop_draw(self,backdrop_mode,backdrop_color):
+    async def backdrop_draw(self,backdrop_mode,backdrop_color):
         match backdrop_mode:
             case 'no_color':
                 layer_canvas = Image.new("RGBA", (self.img_width, self.img_height + self.padding_up_common * 2), (0, 0, 0, 0))

@@ -35,7 +35,7 @@ def main(bot, config):
     async def number_speeches_check(event: GroupMessageEvent):
         context = event.pure_text
         flag=True
-        for i in ['发言排行','发言次数','bb次数','bb排行']:
+        for i in ['发言排行','发言次数','bb次数','bb排行','b话王','逼话王','壁画王']:
             if i in context:
                 context=context.replace(i,'')
                 flag=False
@@ -55,6 +55,7 @@ def main(bot, config):
         number_speeches_check_list = []
         #处理得出本群的人员信息表
         for user in all_users:
+
             if 'number_speeches' in all_users[user] and f'{target_group}' in all_users[user]['number_speeches'] and current_day in all_users[user]['number_speeches'][f'{target_group}']:
                 target_name = (await bot.get_group_member_info(target_group, user))['data']['nickname']
                 number_speeches_check_list.append({'name':user,'nicknime':target_name,'number_speeches_count':all_users[user]['number_speeches'][f'{target_group}'][current_day]})
@@ -83,7 +84,7 @@ def main(bot, config):
     async def number_speeches_check_month(event: GroupMessageEvent):
         context = event.pure_text
         flag=True
-        for i in ['发言排行','发言次数','bb次数','bb排行']:
+        for i in ['发言排行','发言次数','bb次数','bb排行','b话王','逼话王','壁画王']:
             if i in context:
                 context=context.replace(i,'')
                 flag=False

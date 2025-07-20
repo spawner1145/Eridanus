@@ -28,7 +28,7 @@ class basicimgset:
                 setattr(self, key, get_abs_path(value))
 
 
-    def creatbasicimgnobackdrop(self,img_list):
+    async def creatbasicimgnobackdrop(self,img_list):
         """创建一个同名空白画布并返回。"""
         # 创建一个指定大小和颜色的画布
         width=len(img_list)*(self.img_width - self.padding_left_common) + self.padding_left_common
@@ -37,7 +37,7 @@ class basicimgset:
         return canvas
 
 
-    def combine_layer_basic(self,basic_img,img_list):
+    async def combine_layer_basic(self,basic_img,img_list):
         x_offest=0
         if len(img_list) == 1:
             layer_img_canvas=img_list[0]

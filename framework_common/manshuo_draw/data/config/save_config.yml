@@ -77,6 +77,20 @@ basic_set:
   shadow_opacity_img: 50                #阴影的透明度
   blur_radius_img: 10                   #阴影模糊半径
 
+  is_rounded_corners_label: true      #是否对标签进行圆角处理
+  rounded_label_radius: 10            #圆角处理半径
+
+  is_stroke_label: true               #是否对标签进行描边处理
+  stroke_label_radius: 12             #描边的圆角弧度
+  stroke_label_width: 10              #描边的圆角宽度
+
+  is_shadow_label: false               #是否对标签进行阴影处理
+  shadow_offset_label: 10                 #阴影的偏移量
+  shadow_opacity_label: 50                #阴影的透明度
+  blur_radius_label: 10                   #阴影模糊半径
+
+
+
 
 backdrop:
   one_color:
@@ -91,18 +105,6 @@ text:
     must_required_keys: {'content': null}
 
 img:
-  is_rounded_corners_label: true      #是否对标签进行圆角处理
-  rounded_label_radius: 10            #圆角处理半径
-
-  is_stroke_label: true               #是否对标签进行描边处理
-  stroke_label_radius: 12             #描边的圆角弧度
-  stroke_label_width: 10              #描边的圆角宽度
-
-  is_shadow_label: false               #是否对标签进行阴影处理
-  shadow_offset_label: 10                 #阴影的偏移量
-  shadow_opacity_label: 50                #阴影的透明度
-  blur_radius_label: 10                   #阴影模糊半径
-
   must_required_keys: {'img': null}
 
   number_per_row: default           #每行图片个数，默认即为九宫格，可自定义

@@ -27,26 +27,11 @@ class GamesModule:
             for key, value in vars(self).items():
                 setattr(self, key, get_abs_path(value))
 
-        #接下来是对图片进行处理，将其全部转化为pillow的img对象，方便后续处理
-        if self.img:
-            self.processed_img = process_img_download(self.img,self.is_abs_path_convert)
-            #判断图片的排版方式
-            if self.number_per_row == 'default' :
-                if len(self.processed_img) == 1:
-                    self.number_per_row=1
-                    self.is_crop = False
-                elif len(self.processed_img) in [2,4] : self.number_per_row=2
-                else: self.number_per_row=3
-
-            #接下来处理是否裁剪部分
-            if self.is_crop == 'default':
-                if self.number_per_row==1: self.is_crop = False
-                else: self.is_crop = True
-            if self.is_crop is True:self.processed_img=crop_to_square(self.processed_img)
 
 
-    def LuRecordMake(self):
-        init(self.__dict__)#对该模块进行初始化
+
+    async def LuRecordMake(self):
+        await init(self.__dict__)#对该模块进行初始化
         #构建图像阵列
         self.processed_img,self.content=[],[]
         first_day_of_week = datetime(datetime.now().year, datetime.now().month, 1).weekday() + 1
@@ -65,9 +50,9 @@ class GamesModule:
         for i in range(int(self.number_per_row)):
             week_img_canves = Image.new("RGBA", background_make.size, (255, 255, 255, 255)).resize(
                 (self.new_width, int(self.new_width * background_make.height / background_make.width)))
-            img_week = basic_img_draw_text(week_img_canves, f"[title]{weeky[i]}[/title]", self.__dict__,
-                                      box=(int(self.padding*1.2), week_img_canves.height//2 - self.font_title_size//2 + 2), )['canvas']
-            self.pure_backdrop = img_process(self.__dict__, self.pure_backdrop, img_week, x_offset_week, self.current_y, self.upshift)
+            img_week = (await basic_img_draw_text(week_img_canves, f"[title]{weeky[i]}[/title]", self.__dict__,
+                                      box=(int(self.padding*1.2), week_img_canves.height//2 - self.font_title_size//2 + 2), ))['canvas']
+            self.pure_backdrop = await img_process(self.__dict__, self.pure_backdrop, img_week, x_offset_week, self.current_y, self.upshift)
             x_offset_week += self.new_width + self.padding_with
         self.current_y += img_week.height + self.padding_with
         #对每个图片进行单独处理
@@ -77,26 +62,26 @@ class GamesModule:
         self.processed_img=add_append_img(week_list,self.processed_img)
         for img in self.processed_img:
             if self.img_height_limit_module <= 0:break
-            img = per_img_limit_deal(self.__dict__,img)#处理每个图片,您的每张图片绘制自定义区域
+            img = await per_img_limit_deal(self.__dict__,img)#处理每个图片,您的每张图片绘制自定义区域
 
             if f'{self.number_count - first_day_of_week}' in self.content_list:
                 if self.content_list[f'{self.number_count - first_day_of_week}']['type'] == 'lu' and int(
                         self.content_list[f'{self.number_count - first_day_of_week}']['times']) not in {0, 1}:
-                    img = basic_img_draw_text(img, f"[lu]×{self.content_list[f'{self.number_count - first_day_of_week}']['times']}[/lu]", self.__dict__,
-                                              box=(self.padding, img.height - self.font_lu_size - self.padding), )['canvas']
+                    img = (await basic_img_draw_text(img, f"[lu]×{self.content_list[f'{self.number_count - first_day_of_week}']['times']}[/lu]", self.__dict__,
+                                              box=(self.padding, img.height - self.font_lu_size - self.padding), ))['canvas']
                 elif self.content_list[f'{self.number_count - first_day_of_week}']['type'] == 'nolu':
-                    img = basic_img_draw_text(img, f"[date]戒🦌[/date]", self.__dict__,
-                                              box=(self.padding, img.height - self.font_date_size - self.padding), )[
+                    img = (await basic_img_draw_text(img, f"[date]戒🦌[/date]", self.__dict__,
+                                              box=(self.padding, img.height - self.font_date_size - self.padding), ))[
                         'canvas']
             else:
                 if self.number_count - first_day_of_week + 1 > 0:
-                    img = basic_img_draw_text(img, f"[date]{self.number_count - first_day_of_week + 1}[/date]", self.__dict__,
-                                          box=(self.padding * 1.6, img.height - self.font_date_size - self.padding), )['canvas']
+                    img = (await basic_img_draw_text(img, f"[date]{self.number_count - first_day_of_week + 1}[/date]", self.__dict__,
+                                          box=(self.padding * 1.6, img.height - self.font_date_size - self.padding), ))['canvas']
 
-            img=label_process(self.__dict__,img,self.number_count,self.new_width)#加入label绘制
-            self.pure_backdrop = img_process(self.__dict__,self.pure_backdrop, img, self.x_offset, self.current_y, self.upshift)#对每个图像进行处理
-            per_img_deal(self.__dict__,img)  # 处理每个图片的位置关系
-        final_img_deal(self.__dict__)  # 处理最后的位置关系
+            img=await label_process(self.__dict__,img,self.number_count,self.new_width)#加入label绘制
+            self.pure_backdrop = await img_process(self.__dict__,self.pure_backdrop, img, self.x_offset, self.current_y, self.upshift)#对每个图像进行处理
+            await per_img_deal(self.__dict__,img)  # 处理每个图片的位置关系
+        await final_img_deal(self.__dict__)  # 处理最后的位置关系
         return {'canvas': self.pure_backdrop, 'canvas_bottom': self.current_y, 'upshift': self.upshift, 'downshift': self.downshift,
                 'json_img_left_module':self.json_img_left_module,'without_draw':self.without_draw_and_jump}
 
