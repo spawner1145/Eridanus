@@ -4,6 +4,7 @@ basic_set:
   img_width: 1000                   #图像默认宽度
   img_height: 2000                  #图像默认最大长度
   max_num_of_columns: 3             #框架支持多列绘制，此处为最大列数，以免出现无限递归
+  proxy: None                       #绘图框架从网络获取图片所用的代理端口
   padding_left_common: 25           #层级的左间距，注意，修改此处仅会影响部分间距，每个模块内可能有各自的间距设置
   padding_up_common: 20             #层级的上间距，注意，修改此处仅会影响部分间距，每个模块内可能有各自的间距设置
   is_rounded_corners_front: true    #是否对模块进行圆角处理（此处为前置条件，必要不充分）
