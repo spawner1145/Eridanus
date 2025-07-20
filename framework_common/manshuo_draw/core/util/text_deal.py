@@ -108,12 +108,12 @@ async def color_emoji_maker(text,color,size=40):
         return image
     except Exception as e:
         system = platform.system()
-        image_size = 40
+        image_size, x_offest = 40, 0
         if system == "Darwin":  # macOS 系统标识
             font_path = "/System/Library/Fonts/Apple Color Emoji.ttc"
         elif system == "Windows":
             font_path = r"C:\Windows\Fonts\seguiemj.ttf"
-            image_size = 55
+            x_offest=8
         elif system == "Linux":
             font_path = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
         else:
@@ -122,7 +122,7 @@ async def color_emoji_maker(text,color,size=40):
         image = Image.new('RGBA', (image_size, image_size), (255, 255, 255, 0))  # 背景透明
         draw = ImageDraw.Draw(image)
         font = ImageFont.truetype(font_path, size)
-        draw.text((0, 0), text, font=font, fill=color)
+        draw.text((0-x_offest, 0), text, font=font, fill=color)
     #image.show()
     return image
 

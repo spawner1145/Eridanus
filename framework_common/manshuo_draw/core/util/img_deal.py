@@ -198,6 +198,7 @@ async def init(params):#对模块的参数进行初始化
             else:params['number_per_row'] = 3
         # 接下来处理是否裁剪部分
         if params['type'] == 'avatar': params['is_crop'] = True
+        if params['type'] == 'games' and 'is_crop' not in params: params['is_crop'] = False
         if 'is_crop' in params and params['is_crop'] == 'default':
             if params['number_per_row'] == 1:params['is_crop'] = False
             else:params['is_crop'] = True

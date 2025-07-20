@@ -37,7 +37,7 @@ class GamesModule:
         first_day_of_week = datetime(datetime.now().year, datetime.now().month, 1).weekday() + 1
         if first_day_of_week == 7: first_day_of_week=0
         _, days_total = calendar.monthrange(datetime.now().year, datetime.now().month)
-        background_make=process_img_download(self.background,self.is_abs_path_convert)[0]
+        background_make=(await process_img_download(self.background,self.is_abs_path_convert))[0]
         background_make_L = Image.new("RGBA", background_make.size, (255,255,255,255))
         background_make_L.putalpha(background_make.convert('L'))
         for i in range(days_total):
@@ -51,7 +51,7 @@ class GamesModule:
             week_img_canves = Image.new("RGBA", background_make.size, (255, 255, 255, 255)).resize(
                 (self.new_width, int(self.new_width * background_make.height / background_make.width)))
             img_week = (await basic_img_draw_text(week_img_canves, f"[title]{weeky[i]}[/title]", self.__dict__,
-                                      box=(int(self.padding*1.2), week_img_canves.height//2 - self.font_title_size//2 + 2), ))['canvas']
+                                      box=(int(self.padding*1.2), week_img_canves.height//2 - self.font_title_size//2 - 3), ))['canvas']
             self.pure_backdrop = await img_process(self.__dict__, self.pure_backdrop, img_week, x_offset_week, self.current_y, self.upshift)
             x_offset_week += self.new_width + self.padding_with
         self.current_y += img_week.height + self.padding_with
@@ -76,7 +76,7 @@ class GamesModule:
             else:
                 if self.number_count - first_day_of_week + 1 > 0:
                     img = (await basic_img_draw_text(img, f"[date]{self.number_count - first_day_of_week + 1}[/date]", self.__dict__,
-                                          box=(self.padding * 1.6, img.height - self.font_date_size - self.padding), ))['canvas']
+                                          box=(self.padding * 1.6, img.height//2 - self.font_date_size//2 - 3), ))['canvas']
 
             img=await label_process(self.__dict__,img,self.number_count,self.new_width)#加入label绘制
             self.pure_backdrop = await img_process(self.__dict__,self.pure_backdrop, img, self.x_offset, self.current_y, self.upshift)#对每个图像进行处理
