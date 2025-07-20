@@ -16,7 +16,7 @@ def main(bot, config):
     steam_api_key=config.anime_game_service.config['steamsnooping']['steam_api_key']
     #print(steam_api_key)
     if config.anime_game_service.config['steamsnooping']['is_snooping']:
-        bot.logger.info(f"bot开始视奸群友的Steamm啦！")
+        bot.logger.info(f"bot开始视奸群友的Steam啦！")
         threading.Thread(target=url_main(bot, config, db,steam_api_key), daemon=True).start()
 
     #绑定一个steamid

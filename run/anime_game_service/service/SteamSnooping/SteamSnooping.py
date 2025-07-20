@@ -78,6 +78,7 @@ async def steamsnoopall(bot, config, db,steam_api_key):
     for userid in all_snoop_ids_send:
         steamid = str(all_snoop_ids_steamid[f'{userid}'])
         user_info = db.read_user(userid)
+        user_times=int(user_info["SteamSnooping"]['times'][current_day])
         if steamid not in new_players_dict:continue
         if steamid not in old_players_dict:continue
         if old_players_dict[steamid]['gameextrainfo'] == new_players_dict[steamid]['gameextrainfo']:continue
@@ -126,7 +127,7 @@ async def steamsnoopall(bot, config, db,steam_api_key):
                      f"\n成就：{game.get('completed_achievement_number')} / {game.get('total_achievement_number')}"
                      ], 'number_per_row': 1, 'is_crop': False}
             ]
-            await bot.send_group_message(group_id, [Image(file=await manshuo_draw(draw_json))])
+            await bot.send_group_message(group_id, [f"{config.common_config.basic_config['bot']} 发现了群友的Steam动态了哦",Image(file=await manshuo_draw(draw_json))])
 
             #await bot.send_group_message(group_id, [replay_content])
 
