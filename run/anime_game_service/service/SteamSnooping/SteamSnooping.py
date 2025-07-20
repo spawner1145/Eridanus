@@ -80,10 +80,10 @@ async def steamsnoopall(bot, config, db,steam_api_key):
         user_info = db.read_user(userid)
         if 'times' in user_info["SteamSnooping"] and current_day in user_info["SteamSnooping"]['times']:
             user_times=int(user_info["SteamSnooping"]['times'][current_day])
-        if steamid not in new_players_dict:continue
-        if steamid not in old_players_dict:continue
+        if steamid not in new_players_dict or steamid not in old_players_dict:continue
         if old_players_dict[steamid]['gameextrainfo'] == new_players_dict[steamid]['gameextrainfo']:continue
-        if new_players_dict[steamid]['gameextrainfo'] in config.anime_game_service.config['steamsnooping']['game_white']:continue
+        if (new_players_dict[steamid]['gameextrainfo'] in config.anime_game_service.config['steamsnooping']['game_white'] or
+                old_players_dict[steamid]['gameextrainfo'] in config.anime_game_service.config['steamsnooping']['game_white']):continue
         if new_players_dict[steamid]['gameextrainfo'] is not None and old_players_dict[steamid]['gameextrainfo'] is not None:
             replay_content += f"([title]{new_players_dict[steamid]['personaname']}[/title]) 停止玩 {old_players_dict[steamid]['gameextrainfo']}，开始玩 [title]{new_players_dict[steamid]['gameextrainfo']}[/title] 了"
         elif new_players_dict[steamid]['gameextrainfo'] is not None:
