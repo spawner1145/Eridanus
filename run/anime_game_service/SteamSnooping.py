@@ -65,12 +65,12 @@ def main(bot, config):
 
         #await bot.send(event, f'steamid: {steamid}, steam_friend_code: {steam_friend_code}')
         recall_id=await bot.send(event, f'开始查询您的最近steam动态，请耐心等待喵')
-        player_data = await get_user_data(steamid)
+        player_data = await get_user_data(steamid,config.common_config.basic_config['proxy']['http_proxy'])
         try:user_name = (await bot.get_group_member_info(event.group_id, userid))['data']['nickname']
         except:user_name='未知'
         #if len(user_name) > 10: user_name = user_name[:10]
         draw_json=[
-            {'type': 'basic_set', 'img_width': 1500},
+            {'type': 'basic_set', 'img_width': 1500,'proxy':config.common_config.basic_config['proxy']['http_proxy']},
             {'type': 'avatar', 'subtype': 'common', 'img': [f'https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640',player_data["avatar_url"]],'upshift_extra':15,'number_per_row': 2,
              'content': [f"[name]qq昵称: {user_name}[/name]\n[time]游玩时间：{player_data['recent_2_week_play_time']}[/time]",f'[name]Steam昵称: {player_data["player_name"]}[/name]\n[time]好友代码：{steam_friend_code}[/time]'],
              'is_rounded_corners_img':False,'is_stroke_img':False,'is_shadow_img':False},'[title]您的最近游戏动态：[/title]',
