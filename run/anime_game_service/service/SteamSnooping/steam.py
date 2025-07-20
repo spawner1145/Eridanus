@@ -73,7 +73,7 @@ async def _fetch(
         return default
 
 
-async def get_user_data(steam_id: int, cache_path='data/pictures/cache/', proxy='http://127.0.0.1:7890'):
+async def get_user_data(steam_id: int, proxy='http://127.0.0.1:7890'):
     url = f"https://steamcommunity.com/profiles/{steam_id}"
     default_background = (Path(__file__).parent / "res/bg_dots.png")
     default_avatar = (Path(__file__).parent / "res/unknown_avatar.jpg")

@@ -10,7 +10,7 @@ from PIL import Image
 from .common import get_abs_path
 
 
-async def download_img_sync(url,gray_layer=False,proxy=None):
+async def download_img(url,gray_layer=False,proxy="http://127.0.0.1:7890"):
     if url.startswith("data:image"):
         match = re.match(r"data:image/(.*?);base64,(.+)", url)
         if not match:
@@ -63,7 +63,7 @@ async def process_img_download(img_list,is_abs_path_convert=True,gray_layer=Fals
             if is_abs_path_convert is True: content = get_abs_path(content)
             processed_img.append(Image.open(content))
         elif isinstance(content, str) and content.startswith("http"):
-            processed_img.append(Image.open(BytesIO(base64.b64decode(await download_img_sync(content)))))
+            processed_img.append(Image.open(BytesIO(base64.b64decode(await download_img(content,proxy=proxy)))))
         elif isinstance(content, Image.Image):
             processed_img.append(content)
         else:  # 最后判断是否为base64，若不是，则不添加本次图像

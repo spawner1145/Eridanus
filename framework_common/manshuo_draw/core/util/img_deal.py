@@ -187,8 +187,8 @@ async def label_process(params,img,number_count,new_width):
 #以下函数为模块内关系处理函数
 async def init(params):#对模块的参数进行初始化
     # 接下来是对图片进行处理，将其全部转化为pillow的img对象，方便后续处理
-    if 'img' in params and params['img'] !=[]:
-        params['processed_img'] = await process_img_download(params['img'], params['is_abs_path_convert'])
+    if 'img' in params:
+        params['processed_img'] = await process_img_download(params['img'], params['is_abs_path_convert'],proxy=params['proxy'])
         # 判断图片的排版方式
         if params['number_per_row'] == 'default':
             if len(params['processed_img']) == 1:
