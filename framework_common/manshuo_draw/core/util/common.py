@@ -75,7 +75,7 @@ def get_abs_path(path,is_ignore_judge=False):
 
 
 
-def crop_to_square(img_list):
+async def crop_to_square(img_list):
     """
     将一个 Pillow 图像对象裁剪为居中的正方形。
     """

@@ -5,7 +5,7 @@ from .download_img import process_img_download
 from .common import add_append_img
 import copy
 
-def deal_text_with_tag(input_string):
+async def deal_text_with_tag(input_string):
     pattern = r'\[(\w+)\](.*?)\[/\1\]'
     input_string=input_string.replace("\\n", "\n")
     matches = list(re.finditer(pattern, str(input_string), flags=re.DOTALL))
@@ -40,7 +40,7 @@ def deal_text_with_tag(input_string):
     return result
 
 
-def can_render_character(font, character,params):
+async def can_render_character(font, character,params):
     """
     检测文字是否可以正常绘制
     此处受限于pillow自身的绘制缺陷
@@ -75,7 +75,7 @@ def can_render_character(font, character,params):
         # 如果抛出异常，说明字体不支持该字符
         return False
 
-def color_emoji_maker(text,color,size=40):
+async def color_emoji_maker(text,color,size=40):
     try:
         #此绘图方式win暂不可用，仅限于mac与linux使用
         import gi
@@ -108,12 +108,12 @@ def color_emoji_maker(text,color,size=40):
         return image
     except Exception as e:
         system = platform.system()
-        image_size = 40
+        image_size, x_offest = 40, 0
         if system == "Darwin":  # macOS 系统标识
             font_path = "/System/Library/Fonts/Apple Color Emoji.ttc"
         elif system == "Windows":
             font_path = r"C:\Windows\Fonts\seguiemj.ttf"
-            image_size = 55
+            x_offest=8
         elif system == "Linux":
             font_path = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
         else:
@@ -122,13 +122,13 @@ def color_emoji_maker(text,color,size=40):
         image = Image.new('RGBA', (image_size, image_size), (255, 255, 255, 0))  # 背景透明
         draw = ImageDraw.Draw(image)
         font = ImageFont.truetype(font_path, size)
-        draw.text((0, 0), text, font=font, fill=color)
+        draw.text((0-x_offest, 0), text, font=font, fill=color)
     #image.show()
     return image
 
 
 
-def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=False,ellipsis=True):
+async def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=False,ellipsis=True):
     """
     #此方法不同于其余绘制方法
     #其余绘制方法仅返回自身绘制画面
@@ -144,7 +144,7 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
     if content == '' or content is None:
         return {'canvas': canvas, 'canvas_bottom': y}
     if isinstance(content, list):content_list=content
-    else:content_list = deal_text_with_tag(content)
+    else:content_list = await deal_text_with_tag(content)
 
     #将所有的emoji转换成pillow对象
     content_list_convert,emoji_list=[],[]
@@ -195,7 +195,7 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
                 if x == box[0] + char_width + 1 and text[i - 1] == '\n' :#检测是否在一行最开始换行，若是则修正
                     x -= char_width + 1
 
-    line_height_list.append(params[f'font_common_size'])
+    line_height_list.append(params[f'font_{last_tag}_size'])
     line_height_list.append(params[f'font_common_size'])
 
 
@@ -238,12 +238,12 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
             #绘制文字与图片
             if content['tag'] == 'emoji':
                 canvas.paste(text[i], (int(x), int(y - upshift_font + 3)), mask=text[i])
-            elif can_render_character(font, text[i],params):
+            elif await can_render_character(font, text[i],params):
                 if is_shadow: draw.text((x + 2, y - upshift_font + 2), text[i], font=font, fill=(148, 148,148))
                 draw.text((x, y - upshift_font), text[i], font=font, fill=eval(params[f'font_{last_tag}_color']))
             else:
                 try:
-                    emoji_img = color_emoji_maker(text[i], eval(params[f'font_{last_tag}_color']))
+                    emoji_img = await color_emoji_maker(text[i], eval(params[f'font_{last_tag}_color']))
                     emoji_img = emoji_img.resize((char_width, int(char_width * emoji_img.height / emoji_img.width)))
                     canvas.paste(emoji_img, (int(x), int(y + 3 - upshift_font)), mask=emoji_img)
                 except Exception as e:

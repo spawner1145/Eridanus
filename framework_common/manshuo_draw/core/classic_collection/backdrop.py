@@ -24,17 +24,17 @@ class Backdrop:
             for key, value in vars(self).items():
                 setattr(self, key, get_abs_path(value))
 
-    def one_color(self,basic_img):
+    async def one_color(self,basic_img):
         canvas = Image.new("RGBA", (basic_img.width, basic_img.height), eval(self.color))
         canvas.paste(basic_img, (0, 0), mask=basic_img)
         return canvas
 
-    def no_color(self,basic_img):
+    async def no_color(self,basic_img):
         canvas = Image.new("RGBA", (basic_img.width, basic_img.height), (0, 0, 0, 0))
         canvas.paste(basic_img, (0, 0), mask=basic_img)
         return canvas
 
-    def gradient(self,basic_img):
+    async def gradient(self,basic_img):
         width, height = basic_img.size
         color1=eval(self.left_color)
         color2 = eval(self.right_color)

@@ -28,10 +28,10 @@ async def layer_deal(basic_img_info,json_img,json_img_left,layer=1):
             if per_json_img['type'] not in ['layer_processed', 'backdrop']: printf(per_json_img)
             #print(layer_img_info.img_height_limit)
             match per_json_img['type']:
-                case 'text':    json_check = getattr(TextModule(layer_img_info, per_json_img), per_json_img['subtype'])()
-                case 'img':     json_check = getattr(ImageModule(layer_img_info, per_json_img), per_json_img['subtype'])()
-                case 'avatar':  json_check = getattr(AvatarModule(layer_img_info, per_json_img), per_json_img['subtype'])()
-                case 'games':   json_check = getattr(GamesModule(layer_img_info, per_json_img), per_json_img['subtype'])()
+                case 'text':    json_check = await getattr(TextModule(layer_img_info, per_json_img), per_json_img['subtype'])()
+                case 'img':     json_check = await getattr(ImageModule(layer_img_info, per_json_img), per_json_img['subtype'])()
+                case 'avatar':  json_check = await getattr(AvatarModule(layer_img_info, per_json_img), per_json_img['subtype'])()
+                case 'games':   json_check = await getattr(GamesModule(layer_img_info, per_json_img), per_json_img['subtype'])()
                 case 'layer_processed':json_check = per_json_img['content']
                 case _:         json_check=None
             if json_check:
@@ -49,7 +49,7 @@ async def layer_deal(basic_img_info,json_img,json_img_left,layer=1):
         elif layer_check < layer:
             break
 
-    layer_img_canvas=layer_img_info.paste_img(canvas_dict)
+    layer_img_canvas=await layer_img_info.paste_img(canvas_dict)
     #layer_img_canvas.show()
     upshift,downshift=0,0
     return {'layer_img_canvas':layer_img_canvas,
@@ -95,13 +95,13 @@ async def deal_img(json_img): #此函数将逐个解析json文件中的每个字
     for item in json_img_left:printf(item)
     #layer_img_canvas.show()
     #将之前的模块粘贴到实现绘制的无色中间层上
-    basic_img = basic_img_info.creatbasicimgnobackdrop(canves_layer_list)
-    basic_img = basic_img_info.combine_layer_basic(basic_img,canves_layer_list)
+    basic_img = await basic_img_info.creatbasicimgnobackdrop(canves_layer_list)
+    basic_img = await basic_img_info.combine_layer_basic(basic_img,canves_layer_list)
 
     for per_json_img in basic_json_set:               #处理背景相关
         if 'backdrop' in per_json_img['type']:
             backdrop_class=Backdrop(basic_img_info, per_json_img)
-            basic_img=getattr(backdrop_class, per_json_img['subtype'])(basic_img)
+            basic_img=await getattr(backdrop_class, per_json_img['subtype'])(basic_img)
 
 
 

@@ -1,9 +1,10 @@
 from PIL import Image, ImageDraw, ImageFont, ImageOps,ImageFilter
 from .download_img import process_img_download
 from .text_deal import basic_img_draw_text
+from .common import crop_to_square
 import math
 
-def img_process(params,pure_backdrop ,img ,x_offset ,current_y ,upshift=0,type='img'):
+async def img_process(params,pure_backdrop ,img ,x_offset ,current_y ,upshift=0,type='img'):
     # 圆角处理
     if params['is_rounded_corners_front'] and params[f'is_rounded_corners_{type}']:
         mask = Image.new("L", img.size, 0)
@@ -58,7 +59,7 @@ def img_process(params,pure_backdrop ,img ,x_offset ,current_y ,upshift=0,type='
     return pure_backdrop
 
 
-def backdrop_process(params,canves,limit=(0, 0)):
+async def backdrop_process(params,canves,limit=(0, 0)):
     limit_x, limit_y = limit
     if params['background'] is None or params['background'] == []:return canves
     if not isinstance(params['background'], list):background_list=[params['background']]
@@ -66,7 +67,7 @@ def backdrop_process(params,canves,limit=(0, 0)):
     if 'number_count' not in params:number_count=0
     else:number_count=int(params['number_count'])
     if number_count >= len(background_list):number_count=len(background_list)-1
-    background_img = process_img_download(background_list[number_count], params['is_abs_path_convert'])[0]
+    background_img = (await process_img_download(background_list[number_count], params['is_abs_path_convert']))[0]
     if background_img.width > limit_x and background_img.height > limit_y:
         background_img = background_img.resize(
             (int(limit_x), int(limit_x * background_img.height / background_img.width)))
@@ -120,7 +121,7 @@ def backdrop_process(params,canves,limit=(0, 0)):
     canves = background_img
     return canves
 
-def icon_process(params,canves,box_right=(0, 0)):
+async def icon_process(params,canves,box_right=(0, 0)):
     x, y = box_right
     if params['right_icon'] is None or params['right_icon'] == []: return canves
     if not isinstance(params['right_icon'], list):icon_list=[params['right_icon']]
@@ -128,7 +129,7 @@ def icon_process(params,canves,box_right=(0, 0)):
     if 'number_count' not in params:number_count=0
     else:number_count=int(params['number_count'])
     if number_count >= len(icon_list):number_count=len(icon_list)-1
-    icon_img = process_img_download(icon_list[number_count], params['is_abs_path_convert'])[0].convert("RGBA")
+    icon_img = (await process_img_download(icon_list[number_count], params['is_abs_path_convert']))[0].convert("RGBA")
     icon_img = icon_img.resize((int(params['avatar_size'] * icon_img.width / icon_img.height), int(params['avatar_size'] )))
     if params['is_shadow_font']:
         color_image = Image.new("RGBA", icon_img.size, (255,255,255,255))
@@ -139,7 +140,7 @@ def icon_process(params,canves,box_right=(0, 0)):
 
 
 #头像右侧标签以及背景处理
-def icon_backdrop_check(params):
+async def icon_backdrop_check(params):
     if not (params['type_software'] is None and params['background'] is None and params['right_icon'] is None):
         for content_check in params['software_list']:
             if content_check['right_icon'] and params['type_software'] == content_check['type']:
@@ -149,10 +150,10 @@ def icon_backdrop_check(params):
             params['font_name_color'], params['font_time_color'] = '(255,255,255)', '(255,255,255)'
             params['is_shadow_font'] = True
     if params['judge_flag'] == 'default':
-        if (params['background'] or params['right_icon']) and (len(params['processed_img']) != 1 or params['number_per_row'] != 1):
+        if (params['background'] or params['right_icon']) and (len(params['img']) != 1 or params['number_per_row'] != 1):
             params['is_shadow_img'], params['is_rounded_corners_img'], params['is_stroke_img'] = True, True, True
             params['judge_flag'] = 'list'
-        elif (params['background'] or params['right_icon']) and len(params['processed_img']) == 1 and params['number_per_row'] == 1:
+        elif (params['background'] or params['right_icon']) and len(params['img']) == 1 and params['number_per_row'] == 1:
             params['is_shadow_img'], params['is_rounded_corners_img'], params['is_stroke_img'] = False, False, False
             params['judge_flag'] = 'common'
         else:
@@ -164,7 +165,7 @@ def icon_backdrop_check(params):
 
 
 #标签绘制
-def label_process(params,img,number_count,new_width):
+async def label_process(params,img,number_count,new_width):
     font_label = ImageFont.truetype(params['font_label'], params['font_label_size'])
     label_width, label_height, upshift = params['padding'] * 4, params['padding'] + params['font_label_size'], 0
     if number_count >= len(params['label']) or params['label'][number_count] == '':
@@ -177,14 +178,32 @@ def label_process(params,img,number_count,new_width):
     label_canvas = Image.new("RGBA", (int(label_width), int(label_height)), eval(params['label_color']))
     # 调用方法绘制文字并判断是否需要描边和圆角
     # print(label_width,label_height)
-    label_canvas = basic_img_draw_text(label_canvas, f'[label] {label_content} [/label]', params,
+    label_canvas = (await basic_img_draw_text(label_canvas, f'[label] {label_content} [/label]', params,
                                        box=(params['padding'] * 1.3, params['padding'] * 0.8),
-                                       limit_box=(label_width, label_height), ellipsis=False)['canvas']
-    img = img_process(params, img, label_canvas, int(new_width - label_width), 0, upshift, 'label')
+                                       limit_box=(label_width, label_height), ellipsis=False))['canvas']
+    img = await img_process(params, img, label_canvas, int(new_width - label_width), 0, upshift, 'label')
     return img
 
 #以下函数为模块内关系处理函数
-def init(params):#对模块的参数进行初始化
+async def init(params):#对模块的参数进行初始化
+    # 接下来是对图片进行处理，将其全部转化为pillow的img对象，方便后续处理
+    if 'img' in params and params['img'] !=[]:
+        params['processed_img'] = await process_img_download(params['img'], params['is_abs_path_convert'])
+        # 判断图片的排版方式
+        if params['number_per_row'] == 'default':
+            if len(params['processed_img']) == 1:
+                params['number_per_row'] = 1
+                params['is_crop'] = False
+            elif len(params['processed_img']) in [2, 4]:params['number_per_row'] = 2
+            else:params['number_per_row'] = 3
+        # 接下来处理是否裁剪部分
+        if params['type'] == 'avatar': params['is_crop'] = True
+        if params['type'] == 'games' and 'is_crop' not in params: params['is_crop'] = False
+        if 'is_crop' in params and params['is_crop'] == 'default':
+            if params['number_per_row'] == 1:params['is_crop'] = False
+            else:params['is_crop'] = True
+        if params['is_crop'] is True: params['processed_img'] = await crop_to_square(params['processed_img'])
+
     if 'number_per_row' in params:
         params['new_width'] = (((params['img_width'] - params['padding'] * 2) - (params['number_per_row'] - 1) * params['padding_with']) // params['number_per_row'])
     if 'draw_limited_height' in params:params['draw_limited_height_remain']=params['draw_limited_height']
@@ -202,7 +221,7 @@ def init(params):#对模块的参数进行初始化
     #params['pure_backdrop'] = Image.new("RGBA",(params['img_width'], int(params['img_height_limit'] + params['upshift'] + params['padding_up_common']*2)),(255, 0, 0, 255))
 
 
-def per_img_limit_deal(params,img,magnification_img=1,type='img'):  #处理每个模块之间图像的限高关系
+async def per_img_limit_deal(params,img,magnification_img=1,type='img'):  #处理每个模块之间图像的限高关系
     img_height, img_width = int((params['new_width'] / magnification_img) * img.height / img.width),int(params['new_width'] / magnification_img)
     img = img.resize((img_width, img_height))
     if params['number_count'] + 1 <= params['number_per_row'] and 'draw_limited_height' in params:
@@ -216,7 +235,7 @@ def per_img_limit_deal(params,img,magnification_img=1,type='img'):  #处理每�
 
 
 
-def per_img_deal(params,img, type='img'):#绘制完该模块后处理下一个模块的关系
+async def per_img_deal(params,img, type='img'):#绘制完该模块后处理下一个模块的关系
     if img.height > params['max_height']: params['max_height'] = img.height
     params['x_offset'] += params['new_width'] + params['padding_with']
     params['per_number_count'] += 1
@@ -236,7 +255,7 @@ def per_img_deal(params,img, type='img'):#绘制完该模块后处理下一个�
             params['params']['content'][params['number_count'] - 1] = [params['content'][params['number_count'] - 1]]
 
 
-def final_img_deal(params, type='img'):#判断是否需要增减
+async def final_img_deal(params, type='img'):#判断是否需要增减
     if type == 'text':
         if params['content'][0] != []:
             params['params']['content'] = [params['content'][0]]

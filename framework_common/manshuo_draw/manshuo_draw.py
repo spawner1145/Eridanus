@@ -1,8 +1,10 @@
 from framework_common.manshuo_draw.core.deal_img import *
 import asyncio
+import copy
 
 
 async def manshuo_draw(json_img):
+    json_img=copy.deepcopy(json_img)
     json_img=json_check(json_img)   #检查并补正输入的参数
     img_path=await deal_img(json_img)
     return img_path
@@ -69,13 +71,10 @@ if __name__ == '__main__':
 
     ]
 
-    contents_not=[{'type': 'basic_set', 'debug': True},{'type':'text','content':['manshuo']},
-        '这部分[emoji]framework_common/manshuo_draw/data/cache/manshuo.jpg[/emoji]是uo！\n'
-                  '[title]标题[emoji]framework_common/manshuo_draw/data/cache/manshuo.jpg[/emoji]是测试！[/title]'
-                  '这里是测试！这里是测试！这里是测试！这里是测试'
-                  '[title]这里[emoji]framework_common/manshuo_draw/data/cache/manshuo.jpg[/emoji]是测试！[/title]\n'
-                   '这部分[emoji]framework_common/manshuo_draw/data/cache/manshuo.jpg[/emoji]是测manshuo！\n'
-                  '[des]\n这里是[emoji]framework_common/manshuo_draw/data/cache/manshuo.jpg[/emoji]介绍[/des]']
+    contents_not=[{'type': 'basic_set', 'debug': True},
+        'https://avatars.fastly.steamstatic.com/93947d71b3900b1bb1a5144d62a9af99a4338bba_full.jpg',
+        'https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1329410/capsule_184x69.jpg'
+        ]
 
 
     contentsWithNoTag=[
@@ -96,7 +95,7 @@ if __name__ == '__main__':
         {'type': 'img', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg'],'layer':3,
          'content': ['葬送的芙莉莲\n5星','败犬女主太多啦\n4.5星',]
          },
-
+        '这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]',
         {'type': 'img', 'subtype': 'common_with_des','img': ['https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'], 'label': ['BiliBili'],'layer':5,
          'content': ['这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]']},
     ]
