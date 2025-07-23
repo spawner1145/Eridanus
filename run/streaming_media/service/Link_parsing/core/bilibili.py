@@ -67,7 +67,9 @@ async def bilibili(url,filepath=None,is_twice=None):
         url: str = str(resp.url)
         #print(f'url:{url}')
     # AV/BV处理
-    if "av" in url:url= 'https://www.bilibili.com/video/' + av_to_bv(url)
+    if "av" in url:
+        return
+        url= 'https://www.bilibili.com/video/' + av_to_bv(url)
     if re.match(r'^BV[1-9a-zA-Z]{10}$', url):
         url = 'https://www.bilibili.com/video/' + url
     json_check['url'] = url
@@ -241,7 +243,6 @@ async def bilibili(url,filepath=None,is_twice=None):
                             {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                              'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
                              'type_software': 'bilibili'},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
-
 
                     if is_twice is not True:
                         json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
