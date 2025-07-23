@@ -1,7 +1,7 @@
 import os
 import gc
-from framework_common.manshuo_draw.core.classic_collection import *
-from framework_common.manshuo_draw.core.util import *
+from .classic_collection import *
+from .util import *
 
 
 async def layer_deal(basic_img_info,json_img,json_img_left,layer=1):

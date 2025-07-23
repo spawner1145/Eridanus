@@ -43,7 +43,7 @@ class AvatarModule:
             elif self.judge_flag == 'common' :
                 avatar_canvas = Image.new("RGBA", (self.new_width, self.avatar_size + self.padding_up_bottom * 2),(0, 0, 0, 0))
             else:
-                avatar_canvas = Image.new("RGBA", (self.new_width, self.avatar_size + self.padding_up_bottom * 2),eval(self.avatar_backdrop_color))
+                avatar_canvas = Image.new("RGBA", (self.new_width, self.avatar_size + self.padding_up_bottom * 2),eval(str(self.avatar_backdrop_color)))
             img = img.resize((self.avatar_size, self.avatar_size))
             avatar_canvas = await per_img_limit_deal(self.__dict__, avatar_canvas,type='avatar')
             if self.json_img_left_module_flag: break     #将判断条件下移，旨在修改模块的跳出条件，不希望头像模块有绘制一半的情况

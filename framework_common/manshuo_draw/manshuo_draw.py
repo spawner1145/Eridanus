@@ -44,7 +44,7 @@ if __name__ == '__main__':
     contents2=[
         {'type': 'basic_set', 'debug': True,'img_width':1500,'img_height':1000,},
 
-        {'type': 'backdrop', 'subtype': 'gradient'},
+        {'type': 'backdrop', 'subtype': 'img'},
 
         {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift_extra':25,'layer':1,
          'content':[ f"[name]今日发言排行榜[/name]\n[time]2025年 05月27日 20:32[/time]"] },
@@ -100,32 +100,14 @@ if __name__ == '__main__':
          'content': ['这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]']},
     ]
 
-    games_content=[
-        {'type': 'basic_set', 'debug': True, 'img_width': 1500,'img_height':1000},
-        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',
-                                                      'https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'],
-         'content': [f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]",
-                     f"[name]galgame[/name]\n[time]2025年 05月27日 20:32[/time]"],
-         'background': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',
-                        'https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'], },
-        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg'],
-         'upshift_extra': 0,'layer':5,
-         'content': [f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]",f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]"],
-         'type_software': 'bilibili', },
-        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',
-                                                        'https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'],
-         'content': [f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]",
-                     f"[name]galgame[/name]\n[time]2025年 05月27日 20:32[/time]"],
-         'background': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',
-                        'https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'], },
-        '这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]',
-        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',
-                                                        'https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'],
-         'content': [f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]",
-                     f"[name]galgame[/name]\n[time]2025年 05月27日 20:32[/time]"],
-         'background': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',
-                        'https://gal.manshuo.ink/usr/uploads/2025/02/1709218403.png'], },
-    ]
+    games_content=[{'type': 'basic_set', 'debug': True},
+        {'type': 'avatar', 'subtype': 'common', 'img': ['https://i0.hdslb.com/bfs/face/035c2c9e95c5487d0a9aca28c36f0cb20b0afc3f.jpg'],
+                    'upshift_extra': 20, 'content': ['[name]一颗小兔娘[/name]\n[time]2025年07月20日 19:22[/time]'], 'type_software': 'bilibili'},
+                   {'type': 'text', 'content': ['都怪你们不给力，害得爱播赚不了这份钱[emoji]https://i0.hdslb.com/bfs/emote/ca94ad1c7e6dac895eb5b33b7836b634c614d1c0.png[/emoji]'
+                                                '[emoji]https://i0.hdslb.com/bfs/emote/ca94ad1c7e6dac895eb5b33b7836b634c614d1c0.png[/emoji]'
+                                                '[emoji]https://i0.hdslb.com/bfs/emote/ca94ad1c7e6dac895eb5b33b7836b634c614d1c0.png[/emoji]']},
+                   {'type': 'img', 'img': ['http://i0.hdslb.com/bfs/new_dyn/9cd316e9b7f15b48cc12383fc1e446b5498099165.jpg']}]
+
 
 
 
