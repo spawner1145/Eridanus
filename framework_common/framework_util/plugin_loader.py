@@ -5,6 +5,10 @@ import importlib
 import importlib.util
 from pathlib import Path
 from typing import Dict, List, Callable, Any
+
+from framework_common.utils.install_and_import import install_and_import
+
+watchdog=install_and_import("watchdog")
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import logging
