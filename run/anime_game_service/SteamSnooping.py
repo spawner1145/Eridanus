@@ -34,13 +34,13 @@ def main(bot, config):
             await bot.send(event, ['成功绑定 ',At(qq=userid), f' 的steamid ({steamid}) 喵'])
         elif context=='steamunbind':
             db.write_user(userid, {'SteamSnooping': {'steamid': None}})
-            await bot.send(event, ['成功接触 ', At(qq=userid), f' 的steamdi绑定'])
+            await bot.send(event, ['成功解除 ', At(qq=userid), f' 的steamid绑定'])
 
 
     #查询一个人的steam信息
     @bot.on(GroupMessageEvent)
     async def info_steamid(event: GroupMessageEvent):
-        context, steamid, steam_friend_code= event.pure_text, None, None
+        context, steamid, steam_friend_code, userid = event.pure_text, None, None, None
         if event.message_chain.has(At):
             try:
                 if 'steaminfo' == event.processed_message[0]['text']:userid=event.message_chain.get(At)[0].qq
@@ -65,22 +65,44 @@ def main(bot, config):
 
         #await bot.send(event, f'steamid: {steamid}, steam_friend_code: {steam_friend_code}')
         recall_id=await bot.send(event, f'开始查询您的最近steam动态，请耐心等待喵')
-        player_data = await get_user_data(steamid,config.common_config.basic_config['proxy']['http_proxy'])
-        try:user_name = (await bot.get_group_member_info(event.group_id, userid))['data']['nickname']
-        except:user_name='未知'
-        #if len(user_name) > 10: user_name = user_name[:10]
-        draw_json=[
-            {'type': 'basic_set', 'img_width': 1500,'proxy':config.common_config.basic_config['proxy']['http_proxy']},
-            {'type': 'avatar', 'subtype': 'common', 'img': [f'https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640',player_data["avatar_url"]],'upshift_extra':15,'number_per_row': 2,
-             'content': [f"[name]qq昵称: {user_name}[/name]\n[time]游玩时间：{player_data['recent_2_week_play_time']}[/time]",f'[name]Steam昵称: {player_data["player_name"]}[/name]\n[time]好友代码：{steam_friend_code}[/time]'],
-             'is_rounded_corners_img':False,'is_stroke_img':False,'is_shadow_img':False},'[title]您的最近游戏动态：[/title]',
-            {'type': 'img', 'subtype': 'common_with_des_right',
-             'img': [f"{game['game_image_url']}" for game in player_data["game_data"]],
-             'content': [
-                 f"[title]{game['game_name']}[/title]\n游玩时间：{game['play_time']} 小时\n{game['last_played']}"
-                 f"\n成就：{game.get('completed_achievement_number')} / {game.get('total_achievement_number')}"
-                 for game in player_data["game_data"]], 'number_per_row': 1,'is_crop':False}
-        ]
+        proxy_config = config.common_config.basic_config['proxy']['http_proxy']
+        proxy_config = proxy_config if proxy_config else None
+        player_data = await get_user_data(steamid, proxy_config)
+        
+        # 根据是否有userid构建不同的绘图参数
+        proxy_for_draw = config.common_config.basic_config['proxy']['http_proxy'] if config.common_config.basic_config['proxy']['http_proxy'] else None
+        
+        if userid:
+            try:user_name = (await bot.get_group_member_info(event.group_id, userid))['data']['nickname']
+            except:user_name='未知'
+            # 有userid时显示QQ和Steam双头像
+            draw_json=[
+                {'type': 'basic_set', 'img_width': 1500,'proxy': proxy_for_draw},
+                {'type': 'avatar', 'subtype': 'common', 'img': [f'https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640',player_data["avatar_url"]],'upshift_extra':15,'number_per_row': 2,
+                 'content': [f"[name]qq昵称: {user_name}[/name]\n[time]游玩时间：{player_data['recent_2_week_play_time']}[/time]",f'[name]Steam昵称: {player_data["player_name"]}[/name]\n[time]好友代码：{steam_friend_code}[/time]'],
+                 'is_rounded_corners_img':False,'is_stroke_img':False,'is_shadow_img':False},'[title]您的最近游戏动态：[/title]',
+                {'type': 'img', 'subtype': 'common_with_des_right',
+                 'img': [f"{game['game_image_url']}" for game in player_data["game_data"]],
+                 'content': [
+                     f"[title]{game['game_name']}[/title]\n游玩时间：{game['play_time']} 小时\n{game['last_played']}"
+                     f"\n成就：{game.get('completed_achievement_number')} / {game.get('total_achievement_number')}"
+                     for game in player_data["game_data"]], 'number_per_row': 1,'is_crop':False}
+            ]
+        else:
+            # 无userid时只显示Steam头像
+            draw_json=[
+                {'type': 'basic_set', 'img_width': 1500,'proxy': proxy_for_draw},
+                {'type': 'avatar', 'subtype': 'common', 'img': [player_data["avatar_url"]],'upshift_extra':15,
+                 'content': [f'[name]Steam昵称: {player_data["player_name"]}[/name]\n[time]好友代码：{steam_friend_code}[/time]\n[time]游玩时间：{player_data["recent_2_week_play_time"]}[/time]'],
+                 'is_rounded_corners_img':False,'is_stroke_img':False,'is_shadow_img':False},'[title]最近游戏动态：[/title]',
+                {'type': 'img', 'subtype': 'common_with_des_right',
+                 'img': [f"{game['game_image_url']}" for game in player_data["game_data"]],
+                 'content': [
+                     f"[title]{game['game_name']}[/title]\n游玩时间：{game['play_time']} 小时\n{game['last_played']}"
+                     f"\n成就：{game.get('completed_achievement_number')} / {game.get('total_achievement_number')}"
+                     for game in player_data["game_data"]], 'number_per_row': 1,'is_crop':False}
+            ]
+        
         #for item in draw_json:print(item)
         await bot.send(event, Image(file=(await manshuo_draw(draw_json))))
         await bot.recall(recall_id['data']['message_id'])
