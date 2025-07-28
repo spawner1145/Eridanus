@@ -1,5 +1,4 @@
-plugin_description = "AI LLM Plugin"
-
+plugin_description = "Anime Game Service"
 """
 各个入口文件
 """

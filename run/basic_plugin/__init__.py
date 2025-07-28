@@ -1,4 +1,10 @@
 plugin_description = "基础功能集合"
+"""
+各个入口文件
+"""
+from framework_common.framework_util.main_func_detector import load_main_functions
+entrance_func=load_main_functions(__file__)
+
 dynamic_imports = {
     "run.basic_plugin.basic_plugin": [
         "call_weather_query", "call_setu","call_tarot", "call_pick_music",

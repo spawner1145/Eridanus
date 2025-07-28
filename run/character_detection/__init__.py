@@ -1,4 +1,10 @@
 plugin_description="图片审核"
+"""
+各个入口文件
+"""
+from framework_common.framework_util.main_func_detector import load_main_functions
+entrance_func=load_main_functions(__file__)
+
 dynamic_imports={
     "run.character_detection.func_collection": ["operate_group_censor"],
 }

@@ -1,4 +1,10 @@
 plugin_description="资源搜集(r18)"
+"""
+各个入口文件
+"""
+from framework_common.framework_util.main_func_detector import load_main_functions
+entrance_func=load_main_functions(__file__)
+
 dynamic_imports = {
     "run.resource_collector.resource_search": [
         "search_book_info", "call_asmr", "call_download_book","call_jm"

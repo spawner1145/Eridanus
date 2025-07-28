@@ -1,4 +1,18 @@
+
+
 plugin_description="ACG相关信息查询插件"
+
+
+
+"""
+各个入口文件
+"""
+from framework_common.framework_util.main_func_detector import load_main_functions
+entrance_func=load_main_functions(__file__)
+
+"""
+函数调用所需
+"""
 dynamic_imports={
     "run.acg_infromation.bangumi": ["call_bangumi_search"],
     "run.acg_infromation.character_identify": ["call_character_identify"],

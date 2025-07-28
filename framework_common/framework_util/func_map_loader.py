@@ -2,8 +2,10 @@ import os
 import importlib
 import traceback
 
-from developTools.utils.logger import get_logger
+
 import copy
+
+from developTools.utils.logger import get_logger
 
 
 def convert_gemini_to_openai(gemini_tools):
@@ -33,6 +35,7 @@ def convert_gemini_to_openai(gemini_tools):
     return openai_functions
 
 logger=get_logger()
+print(logger)
 PLUGIN_DIR = "run"
 dynamic_imports = {}
 function_declarations = []
@@ -46,8 +49,17 @@ for root, dirs, files in os.walk(PLUGIN_DIR):
 
             # **加载 dynamic_imports**
             if hasattr(module, "dynamic_imports"):
-                dynamic_imports.update(module.dynamic_imports)
-                #print(f"✅ 发现并加载 {module_name}.dynamic_imports")
+                if isinstance(module.dynamic_imports, dict):
+                    # 旧格式：字典
+                    dynamic_imports.update(module.dynamic_imports)
+                    logger.info(f"✅ 发现并加载 {module_name}.dynamic_imports (字典格式)")
+                elif isinstance(module.dynamic_imports, list):
+                    # 新格式：函数对象列表
+                    func_names = [func.__name__ for func in module.dynamic_imports if callable(func)]
+                    dynamic_imports[module_name] = func_names
+                    logger.info(f"✅ 发现并加载 {module_name}.dynamic_imports (列表格式)")
+                else:
+                    logger.warning(f"⚠️ {module_name}.dynamic_imports 格式不正确")
 
             # **加载 function_declarations**
             if hasattr(module, "function_declarations"):
@@ -57,7 +69,6 @@ for root, dirs, files in os.walk(PLUGIN_DIR):
         except Exception as e:
             logger.error(f"❌ 无法导入 {module_name}: {e}")
             traceback.print_exc()
-
 
 def openai_func_map():
     return convert_gemini_to_openai(function_declarations)
