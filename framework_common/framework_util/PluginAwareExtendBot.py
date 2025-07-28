@@ -1,0 +1,760 @@
+import os
+import sys
+import asyncio
+import importlib
+import importlib.util
+from pathlib import Path
+from typing import Dict, List, Callable, Any, Set
+import time
+import weakref
+
+from framework_common.utils.install_and_import import install_and_import
+
+watchdog = install_and_import("watchdog")
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+import logging
+from threading import Lock
+from concurrent.futures import ThreadPoolExecutor
+
+from framework_common.framework_util.websocket_fix import ExtendBot
+from framework_common.framework_util.yamlLoader import YAMLManager
+from framework_common.utils.system_logger import get_logger
+
+
+class PluginAwareExtendBot(ExtendBot):
+    """继承ExtendBot，添加插件感知的事件管理功能"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 插件名 -> {事件类型: {处理器函数}}
+        self._plugin_handlers: Dict[str, Dict[type, Set[Callable]]] = {}
+        self._current_plugin: str = None
+        self._handler_lock = Lock()
+
+    def _set_current_plugin(self, plugin_name: str):
+        """设置当前正在加载的插件名（内部使用）"""
+        self._current_plugin = plugin_name
+
+    def _clear_current_plugin(self):
+        """清除当前插件名（内部使用）"""
+        self._current_plugin = None
+
+    def on(self, event):
+        """重写on方法，添加插件感知功能"""
+
+        def decorator(func):
+            # 先调用父类的on方法注册事件
+            result = super(PluginAwareExtendBot, self).on(event)(func)
+
+            # 如果在插件上下文中，记录这个处理器
+            if self._current_plugin:
+                with self._handler_lock:
+                    plugin_name = self._current_plugin
+                    if plugin_name not in self._plugin_handlers:
+                        self._plugin_handlers[plugin_name] = {}
+                    if event not in self._plugin_handlers[plugin_name]:
+                        self._plugin_handlers[plugin_name][event] = set()
+                    self._plugin_handlers[plugin_name][event].add(func)
+
+            return result
+
+        return decorator
+
+    def _unload_plugin_handlers(self, plugin_name: str):
+        """卸载指定插件的所有事件处理器（内部使用）"""
+        with self._handler_lock:
+            if plugin_name not in self._plugin_handlers:
+                return 0
+
+            handler_count = 0
+            plugin_handlers_map = self._plugin_handlers[plugin_name]
+
+            for event_type, handlers in plugin_handlers_map.items():
+                if event_type in self.event_bus.handlers:
+                    # 从事件总线中移除这些处理器
+                    for handler in handlers:
+                        self.event_bus.handlers[event_type].discard(handler)
+                        handler_count += 1
+
+                    # 如果该事件类型没有处理器了，清理空集合
+                    if not self.event_bus.handlers[event_type]:
+                        del self.event_bus.handlers[event_type]
+
+            # 清理插件的处理器记录
+            del self._plugin_handlers[plugin_name]
+            return handler_count
+
+    def _get_plugin_handlers_count(self, plugin_name: str) -> int:
+        """获取插件注册的处理器数量（内部使用）"""
+        with self._handler_lock:
+            if plugin_name not in self._plugin_handlers:
+                return 0
+            return sum(len(handlers) for handlers in self._plugin_handlers[plugin_name].values())
+
+
+class PluginManager:
+    def __init__(self, bot: ExtendBot, config: YAMLManager, plugins_dir: str = "run"):
+        # 如果传入的不是PluginAwareExtendBot，则需要动态增强原bot
+        if isinstance(bot, PluginAwareExtendBot):
+            self.bot = bot
+        else:
+            # 直接在原bot实例上添加插件感知功能，而不是创建新实例
+            self._enhance_bot_instance(bot)
+            self.bot = bot
+
+        self.config = config
+        self.plugins_dir = Path(plugins_dir)
+        self.loaded_plugins: Dict[str, Dict] = {}
+        self.plugin_lock = Lock()
+        self.executor = ThreadPoolExecutor(max_workers=10)
+        self.observer = None
+
+        # 文件修改时间缓存，用于防止重复热重载
+        self._file_mod_times: Dict[str, float] = {}
+        self._reload_debounce_time = 0.5  # 防抖时间（秒）
+
+        # 设置日志
+        self.logger = get_logger("PluginManager")
+
+        # 确保插件目录存在
+        self.plugins_dir.mkdir(exist_ok=True)
+
+    def _enhance_bot_instance(self, bot: ExtendBot):
+        """动态增强现有bot实例，添加插件感知功能"""
+        # 添加插件相关属性
+        bot._plugin_handlers = {}
+        bot._current_plugin = None
+        bot._handler_lock = Lock()
+
+        # 保存原始的on方法
+        bot._original_on = bot.on
+
+        # 定义新的on方法
+        def enhanced_on(event):
+            def decorator(func):
+                # 先调用原始的on方法注册事件
+                result = bot._original_on(event)(func)
+
+                # 如果在插件上下文中，记录这个处理器
+                if hasattr(bot, '_current_plugin') and bot._current_plugin:
+                    with bot._handler_lock:
+                        plugin_name = bot._current_plugin
+                        if plugin_name not in bot._plugin_handlers:
+                            bot._plugin_handlers[plugin_name] = {}
+                        if event not in bot._plugin_handlers[plugin_name]:
+                            bot._plugin_handlers[plugin_name][event] = set()
+                        bot._plugin_handlers[plugin_name][event].add(func)
+
+                return result
+
+            return decorator
+
+        # 定义插件管理方法
+        def _set_current_plugin(plugin_name: str):
+            bot._current_plugin = plugin_name
+
+        def _clear_current_plugin():
+            bot._current_plugin = None
+
+        def _unload_plugin_handlers(plugin_name: str):
+            """改进的处理器清理方法"""
+            if not hasattr(bot, '_plugin_handlers'):
+                return 0
+
+            with bot._handler_lock:
+                handler_count = 0
+
+                # 方法1: 使用插件记录的方式清理
+                if plugin_name in bot._plugin_handlers:
+                    plugin_handlers_map = bot._plugin_handlers[plugin_name]
+                    self.logger.debug(f"开始清理插件 {plugin_name} 的事件处理器")
+
+                    for event_type, handlers in plugin_handlers_map.items():
+                        self.logger.debug(f"事件类型 {event_type.__name__}: 需要清理 {len(handlers)} 个处理器")
+
+                        if event_type in bot.event_bus.handlers:
+                            original_count = len(bot.event_bus.handlers[event_type])
+
+                            # 从事件总线中移除这些处理器
+                            for handler in handlers:
+                                if handler in bot.event_bus.handlers[event_type]:
+                                    bot.event_bus.handlers[event_type].discard(handler)
+                                    handler_count += 1
+                                    self.logger.debug(f"已移除处理器: {handler.__name__}")
+
+                            final_count = len(bot.event_bus.handlers[event_type])
+                            self.logger.debug(
+                                f"事件类型 {event_type.__name__}: 清理前 {original_count} 个，清理后 {final_count} 个")
+
+                            # 如果该事件类型没有处理器了，清理空集合
+                            if not bot.event_bus.handlers[event_type]:
+                                del bot.event_bus.handlers[event_type]
+                                self.logger.debug(f"已删除空的事件类型: {event_type.__name__}")
+
+                    # 清理插件的处理器记录
+                    del bot._plugin_handlers[plugin_name]
+
+                # 方法2: 强制按模块名清理（备用方案）
+                force_cleared = _force_clear_all_handlers_for_plugin(plugin_name)
+                handler_count += force_cleared
+
+                if force_cleared > 0:
+                    self.logger.warning(f"强制清理了额外的 {force_cleared} 个处理器")
+
+                self.logger.debug(f"插件 {plugin_name} 的处理器清理完成，共清理 {handler_count} 个")
+                return handler_count
+
+        def _force_clear_all_handlers_for_plugin(plugin_name: str):
+            """强制清理插件的所有处理器（按模块名匹配）"""
+            if not hasattr(bot, 'event_bus') or not hasattr(bot.event_bus, 'handlers'):
+                return 0
+
+            cleared_count = 0
+            module_prefix = f"run.{plugin_name}"
+
+            # 遍历所有事件类型的处理器
+            for event_type in list(bot.event_bus.handlers.keys()):
+                handlers_to_remove = set()
+
+                for handler in list(bot.event_bus.handlers[event_type]):
+                    # 检查处理器所属的模块
+                    if hasattr(handler, '__module__') and handler.__module__:
+                        if (handler.__module__.startswith(module_prefix + ".") or
+                                handler.__module__ == module_prefix):
+                            handlers_to_remove.add(handler)
+
+                # 移除找到的处理器
+                for handler in handlers_to_remove:
+                    if handler in bot.event_bus.handlers[event_type]:
+                        bot.event_bus.handlers[event_type].discard(handler)
+                        cleared_count += 1
+                        self.logger.debug(f"强制清理处理器: {handler.__name__} (模块: {handler.__module__})")
+
+                # 如果该事件类型没有处理器了，清理空集合
+                if not bot.event_bus.handlers[event_type]:
+                    del bot.event_bus.handlers[event_type]
+
+            return cleared_count
+
+        def _get_plugin_handlers_count(plugin_name: str) -> int:
+            if not hasattr(bot, '_plugin_handlers'):
+                return 0
+            with bot._handler_lock:
+                if plugin_name not in bot._plugin_handlers:
+                    return 0
+                return sum(len(handlers) for handlers in bot._plugin_handlers[plugin_name].values())
+
+        # 动态添加方法到bot实例
+        bot.on = enhanced_on
+        bot._set_current_plugin = _set_current_plugin
+        bot._clear_current_plugin = _clear_current_plugin
+        bot._unload_plugin_handlers = _unload_plugin_handlers
+        bot._get_plugin_handlers_count = _get_plugin_handlers_count
+        bot._force_clear_all_handlers_for_plugin = _force_clear_all_handlers_for_plugin
+
+    async def start(self):
+        """启动插件管理器"""
+        self.logger.info("启动插件管理器...")
+
+        # 初始加载所有插件
+        await self.load_all_plugins()
+
+        # 启动文件监控
+        self.start_file_watcher()
+
+    async def stop(self):
+        """停止插件管理器"""
+        self.logger.info("停止插件管理器...")
+
+        if self.observer:
+            self.observer.stop()
+            self.observer.join()
+
+        self.executor.shutdown(wait=True)
+
+    def start_file_watcher(self):
+        """启动文件监控以支持热重载"""
+
+        class PluginFileHandler(FileSystemEventHandler):
+            def __init__(self, plugin_manager):
+                self.plugin_manager = plugin_manager
+
+            def on_modified(self, event):
+                if event.is_directory:
+                    return
+
+                file_path = Path(event.src_path)
+
+                # 监控插件目录下的所有.py文件变化
+                if (file_path.suffix.lower() == '.py' and
+                        self._is_plugin_file(file_path)):
+
+                    plugin_name = self._get_plugin_name_from_path(file_path)
+                    if plugin_name: #and plugin_name not in self.plugin_manager._reloading_plugins:
+                        # 防抖处理
+                        current_time = time.time()
+                        file_key = str(file_path)
+
+                        if (file_key in self.plugin_manager._file_mod_times and
+                                current_time - self.plugin_manager._file_mod_times[file_key] <
+                                self.plugin_manager._reload_debounce_time):
+                            return
+
+                        self.plugin_manager._file_mod_times[file_key] = current_time
+
+                        self.plugin_manager.logger.info(
+                            f"检测到插件 {plugin_name} 的文件 {file_path.name} 变化，准备重载...")
+
+                        # 使用线程安全的方式调度重载任务
+                        self.plugin_manager._schedule_reload(plugin_name)
+
+            def _is_plugin_file(self, file_path: Path) -> bool:
+                """检查是否是插件相关的文件"""
+                try:
+                    # 确保文件在run目录下的某个插件目录中
+                    relative_path = file_path.relative_to(self.plugin_manager.plugins_dir)
+                    parts = relative_path.parts
+
+                    # 至少要有两个部分：插件目录名和文件名
+                    if len(parts) >= 2:
+                        plugin_dir = self.plugin_manager.plugins_dir / parts[0]
+                        return plugin_dir.is_dir() and (plugin_dir / "__init__.py").exists()
+
+                    return False
+                except ValueError:
+                    # 文件不在plugins_dir中
+                    return False
+
+            def _get_plugin_name_from_path(self, file_path: Path) -> str:
+                """从文件路径提取插件名"""
+                try:
+                    relative_path = file_path.relative_to(self.plugin_manager.plugins_dir)
+                    return relative_path.parts[0]  # 第一部分就是插件目录名
+                except (ValueError, IndexError):
+                    return None
+
+        self.observer = Observer()
+        # 递归监控run目录及其子目录
+        self.observer.schedule(
+            PluginFileHandler(self),
+            str(self.plugins_dir),
+            recursive=True  # 改为True，监控所有子目录
+        )
+        self.observer.start()
+        self.logger.info("文件监控已启动（递归监控所有插件文件）")
+
+    def _schedule_reload(self, plugin_name: str):
+        """线程安全地调度插件重载"""
+
+        def reload_task():
+            try:
+                # 获取当前事件循环，如果没有则创建新的
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_closed():
+                        raise RuntimeError("Event loop is closed")
+                except RuntimeError:
+                    # 没有事件循环或已关闭，创建新的
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                # 在事件循环中运行重载任务
+                if loop.is_running():
+                    # 如果循环正在运行，使用call_soon_threadsafe
+                    future = asyncio.run_coroutine_threadsafe(
+                        self.reload_plugin(plugin_name), loop)
+                    future.result(timeout=30)  # 30秒超时
+                else:
+                    # 如果循环未运行，直接运行
+                    loop.run_until_complete(self.reload_plugin(plugin_name))
+
+            except Exception as e:
+                self.logger.error(f"调度重载插件 {plugin_name} 失败: {str(e)}")
+
+        # 在线程池中执行
+        self.executor.submit(reload_task)
+
+    async def load_all_plugins(self):
+        """加载所有插件"""
+        self.logger.info("开始加载所有插件...")
+
+        # 只检查run文件夹下第一层的目录，不递归
+        plugin_dirs = [d for d in self.plugins_dir.iterdir()
+                       if d.is_dir() and not d.name.startswith('.')]
+
+        # 使用异步方式并发加载插件
+        tasks = []
+        for plugin_dir in plugin_dirs:
+            # 确保该目录有__init__.py文件才加载
+            if (plugin_dir / "__init__.py").exists():
+                task = self.load_plugin(plugin_dir.name)
+                tasks.append(task)
+            else:
+                self.logger.debug(f"跳过目录 '{plugin_dir.name}' - 缺少 __init__.py 文件")
+
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # 统计加载结果
+            success_count = sum(1 for r in results if r is True)
+            self.logger.info(f"插件加载完成: 成功 {success_count}/{len(tasks)}")
+        else:
+            self.logger.info("未找到可加载的插件")
+
+    async def load_plugin(self, plugin_name: str) -> bool:
+        """加载单个插件"""
+        try:
+            plugin_dir = self.plugins_dir / plugin_name
+            init_file = plugin_dir / "__init__.py"
+
+            if not init_file.exists():
+                self.logger.warning(f"插件 {plugin_name} 缺少 __init__.py 文件")
+                return False
+
+            # 使用线程池执行导入操作，避免阻塞
+            loop = asyncio.get_event_loop()
+            plugin_info = await loop.run_in_executor(
+                self.executor,
+                self._import_plugin,
+                plugin_name,
+                str(init_file)
+            )
+
+            if not plugin_info:
+                self.logger.warning(f"插件 {plugin_name} 导入失败")
+                return False
+            #print(plugin_info)
+            # 执行插件的入口函数（在插件上下文中）
+            await self._execute_plugin_functions(plugin_name, plugin_info)
+
+            with self.plugin_lock:
+                self.loaded_plugins[plugin_name] = plugin_info
+
+            # 记录插件注册的处理器数量
+            handler_count = self.bot._get_plugin_handlers_count(plugin_name)
+            self.logger.info(f"插件 {plugin_name} 加载成功，注册了 {handler_count} 个事件处理器")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"加载插件 {plugin_name} 失败: {str(e)}")
+            return False
+
+    def _clear_plugin_modules_from_cache(self, plugin_name: str):
+        """彻底清理插件相关的模块缓存"""
+        module_prefix = f"run.{plugin_name}"
+        modules_to_remove = []
+        self.logger.debug(f"开始清理插件 {plugin_name} 的模块缓存...")
+        # 找出所有相关模块
+        for module_name in sys.modules.keys():
+            if (module_name == module_prefix or
+                    module_name.startswith(module_prefix + ".")):
+                modules_to_remove.append(module_name)
+        self.logger.debug(f"需要清理 {len(modules_to_remove)} 个模块: {modules_to_remove}")
+        # 删除模块
+        for module_name in modules_to_remove:
+            try:
+                #print(sys.modules)
+                #print(sys.modules[module_name])
+                del sys.modules[module_name]
+                self.logger.debug(f"已清理模块缓存: {module_name}")
+            except KeyError:
+                self.logger.error(sys.modules)
+                self.logger.error(sys.modules[module_name])
+                error_msg = f"模块 {module_name} 不在缓存中"
+                self.logger.error(error_msg)
+
+    def _import_plugin(self, plugin_name: str, init_file_path: str) -> Dict:
+        """导入插件模块（在线程池中执行）"""
+        try:
+            # 构造模块名
+            module_name = f"run.{plugin_name}"
+
+            # 彻底清理相关模块缓存
+            self._clear_plugin_modules_from_cache(plugin_name)
+
+            # 重新导入模块
+            spec = importlib.util.spec_from_file_location(module_name, init_file_path)
+            if not spec or not spec.loader:
+                raise ImportError(f"无法创建模块规格: {module_name}")
+
+            module = importlib.util.module_from_spec(spec)
+
+            # 先加入sys.modules再执行，这样可以处理循环导入
+            sys.modules[module_name] = module
+
+            try:
+                spec.loader.exec_module(module)
+            except Exception as e:
+                # 如果执行失败，从sys.modules中移除
+                if module_name in sys.modules:
+                    del sys.modules[module_name]
+                raise e
+
+            # 获取 entrance_func
+            if not hasattr(module, 'entrance_func'):
+                raise AttributeError(f"插件 {plugin_name} 的 __init__.py 缺少 entrance_func 变量")
+
+            entrance_func = getattr(module, 'entrance_func')
+            if not isinstance(entrance_func, list):
+                raise TypeError(f"插件 {plugin_name} 的 entrance_func 必须是列表类型")
+
+            return {
+                'module': module,
+                'entrance_func': entrance_func,
+                'module_name': module_name,
+                'load_time': time.time()  # 记录加载时间
+            }
+
+        except Exception as e:
+            self.logger.error(f"导入插件 {plugin_name} 失败: {str(e)}")
+            # 清理可能残留的模块
+            self._clear_plugin_modules_from_cache(plugin_name)
+            return None
+
+    async def _execute_plugin_functions(self, plugin_name: str, plugin_info: Dict):
+        """执行插件的入口函数"""
+        entrance_funcs = plugin_info['entrance_func']
+
+        # 设置插件上下文
+        self.bot._set_current_plugin(plugin_name)
+
+        try:
+            for func in entrance_funcs:
+                try:
+                    if callable(func):
+                        # 在独立线程中执行插件函数，避免事件循环冲突
+                        loop = asyncio.get_event_loop()
+                        await loop.run_in_executor(
+                            self.executor,
+                            self._run_plugin_function,
+                            func,
+                            self.bot,
+                            self.config
+                        )
+                        self.logger.debug(f"插件 {plugin_name} 的函数 {func.__name__} 执行成功")
+                    else:
+                        self.logger.warning(f"插件 {plugin_name} 的 entrance_func 中包含非可调用对象: {func}")
+
+                except Exception as e:
+                    self.logger.error(f"执行插件 {plugin_name} 的函数 {func} 失败: {str(e)}")
+
+        finally:
+            # 清理插件上下文
+            self.bot._clear_current_plugin()
+
+    def _run_plugin_function(self, func, bot, config):
+        """在线程池中运行插件函数"""
+        try:
+            # 如果是异步函数，创建新的事件循环来运行
+            if asyncio.iscoroutinefunction(func):
+                # 创建新的事件循环
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(func(bot, config))
+                finally:
+                    loop.close()
+                    # 重要：清理事件循环策略避免内存泄漏
+                    asyncio.set_event_loop(None)
+            else:
+                # 同步函数直接调用
+                func(bot, config)
+
+        except Exception as e:
+            self.logger.error(f"插件函数执行失败: {str(e)}")
+            raise
+
+    async def reload_plugin(self, plugin_name: str):
+        """重载指定插件"""
+        self.logger.info(f"开始重载插件: {plugin_name}")
+
+        try:
+            # 先卸载插件
+            self.logger.error(f"插件 {plugin_name} 开始卸载...")
+            #self.logger.error(sys.modules)
+            #self.logger.error(sys.modules[self.loaded_plugins[plugin_name]['module_name']])
+            await self.unload_plugin(plugin_name)
+
+            # 等待一小段时间确保卸载完成
+            await asyncio.sleep(1)
+
+            # 重新加载插件
+            success = await self.load_plugin(plugin_name)
+
+            if success:
+                self.logger.info(f"插件 {plugin_name} 重载成功")
+            else:
+                self.logger.error(f"插件 {plugin_name} 重载失败")
+
+        except Exception as e:
+            self.logger.error(f"重载插件 {plugin_name} 时发生错误: {str(e)}")
+
+    async def unload_plugin(self, plugin_name: str):
+        """卸载指定插件"""
+        self.logger.debug(f"0开始卸载插件: {plugin_name}")
+        try:
+            with self.plugin_lock:
+                if plugin_name in self.loaded_plugins:
+                    plugin_info = self.loaded_plugins[plugin_name]
+                    module_name = plugin_info['module_name']
+                    del sys.modules[module_name]
+                    # 获取当前处理器数量并卸载插件的所有事件处理器
+                    handler_count = self.bot._unload_plugin_handlers(plugin_name)
+
+                    # 彻底清理模块缓存
+                    self.logger.debug(f"插件 {plugin_name} 开始清理模块缓存...")
+                    self._clear_plugin_modules_from_cache(plugin_name)
+
+                    del self.loaded_plugins[plugin_name]
+                    self.logger.info(f"插件 {plugin_name} 已卸载，清理了 {handler_count} 个事件处理器")
+
+                    # 强制垃圾回收
+                    import gc
+                    gc.collect()
+
+        except Exception as e:
+            self.logger.error(f"卸载插件 {plugin_name} 失败: {str(e)}")
+
+    async def reload_all_plugins(self):
+        """重载所有插件"""
+        self.logger.info("开始重载所有插件...")
+
+        plugin_names = list(self.loaded_plugins.keys())
+
+        # 并发重载所有插件
+        tasks = [self.reload_plugin(plugin_name) for plugin_name in plugin_names]
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        self.logger.info("所有插件重载完成")
+
+    def get_loaded_plugins(self) -> List[str]:
+        """获取已加载的插件列表"""
+        with self.plugin_lock:
+            return list(self.loaded_plugins.keys())
+
+    async def get_plugin_status(self) -> Dict[str, Dict]:
+        """获取插件状态信息"""
+        status = {}
+
+        # 只扫描run目录下第一层的插件目录
+        plugin_dirs = [d for d in self.plugins_dir.iterdir()
+                       if d.is_dir() and not d.name.startswith('.')]
+
+        for plugin_dir in plugin_dirs:
+            plugin_name = plugin_dir.name
+            init_file = plugin_dir / "__init__.py"
+
+            status[plugin_name] = {
+                'loaded': plugin_name in self.loaded_plugins,
+                'has_init': init_file.exists(),
+                'path': str(plugin_dir),
+                'event_handlers_count': self.bot._get_plugin_handlers_count(plugin_name)
+            }
+
+            if plugin_name in self.loaded_plugins:
+                plugin_info = self.loaded_plugins[plugin_name]
+                status[plugin_name]['entrance_func_count'] = len(plugin_info['entrance_func'])
+                status[plugin_name]['load_time'] = plugin_info.get('load_time', 0)
+
+        return status
+
+
+# 完整的使用示例
+class BotApplication:
+    def __init__(self, bot: ExtendBot, config: YAMLManager):
+        self.bot = bot
+        self.config = config
+        self.plugin_manager = PluginManager(bot, config)
+        self.running = False
+
+    async def start(self):
+        """启动应用程序"""
+        self.logger = logging.getLogger(__name__)
+        self.logger.info("启动Bot应用程序...")
+
+        # 启动插件管理器
+        await self.plugin_manager.start()
+
+        # 设置运行标志
+        self.running = True
+
+        # 启动bot（这里假设bot有start方法）
+        if hasattr(self.bot, 'start'):
+            await self.bot.start()
+
+        self.logger.info("Bot应用程序启动完成")
+
+    async def run(self):
+        """运行应用程序主循环"""
+        while self.running:
+            try:
+                # 这里可以添加其他定期任务
+                await asyncio.sleep(1)
+
+                # 如果bot断开连接，可以在这里处理重连逻辑
+                if hasattr(self.bot, 'is_connected') and not self.bot.is_connected():
+                    self.logger.warning("Bot连接断开，尝试重连...")
+                    if hasattr(self.bot, 'reconnect'):
+                        await self.bot.reconnect()
+
+            except KeyboardInterrupt:
+                self.logger.info("收到中断信号，正在停止...")
+                break
+            except Exception as e:
+                self.logger.error(f"运行时错误: {str(e)}")
+                await asyncio.sleep(5)  # 错误后等待5秒再继续
+
+    async def stop(self):
+        """停止应用程序"""
+        self.logger.info("正在停止应用程序...")
+        self.running = False
+
+        # 停止插件管理器
+        await self.plugin_manager.stop()
+
+        # 停止bot
+        if hasattr(self.bot, 'stop'):
+            await self.bot.stop()
+
+        self.logger.info("应用程序已停止")
+
+
+# 使用示例
+async def main():
+    """使用示例"""
+    # 设置日志
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
+    # 假设你已经有了 bot 和 config 实例
+    # bot = ExtendBot()
+    # config = YAMLManager()
+
+    # 创建应用程序实例
+    # app = BotApplication(bot, config)
+
+    # 启动应用程序
+    # await app.start()
+
+    # 运行应用程序（这会持续运行直到收到停止信号）
+    # try:
+    #     await app.run()
+    # finally:
+    #     await app.stop()
+
+    # 或者，如果你只想使用插件管理器：
+    # plugin_manager = PluginManager(bot, config)
+    # await plugin_manager.start()
+
+    # 保持程序运行（在实际使用中，bot的事件循环会保持程序运行）
+    # while True:
+    #     await asyncio.sleep(1)
+
+    pass
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

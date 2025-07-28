@@ -283,7 +283,7 @@ async def batch_write_pending():
                     )
 
         await db.commit()
-        logger.debug(f"批量写入完成: {len(batch_data)} 个群组")
+        #logger.debug(f"批量写入完成: {len(batch_data)} 个群组")
 
         # 清理相关缓存
         for group_id in batch_data.keys():
@@ -311,7 +311,7 @@ async def periodic_batch_write():
     """定期批量写入任务"""
     while True:
         try:
-            await asyncio.sleep(2)  # 每2秒检查一次
+            await asyncio.sleep(5)  # 每2秒检查一次
             await batch_write_pending()
         except Exception as e:
             logger.error(f"定期批量写入错误: {e}")

@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 from framework_common.utils.system_logger import get_logger
-from framework_common.framework_util.plugin_loader import PluginManager
+from framework_common.framework_util.PluginAwareExtendBot import PluginManager
 
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.framework_util.websocket_fix import ExtendBot
@@ -168,6 +168,15 @@ def main_sync():
         except Exception as e:
             bot1.logger.error(f"清理过程出错：{e}")
 
+from developTools.event.events import GroupMessageEvent
+@bot1.on(GroupMessageEvent)
+async def _(event: GroupMessageEvent):
+    if event.pure_text=="/reload all":
+        await reload_all_plugins()
+        await bot1.send(event, "插件重载完成")
+    elif event.pure_text=="/status":
+        status = await get_plugin_status()
+        print(status)
 
 # 添加一些管理命令（可选）
 async def reload_all_plugins():
@@ -175,6 +184,7 @@ async def reload_all_plugins():
     if plugin_manager1:
         bot1.logger.info("重载主Bot插件...")
         await plugin_manager1.reload_all_plugins()
+
 
     if plugin_manager2:
         bot1.logger.info("重载WebUI Bot插件...")
