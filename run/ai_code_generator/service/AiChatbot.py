@@ -51,7 +51,7 @@ class AiChatbot:
         else:
             proxies = None
         url = f"{base_url}/v1beta/models/{model}:generateContent?key={apikey}"
-
+        #print(url)
         generation_config = {
             "temperature": temperature,
             "topK": 64,

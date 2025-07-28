@@ -575,7 +575,8 @@ async def code_generate(config,prompt):
     api_key=random.choice(config.ai_llm.config["llm"]["gemini"]["api_keys"]),
     model=config.ai_llm.config["llm"]["gemini"]["model"],
     proxy=config.common_config.basic_config["proxy"]["http_proxy"]
-    AiChatbot = AiChatbot(base_url=base_url, api_key=api_key, model=model,proxy=proxy)
+    #print(base_url,type(base_url),api_key,type(api_key),model,proxy,type(proxy))
+    AiChatbot = AiChatbot(base_url=str(base_url[0]), api_key=str(api_key[0]), model=model[0],proxy=proxy)
 
     generator = AIPluginGenerator(AiChatbot.get_response)
 
@@ -587,10 +588,11 @@ async def code_generate(config,prompt):
         print(f"插件路径: {result['plugin_path']}")
     else:
         print(f"生成失败: {result['error']}")
-
+        return f"生成失败: {result['error']}"
     # 列出所有插件
     plugins = generator.list_generated_plugins()
     print(f"已生成的插件: {plugins}")
+    return f"已生成的插件: {plugins}"
 
 
 if __name__ == "__main__":

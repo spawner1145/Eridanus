@@ -11,5 +11,5 @@ def main(bot: ExtendBot,config: YAMLManager):
         if event.pure_text.startswith(config.ai_code_generator.ai_coder["prefix"]):
             if event.sender.user_id>config.ai_code_generator.ai_coder["code_generation_permission_need"]:
                 prompt=event.pure_text.replace(config.ai_code_generator.ai_coder["prefix"],"").strip()
-                await code_generate(config,prompt)
-                await bot.send(event, [Text("AI代码生成成功，请检查控制台")])
+                r=await code_generate(config,prompt)
+                await bot.send(event, r)
