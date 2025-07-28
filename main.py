@@ -70,12 +70,16 @@ async def load_plugins(bot, config, bot_name="main"):
     try:
 
         #plugin_manager = PluginManager(bot, config, )
+        load_strategy_dict = {"batch_loading": LoadStrategy.BATCH_LOADING,"all_at_once":LoadStrategy.ALL_AT_ONCE,"memory_aware":LoadStrategy.MEMORY_AWARE}
+
         load_config = PluginLoadConfig(
-            batch_size=2,  # 每批2个插件
-            batch_delay=3.0,  # 批次间延迟3秒
-            max_retries=5,  # 最大重试5次
-            memory_threshold_mb=200,  # 内存阈值200MB
-            load_strategy=LoadStrategy.MEMORY_AWARE  # 内存感知加载
+            batch_size= config.common_config.basic_config["PluginLoadConfig"]["batch_size"],  # 每批加载的插件数量
+            batch_delay=config.common_config.basic_config["PluginLoadConfig"]["batch_delay"],  # 批次间延迟（秒）
+            max_retries= config.common_config.basic_config["PluginLoadConfig"]["max_retries"],  # 最大重试次数
+            retry_delay= config.common_config.basic_config["PluginLoadConfig"]["retry_delay"],  # 重试延迟（秒）
+            memory_threshold_mb= config.common_config.basic_config["PluginLoadConfig"]["memory_threshold_mb"],  # 内存阈值（MB）
+            enable_gc_between_batches= config.common_config.basic_config["PluginLoadConfig"]["enable_gc_between_batches"] | True,  # 批次间是否强制垃圾回收
+            load_strategy=load_strategy_dict.get(config.common_config.basic_config["PluginLoadConfig"]["load_strategy"],LoadStrategy.BATCH_LOADING),
         )
         plugin_manager = PluginManager(bot, config, plugins_dir="run",load_config=load_config)
 

@@ -41,9 +41,9 @@ class LoadStrategy(Enum):
 class PluginLoadConfig:
     """插件加载配置"""
     batch_size: int = 4  # 每批加载的插件数量
-    batch_delay: float = 2.0  # 批次间延迟（秒）
+    batch_delay: float| int = 2.0  # 批次间延迟（秒）
     max_retries: int = 3  # 最大重试次数
-    retry_delay: float = 1.0  # 重试延迟（秒）
+    retry_delay: float | int = 1.0  # 重试延迟（秒）
     memory_threshold_mb: int = 100  # 内存阈值（MB）
     enable_gc_between_batches: bool = True  # 批次间是否强制垃圾回收
     load_strategy: LoadStrategy = LoadStrategy.BATCH_LOADING
