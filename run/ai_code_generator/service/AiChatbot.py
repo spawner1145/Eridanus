@@ -3,8 +3,8 @@ import json
 from typing import Dict, Any, List, Union
 
 class AiChatbot:
-    def __init__(self, ai_model, api_key,proxy,base_url):
-        self.ai_model = ai_model
+    def __init__(self, model, api_key,proxy,base_url):
+        self.ai_model = model
         self.api_key = api_key
         self.proxy = proxy
         self.base_url = base_url
