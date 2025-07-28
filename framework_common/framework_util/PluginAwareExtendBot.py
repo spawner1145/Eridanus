@@ -3,6 +3,7 @@ import sys
 import asyncio
 import importlib
 import importlib.util
+import traceback
 from pathlib import Path
 from typing import Dict, List, Callable, Any, Set
 import time
@@ -408,6 +409,7 @@ class PluginManager:
             return True
 
         except Exception as e:
+            traceback.print_exc()
             self.logger.error(f"加载插件 {plugin_name} 失败: {str(e)}")
             return False
 
@@ -478,6 +480,7 @@ class PluginManager:
             }
 
         except Exception as e:
+            traceback.print_exc()
             self.logger.error(f"导入插件 {plugin_name} 失败: {str(e)}")
             # 清理可能残留的模块
             self._clear_plugin_modules_from_cache(plugin_name)
