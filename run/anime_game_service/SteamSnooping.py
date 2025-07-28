@@ -76,6 +76,7 @@ def main(bot, config):
             try:user_name = (await bot.get_group_member_info(event.group_id, userid))['data']['nickname']
             except:user_name='未知'
             # 有userid时显示QQ和Steam双头像
+            #if len(user_name) > 10: user_name = user_name[:10]
             draw_json=[
                 {'type': 'basic_set', 'img_width': 1500,'proxy': proxy_for_draw},
                 {'type': 'avatar', 'subtype': 'common', 'img': [f'https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640',player_data["avatar_url"]],'upshift_extra':15,'number_per_row': 2,
