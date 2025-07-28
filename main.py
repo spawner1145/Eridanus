@@ -23,7 +23,7 @@ from framework_common.framework_util.websocket_fix import ExtendBot
 # 全局插件管理器实例
 plugin_manager1 = None
 plugin_manager2 = None
-
+bot2 = None
 config = YAMLManager("run")  # 这玩意用来动态加载和修改配置文件
 bot1 = ExtendBot(config.common_config.basic_config["adapter"]["ws_client"]["ws_link"], config,
                  blocked_loggers=["DEBUG", "INFO_MSG"])
@@ -168,13 +168,25 @@ def main_sync():
         except Exception as e:
             bot1.logger.error(f"清理过程出错：{e}")
 
-from developTools.event.events import GroupMessageEvent
+from developTools.event.events import GroupMessageEvent,PrivateMessageEvent
+if bot2:
+    @bot2.on(GroupMessageEvent)
+    async def _(event: GroupMessageEvent):
+        await handler(bot2,event)
+    @bot2.on(PrivateMessageEvent)
+    async def _(event: PrivateMessageEvent):
+        await handler(bot2,event)
 @bot1.on(GroupMessageEvent)
 async def _(event: GroupMessageEvent):
+    await handler(event)
+@bot1.on(PrivateMessageEvent)
+async def _(event: PrivateMessageEvent):
+    await handler(event)
+
+async def handler(bot,event: GroupMessageEvent | PrivateMessageEvent):
     if event.pure_text=="/reload all":
-        print(config.common_config.basic_config,type(config.common_config.basic_config))
         await reload_all_plugins()
-        await bot1.send(event, "插件重载完成")
+        await bot.send(event, "插件重载完成")
     elif event.pure_text=="/status":
         status = await get_plugin_status()
         print(status)
@@ -187,7 +199,6 @@ async def reload_all_plugins():
     if plugin_manager1:
         bot1.logger.info("重载主Bot插件...")
         await plugin_manager1.reload_all_plugins()
-
 
     if plugin_manager2:
         bot1.logger.info("重载WebUI Bot插件...")
@@ -208,8 +219,5 @@ async def get_plugin_status():
 
 
 if __name__ == "__main__":
-    # 设置带颜色的日志格式
-
     logger=get_logger("Eridanus")
-    # 运行主程序
     main_sync()
