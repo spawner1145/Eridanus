@@ -178,10 +178,10 @@ if bot2:
         await handler(bot2,event)
 @bot1.on(GroupMessageEvent)
 async def _(event: GroupMessageEvent):
-    await handler(event)
+    await handler(bot1,event)
 @bot1.on(PrivateMessageEvent)
 async def _(event: PrivateMessageEvent):
-    await handler(event)
+    await handler(bot1,event)
 
 async def handler(bot,event: GroupMessageEvent | PrivateMessageEvent):
     if event.pure_text=="/reload all":
