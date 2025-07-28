@@ -7,13 +7,13 @@ import threading
 import traceback
 import logging
 
-from framework_common.utils.system_logger import get_logger
+
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
+from framework_common.utils.system_logger import get_logger
 from framework_common.framework_util.plugin_loader import PluginManager
 
 from framework_common.framework_util.yamlLoader import YAMLManager
