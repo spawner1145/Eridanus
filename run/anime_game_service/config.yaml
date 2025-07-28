@@ -2,3 +2,5 @@ steamsnooping:
   is_snooping: False   #是否开启Steam视奸功能
   steam_api_key:      #需要您自行申请写入一个或多个Steam Api Key，申请地址：https://partner.steamgames.com/doc/webapi_overview/auth
     - None
+  game_white:
+    - 1

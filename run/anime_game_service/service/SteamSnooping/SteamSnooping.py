@@ -54,7 +54,8 @@ async def steamsnoopall(bot, config, db,steam_api_key):
             if targetid in all_snoop_ids_send: all_snoop_ids_send[targetid].append(targetgruop)
             else:all_snoop_ids_send[targetid]=[targetgruop]
             all_snoop_ids_steamid[targetid]=ids_list[targetgruop][f'{targetid}_steamid']
-    steam_info = await get_steam_users_info(all_snoop_ids, steam_api_key, bot ,config.common_config.basic_config['proxy']['http_proxy'])
+    proxy = config.common_config.basic_config['proxy']['http_proxy'] if config.common_config.basic_config['proxy']['http_proxy'] else None
+    steam_info = await get_steam_users_info(all_snoop_ids, steam_api_key, bot, proxy)
     #将查询到的数据进行保存
     new_players_dict={}
     for item in steam_info["response"]["players"]:
