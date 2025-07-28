@@ -1,8 +1,14 @@
 import logging
-import colorlog
-from threading import Lock
 import sys
+from threading import Lock
 
+import colorlog
+for logger_name in ['apscheduler', 'apscheduler.scheduler', 'httpx', 'httpcore']:
+    logger = logging.getLogger(logger_name)
+    logger.handlers.clear()
+    logger.addHandler(logging.NullHandler())  # 添加 NullHandler
+    logger.propagate = False  # 禁止传播
+    logger.setLevel(logging.WARNING)
 
 class SingletonLogger:
     _instance = None
@@ -20,15 +26,9 @@ class SingletonLogger:
         if self._initialized:
             return
 
-        # 完全重置logging系统
-        logging.getLogger().handlers.clear()
-        logging.getLogger().setLevel(logging.NOTSET)
-
-        # 创建新的handler
-        handler = colorlog.StreamHandler(sys.stdout)
-
-        # 创建formatter
-        formatter = colorlog.ColoredFormatter(
+        # 创建 handler 和 formatter
+        self.handler = colorlog.StreamHandler(sys.stdout)
+        self.formatter = colorlog.ColoredFormatter(
             fmt='%(log_color)s%(asctime)s - [Eridanus] %(name)s - %(levelname)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S',
             log_colors={
@@ -40,18 +40,17 @@ class SingletonLogger:
             },
             reset=True
         )
-
-        handler.setFormatter(formatter)
-
-        # 配置root logger
-        root_logger = logging.getLogger()
-        root_logger.setLevel(logging.INFO)
-        root_logger.addHandler(handler)
+        self.handler.setFormatter(self.formatter)
 
         self._initialized = True
 
     def get_logger(self, name: str) -> logging.Logger:
-        return logging.getLogger(name)
+        logger = logging.getLogger(name)
+        logger.setLevel(logging.INFO)
+        logger.handlers.clear()  # 清除已有 handler
+        logger.addHandler(self.handler)  # 添加你的 handler
+        logger.propagate = False  # 禁止传播到 root logger
+        return logger
 
 
 def get_logger(name: str) -> logging.Logger:
