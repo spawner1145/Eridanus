@@ -3,6 +3,10 @@ from ruamel.yaml import YAML
 from typing import Any
 from concurrent.futures import ThreadPoolExecutor
 import threading
+
+from framework_common.utils.install_and_import import install_and_import
+
+watchdog=install_and_import("watchdog")
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
