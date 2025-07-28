@@ -54,7 +54,6 @@ async def steamsnoopall(bot, config, db,steam_api_key):
             if targetid in all_snoop_ids_send: all_snoop_ids_send[targetid].append(targetgruop)
             else:all_snoop_ids_send[targetid]=[targetgruop]
             all_snoop_ids_steamid[targetid]=ids_list[targetgruop][f'{targetid}_steamid']
-    
     proxy = config.common_config.basic_config['proxy']['http_proxy'] if config.common_config.basic_config['proxy']['http_proxy'] else None
     steam_info = await get_steam_users_info(all_snoop_ids, steam_api_key, bot, proxy)
     #将查询到的数据进行保存
@@ -84,20 +83,8 @@ async def steamsnoopall(bot, config, db,steam_api_key):
             user_times=int(user_info["SteamSnooping"]['times'][current_day])
         if steamid not in new_players_dict or steamid not in old_players_dict:continue
         if old_players_dict[steamid]['gameextrainfo'] == new_players_dict[steamid]['gameextrainfo']:continue
-        
-        # 安全获取游戏白名单配置
-        game_white_list = []
-        try:
-            if (hasattr(config, 'anime_game_service') and 
-                hasattr(config.anime_game_service, 'config') and
-                'steamsnooping' in config.anime_game_service.config and
-                'game_white' in config.anime_game_service.config['steamsnooping']):
-                game_white_list = config.anime_game_service.config['steamsnooping']['game_white']
-        except (AttributeError, KeyError, TypeError):
-            game_white_list = []
-        
-        if (new_players_dict[steamid]['gameextrainfo'] in game_white_list or
-                old_players_dict[steamid]['gameextrainfo'] in game_white_list):continue
+        if (new_players_dict[steamid]['gameextrainfo'] in config.anime_game_service.config['steamsnooping']['game_white'] or
+                old_players_dict[steamid]['gameextrainfo'] in config.anime_game_service.config['steamsnooping']['game_white']):continue
         if new_players_dict[steamid]['gameextrainfo'] is not None and old_players_dict[steamid]['gameextrainfo'] is not None:
             replay_content += f"([title]{new_players_dict[steamid]['personaname']}[/title]) 停止玩 {old_players_dict[steamid]['gameextrainfo']}，开始玩 [title]{new_players_dict[steamid]['gameextrainfo']}[/title] 了"
         elif new_players_dict[steamid]['gameextrainfo'] is not None:
@@ -117,7 +104,7 @@ async def steamsnoopall(bot, config, db,steam_api_key):
         if user_times is None:user_times=0
         hours, minutes = int(user_times / 3600), int(user_times % 3600 / 60)
         user_times_str = (f"{hours} 小时 {minutes} 分钟" if hours > 0 else f"{minutes} 分钟")
-        game = (await get_user_data(int(steamid), proxy))["game_data"][0]
+        game = (await get_user_data(int(steamid),config.common_config.basic_config['proxy']['http_proxy']))["game_data"][0]
         for group_id in all_snoop_ids_send[userid]:
             try:
                 user_name = (await bot.get_group_member_info(group_id,userid))['data']['nickname']
@@ -127,7 +114,7 @@ async def steamsnoopall(bot, config, db,steam_api_key):
             #if len(user_name) > 10: user_name = user_name[:10]
             replay_content = f'[title]{user_name}[/title]' + replay_content
             draw_json = [
-                {'type': 'basic_set', 'img_width': 1500,'proxy': proxy},
+                {'type': 'basic_set', 'img_width': 1500,'proxy':config.common_config.basic_config['proxy']['http_proxy']},
                 {'type': 'avatar', 'subtype': 'common',
                  'img': [f'https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640', new_players_dict[steamid]['avatarfull']],
                  'upshift_extra': 15, 'number_per_row': 2,
