@@ -23,7 +23,7 @@ def main(bot, config):
 
             if user_info.permission >= config.system_plugin.config["api_implements"]["send_like"]:
                 await bot.send_like(event.user_id)
-                await bot.send(event, "已赞你！")
+                await bot.send(event, "👎🏻")
         if event.pure_text.startswith("改备注"):
             await bot.send(event, "已修改")
             remark = event.pure_text.split("改备注")[1].strip()
