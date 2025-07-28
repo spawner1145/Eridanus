@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 from framework_common.utils.system_logger import get_logger
-from framework_common.framework_util.PluginAwareExtendBot import PluginManager
+from framework_common.framework_util.PluginAwareExtendBot import PluginManager, PluginLoadConfig, LoadStrategy
 
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.framework_util.websocket_fix import ExtendBot
@@ -69,8 +69,18 @@ async def load_plugins(bot, config, bot_name="main"):
 
     try:
 
-        plugin_manager = PluginManager(bot, config, plugins_dir="run")
+        #plugin_manager = PluginManager(bot, config, )
+        load_config = PluginLoadConfig(
+            batch_size=2,  # 每批2个插件
+            batch_delay=3.0,  # 批次间延迟3秒
+            max_retries=5,  # 最大重试5次
+            memory_threshold_mb=200,  # 内存阈值200MB
+            load_strategy=LoadStrategy.MEMORY_AWARE  # 内存感知加载
+        )
+        plugin_manager = PluginManager(bot, config, plugins_dir="run",load_config=load_config)
 
+        # 手动重试失败的插件
+        await plugin_manager.retry_failed_plugins()
         if bot_name == "main":
             plugin_manager1 = plugin_manager
         else:
