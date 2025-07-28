@@ -16,6 +16,10 @@ from framework_common.utils.install_and_import import install_and_import
 获取环境
 """
 logger = get_logger()
+logger.warning("请在关闭bot主程序的情况下运行更新程序")
+logger.warning("请在关闭bot主程序的情况下运行更新程序")
+logger.warning("请在关闭bot主程序的情况下运行更新程序")
+
 parent_dir = os.path.dirname(os.getcwd())
 # 检测上一级目录下的environments/MinGit/cmd/git.exe是否存在
 custom_git_path = os.path.join(parent_dir, "environments", "MinGit", "cmd", "git.exe")
