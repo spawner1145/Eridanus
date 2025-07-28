@@ -344,36 +344,7 @@ class PluginManager:
         self.observer.start()
         self.logger.info("文件监控已启动（递归监控所有插件文件）")
 
-    def _schedule_reload(self, plugin_name: str):
-        """线程安全地调度插件重载"""
 
-        def reload_task():
-            try:
-                # 获取当前事件循环，如果没有则创建新的
-                try:
-                    loop = asyncio.get_event_loop()
-                    if loop.is_closed():
-                        raise RuntimeError("Event loop is closed")
-                except RuntimeError:
-                    # 没有事件循环或已关闭，创建新的
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-
-                # 在事件循环中运行重载任务
-                if loop.is_running():
-                    # 如果循环正在运行，使用call_soon_threadsafe
-                    future = asyncio.run_coroutine_threadsafe(
-                        self.reload_plugin(plugin_name), loop)
-                    future.result(timeout=30)  # 30秒超时
-                else:
-                    # 如果循环未运行，直接运行
-                    loop.run_until_complete(self.reload_plugin(plugin_name))
-
-            except Exception as e:
-                self.logger.error(f"调度重载插件 {plugin_name} 失败: {str(e)}")
-
-        # 在线程池中执行
-        self.executor.submit(reload_task)
 
     async def load_all_plugins(self):
         """加载所有插件"""
@@ -617,16 +588,152 @@ class PluginManager:
             self.logger.error(f"卸载插件 {plugin_name} 失败: {str(e)}")
 
     async def reload_all_plugins(self):
-        """重载所有插件"""
-        self.logger.info("开始重载所有插件...")
+        """重载所有插件 - 最彻底的方案"""
+        self.logger.info("开始全量重载所有插件...")
 
-        plugin_names = list(self.loaded_plugins.keys())
+        try:
+            # 记录当前加载的插件
+            current_plugins = list(self.loaded_plugins.keys())
+            total_handlers_before = sum(self.bot._get_plugin_handlers_count(name) for name in current_plugins)
 
-        # 并发重载所有插件
-        tasks = [self.reload_plugin(plugin_name) for plugin_name in plugin_names]
-        await asyncio.gather(*tasks, return_exceptions=True)
+            self.logger.info(f"准备重载 {len(current_plugins)} 个插件，当前总处理器数: {total_handlers_before}")
 
-        self.logger.info("所有插件重载完成")
+            # 第一步：卸载所有插件
+            for plugin_name in current_plugins:
+                try:
+                    await self.unload_plugin(plugin_name)
+                except Exception as e:
+                    self.logger.error(f"卸载插件 {plugin_name} 失败: {e}")
+
+            # 第二步：核弹式清理所有run模块
+            self._nuclear_clear_all_run_modules()
+
+            # 第三步：等待确保清理完成
+            await asyncio.sleep(1)
+
+            # 第四步：重新加载所有插件
+            await self.load_all_plugins()
+
+            # 统计结果
+            reloaded_plugins = list(self.loaded_plugins.keys())
+            total_handlers_after = sum(self.bot._get_plugin_handlers_count(name) for name in reloaded_plugins)
+
+            success_count = len(reloaded_plugins)
+            self.logger.info(f"全量重载完成: {success_count}/{len(current_plugins)} 个插件成功重载")
+            self.logger.info(f"事件处理器: {total_handlers_before} -> {total_handlers_after}")
+
+            if success_count < len(current_plugins):
+                failed_plugins = set(current_plugins) - set(reloaded_plugins)
+                self.logger.warning(f"重载失败的插件: {failed_plugins}")
+
+        except Exception as e:
+            self.logger.error(f"全量重载过程中发生错误: {str(e)}")
+
+    def _nuclear_clear_all_run_modules(self):
+        """核清理所有run模块"""
+        import gc
+
+        self.logger.debug("开始核清理所有run模块...")
+
+        # 找出所有run模块
+        run_modules = []
+        for module_name in list(sys.modules.keys()):
+            if module_name.startswith("run."):
+                run_modules.append(module_name)
+
+        self.logger.debug(f"发现 {len(run_modules)} 个run模块需要清理")
+
+        # 按深度倒序清理（子模块先清理）
+        run_modules.sort(key=lambda x: x.count('.'), reverse=True)
+
+        # 清理所有run模块
+        cleared_count = 0
+        for module_name in run_modules:
+            try:
+                if module_name in sys.modules:
+                    module = sys.modules[module_name]
+
+                    # 清空模块内容
+                    if hasattr(module, '__dict__'):
+                        module.__dict__.clear()
+
+                    # 从缓存删除
+                    del sys.modules[module_name]
+                    del module
+                    cleared_count += 1
+
+            except Exception as e:
+                self.logger.debug(f"清理模块 {module_name} 时出错: {e}")
+
+        # 清理importlib缓存
+        try:
+            if hasattr(importlib, 'invalidate_caches'):
+                importlib.invalidate_caches()
+
+            # 清理模块锁
+            if hasattr(importlib, '_bootstrap') and hasattr(importlib._bootstrap, '_module_locks'):
+                locks_to_clear = []
+                for lock_name in list(importlib._bootstrap._module_locks.keys()):
+                    if isinstance(lock_name, str) and lock_name.startswith("run."):
+                        locks_to_clear.append(lock_name)
+
+                for lock_name in locks_to_clear:
+                    try:
+                        del importlib._bootstrap._module_locks[lock_name]
+                    except KeyError:
+                        pass
+
+        except Exception as e:
+            self.logger.debug(f"清理importlib缓存时出错: {e}")
+
+        # 强制垃圾回收
+        collected = 0
+        for i in range(3):
+            round_collected = gc.collect()
+            collected += round_collected
+            if round_collected == 0:
+                break
+
+        self.logger.info(f"核清理完成: 清理了 {cleared_count} 个模块，回收了 {collected} 个对象")
+
+    def _schedule_reload(self, plugin_name: str):
+        """调度全量重载（避免频繁重载）"""
+
+        # 防抖：如果已经有重载任务在进行，就不再创建新的
+        if hasattr(self, '_reload_in_progress') and self._reload_in_progress:
+            self.logger.debug(f"重载已在进行中，跳过插件 {plugin_name} 的重载请求")
+            return
+
+        def reload_task():
+            try:
+                # 设置重载标志
+                self._reload_in_progress = True
+
+                # 获取事件循环
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_closed():
+                        raise RuntimeError("Event loop is closed")
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                # 执行全量重载
+                if loop.is_running():
+                    future = asyncio.run_coroutine_threadsafe(
+                        self.reload_plugin(plugin_name), loop)
+                    future.result(timeout=60)  # 增加超时时间
+                else:
+                    loop.run_until_complete(self.reload_plugin(plugin_name))
+
+            except Exception as e:
+                self.logger.error(f"全量重载失败: {str(e)}")
+            finally:
+                # 清除重载标志
+                self._reload_in_progress = False
+
+        # 在线程池中执行
+        self.executor.submit(reload_task)
 
     def get_loaded_plugins(self) -> List[str]:
         """获取已加载的插件列表"""

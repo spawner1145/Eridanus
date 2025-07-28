@@ -29,7 +29,7 @@ def check_has_main_and_cache(module_name: str) -> tuple[bool, object]:
 
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
-            module_cache[module_name] = module
+            #module_cache[module_name] = module
 
         return hasattr(module, "main") and callable(getattr(module, "main")), module
     except Exception:
