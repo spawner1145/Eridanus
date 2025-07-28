@@ -172,11 +172,14 @@ from developTools.event.events import GroupMessageEvent
 @bot1.on(GroupMessageEvent)
 async def _(event: GroupMessageEvent):
     if event.pure_text=="/reload all":
+        print(config.common_config.basic_config,type(config.common_config.basic_config))
         await reload_all_plugins()
         await bot1.send(event, "插件重载完成")
     elif event.pure_text=="/status":
         status = await get_plugin_status()
         print(status)
+    elif event.pure_text=="/test":
+        print(config.ai_llm.config["test"])
 
 # 添加一些管理命令（可选）
 async def reload_all_plugins():
