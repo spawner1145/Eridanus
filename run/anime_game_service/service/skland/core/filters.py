@@ -6,7 +6,16 @@ from developTools.utils.logger import get_logger
 logger=get_logger()
 
 from .config import CACHE_DIR
-
+import urllib.request
+import os
+def download_file(url, save_path):
+    try:
+        # 使用 urllib.request.urlretrieve 下载文件
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        urllib.request.urlretrieve(url, save_path)
+        logger.info(f"文件已成功保存到 {save_path}")
+    except Exception as e:
+        logger.error(f"下载失败: {e}")
 
 def format_timestamp(timestamp: float) -> str:
     delta = timedelta(seconds=timestamp)
@@ -53,8 +62,9 @@ def charId_to_avatarUrl(charId: str) -> str:
     if not img_path.exists():
         img_url = f"https://web.hycdn.cn/arknights/game/assets/char/avatar/{charId}.png"
         logger.error(f"Avatar not found locally, using URL: {img_url}")
+        download_file(img_url, img_path)
         return img_url
-    return img_path.as_uri()
+    return img_path.as_posix()
 
 
 def charId_to_portraitUrl(charId: str) -> str:
@@ -67,8 +77,9 @@ def charId_to_portraitUrl(charId: str) -> str:
         encoded_id = quote(charId, safe="")
         img_url = f"https://web.hycdn.cn/arknights/game/assets/char/portrait/{encoded_id}.png"
         logger.error(f"Portrait not found locally, using URL: {img_url}")
+        download_file(img_url, img_path)
         return img_url
-    return img_path.as_uri()
+    return img_path.as_posix()
 
 
 def loads_json(json_str: str) -> dict:

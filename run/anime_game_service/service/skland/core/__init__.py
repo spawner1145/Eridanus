@@ -14,5 +14,5 @@ from .render import render_ark_card,render_rogue_card,render_rogue_info
 
 __all__ = ['SklandAPI', 'SklandLoginAPI', 'refresh_cred_token_if_needed', 'refresh_access_token_if_needed',
            'CRED', 'ArkSignResponse','get_characters_and_bind','get_background_image','render_ark_card','render_rogue_card',
-           'render_rogue_info','Topics','get_rogue_background_image'
+           'render_rogue_info','Topics','get_rogue_background_image','RogueData'
            ]

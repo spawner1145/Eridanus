@@ -39,6 +39,40 @@ def main(bot, config):
         if event.message_chain.has(At):userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
         if context in order_list:await skland_info(userid, bot, event)
 
+    #森空岛肉鸽战绩查询
+    @bot.on(GroupMessageEvent)
+    async def sing_rouge_info(event: GroupMessageEvent):
+        order_list=['sklandrogue','sklandrg','肉鸽信息']
+        context, userid, flag=event.pure_text, str(event.sender.user_id), True
+        if event.message_chain.has(At):userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
+        for order_check in order_list:
+            if order_check in context:
+                flag=False
+                context = context.replace(' ', '').replace(order_check, '')
+        if flag is True or context not in ["傀影","水月", "萨米", "萨卡兹"]:return
+        await rouge_info(userid, context,bot=bot, event=event)
+
+    ##森空岛肉鸽详细战绩查询
+    @bot.on(GroupMessageEvent)
+    async def sing_sklandid(event: GroupMessageEvent):
+        order_list=['sklandrogueinfo','sklandrginfo','肉鸽查询','查询肉鸽']
+        context, userid, flag, game_count = event.pure_text, str(event.sender.user_id), True, None
+        if event.message_chain.has(At):userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
+        for order_check in order_list:
+            if order_check in context:
+                flag=False
+                context = context.replace(order_check, '').replace(' ', '')
+        if flag is True :return
+        flag=True
+        for check in ["傀影","水月", "萨米", "萨卡兹"]:
+            if check in context:
+                flag = False
+                rg_type = check
+                try:game_count=int(context.replace(check,''))
+                except:pass
+        if flag is True :return
+        await rouge_detailed_info(userid, rg_type,game_count,bot=bot, event=event)
+
 
     #菜单
     @bot.on(GroupMessageEvent)
@@ -50,6 +84,9 @@ def main(bot, config):
             '[title]指令菜单：[/title]'
             '\n- 绑定森空岛账号：sklandbind, 森空岛绑定\n- 森空岛签到：sklandsign, 森空岛签到\n'
             '- 森空岛信息：sklandinfo, 森空岛info、森空岛信息、我的森空岛\n'
+            '- 森空岛肉鸽战绩查询：sklandrogue, sklandrg、肉鸽信息 + 傀影or水月or萨米or萨卡兹\n'
+            '- 森空岛肉鸽详细战绩查询：sklandrogueinfo, sklandrginfo、肉鸽查询、查询肉鸽 + 傀影or水月or萨米or萨卡兹 + 你想查询的最近场次\n'
+            'eg: 水月肉鸽查询1 or 肉鸽查询水月3\n'
             '等待开发，欢迎催更（咕咕咕\n'
             '[des]                                             Function By 漫朔[/des]'
                        ]

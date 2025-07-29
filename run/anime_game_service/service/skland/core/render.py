@@ -16,6 +16,15 @@ from .filters import (
 )
 from framework_common.manshuo_draw import *
 
+def rogue_totem(totem, topic):
+    match topic:
+        case 'rogue_1': img_url = f"run/anime_game_service\service\skland\core/resources/images/rogue/capsule/{totem.id}.png"
+        case 'rogue_2': img_url = f"run/anime_game_service\service\skland\core/resources/images/rogue/mutation/pic_{totem.id}.png"
+        case 'rogue_3': img_url = f"https://web.hycdn.cn/arknights/game/assets/roguelike_item/{totem.id}.png"
+        case 'rogue_4': img_url = f"https://web.hycdn.cn/arknights/game/assets/roguelike_item/{totem.id}.png"
+        case _: img_url = None
+    return img_url
+
 async def render_ark_card(props ,bg ):
     draw_data ={
             "now_ts": datetime.now().timestamp(),
@@ -110,10 +119,10 @@ async def render_rogue_card(props: RogueData, bg: str | Url) -> bytes:
         else:status = '失败'
         index += 1
         per_rogue_info=[{'type': 'text', 'content': [f'[title]{record.mode} - {record.modeGrade}            {status}[/title]'
-                                                     f'\n得分：{record.score}     {record.lastStage}'], 'layer': 3},
-                        {'type': 'img', 'number_per_row': 8, 'layer': 3,'is_shadow_img': False,'img': [ charId_to_avatarUrl(char.id) for char in record.lastChars],},
+                                                     f'\n得分：{record.score}     {record.lastStage}'], 'layer': 2},
+                        {'type': 'img', 'number_per_row': 8, 'layer': 2,'is_shadow_img': False,'img': [ charId_to_avatarUrl(char.id) for char in record.lastChars],},
                         {'type': 'text',
-                         'content': [f'id：{index}     {format_timestamp_str(record.endTs)}'], 'layer': 3},
+                         'content': [f'id：{index}     {format_timestamp_str(record.endTs)}'], 'layer': 2},
                         ]
         if index == 1:rogue_favour_info = rogue_favour_info + per_rogue_info
         else:rogue_favour_info = rogue_favour_info + [{'type': 'text', 'content': ['  '], 'layer': 2}] + per_rogue_info
@@ -125,10 +134,10 @@ async def render_rogue_card(props: RogueData, bg: str | Url) -> bytes:
         else:status = '失败'
         index += 1
         per_rogue_info=[{'type': 'text', 'content': [f'[title]{record.mode} - {record.modeGrade}            {status}[/title]'
-                                                     f'\n得分：{record.score}     {record.lastStage}'], 'layer': 3},
-                        {'type': 'img', 'number_per_row': 8, 'layer': 3,'is_shadow_img': False,'img': [ charId_to_avatarUrl(char.id) for char in record.lastChars],},
+                                                     f'\n得分：{record.score}     {record.lastStage}'], 'layer': 2},
+                        {'type': 'img', 'number_per_row': 8, 'layer': 2,'is_shadow_img': False,'img': [ charId_to_avatarUrl(char.id) for char in record.lastChars],},
                         {'type': 'text',
-                         'content': [f'id：{index}     {format_timestamp_str(record.endTs)}'], 'layer': 3},
+                         'content': [f'id：{index}     {format_timestamp_str(record.endTs)}'], 'layer': 2},
                         ]
         print(per_rogue_info)
         if index == 1:rogue_history_info = rogue_history_info + per_rogue_info
@@ -136,7 +145,7 @@ async def render_rogue_card(props: RogueData, bg: str | Url) -> bytes:
 
 
     draw_json=[
-        {'type': 'basic_set','debug':True ,'img_height':2000,'font_common_color':(255,255,255),'font_title_color':(255,255,255),'font_des_color':(255,255,255),
+        {'type': 'basic_set','debug':False ,'img_height':2000,'font_common_color':(255,255,255),'font_title_color':(255,255,255),'font_des_color':(255,255,255),
           'backdrop_color':{'color1':'(80, 80, 80, 255)'},'stroke_layer_color':(130,130,130),'stroke_img_color':(130,130,130)},
         {'type': 'backdrop', 'subtype': 'gradient','left_color': (5,22,29),'right_color': (84,89,88)},
         {'type': 'avatar', 'img': [props.gameUserInfo.avatar.url],'upshift_extra': 20,'background':[bg],
@@ -145,22 +154,15 @@ async def render_rogue_card(props: RogueData, bg: str | Url) -> bytes:
         {'type': 'text', 'content': ['[title]常用干员[/title]'], 'layer': 2},
         {'type': 'img', 'is_crop': False, 'img': [charId_to_portraitUrl(char.id) for char in props.history.chars], 'layer': 2,
           'is_stroke_img': False, 'is_shadow_img': False, 'is_rounded_corners_img': False, 'number_per_row': 3},
-
-
-
     ]
     draw_json = draw_json + rogue_favour_info + rogue_history_info
-
     draw_json+=['[des]                                             Function By 漫朔[/des]']
     img_path=await manshuo_draw(draw_json)
     return img_path
 
 
 async def render_rogue_info(props: RogueData, bg: str | Url, id: int, is_favored: bool) -> bytes:
-    return await template_to_pic(
-        template_path=str(TEMPLATES_DIR),
-        template_name="rogue_info.html.jinja2",
-        templates={
+    draw_data ={
             "id": id,
             "record": props.history.favourRecords[id - 1]
             if is_favored and id - 1 < len(props.history.favourRecords)
@@ -173,16 +175,51 @@ async def render_rogue_info(props: RogueData, bg: str | Url, id: int, is_favored
             "career": props.career,
             "game_user_info": props.gameUserInfo,
             "history": props.history,
-        },
-        filters={
-            "format_timestamp_str": format_timestamp_str,
-            "charId_to_avatarUrl": charId_to_avatarUrl,
-            "charId_to_portraitUrl": charId_to_portraitUrl,
-            "loads_json": loads_json,
-        },
-        pages={
-            "viewport": {"width": 1100, "height": 1},
-            "base_url": f"file://{TEMPLATES_DIR}",
-        },
-        device_scale_factor=1.5,
-    )
+        }
+    #pprint.pprint(draw_data)
+    record=draw_data['record']
+    if record.success:status = '胜利'
+    else:status = '失败'
+    match props.topic:
+        case 'rogue_1': topic_name='剧目'
+        case 'rogue_2': topic_name = '符号认知'
+        case 'rogue_3': topic_name = '密文板'
+        case 'rogue_4': topic_name = '思绪'
+        case _: topic_name = '未知'
+    time_record=format_timestamp_str(record.endTs)
+    text_json=''
+    for text_check in loads_json(record.endingText):
+        if 'fontSize' in text_check:text_json += f"[title]{text_check['content']}[/title]"
+        else:text_json += text_check['content']
+    draw_json=[
+        {'type': 'basic_set','debug':False ,'img_height':1500,'font_common_color':(255,255,255),'font_title_color':(255,255,255),'font_des_color':(255,255,255),
+          'backdrop_color':{'color1':'(80, 80, 80, 255)'},'stroke_layer_color':(130,130,130),'stroke_img_color':(130,130,130)},
+        {'type': 'backdrop', 'subtype': 'gradient','left_color': (5,22,29),'right_color': (84,89,88)},
+        {'type': 'avatar', 'img': [props.gameUserInfo.avatar.url],'upshift_extra': 20,'background':[bg],
+         'content': [f"[name]{props.gameUserInfo.name}[/name]"
+                     f"\n[time]lv:{props.gameUserInfo.level} [/time]"]},
+        {'type': 'img', 'subtype': 'common_with_des', 'number_per_row': 1,
+         'is_shadow_img': False, 'description_color': (52, 52, 52, 255),
+         'img': [props.topic_img],
+         'content': [f'[title]{record.lastStage}      {status}[/title]\n得分：{record.score}\n[des]{time_record}   {record.mode} {record.modeGrade}  {record.band.name}[/des]']},
+        {'type': 'text', 'content': ['[title]初始干员[/title]'], 'layer': 2},
+        {'type': 'img', 'is_crop': False, 'img': [charId_to_portraitUrl(char.id) for char in record.initChars], 'layer': 2,
+          'is_stroke_img': False, 'is_shadow_img': False, 'is_rounded_corners_img': False, 'number_per_row': 5},
+        '  ',{'type': 'text', 'content': ['[title]历程回顾[/title]'], 'layer': 2},{'type': 'text', 'content': [f'{text_json}'], 'layer': 2},
+        '  ',{'type': 'text', 'content': ['[title]招募干员[/title]'], 'layer': 2},
+        {'type': 'img', 'is_crop': False, 'img': [charId_to_portraitUrl(char.id) for char in record.troopChars],'layer': 2,
+         'is_stroke_img': False, 'is_shadow_img': False, 'is_rounded_corners_img': False, 'number_per_row': 8},
+        '  ', {'type': 'text', 'content': ['[title]收藏品[/title]'], 'layer': 2},
+        {'type': 'img', 'is_crop': False, 'img': [f"https://web.hycdn.cn/arknights/game/assets/roguelike_item/{relic}.png" for relic in record.gainRelicList],
+         'layer': 2,'is_stroke_img': False, 'is_shadow_img': False, 'is_rounded_corners_img': False, 'number_per_row': 10},
+        '  ', {'type': 'text', 'content': [f'[title]{topic_name}[/title]'], 'layer': 2},
+        {'type': 'img', 'is_crop': False, 'img': [rogue_totem(totem, props.topic) for totem in record.totemList],
+         'layer': 2,'is_stroke_img': False, 'is_shadow_img': False, 'is_rounded_corners_img': False, 'number_per_row': 10},
+        '  ', {'type': 'text', 'content': [f'[title]数据统计[/title]'], 'layer': 2},
+        {'type': 'text', 'content': [f'通过层数：{record.cntCrossedZone}  通过步数：{record.cntArrivedNode} 普通战斗次数：{record.cntBattleNormal} \n'
+                                     f'精英战斗次数：{record.cntBattleElite}  领袖战斗次数：{record.cntBattleBoss}  获得物品数：{record.cntGainRelicItem}   招募干员次数：{record.cntRecruitUpgrade}'], 'layer': 2},
+    ]
+
+    draw_json+=['[des]                                             Function By 漫朔[/des]']
+    img_path=await manshuo_draw(draw_json)
+    return img_path

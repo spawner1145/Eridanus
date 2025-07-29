@@ -152,19 +152,46 @@ async def rouge_info(userid,rg_type,bot=None,event=None):
         return
     user_info_self, character_info_self = user_info['skland']['user_info'], user_info['skland']['character_info']
     topic_id = Topics(rg_type).topic_id
-    rogue = await get_rogue_info(user_info_self, str(character_info_self['uid']), topic_id)
+    rogue_data = await get_rogue_info(user_info_self, str(character_info_self['uid']), topic_id)
     background = await get_rogue_background_image(topic_id)
-    image_path = await render_rogue_card(rogue, background)
+    image_path = await render_rogue_card(rogue_data, background)
 
     if bot and event:
         await bot.send(event, [At(qq=userid),f" 的 {rg_type} 肉鸽信息如下：",Image(file=image_path)])
     else:
-        pass
-        #PImage.open(image_path).show()
+        PImage.open(image_path).show()
+
+async def rouge_detailed_info(userid,rg_type,game_count=None,favored=False,bot=None,event=None):
+    """获取明日方舟肉鸽战绩详情"""
+    @refresh_cred_token_if_needed
+    @refresh_access_token_if_needed
+    async def get_rogue_info(user_info, uid: str, topic_id: str):
+        return await SklandAPI.get_rogue(
+            CRED(cred=user_info['cred'], token=user_info['cred_token'], userId=str(user_info['user_id'])),
+            uid,topic_id,)
+    user_info = db.read_user(userid)
+    if not (user_info and 'skland' in user_info and 'user_info' in user_info['skland'] and 'character_info' in user_info['skland']):
+        if bot and event:await bot.send(event, '此用户还未绑定，请发送 ‘森空岛帮助’ 查看菜单')
+        else:print('此用户还未绑定，请发送 ‘森空岛帮助’ 查看菜单')
+        return
+    if game_count is None: game_count = 1
+    user_info_self, character_info_self = user_info['skland']['user_info'], user_info['skland']['character_info']
+    topic_id = Topics(rg_type).topic_id
+    rogue_data = await get_rogue_info(user_info_self, str(character_info_self['uid']), topic_id)
+    background = await get_rogue_background_image(topic_id)
+    image_path = await render_rogue_info(rogue_data, background, game_count, favored)
+    if bot and event:
+        await bot.send(event, [At(qq=userid),f" 的 {rg_type} 肉鸽信息如下：",Image(file=image_path)])
+    else:
+        PImage.open(image_path).show()
+
+
+
 
 
 if __name__ == '__main__':
 
     #asyncio.run(qrcode_get(1667962668))
     #asyncio.run(self_info(1270858640))
-    asyncio.run(rouge_info(1667962668,'水月'))
+    #asyncio.run(rouge_info(1667962668,'水月'))
+    asyncio.run(rouge_detailed_info(1667962668,'水月'))
