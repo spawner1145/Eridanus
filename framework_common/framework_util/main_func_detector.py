@@ -28,7 +28,7 @@ def check_has_main(module_name: str) -> tuple[bool, object]:
         return hasattr(module, "main") and callable(getattr(module, "main")), module
     except Exception as e:
         if not module_name.startswith("run.character_detection."):
-            logger.warning(f"⚠️ 加载模块 {module_name} 失败，请尝试补全依赖后重试")
+            logger.warning(f"⚠️ 加载模块 {module_name} 失败， \n{e}")
             traceback.print_exc()
         return False, None
 
