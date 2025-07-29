@@ -111,7 +111,7 @@ async def render_rogue_card(props: RogueData, bg: str | Url) -> bytes:
             "game_user_info": props.gameUserInfo,
             "history": props.history,
         }
-    pprint.pprint(draw_data)
+    #pprint.pprint(draw_data)
 
     rogue_favour_info, index=['    ',{'type': 'text', 'content': ['[title]收藏战绩[/title]'], 'layer': 2}], 0
     for record in props.history.favourRecords:
@@ -139,7 +139,7 @@ async def render_rogue_card(props: RogueData, bg: str | Url) -> bytes:
                         {'type': 'text',
                          'content': [f'id：{index}     {format_timestamp_str(record.endTs)}'], 'layer': 2},
                         ]
-        print(per_rogue_info)
+        #print(per_rogue_info)
         if index == 1:rogue_history_info = rogue_history_info + per_rogue_info
         else:rogue_history_info = rogue_history_info + [{'type': 'text', 'content': ['  '], 'layer': 2}] + per_rogue_info
 
