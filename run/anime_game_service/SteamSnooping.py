@@ -25,14 +25,14 @@ def main(bot, config):
         context, userid=event.pure_text, str(event.sender.user_id)
         if event.message_chain.has(At):
             userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
-        if context.startswith('steambind '):
+        if context.lower().startswith('steambind '):
             steamid=get_steam_id(context.replace('steambind ', ''))
             if not steamid:
                 await bot.send(event, '请输入正确的 Steam ID 或 Steam好友代码，格式: steambind [Steam ID 或 Steam好友代码]')
                 return
             db.write_user(userid, {'SteamSnooping':{'steamid':steamid}})
             await bot.send(event, ['成功绑定 ',At(qq=userid), f' 的steamid ({steamid}) 喵'])
-        elif context=='steamunbind':
+        elif context.lower()=='steamunbind':
             db.write_user(userid, {'SteamSnooping': {'steamid': None}})
             await bot.send(event, ['成功解除 ', At(qq=userid), f' 的steamid绑定'])
 
@@ -46,10 +46,10 @@ def main(bot, config):
                 if 'steaminfo' == event.processed_message[0]['text']:userid=event.message_chain.get(At)[0].qq
                 else:return
             except Exception as e:return
-        elif context.startswith('steaminfo '):
+        elif context.lower().startswith('steaminfo '):
             steamid=get_steam_id(context.replace('steaminfo ', ''))
             steam_friend_code = int(steamid) - STEAM_ID_OFFSET
-        elif context == 'steaminfo':
+        elif context.lower() == 'steaminfo':
             userid = str(event.sender.user_id)
         else:return
 
@@ -115,7 +115,7 @@ def main(bot, config):
         target_group = str(event.group_id)
         if event.message_chain.has(At):
             userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
-        if context.startswith('steamadd'):
+        if context.lower().startswith('steamadd'):
             steaminfodata = db.read_user(userid)
             if not (steaminfodata and  'SteamSnooping' in steaminfodata):
                 await bot.send(event, '此用户好像还未绑定，发送"steamhelp"来查看帮助哦')
@@ -124,14 +124,14 @@ def main(bot, config):
                                                               f'{userid}_steamid':steaminfodata["SteamSnooping"]["steamid"],
                                                               }})
             await bot.send(event, [At(qq=userid), f' 已被加入视歼列表'])
-        elif context=='steamremove':
+        elif context.lower()=='steamremove':
             db.write_user('SteamSnoopingList', {target_group:{userid:False}})
             await bot.send(event, [At(qq=userid), f' 已被移除视歼列表'])
 
     #查看当前群的视奸列表
     @bot.on(GroupMessageEvent)
     async def group_check_steamid(event: GroupMessageEvent):
-        if event.pure_text == 'steamcheck':
+        if event.pure_text.lower() == 'steamcheck':
             ids_list = db.read_user('SteamSnoopingList')
             user_list, name_list = [],'当前群聊的 Steam视奸 列表为：\n'
             if not (ids_list and str(event.group_id) in ids_list) :
@@ -152,7 +152,7 @@ def main(bot, config):
     #菜单
     @bot.on(GroupMessageEvent)
     async def menu_steamid(event: GroupMessageEvent):
-        if event.pure_text == 'steamhelp':
+        if event.pure_text.lower() == 'steamhelp':
             draw_json=[{'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],'upshift_extra':15,
              'content': [f"[name]Steam视奸菜单[/name]\n[time]什么！你是怎么发现我可以视奸你的！！！！[/time]"]},
             '在这里你可以通过bot随时随地[title]视奸[/title]你朋友的steam状态\n[des]但是要小心使用，至少经过朋友同意或者不影响他人哦[/des]\n[title]指令菜单：[/title]'
