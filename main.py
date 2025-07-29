@@ -182,7 +182,7 @@ def main_sync():
         except Exception as e:
             bot1.logger.error(f"清理过程出错：{e}")
 
-from developTools.event.events import GroupMessageEvent,PrivateMessageEvent
+from developTools.event.events import GroupMessageEvent,PrivateMessageEvent,LifecycleMetaEvent
 if bot2:
     @bot2.on(GroupMessageEvent)
     async def _(event: GroupMessageEvent):
@@ -196,6 +196,11 @@ async def _(event: GroupMessageEvent):
 @bot1.on(PrivateMessageEvent)
 async def _(event: PrivateMessageEvent):
     await handler(bot1,event)
+@bot1.on(LifecycleMetaEvent)
+async def _(event: LifecycleMetaEvent):
+    from asyncio import sleep
+    await sleep(2)
+    await bot1.send_friend_message(config.common_config.basic_config["master"]["id"], "欢迎使用\n\n群内发送 帮助 可查看命令列表\n\n访问webui请在bot所在设备用浏览器访问\nhttp://localhost:5007")
 
 async def handler(bot,event: GroupMessageEvent | PrivateMessageEvent):
     if event.pure_text=="/reload all":

@@ -52,12 +52,12 @@ for root, dirs, files in os.walk(PLUGIN_DIR):
                 if isinstance(module.dynamic_imports, dict):
                     # 旧格式：字典
                     dynamic_imports.update(module.dynamic_imports)
-                    logger.info(f"✅ 发现并加载 {module_name}.dynamic_imports (字典格式)")
+                    #logger.info(f"✅ 发现并加载 {module_name}.dynamic_imports (字典格式)")
                 elif isinstance(module.dynamic_imports, list):
                     # 新格式：函数对象列表
                     func_names = [func.__name__ for func in module.dynamic_imports if callable(func)]
                     dynamic_imports[module_name] = func_names
-                    logger.info(f"✅ 发现并加载 {module_name}.dynamic_imports (列表格式)")
+                    #logger.info(f"✅ 发现并加载 {module_name}.dynamic_imports (列表格式)")
                 else:
                     logger.warning(f"⚠️ {module_name}.dynamic_imports 格式不正确")
 

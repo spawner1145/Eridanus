@@ -54,4 +54,6 @@ class SingletonLogger:
 
 
 def get_logger(name: str) -> logging.Logger:
-    return SingletonLogger().get_logger(name)
+    from developTools.utils.logger import get_logger as get_logger_developTools
+    return get_logger_developTools(name)
+    #return SingletonLogger().get_logger(name)

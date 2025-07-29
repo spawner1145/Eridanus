@@ -61,7 +61,7 @@ def load_main_functions(init_file: str) -> List[Callable]:
         if has_main:
             entrance_func.append(module.main)
             module_names.append(module_name)
-            logger.info(f"成功导入 {module_name}.main")
+            #logger.info(f"成功导入 {module_name}.main")
         else:
             pass
             #logger.warning(f"跳过 {module_name}：无 callable main 函数")
