@@ -701,28 +701,33 @@ class PluginManager:
             # 彻底清理相关模块缓存
             self._clear_plugin_modules_from_cache(plugin_name)
 
+            # 强制垃圾回收
+            import gc
+            gc.collect()
+
             # 重新导入模块
             spec = importlib.util.spec_from_file_location(module_name, init_file_path)
             if not spec or not spec.loader:
                 raise ImportError(f"无法创建模块规格: {module_name}")
 
             module = importlib.util.module_from_spec(spec)
-
-            # 先加入sys.modules再执行，这样可以处理循环导入
             sys.modules[module_name] = module
 
             try:
                 spec.loader.exec_module(module)
             except Exception as e:
-                # 如果执行失败，从sys.modules中移除
                 if module_name in sys.modules:
                     del sys.modules[module_name]
                 raise e
 
-            # 获取 entrance_func
-            # 自动发现并加载插件的main函数
+            # 【关键修改】：预加载插件目录下的所有Python文件，确保依赖完整
+            self._preload_plugin_modules(plugin_name)
 
-            entrance_func = load_main_functions(init_file_path)
+            # 等待一小段时间确保所有模块都加载完成
+            time.sleep(0.05)
+
+            # 多次尝试获取entrance_func直到结果稳定
+            entrance_func = self._get_stable_entrance_func(init_file_path, max_attempts=3)
 
             if not entrance_func:
                 self.logger.warning(f"插件 {plugin_name} 未找到任何main函数")
@@ -732,15 +737,69 @@ class PluginManager:
                 'module': module,
                 'entrance_func': entrance_func,
                 'module_name': module_name,
-                'load_time': time.time()  # 记录加载时间
+                'load_time': time.time()
             }
 
         except Exception as e:
             traceback.print_exc()
             self.logger.error(f"导入插件 {plugin_name} 失败: {str(e)}")
-            # 清理可能残留的模块
             self._clear_plugin_modules_from_cache(plugin_name)
             return None
+
+    def _preload_plugin_modules(self, plugin_name: str):
+        """预加载插件目录下的所有Python模块"""
+        plugin_dir = self.plugins_dir / plugin_name
+
+        # 找到所有.py文件（除了__init__.py）
+        py_files = [f for f in plugin_dir.glob("*.py") if f.name != "__init__.py"]
+
+        for py_file in py_files:
+            module_name = f"run.{plugin_name}.{py_file.stem}"
+
+            # 如果模块还没加载，尝试加载它
+            if module_name not in sys.modules:
+                try:
+                    spec = importlib.util.spec_from_file_location(module_name, str(py_file))
+                    if spec and spec.loader:
+                        module = importlib.util.module_from_spec(spec)
+                        sys.modules[module_name] = module
+                        spec.loader.exec_module(module)
+                        self.logger.debug(f"预加载了模块: {module_name}")
+                except Exception as e:
+                    self.logger.debug(f"预加载模块 {module_name} 失败: {e}")
+                    # 预加载失败不影响主流程
+                    if module_name in sys.modules:
+                        del sys.modules[module_name]
+
+    def _get_stable_entrance_func(self, init_file_path: str, max_attempts: int = 3) -> List[Callable]:
+        """多次尝试获取entrance_func直到结果稳定"""
+        previous_result = None
+
+        for attempt in range(max_attempts):
+            try:
+                # 清理importlib缓存
+                importlib.invalidate_caches()
+
+                # 获取entrance_func
+                current_result = load_main_functions(init_file_path)
+
+                # 如果结果与上次相同，说明已经稳定
+                if attempt > 0 and len(current_result) == len(previous_result):
+                    # 简单比较函数数量，如果相同则认为稳定
+                    return current_result
+
+                previous_result = current_result
+
+                # 如果不是最后一次尝试，等待一下
+                if attempt < max_attempts - 1:
+                    time.sleep(0.02)
+
+            except Exception as e:
+                self.logger.debug(f"第 {attempt + 1} 次获取entrance_func失败: {e}")
+                if attempt == max_attempts - 1:
+                    return []
+
+        return previous_result or []
 
     async def _execute_plugin_functions(self, plugin_name: str, plugin_info: Dict):
         """执行插件的入口函数"""
