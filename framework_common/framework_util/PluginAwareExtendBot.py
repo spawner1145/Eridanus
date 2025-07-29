@@ -1013,7 +1013,7 @@ class PluginManager:
             if round_collected == 0:
                 break
 
-        self.logger.info(f"核清理完成: 清理了 {cleared_count} 个模块，回收了 {collected} 个对象")
+        self.logger.info(f"清理完成: 清理了 {cleared_count} 个模块，回收了 {collected} 个对象")
 
     def _schedule_reload(self, plugin_name: str):
         """调度全量重载（避免频繁重载）"""
