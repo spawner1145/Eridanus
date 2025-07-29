@@ -549,7 +549,7 @@ class PluginManager:
                     self.load_statistics['total_memory_used'] += result.memory_used
                     return result
                 else:
-                    raise Exception("插件加载返回False")
+                    raise Exception(f"插件 {plugin_name} 加载失败，load_plugin返回False")
 
             except Exception as e:
                 result.error = str(e)
@@ -666,7 +666,7 @@ class PluginManager:
         except Exception as e:
             traceback.print_exc()
             self.logger.error(f"加载插件 {plugin_name} 失败: {str(e)}")
-            return False
+            raise e
 
     def _clear_plugin_modules_from_cache(self, plugin_name: str):
         """彻底清理插件相关的模块缓存"""
