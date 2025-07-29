@@ -17,7 +17,7 @@ import psutil
 from watchdog.watchmedo import load_config
 
 from framework_common.utils.install_and_import import install_and_import
-
+from framework_common.framework_util.main_func_detector import load_main_functions
 watchdog = install_and_import("watchdog")
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -720,12 +720,13 @@ class PluginManager:
                 raise e
 
             # 获取 entrance_func
-            if not hasattr(module, 'entrance_func'):
-                raise AttributeError(f"插件 {plugin_name} 的 __init__.py 缺少 entrance_func 变量")
+            # 自动发现并加载插件的main函数
 
-            entrance_func = getattr(module, 'entrance_func')
-            if not isinstance(entrance_func, list):
-                raise TypeError(f"插件 {plugin_name} 的 entrance_func 必须是列表类型")
+            entrance_func = load_main_functions(init_file_path)
+
+            if not entrance_func:
+                self.logger.warning(f"插件 {plugin_name} 未找到任何main函数")
+                entrance_func = []
 
             return {
                 'module': module,

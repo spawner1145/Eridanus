@@ -16,7 +16,20 @@ logger = get_logger("main_func_detector")
 def check_has_main(module_name: str) -> tuple[bool, object]:
     """检查模块是否包含 `main()` 方法，并缓存已加载的模块"""
 
+
+
+
     try:
+        # 强制重新加载模块以确保一致性
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+
+        # 清理所有相关的子模块
+        modules_to_remove = [name for name in sys.modules.keys()
+                             if name.startswith(module_name + ".")]
+        for mod_name in modules_to_remove:
+            del sys.modules[mod_name]
+
         # 如果模块已经在sys.modules中，直接使用
         if module_name in sys.modules:
             module = sys.modules[module_name]
