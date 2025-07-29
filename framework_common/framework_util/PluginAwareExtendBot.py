@@ -549,7 +549,7 @@ class PluginManager:
                     self.load_statistics['total_memory_used'] += result.memory_used
                     return result
                 else:
-                    raise Exception(f"插件 {plugin_name} 加载失败，load_plugin返回False")
+                    raise Exception("插件加载返回False")
 
             except Exception as e:
                 result.error = str(e)
@@ -666,7 +666,7 @@ class PluginManager:
         except Exception as e:
             traceback.print_exc()
             self.logger.error(f"加载插件 {plugin_name} 失败: {str(e)}")
-            raise e
+            return False
 
     def _clear_plugin_modules_from_cache(self, plugin_name: str):
         """彻底清理插件相关的模块缓存"""
@@ -719,22 +719,19 @@ class PluginManager:
                     del sys.modules[module_name]
                 raise e
 
-            # 直接在这里执行 load_main_functions 的逻辑，而不是依赖 __init__.py 中的定义
-            entrance_func = self._load_plugin_main_functions(plugin_name, init_file_path)
+            # 获取 entrance_func
+            if not hasattr(module, 'entrance_func'):
+                raise AttributeError(f"插件 {plugin_name} 的 __init__.py 缺少 entrance_func 变量")
 
-            # 如果 __init__.py 中已经定义了 entrance_func，则使用它；否则使用我们加载的
-            if hasattr(module, 'entrance_func') and isinstance(getattr(module, 'entrance_func'), list):
-                entrance_func = getattr(module, 'entrance_func')
-
-            if not entrance_func:
-                self.logger.warning(f"插件 {plugin_name} 没有找到可用的 entrance_func")
-                entrance_func = []
+            entrance_func = getattr(module, 'entrance_func')
+            if not isinstance(entrance_func, list):
+                raise TypeError(f"插件 {plugin_name} 的 entrance_func 必须是列表类型")
 
             return {
                 'module': module,
                 'entrance_func': entrance_func,
                 'module_name': module_name,
-                'load_time': time.time()
+                'load_time': time.time()  # 记录加载时间
             }
 
         except Exception as e:
@@ -743,64 +740,6 @@ class PluginManager:
             # 清理可能残留的模块
             self._clear_plugin_modules_from_cache(plugin_name)
             return None
-
-    def _check_has_main(self, module_name: str) -> tuple[bool, object]:
-        """检查模块是否包含 main() 方法"""
-        try:
-            spec = importlib.util.find_spec(module_name)
-            if spec is None:
-                self.logger.warning(f"⚠️ 未找到模块 {module_name}")
-                return False, None
-
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-
-            return hasattr(module, "main") and callable(getattr(module, "main")), module
-        except Exception as e:
-            self.logger.warning(f"⚠️ 加载模块 {module_name} 失败 {str(e)}")
-            return False, None
-
-    def _load_plugin_main_functions(self, plugin_name: str, init_file_path: str) -> List[Callable]:
-        """
-        从插件目录加载包含 main 函数的模块
-        参数 plugin_name: 插件名称
-        参数 init_file_path: __init__.py 的文件路径
-        返回 entrance_func 列表，包含所有 main 函数
-        """
-        entrance_func: List[Callable] = []
-        module_names: List[str] = []
-
-        # 获取 __init__.py 所在目录
-        dir_path = Path(init_file_path).parent
-        package = "run"  # 固定为 run
-        subpackage = plugin_name  # 当前插件名
-
-        # 遍历目录下的 .py 文件
-        for file_path in dir_path.glob("*.py"):
-            if file_path.name == "__init__.py":  # 跳过 __init__.py
-                continue
-
-            module_name = file_path.stem
-            # 构造模块路径（例如 run.a_example.example）
-            full_module_name = f"{package}.{subpackage}.{module_name}"
-
-            # 检查是否包含 main 函数
-            has_main, module = self._check_has_main(full_module_name)
-
-            if has_main:
-                entrance_func.append(module.main)
-                module_names.append(module_name)
-                self.logger.debug(f"成功导入 {module_name}.main")
-            else:
-                self.logger.debug(f"跳过 {module_name}：无 callable main 函数")
-
-        # 输出加载结果
-        if module_names:
-            self.logger.info(f"插件 {plugin_name} 加载了 {len(module_names)} 个 main 函数: {module_names}")
-        else:
-            self.logger.warning(f"插件 {plugin_name} 未找到任何可用的 main 函数")
-
-        return entrance_func
 
     async def _execute_plugin_functions(self, plugin_name: str, plugin_info: Dict):
         """执行插件的入口函数"""
@@ -1013,7 +952,7 @@ class PluginManager:
             if round_collected == 0:
                 break
 
-        self.logger.info(f"清理完成: 清理了 {cleared_count} 个模块，回收了 {collected} 个对象")
+        self.logger.info(f"核清理完成: 清理了 {cleared_count} 个模块，回收了 {collected} 个对象")
 
     def _schedule_reload(self, plugin_name: str):
         """调度全量重载（避免频繁重载）"""
