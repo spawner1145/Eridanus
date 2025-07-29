@@ -121,9 +121,6 @@ def webui_bot():
             config_fix(config_copy)
             async def setup_bot2():
                 from asyncio import sleep
-                bot1.logger.warning("bot2将在20秒后启动")
-                await sleep(20)
-
                 await load_plugins(bot2, config_copy, "webui")
 
             asyncio.run(setup_bot2())

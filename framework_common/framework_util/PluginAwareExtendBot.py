@@ -757,7 +757,7 @@ class PluginManager:
 
             return hasattr(module, "main") and callable(getattr(module, "main")), module
         except Exception as e:
-            self.logger.warning(f"⚠️ 加载模块 {module_name} 失败")
+            self.logger.warning(f"⚠️ 加载模块 {module_name} 失败 {str(e)}")
             return False, None
 
     def _load_plugin_main_functions(self, plugin_name: str, init_file_path: str) -> List[Callable]:
