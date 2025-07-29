@@ -50,7 +50,9 @@ def main(bot, config):
                 flag=False
                 context = context.replace(' ', '').replace(order_check, '')
         if flag is True or context not in ["傀影","水月", "萨米", "萨卡兹"]:return
+        recall_id = await bot.send(event, f'开始查询您的{context}肉鸽信息，请耐心等待喵')
         await rouge_info(userid, context,bot=bot, event=event)
+        await bot.recall(recall_id['data']['message_id'])
 
     ##森空岛肉鸽详细战绩查询
     @bot.on(GroupMessageEvent)
@@ -71,7 +73,9 @@ def main(bot, config):
                 try:game_count=int(context.replace(check,''))
                 except:pass
         if flag is True :return
+        recall_id = await bot.send(event, f'开始查询您的{rg_type}肉鸽信息，请耐心等待喵')
         await rouge_detailed_info(userid, rg_type,game_count,bot=bot, event=event)
+        await bot.recall(recall_id['data']['message_id'])
 
 
     #菜单
