@@ -57,7 +57,10 @@ def main(bot, config):
         for user in all_users:
 
             if 'number_speeches' in all_users[user] and f'{target_group}' in all_users[user]['number_speeches'] and current_day in all_users[user]['number_speeches'][f'{target_group}']:
-                target_name = (await bot.get_group_member_info(target_group, user))['data']['nickname']
+                try:
+                    target_name = (await bot.get_group_member_info(target_group, user))['data']['nickname']
+                except:
+                    target_name = '小壁画'
                 number_speeches_check_list.append({'name':user,'nicknime':target_name,'number_speeches_count':all_users[user]['number_speeches'][f'{target_group}'][current_day]})
         number_speeches_check_list_nolimited = sorted(number_speeches_check_list, key=lambda x: x["number_speeches_count"], reverse=True)
         number_speeches_check_list=[]

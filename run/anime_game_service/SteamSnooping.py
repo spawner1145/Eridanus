@@ -25,31 +25,31 @@ def main(bot, config):
         context, userid=event.pure_text, str(event.sender.user_id)
         if event.message_chain.has(At):
             userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
-        if context.startswith('steambind '):
+        if context.lower().startswith('steambind '):
             steamid=get_steam_id(context.replace('steambind ', ''))
             if not steamid:
                 await bot.send(event, '请输入正确的 Steam ID 或 Steam好友代码，格式: steambind [Steam ID 或 Steam好友代码]')
                 return
             db.write_user(userid, {'SteamSnooping':{'steamid':steamid}})
             await bot.send(event, ['成功绑定 ',At(qq=userid), f' 的steamid ({steamid}) 喵'])
-        elif context=='steamunbind':
+        elif context.lower()=='steamunbind':
             db.write_user(userid, {'SteamSnooping': {'steamid': None}})
-            await bot.send(event, ['成功接触 ', At(qq=userid), f' 的steamdi绑定'])
+            await bot.send(event, ['成功解除 ', At(qq=userid), f' 的steamid绑定'])
 
 
     #查询一个人的steam信息
     @bot.on(GroupMessageEvent)
     async def info_steamid(event: GroupMessageEvent):
-        context, steamid, steam_friend_code= event.pure_text, None, None
+        context, steamid, steam_friend_code, userid = event.pure_text, None, None, None
         if event.message_chain.has(At):
             try:
                 if 'steaminfo' == event.processed_message[0]['text']:userid=event.message_chain.get(At)[0].qq
                 else:return
             except Exception as e:return
-        elif context.startswith('steaminfo '):
+        elif context.lower().startswith('steaminfo '):
             steamid=get_steam_id(context.replace('steaminfo ', ''))
             steam_friend_code = int(steamid) - STEAM_ID_OFFSET
-        elif context == 'steaminfo':
+        elif context.lower() == 'steaminfo':
             userid = str(event.sender.user_id)
         else:return
 
@@ -65,22 +65,45 @@ def main(bot, config):
 
         #await bot.send(event, f'steamid: {steamid}, steam_friend_code: {steam_friend_code}')
         recall_id=await bot.send(event, f'开始查询您的最近steam动态，请耐心等待喵')
-        player_data = await get_user_data(steamid,config.common_config.basic_config['proxy']['http_proxy'])
-        try:user_name = (await bot.get_group_member_info(event.group_id, userid))['data']['nickname']
-        except:user_name='未知'
-        #if len(user_name) > 10: user_name = user_name[:10]
-        draw_json=[
-            {'type': 'basic_set', 'img_width': 1500,'proxy':config.common_config.basic_config['proxy']['http_proxy']},
-            {'type': 'avatar', 'subtype': 'common', 'img': [f'https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640',player_data["avatar_url"]],'upshift_extra':15,'number_per_row': 2,
-             'content': [f"[name]qq昵称: {user_name}[/name]\n[time]游玩时间：{player_data['recent_2_week_play_time']}[/time]",f'[name]Steam昵称: {player_data["player_name"]}[/name]\n[time]好友代码：{steam_friend_code}[/time]'],
-             'is_rounded_corners_img':False,'is_stroke_img':False,'is_shadow_img':False},'[title]您的最近游戏动态：[/title]',
-            {'type': 'img', 'subtype': 'common_with_des_right',
-             'img': [f"{game['game_image_url']}" for game in player_data["game_data"]],
-             'content': [
-                 f"[title]{game['game_name']}[/title]\n游玩时间：{game['play_time']} 小时\n{game['last_played']}"
-                 f"\n成就：{game.get('completed_achievement_number')} / {game.get('total_achievement_number')}"
-                 for game in player_data["game_data"]], 'number_per_row': 1,'is_crop':False}
-        ]
+        proxy_config = config.common_config.basic_config['proxy']['http_proxy']
+        proxy_config = proxy_config if proxy_config else None
+        player_data = await get_user_data(steamid, proxy_config)
+        
+        # 根据是否有userid构建不同的绘图参数
+        proxy_for_draw = config.common_config.basic_config['proxy']['http_proxy'] if config.common_config.basic_config['proxy']['http_proxy'] else None
+        
+        if userid:
+            try:user_name = (await bot.get_group_member_info(event.group_id, userid))['data']['nickname']
+            except:user_name='未知'
+            # 有userid时显示QQ和Steam双头像
+            #if len(user_name) > 10: user_name = user_name[:10]
+            draw_json=[
+                {'type': 'basic_set', 'img_width': 1500,'proxy': proxy_for_draw},
+                {'type': 'avatar', 'subtype': 'common', 'img': [f'https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640',player_data["avatar_url"]],'upshift_extra':15,'number_per_row': 2,
+                 'content': [f"[name]qq昵称: {user_name}[/name]\n[time]游玩时间：{player_data['recent_2_week_play_time']}[/time]",f'[name]Steam昵称: {player_data["player_name"]}[/name]\n[time]好友代码：{steam_friend_code}[/time]'],
+                 'is_rounded_corners_img':False,'is_stroke_img':False,'is_shadow_img':False},'[title]您的最近游戏动态：[/title]',
+                {'type': 'img', 'subtype': 'common_with_des_right',
+                 'img': [f"{game['game_image_url']}" for game in player_data["game_data"]],
+                 'content': [
+                     f"[title]{game['game_name']}[/title]\n游玩时间：{game['play_time']} 小时\n{game['last_played']}"
+                     f"\n成就：{game.get('completed_achievement_number')} / {game.get('total_achievement_number')}"
+                     for game in player_data["game_data"]], 'number_per_row': 1,'is_crop':False}
+            ]
+        else:
+            # 无userid时只显示Steam头像
+            draw_json=[
+                {'type': 'basic_set', 'img_width': 1500,'proxy': proxy_for_draw},
+                {'type': 'avatar', 'subtype': 'common', 'img': [player_data["avatar_url"]],'upshift_extra':15,
+                 'content': [f'[name]Steam昵称: {player_data["player_name"]}[/name]\n[time]好友代码：{steam_friend_code}[/time]\n[time]游玩时间：{player_data["recent_2_week_play_time"]}[/time]'],
+                 'is_rounded_corners_img':False,'is_stroke_img':False,'is_shadow_img':False},'[title]最近游戏动态：[/title]',
+                {'type': 'img', 'subtype': 'common_with_des_right',
+                 'img': [f"{game['game_image_url']}" for game in player_data["game_data"]],
+                 'content': [
+                     f"[title]{game['game_name']}[/title]\n游玩时间：{game['play_time']} 小时\n{game['last_played']}"
+                     f"\n成就：{game.get('completed_achievement_number')} / {game.get('total_achievement_number')}"
+                     for game in player_data["game_data"]], 'number_per_row': 1,'is_crop':False}
+            ]
+        
         #for item in draw_json:print(item)
         await bot.send(event, Image(file=(await manshuo_draw(draw_json))))
         await bot.recall(recall_id['data']['message_id'])
@@ -92,7 +115,7 @@ def main(bot, config):
         target_group = str(event.group_id)
         if event.message_chain.has(At):
             userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
-        if context.startswith('steamadd'):
+        if context.lower().startswith('steamadd'):
             steaminfodata = db.read_user(userid)
             if not (steaminfodata and  'SteamSnooping' in steaminfodata):
                 await bot.send(event, '此用户好像还未绑定，发送"steamhelp"来查看帮助哦')
@@ -101,14 +124,14 @@ def main(bot, config):
                                                               f'{userid}_steamid':steaminfodata["SteamSnooping"]["steamid"],
                                                               }})
             await bot.send(event, [At(qq=userid), f' 已被加入视歼列表'])
-        elif context=='steamremove':
+        elif context.lower()=='steamremove':
             db.write_user('SteamSnoopingList', {target_group:{userid:False}})
             await bot.send(event, [At(qq=userid), f' 已被移除视歼列表'])
 
     #查看当前群的视奸列表
     @bot.on(GroupMessageEvent)
     async def group_check_steamid(event: GroupMessageEvent):
-        if event.pure_text == 'steamcheck':
+        if event.pure_text.lower() == 'steamcheck':
             ids_list = db.read_user('SteamSnoopingList')
             user_list, name_list = [],'当前群聊的 Steam视奸 列表为：\n'
             if not (ids_list and str(event.group_id) in ids_list) :
@@ -129,7 +152,7 @@ def main(bot, config):
     #菜单
     @bot.on(GroupMessageEvent)
     async def menu_steamid(event: GroupMessageEvent):
-        if event.pure_text == 'steamhelp':
+        if event.pure_text.lower() == 'steamhelp':
             draw_json=[{'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],'upshift_extra':15,
              'content': [f"[name]Steam视奸菜单[/name]\n[time]什么！你是怎么发现我可以视奸你的！！！！[/time]"]},
             '在这里你可以通过bot随时随地[title]视奸[/title]你朋友的steam状态\n[des]但是要小心使用，至少经过朋友同意或者不影响他人哦[/des]\n[title]指令菜单：[/title]'

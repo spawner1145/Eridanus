@@ -1,0 +1,2 @@
+code_generation_permission_need: 100 #100级以上权限用户才可以生成代码
+prefix: "/写插件"

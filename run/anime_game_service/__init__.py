@@ -1,1 +1,1 @@
-plugin_description="game service"
+plugin_description = "Anime Game Service"

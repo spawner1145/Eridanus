@@ -1,7 +1,13 @@
+from run.ai_generated_art.aiDraw import call_text2img, call_aiArtModerate
+
 plugin_description = "ai绘画"
-dynamic_imports = {
-    "run.ai_generated_art.aiDraw": ["call_text2img", "call_aiArtModerate"],
-}
+
+
+dynamic_imports = [
+    call_text2img,
+    call_aiArtModerate,
+
+]
 function_declarations=[
 
     {

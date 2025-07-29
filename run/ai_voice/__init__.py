@@ -1,5 +1,6 @@
 plugin_description="语音合成"
 
+
 dynamic_imports = {
     "run.ai_voice.text2voice": [
         "call_tts", "call_all_speakers"]

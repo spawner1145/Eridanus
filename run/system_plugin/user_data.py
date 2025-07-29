@@ -80,9 +80,18 @@ def main(bot,config):
     """
     master_id = config.common_config.basic_config["master"]["id"]
     master_name = config.common_config.basic_config["master"]["name"]
-    asyncio.run(add_user(master_id, master_name, master_name))
-    asyncio.run(update_user(master_id, permission=9999, nickname=master_name))
-    asyncio.run(update_user(111111111,permission=9999,nickname="主人"))
+
+    async def setup_users():
+        tasks = [
+            add_user(master_id, master_name, master_name),
+            update_user(master_id, permission=9999, nickname=master_name),
+            update_user(111111111, permission=9999, nickname="主人")
+        ]
+        await asyncio.gather(*tasks)
+
+    # 直接运行异步函数
+    asyncio.run(setup_users())
+
     if master_id not in config.common_config.censor_user["whitelist"]:
         config.common_config.censor_user["whitelist"].append(master_id)
         config.save_yaml("censor_user",plugin_name="common_config")

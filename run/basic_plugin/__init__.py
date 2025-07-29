@@ -1,4 +1,6 @@
 plugin_description = "基础功能集合"
+
+
 dynamic_imports = {
     "run.basic_plugin.basic_plugin": [
         "call_weather_query", "call_setu","call_tarot", "call_pick_music",
