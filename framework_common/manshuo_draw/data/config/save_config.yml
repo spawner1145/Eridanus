@@ -32,6 +32,7 @@ basic_set:
   is_stroke_layer: true             #是否对层级进行描边处理
   stroke_layer_radius: 23           #描边的圆角弧度
   stroke_layer_width: 10            #描边的圆角宽度
+  stroke_layer_color: (255, 255, 255, 80) #描边的圆角颜色
 
   is_shadow_layer: true             #是否对层级进行阴影处理
   shadow_offset_layer: 10           #阴影的偏移量
@@ -72,6 +73,7 @@ basic_set:
   is_stroke_img: true               #是否对模块进行描边处理
   stroke_img_radius: 23             #描边的圆角弧度
   stroke_img_width: 10              #描边的圆角宽度
+  stroke_img_color: (255, 255, 255, 80) #描边的圆角颜色
 
   is_shadow_img: true               #是否对模块进行阴影处理
   shadow_offset_img: 10                 #阴影的偏移量
@@ -84,6 +86,7 @@ basic_set:
   is_stroke_label: true               #是否对标签进行描边处理
   stroke_label_radius: 12             #描边的圆角弧度
   stroke_label_width: 10              #描边的圆角宽度
+  stroke_label_color: (255, 255, 255, 80) #描边的圆角颜色
 
   is_shadow_label: false               #是否对标签进行阴影处理
   shadow_offset_label: 10                 #阴影的偏移量
@@ -99,6 +102,11 @@ backdrop:
   gradient:
     left_color: (191, 202, 255)
     right_color: (185, 246, 236)
+  img:
+    background: None        #请输入您的背景路径或url
+    is_blurred: True
+    is_shadow: False
+
 
 text:
   must_required_keys: {'content': null}
@@ -121,6 +129,7 @@ img:
 
   common_with_des_right:
     must_required_keys: {'img': null, 'content': null}
+    magnification_img: default            #图片占左侧空间，以倍数方式呈现
     description_color: (255,255,255,255)  #放置介绍区域的颜色
 
 
@@ -142,6 +151,7 @@ avatar:
   is_stroke_avatar: true             #是否对头像进行描边处理
   stroke_avatar_width: 10
   stroke_avatar_radius: 55
+  stroke_avatar_color: (255, 255, 255, 80) #描边的圆角颜色
 
   is_shadow_avatar: false             #是否对头像进行阴影处理
   shadow_offset_avatar: 10                 #阴影的偏移量
@@ -156,6 +166,8 @@ avatar:
 
   judge_flag: default #此处判断头像的背景处理方式，目前有：'common'平铺样式、'list'列表样式、'default'自动判断
   is_name: Ture                   #是否在头像右侧旁添加名字
+  is_blurred: True
+  is_shadow: True
 
   software_list:
     - {'type': 'bilibili', 'background': framework_common/manshuo_draw/data/img/type_software/bili.png, 'right_icon': framework_common/manshuo_draw/data/img/type_software/bili_icon.png}

@@ -41,6 +41,7 @@ class basicimgset:
         x_offest=0
         if len(img_list) == 1:
             layer_img_canvas=img_list[0]
+            if layer_img_canvas.mode not in ("RGBA"): layer_img_canvas = layer_img_canvas.convert("RGBA")
             width, height = layer_img_canvas.size
             if height > self.img_height:
                 height = self.img_height

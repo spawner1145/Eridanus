@@ -37,7 +37,7 @@ async def img_process(params,pure_backdrop ,img ,x_offset ,current_y ,upshift=0,
     # 描边处理
     if params['is_stroke_front'] and params[f'is_stroke_{type}']:
         shadow_image = Image.new('RGBA', (img.width + params[f'stroke_{type}_width'], img.height + params[f'stroke_{type}_width']),
-                                 (255, 255, 255, 80))
+                                 eval(str(params[f'stroke_{type}_color'])))
         shadow_blurred = shadow_image.filter(ImageFilter.GaussianBlur(params[f'stroke_{type}_width'] / 2))
         mask = Image.new('L', shadow_blurred.size, 255)
         draw = ImageDraw.Draw(mask)
@@ -81,41 +81,42 @@ async def backdrop_process(params,canves,limit=(0, 0)):
     offest_y = (background_img.height - limit_y) // 2
     # print(offest_x,offest_y)
     background_img = background_img.crop((offest_x, offest_y, limit_x + offest_x, limit_y + offest_y))
-
+    if background_img.mode != "RGBA": background_img = background_img.convert("RGBA")
     #对图像进行模糊化处理
-    if background_img.mode not in ("RGB", "RGBA"):background_img = background_img.convert("RGBA")
-    background_img = background_img.filter(ImageFilter.GaussianBlur(radius=5))
+    if params['is_blurred']:
+        background_img = background_img.filter(ImageFilter.GaussianBlur(radius=5))
 
-    #对图像进行边缘阴影化处理
-    width, height = background_img.size
-    center_x, center_y = width // 2, height // 2
-    shadow_color = (0, 0, 0)
-    # 创建空白遮罩图像
-    mask = Image.new("L", (width, height), 0)  # 单通道（L模式）
-    draw = ImageDraw.Draw(mask)
-    max_alpha, intensity = 100, 0.8
-    # 创建径向渐变（非线性）
-    max_distance = math.sqrt(center_x ** 2 + center_y ** 2)  # 从中心到角落的最大距离
-    for y in range(height):
-        for x in range(width):
-            # 计算像素点到中心的距离
-            dx = x - center_x
-            dy = y - center_y
-            distance = math.sqrt(dx ** 2 + dy ** 2)
+    if params['is_shadow']:
+        #对图像进行边缘阴影化处理
+        width, height = background_img.size
+        center_x, center_y = width // 2, height // 2
+        shadow_color = (0, 0, 0)
+        # 创建空白遮罩图像
+        mask = Image.new("L", (width, height), 0)  # 单通道（L模式）
+        draw = ImageDraw.Draw(mask)
+        max_alpha, intensity = 100, 0.8
+        # 创建径向渐变（非线性）
+        max_distance = math.sqrt(center_x ** 2 + center_y ** 2)  # 从中心到角落的最大距离
+        for y in range(height):
+            for x in range(width):
+                # 计算像素点到中心的距离
+                dx = x - center_x
+                dy = y - center_y
+                distance = math.sqrt(dx ** 2 + dy ** 2)
 
-            # 根据距离计算透明度，使用非线性公式
-            normalized_distance = distance / max_distance  # 距离归一化到 [0, 1]
-            alpha = int(max_alpha * (normalized_distance ** intensity))  # 非线性加深
-            if alpha > max_alpha:
-                alpha = max_alpha
-            mask.putpixel((x, y), alpha)
+                # 根据距离计算透明度，使用非线性公式
+                normalized_distance = distance / max_distance  # 距离归一化到 [0, 1]
+                alpha = int(max_alpha * (normalized_distance ** intensity))  # 非线性加深
+                if alpha > max_alpha:
+                    alpha = max_alpha
+                mask.putpixel((x, y), alpha)
 
-    # 创建阴影图层
-    shadow = Image.new("RGBA", background_img.size, shadow_color + (0,))
-    shadow.putalpha(mask)
+        # 创建阴影图层
+        shadow = Image.new("RGBA", background_img.size, shadow_color + (0,))
+        shadow.putalpha(mask)
 
-    # 合并原图和阴影
-    background_img = Image.alpha_composite(background_img.convert("RGBA"), shadow)
+        # 合并原图和阴影
+        background_img = Image.alpha_composite(background_img.convert("RGBA"), shadow)
 
     background_img.paste(canves, (0, 0), mask=canves)
     canves = background_img
@@ -221,8 +222,13 @@ async def init(params):#对模块的参数进行初始化
     #params['pure_backdrop'] = Image.new("RGBA",(params['img_width'], int(params['img_height_limit'] + params['upshift'] + params['padding_up_common']*2)),(255, 0, 0, 255))
 
 
-async def per_img_limit_deal(params,img,magnification_img=1,type='img'):  #处理每个模块之间图像的限高关系
-    img_height, img_width = int((params['new_width'] / magnification_img) * img.height / img.width),int(params['new_width'] / magnification_img)
+async def per_img_limit_deal(params,img,type='img'):  #处理每个模块之间图像的限高关系
+    if 'magnification_img' in params:
+        if params['magnification_img'] == 'default':
+            if img.height / img.width < 9 / 16:params['magnification_img'] = 2
+            else:params['magnification_img'] = 2.5
+    else:params['magnification_img'] = 1
+    img_height, img_width = int((params['new_width'] / params['magnification_img']) * img.height / img.width),int(params['new_width'] / params['magnification_img'])
     img = img.resize((img_width, img_height))
     if params['number_count'] + 1 <= params['number_per_row'] and 'draw_limited_height' in params:
 

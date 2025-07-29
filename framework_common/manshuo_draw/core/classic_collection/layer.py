@@ -37,7 +37,7 @@ class LayerSet:
             case 'no_color':
                 layer_canvas = Image.new("RGBA", (self.img_width, self.img_height + self.padding_up_common * 2), (0, 0, 0, 0))
             case 'one_color':
-                layer_canvas = Image.new("RGBA", (self.img_width, self.img_height + self.padding_up_common * 2), eval(self.backdrop_color['color1']))
+                layer_canvas = Image.new("RGBA", (self.img_width, self.img_height + self.padding_up_common * 2), eval(str(self.backdrop_color['color1'])))
             case 'gradient':
                 color1 = eval(self.backdrop_color['color1'])
                 color2 = eval(self.backdrop_color['color2'])

@@ -152,7 +152,7 @@ async def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_s
         if item['tag'] == 'emoji':
             if not isinstance(item['content'], dict):emoji_list=[item['content']]
             else:emoji_list=item['content']
-            for pillow_emoji in process_img_download(emoji_list, params['is_abs_path_convert']):
+            for pillow_emoji in (await process_img_download(emoji_list, params['is_abs_path_convert'])):
                 if 'last_tag' not in item: item['last_tag']='common'
                 content_list_convert.append({'content': [pillow_emoji.convert("RGBA")], 'tag': 'emoji','last_tag': item['last_tag']})
         else:content_list_convert.append(item)
@@ -240,10 +240,10 @@ async def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_s
                 canvas.paste(text[i], (int(x), int(y - upshift_font + 3)), mask=text[i])
             elif await can_render_character(font, text[i],params):
                 if is_shadow: draw.text((x + 2, y - upshift_font + 2), text[i], font=font, fill=(148, 148,148))
-                draw.text((x, y - upshift_font), text[i], font=font, fill=eval(params[f'font_{last_tag}_color']))
+                draw.text((x, y - upshift_font), text[i], font=font, fill=eval(str(params[f'font_{last_tag}_color'])))
             else:
                 try:
-                    emoji_img = await color_emoji_maker(text[i], eval(params[f'font_{last_tag}_color']))
+                    emoji_img = await color_emoji_maker(text[i], eval(str(params[f'font_{last_tag}_color'])))
                     emoji_img = emoji_img.resize((char_width, int(char_width * emoji_img.height / emoji_img.width)))
                     canvas.paste(emoji_img, (int(x), int(y + 3 - upshift_font)), mask=emoji_img)
                 except Exception as e:
@@ -254,7 +254,7 @@ async def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_s
             i += 1
             if (x + char_width * 2 > x_limit and i < len(text) and ellipsis) or text[i - 1] == '\n':
                 if y > y_limit - (params[f'font_common_size'])  - params['padding_up'] - line_height_list[line_count + 1]:
-                    draw.text((x, y), '...', font=font, fill=eval(params[f'font_{last_tag}_color']))
+                    draw.text((x, y), '...', font=font, fill=eval(str(params[f'font_{last_tag}_color'])))
                     should_break = True
                     break
             if (x + char_width > x_limit and i - 1 < len(text)) or text[i - 1] == '\n':
@@ -265,12 +265,17 @@ async def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_s
                 if x == box[0] + char_width + 1 and text[i - 1] == '\n' :#检测是否在一行最开始换行，若是则修正
                     x -= char_width + 1
     canvas_bottom = y + params[f'font_common_size'] + 2
-    if text and params["number_count"] < len(params['content']):
+    if 'content' in params:params_check = params['content']
+    elif 'label' in params:params_check = params['label']
+
+    if text and params["number_count"] < len(params_check):
         content_left['content']=text[i:]
-        if content_left['content'] == '':
-            params['content'][params["number_count"]]=left_content_list
+        #print(f'left_content_list: {left_content_list},content_left: {content_left["content"]}')
+        if content_left['content'] == '' or content_left['content'] == []:
+            params_check[params["number_count"]]=left_content_list
         else:
-            params['content'][params["number_count"]]=add_append_img([content_left],left_content_list)
+            params_check[params["number_count"]]=add_append_img([content_left],left_content_list)
+    #print(f"params['content']: {params['content'][params['number_count']]}")
     return {'canvas': canvas, 'canvas_bottom': canvas_bottom,}
 
 
