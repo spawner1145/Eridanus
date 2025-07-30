@@ -720,14 +720,22 @@ class PluginManager:
                     del sys.modules[module_name]
                 raise e
 
-            # 【关键修改】：预加载插件目录下的所有Python文件，确保依赖完整
+            # 【修改1】：预加载插件目录下的所有Python文件
             self._preload_plugin_modules(plugin_name)
 
-            # 等待一小段时间确保所有模块都加载完成
-            time.sleep(0.05)
+            # 【修改2】：确保所有模块都完全加载后再扫描
+            time.sleep(0.1)  # 增加等待时间
 
-            # 多次尝试获取entrance_func直到结果稳定
-            entrance_func = self._get_stable_entrance_func(init_file_path, max_attempts=3)
+            # 【修改3】：先尝试从已加载的模块中直接查找main函数
+            entrance_func = self._find_main_functions_from_modules(plugin_name)
+
+            # 【修改4】：如果模块扫描失败，回退到文件扫描
+            if not entrance_func:
+                entrance_func = self._get_stable_entrance_func(init_file_path, max_attempts=5)  # 增加重试次数
+
+            # 【修改5】：最后的兜底方案：直接从模块属性查找
+            if not entrance_func:
+                entrance_func = self._fallback_find_main_functions(module, plugin_name)
 
             if not entrance_func:
                 self.logger.warning(f"插件 {plugin_name} 未找到任何main函数")
@@ -746,32 +754,67 @@ class PluginManager:
             self._clear_plugin_modules_from_cache(plugin_name)
             return None
 
+    def _find_main_functions_from_modules(self, plugin_name: str) -> List[Callable]:
+        """从已加载的模块中查找main函数"""
+        entrance_funcs = []
+        module_prefix = f"run.{plugin_name}"
+
+        try:
+            for module_name, module in sys.modules.items():
+                if (module_name == module_prefix or
+                        module_name.startswith(module_prefix + ".")):
+
+                    # 检查模块中的所有属性
+                    for attr_name in dir(module):
+                        if attr_name == 'main':
+                            attr = getattr(module, attr_name)
+                            if callable(attr):
+                                entrance_funcs.append(attr)
+                                self.logger.debug(f"从模块 {module_name} 找到main函数")
+
+        except Exception as e:
+            self.logger.debug(f"从模块查找main函数失败: {e}")
+
+        return entrance_funcs
+
+    def _fallback_find_main_functions(self, main_module, plugin_name: str) -> List[Callable]:
+        """兜底方案：直接从主模块查找main函数"""
+        entrance_funcs = []
+
+        try:
+            # 检查主模块是否有main函数
+            if hasattr(main_module, 'main') and callable(getattr(main_module, 'main')):
+                entrance_funcs.append(getattr(main_module, 'main'))
+                self.logger.debug(f"从主模块找到main函数")
+
+            # 检查主模块的__dict__中的所有函数
+            for name, obj in main_module.__dict__.items():
+                if name == 'main' and callable(obj):
+                    if obj not in entrance_funcs:  # 避免重复
+                        entrance_funcs.append(obj)
+                        self.logger.debug(f"从主模块__dict__找到main函数")
+
+        except Exception as e:
+            self.logger.debug(f"兜底查找main函数失败: {e}")
+
+        return entrance_funcs
+
     def _preload_plugin_modules(self, plugin_name: str):
-        """预加载插件目录下的所有Python模块"""
+        """预加载插件目录下的所有Python模块（只加载第一层，跳过特定目录）"""
         plugin_dir = self.plugins_dir / plugin_name
 
-        # 找到所有.py文件（除了__init__.py）
-        py_files = [f for f in plugin_dir.glob("*.py") if f.name != "__init__.py"]
+        # 定义需要跳过的目录名
+        skip_dirs = {'service', 'services', 'utils', 'lib', 'libs', 'config', 'configs', '__pycache__'}
 
-        for py_file in py_files:
-            module_name = f"run.{plugin_name}.{py_file.stem}"
+        # 只加载插件目录第一层的.py文件，不递归，同时跳过特定目录中的文件
+        py_files = []
+        for f in plugin_dir.glob("*.py"):
+            if f.name != "__init__.py":
+                # 检查文件是否在跳过的目录中
+                if f.parent.name not in skip_dirs:
+                    py_files.append(f)
 
-            # 如果模块还没加载，尝试加载它
-            if module_name not in sys.modules:
-                try:
-                    spec = importlib.util.spec_from_file_location(module_name, str(py_file))
-                    if spec and spec.loader:
-                        module = importlib.util.module_from_spec(spec)
-                        sys.modules[module_name] = module
-                        spec.loader.exec_module(module)
-                        self.logger.debug(f"预加载了模块: {module_name}")
-                except Exception as e:
-                    self.logger.debug(f"预加载模块 {module_name} 失败: {e}")
-                    # 预加载失败不影响主流程
-                    if module_name in sys.modules:
-                        del sys.modules[module_name]
-
-    def _get_stable_entrance_func(self, init_file_path: str, max_attempts: int = 3) -> List[Callable]:
+    def _get_stable_entrance_func(self, init_file_path: str, max_attempts: int = 5) -> List[Callable]:
         """多次尝试获取entrance_func直到结果稳定"""
         previous_result = None
 
@@ -780,24 +823,26 @@ class PluginManager:
                 # 清理importlib缓存
                 importlib.invalidate_caches()
 
+                # 【修改】：增加等待时间
+                time.sleep(0.05 * (attempt + 1))  # 递增等待时间
+
                 # 获取entrance_func
                 current_result = load_main_functions(init_file_path)
 
-                # 如果结果与上次相同，说明已经稳定
-                if attempt > 0 and len(current_result) == len(previous_result):
-                    # 简单比较函数数量，如果相同则认为稳定
+                self.logger.debug(f"第 {attempt + 1} 次扫描找到 {len(current_result)} 个main函数")
+
+                # 如果找到了函数就返回
+                if current_result:
                     return current_result
+
+                # 如果结果与上次相同且都为空，再试一次
+                if attempt > 1 and len(current_result) == len(previous_result or []):
+                    continue
 
                 previous_result = current_result
 
-                # 如果不是最后一次尝试，等待一下
-                if attempt < max_attempts - 1:
-                    time.sleep(0.02)
-
             except Exception as e:
                 self.logger.debug(f"第 {attempt + 1} 次获取entrance_func失败: {e}")
-                if attempt == max_attempts - 1:
-                    return []
 
         return previous_result or []
 
@@ -805,13 +850,36 @@ class PluginManager:
         """执行插件的入口函数"""
         entrance_funcs = plugin_info['entrance_func']
 
+        self.logger.info(f"插件 {plugin_name} 找到 {len(entrance_funcs)} 个main函数")
+
         # 设置插件上下文
         self.bot._set_current_plugin(plugin_name)
 
         try:
-            for func in entrance_funcs:
+            for i, func in enumerate(entrance_funcs):
                 try:
                     if callable(func):
+                        import inspect
+                        try:
+                            sig = inspect.signature(func)
+                            param_count = len(sig.parameters)
+                            param_names = list(sig.parameters.keys())
+                        except (TypeError, ValueError):
+                            param_count = "unknown"
+                            param_names = []
+
+                        # 获取函数所在的文件路径
+                        func_file = "unknown"
+                        if hasattr(func, '__code__') and hasattr(func.__code__, 'co_filename'):
+                            func_file = func.__code__.co_filename
+
+                        '''self.logger.info(f"执行插件 {plugin_name} 的第 {i + 1} 个main函数:")
+                        self.logger.info(f"  - 函数名: {func.__name__}")
+                        self.logger.info(f"  - 所在文件: {func_file}")
+                        self.logger.info(f"  - 所在模块: {getattr(func, '__module__', 'unknown')}")
+                        self.logger.info(f"  - 参数数量: {param_count}")
+                        self.logger.info(f"  - 参数名称: {param_names}")'''
+
                         # 在独立线程中执行插件函数，避免事件循环冲突
                         loop = asyncio.get_event_loop()
                         await loop.run_in_executor(
@@ -826,7 +894,16 @@ class PluginManager:
                         self.logger.warning(f"插件 {plugin_name} 的 entrance_func 中包含非可调用对象: {func}")
 
                 except Exception as e:
-                    self.logger.error(f"执行插件 {plugin_name} 的函数 {func} 失败: {str(e)}")
+                    # 获取更详细的错误信息
+                    func_file = "unknown"
+                    if hasattr(func, '__code__') and hasattr(func.__code__, 'co_filename'):
+                        func_file = func.__code__.co_filename
+
+                    self.logger.error(f"执行插件 {plugin_name} 的函数失败:")
+                    self.logger.error(f"  - 函数名: {getattr(func, '__name__', str(func))}")
+                    self.logger.error(f"  - 所在文件: {func_file}")
+                    self.logger.error(f"  - 所在模块: {getattr(func, '__module__', 'unknown')}")
+                    self.logger.error(f"  - 错误信息: {str(e)}")
 
         finally:
             # 清理插件上下文
