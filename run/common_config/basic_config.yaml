@@ -22,7 +22,7 @@ adapter:
     ws_link: "ws://127.0.0.1:3001"  #bot的websocket请求地址
 
 PluginLoadConfig: #插件加载配置，根据配置情况调整。会影响插件加载速度。
-  load_strategy: "batch_loading" #加载策略，可选batch_loading，all_at_once，memory_aware
+  load_strategy: "all_at_once" #加载策略，可选batch_loading，all_at_once，memory_aware
   batch_size: 2  # 每批加载的插件数量
   batch_delay: 3  # 批次间延迟（秒）
   max_retries: 3  # 最大重试次数

@@ -51,10 +51,7 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def aiReply(event: GroupMessageEvent):
         await check_commands(event)
-        if (event.message_chain.has(At) and event.message_chain.get(At)[0].qq == bot.id
-                or prefix_check(str(event.pure_text), config.ai_llm.config["llm"]["prefix"])  #前缀判断
-                or await judge_trigger(event.processed_message, event.user_id, config, tools=tools, bot=bot,
-                                       event=event)):  #触发cd判断
+        if (event.message_chain.has(At) and event.message_chain.get(At)[0].qq in [bot.id,1000000]) or prefix_check(str(event.pure_text), config.ai_llm.config["llm"]["prefix"]) or await judge_trigger(event.processed_message, event.user_id, config, tools=tools, bot=bot,event=event):  #触发cd判断
             bot.logger.info(f"接受消息{event.processed_message}")
 
             ## 权限判断

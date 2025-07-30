@@ -7,30 +7,32 @@ import threading
 import traceback
 import logging
 
-
-
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 from framework_common.utils.system_logger import get_logger
 from framework_common.framework_util.PluginAwareExtendBot import PluginManager, PluginLoadConfig, LoadStrategy
-
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.framework_util.websocket_fix import ExtendBot
-
+from developTools.adapters.websocket_adapter import WebSocketBot
+from framework_common.framework_util.DualBotManager import DualBotManager
+from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, LifecycleMetaEvent
 
 # 全局插件管理器实例
-plugin_manager1 = None
-plugin_manager2 = None
+plugin_manager = None
 bot2 = None
+dual_manager = None
+
 config = YAMLManager("run")  # 这玩意用来动态加载和修改配置文件
 bot1 = ExtendBot(config.common_config.basic_config["adapter"]["ws_client"]["ws_link"], config,
                  blocked_loggers=["DEBUG", "INFO_MSG"])
 
 bot1.logger.info("正在初始化....")
+
 if config.common_config.basic_config["webui"]["enable"]:
-    bot2 = ExtendBot("ws://127.0.0.1:5007/api/ws", config, blocked_loggers=["DEBUG", "INFO_MSG", "warning"])
+    bot2 = WebSocketBot("ws://127.0.0.1:5007/api/ws")
     bot1.logger.server("🔧 WebUI 服务启动中，请在完全启动后，本机浏览器访问 http://localhost:5007")
     bot1.logger.server("🔧 若您部署的远程主机有公网ip或端口转发功能，请访问对应ip的5007端口，或设置的转发端口。")
     bot1.logger.server("🔧 WebUI 初始账号密码均为 eridanus")
@@ -63,32 +65,33 @@ if config.common_config.basic_config["webui"]["enable"]:
 
 async def load_plugins(bot, config, bot_name="main"):
     """使用新的插件管理器加载插件"""
-    global plugin_manager1, plugin_manager2
+    global plugin_manager
 
     bot.logger.info(f"🔧 正在使用插件管理器加载插件....")
 
     try:
-
-        #plugin_manager = PluginManager(bot, config, )
-        load_strategy_dict = {"batch_loading": LoadStrategy.BATCH_LOADING,"all_at_once":LoadStrategy.ALL_AT_ONCE,"memory_aware":LoadStrategy.MEMORY_AWARE}
+        load_strategy_dict = {
+            "batch_loading": LoadStrategy.BATCH_LOADING,
+            "all_at_once": LoadStrategy.ALL_AT_ONCE,
+            "memory_aware": LoadStrategy.MEMORY_AWARE
+        }
 
         load_config = PluginLoadConfig(
-            batch_size= config.common_config.basic_config["PluginLoadConfig"]["batch_size"],  # 每批加载的插件数量
-            batch_delay=config.common_config.basic_config["PluginLoadConfig"]["batch_delay"],  # 批次间延迟（秒）
-            max_retries= config.common_config.basic_config["PluginLoadConfig"]["max_retries"],  # 最大重试次数
-            retry_delay= config.common_config.basic_config["PluginLoadConfig"]["retry_delay"],  # 重试延迟（秒）
-            memory_threshold_mb= config.common_config.basic_config["PluginLoadConfig"]["memory_threshold_mb"],  # 内存阈值（MB）
-            enable_gc_between_batches= config.common_config.basic_config["PluginLoadConfig"]["enable_gc_between_batches"] | True,  # 批次间是否强制垃圾回收
-            load_strategy=load_strategy_dict.get(config.common_config.basic_config["PluginLoadConfig"]["load_strategy"],LoadStrategy.BATCH_LOADING),
+            batch_size=config.common_config.basic_config["PluginLoadConfig"]["batch_size"],
+            batch_delay=config.common_config.basic_config["PluginLoadConfig"]["batch_delay"],
+            max_retries=config.common_config.basic_config["PluginLoadConfig"]["max_retries"],
+            retry_delay=config.common_config.basic_config["PluginLoadConfig"]["retry_delay"],
+            memory_threshold_mb=config.common_config.basic_config["PluginLoadConfig"]["memory_threshold_mb"],
+            enable_gc_between_batches=config.common_config.basic_config["PluginLoadConfig"][
+                                          "enable_gc_between_batches"] | True,
+            load_strategy=load_strategy_dict.get(config.common_config.basic_config["PluginLoadConfig"]["load_strategy"],
+                                                 LoadStrategy.BATCH_LOADING),
         )
-        plugin_manager = PluginManager(bot, config, plugins_dir="run",load_config=load_config)
+        plugin_manager = PluginManager(bot, config, plugins_dir="run", load_config=load_config)
 
         # 手动重试失败的插件
         await plugin_manager.retry_failed_plugins()
-        if bot_name == "main":
-            plugin_manager1 = plugin_manager
-        else:
-            plugin_manager2 = plugin_manager
+
 
         await plugin_manager.start()
 
@@ -103,59 +106,90 @@ async def load_plugins(bot, config, bot_name="main"):
         return None
 
 
-def webui_bot():
-    config_copy = YAMLManager("run")  # 这玩意用来动态加载和修改配置文件
+async def handler(bot, event: GroupMessageEvent | PrivateMessageEvent):
+    """统一的事件处理器"""
+    if event.pure_text == "/reload all":
+        await reload_all_plugins()
+        await bot.send(event, "插件重载完成")
+    elif event.pure_text == "/status":
+        status = await get_plugin_status()
+        print(status)
+    elif event.pure_text == "/test":
+        print(config.ai_llm.config["test"])
 
-    def config_fix(config_copy):
-        config_copy.resource_collector.config["JMComic"]["anti_nsfw"] = "no_censor"
-        config_copy.resource_collector.config["asmr"]["gray_layer"] = False
-        config_copy.basic_plugin.config["setu"]["gray_layer"] = False
-        config_copy.resource_collector.config["iwara"]["iwara_gray_layer"] = False
-        config_copy.ai_llm.config["llm"]["读取群聊上下文"] = False
-        config_copy.resource_collector.config["iwara"]["zip_file"] = False
-        config_copy.common_config.basic_config["master"]["id"] = 111111111
 
-    def run_bot2():
-        """在独立线程运行 bot2"""
-        try:
-            config_fix(config_copy)
-            async def setup_bot2():
-                from asyncio import sleep
-                await load_plugins(bot2, config_copy, "webui")
+async def reload_all_plugins():
+    """重载所有插件的便捷函数"""
+    if plugin_manager:
+        bot1.logger.info("重载主Bot插件...")
+        await plugin_manager.reload_all_plugins()
 
-            asyncio.run(setup_bot2())
 
-            # 然后运行bot2（bot.run()会创建自己的事件循环）
-            bot2.run()
 
-        except Exception as e:
-            bot1.logger.error(f"Bot2 线程运行失败：{e}")
-            traceback.print_exc()
+async def get_plugin_status():
+    """获取插件状态的便捷函数"""
+    status = {}
 
-    bot2_thread = threading.Thread(target=run_bot2, daemon=True)
-    bot2_thread.start()
+    if plugin_manager:
+        status['main_bot'] = await plugin_manager.get_plugin_status()
+
+
+    return status
+
+
+def setup_event_handlers():
+    """设置事件处理器 - 只在主Bot上注册，因为副Bot的消息会转发到主Bot"""
+
+    @bot1.on(GroupMessageEvent)
+    async def handle_group_message(event: GroupMessageEvent):
+        await handler(bot1, event)
+
+    @bot1.on(PrivateMessageEvent)
+    async def handle_private_message(event: PrivateMessageEvent):
+        await handler(bot1, event)
+
+    @bot1.on(LifecycleMetaEvent)
+    async def handle_lifecycle(event: LifecycleMetaEvent):
+        from asyncio import sleep
+        await sleep(2)
+        await bot1.send_friend_message(
+            config.common_config.basic_config["master"]["id"],
+            "欢迎使用\n\n群内发送 帮助 可查看命令列表\n\n访问webui请在bot所在设备用浏览器访问\nhttp://localhost:5007"
+        )
 
 
 def main_sync():
     """同步主函数，用于处理事件循环"""
+    global dual_manager
 
-    async def async_setup():
-        """异步设置函数"""
+    async def async_main():
+        """异步主函数"""
         try:
-            if config.common_config.basic_config["webui"]["enable"]:
-                webui_bot()
-
+            # 1. 加载主Bot插件
             await load_plugins(bot1, config, "main")
-            bot1.logger.info("🚀 主Bot插件管理器启动完成，开始运行Bot...")
+            bot1.logger.info("🚀 主Bot插件管理器启动完成")
+
+            # 2. 设置事件处理器
+            setup_event_handlers()
+
+            # 3. 创建双Bot管理器（如果有副Bot）
+            if bot2:
+                dual_manager = DualBotManager(bot1, bot2, target_group_id=879886836)
+                bot1.logger.info("🔧 双Bot管理器已创建，开始启动双Bot系统...")
+                # 启动双Bot系统
+                await dual_manager.start_both_bots()
+            else:
+                bot1.logger.info("🚀 开始运行单Bot模式...")
+                # 只运行主Bot
+                await bot1._connect_and_run()
 
         except Exception as e:
-            bot1.logger.error(f"插件加载错误：{e}")
+            bot1.logger.error(f"运行错误：{e}")
             traceback.print_exc()
 
     try:
-        asyncio.run(async_setup())
-
-        bot1.run()
+        # 运行异步主函数
+        asyncio.run(async_main())
 
     except KeyboardInterrupt:
         bot1.logger.info("收到停止信号，正在关闭...")
@@ -163,81 +197,22 @@ def main_sync():
         bot1.logger.error(f"主程序运行错误：{e}")
         traceback.print_exc()
     finally:
+        # 清理资源
         async def cleanup():
-            if plugin_manager1:
+            if plugin_manager:
                 try:
-                    await plugin_manager1.stop()
+                    await plugin_manager.stop()
                     bot1.logger.info("主Bot插件管理器已停止")
                 except Exception as e:
                     bot1.logger.error(f"停止主Bot插件管理器失败：{e}")
 
-            if plugin_manager2:
-                try:
-                    await plugin_manager2.stop()
-                    bot1.logger.info("WebUI Bot插件管理器已停止")
-                except Exception as e:
-                    bot1.logger.error(f"停止WebUI Bot插件管理器失败：{e}")
 
         try:
             asyncio.run(cleanup())
         except Exception as e:
             bot1.logger.error(f"清理过程出错：{e}")
 
-from developTools.event.events import GroupMessageEvent,PrivateMessageEvent,LifecycleMetaEvent
-if bot2:
-    @bot2.on(GroupMessageEvent)
-    async def _(event: GroupMessageEvent):
-        await handler(bot2,event)
-    @bot2.on(PrivateMessageEvent)
-    async def _(event: PrivateMessageEvent):
-        await handler(bot2,event)
-@bot1.on(GroupMessageEvent)
-async def _(event: GroupMessageEvent):
-    await handler(bot1,event)
-@bot1.on(PrivateMessageEvent)
-async def _(event: PrivateMessageEvent):
-    await handler(bot1,event)
-@bot1.on(LifecycleMetaEvent)
-async def _(event: LifecycleMetaEvent):
-    from asyncio import sleep
-    await sleep(2)
-    await bot1.send_friend_message(config.common_config.basic_config["master"]["id"], "欢迎使用\n\n群内发送 帮助 可查看命令列表\n\n访问webui请在bot所在设备用浏览器访问\nhttp://localhost:5007")
-
-async def handler(bot,event: GroupMessageEvent | PrivateMessageEvent):
-    if event.pure_text=="/reload all":
-        await reload_all_plugins()
-        await bot.send(event, "插件重载完成")
-    elif event.pure_text=="/status":
-        status = await get_plugin_status()
-        print(status)
-    elif event.pure_text=="/test":
-        print(config.ai_llm.config["test"])
-
-# 添加一些管理命令（可选）
-async def reload_all_plugins():
-    """重载所有插件的便捷函数"""
-    if plugin_manager1:
-        bot1.logger.info("重载主Bot插件...")
-        await plugin_manager1.reload_all_plugins()
-
-    if plugin_manager2:
-        bot1.logger.info("重载WebUI Bot插件...")
-        await plugin_manager2.reload_all_plugins()
-
-
-async def get_plugin_status():
-    """获取插件状态的便捷函数"""
-    status = {}
-
-    if plugin_manager1:
-        status['main_bot'] = await plugin_manager1.get_plugin_status()
-
-    if plugin_manager2:
-        status['webui_bot'] = await plugin_manager2.get_plugin_status()
-
-    return status
-
 
 if __name__ == "__main__":
-    logger=get_logger("Eridanus")
+    logger = get_logger("Eridanus")
     main_sync()
