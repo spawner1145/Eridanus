@@ -23,7 +23,7 @@ from run.ai_voice.service.online_vits import random_session_hash
 logger=get_logger()
 async def huggingface_blue_archive_tts(text, speaker,lang_type="ja",proxy=None):
     logger.info(f"params: speaker={speaker}, text={text}, lang_type={lang_type}")
-    url = "wss://ori-muchim-bluearchivetts.hf.space/queue/join"
+    url = "wss://avillia-bluearchivetts.hf.space/queue/join"
     session_hash = random_session_hash(11)
 
     async with websockets.connect(url,ssl=ssl_context) as ws:
@@ -46,7 +46,7 @@ async def huggingface_blue_archive_tts(text, speaker,lang_type="ja",proxy=None):
                     }))
 
                 elif "output" in result:
-                    file_url = f"https://ori-muchim-bluearchivetts.hf.space/file={result['output']['data'][1]['name']}"
+                    file_url = f"https://avillia-bluearchivetts.hf.space/file={result['output']['data'][1]['name']}"
                     async with httpx.AsyncClient() as client:
                         response = await client.get(file_url)
                         with open(f"data/voice/cache/{session_hash}.wav", "wb") as f:
