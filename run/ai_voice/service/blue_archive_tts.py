@@ -24,7 +24,7 @@ logger=get_logger()
 async def huggingface_blue_archive_tts(text, speaker,lang_type="ja",proxy=None):
     logger.info(f"params: speaker={speaker}, text={text}, lang_type={lang_type}")
     url = "wss://avillia-bluearchivetts.hf.space/queue/join"
-    session_hash = random_session_hash(11)
+    session_hash = random_session_hash(10)
 
     async with websockets.connect(url,ssl=ssl_context) as ws:
         logger.info(f"连接到 {url}")
@@ -41,7 +41,7 @@ async def huggingface_blue_archive_tts(text, speaker,lang_type="ja",proxy=None):
                 elif result["msg"] == "send_data":
                     await ws.send(json.dumps({
                         "fn_index": 0,
-                        "data": [text, speaker, 1.2],
+                        "data": [text, speaker, 1.2,False],
                         "session_hash": session_hash
                     }))
 
