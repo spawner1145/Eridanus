@@ -41,7 +41,7 @@ async def huggingface_blue_archive_tts(text, speaker,lang_type="ja",proxy=None):
                 elif result["msg"] == "send_data":
                     await ws.send(json.dumps({
                         "fn_index": 0,
-                        "data": [text, speaker, 1.2,False],
+                        "data": [text, speaker, 1.0,False],
                         "session_hash": session_hash
                     }))
 
