@@ -173,7 +173,7 @@ def main(bot, config):
                         if result["continute_intent"]:
                             reply_message = await aiReplyCore(
                                 [{
-                                    'text': 'system: 请继续当前聊天话题，主动提问或表达自己的观点。直接发送文本，不必回复此条消息。直接发送面向用户的回复'}],
+                                    'text': 'system: 请继续当前聊天话题，可以适当主动提问或表达自己的观点和偏好，不要一直提问。直接发送文本，不必回复此条消息。直接发送面向用户的回复'}],
                                 current_event.user_id,
                                 config,
                                 system_instruction="你是一个群聊机器人，请继续当前话题",
