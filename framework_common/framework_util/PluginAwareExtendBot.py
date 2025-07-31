@@ -12,13 +12,13 @@ from pathlib import Path
 from typing import Dict, List, Callable, Any, Set
 import time
 import weakref
-
-import psutil
-from watchdog.watchmedo import load_config
-
 from framework_common.utils.install_and_import import install_and_import
 from framework_common.framework_util.main_func_detector import load_main_functions
 watchdog = install_and_import("watchdog")
+import psutil
+from watchdog.watchmedo import load_config
+
+
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import logging
