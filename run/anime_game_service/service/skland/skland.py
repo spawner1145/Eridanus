@@ -193,5 +193,5 @@ if __name__ == '__main__':
 
     #asyncio.run(qrcode_get(1667962668))
     #asyncio.run(self_info(1270858640))
-    #asyncio.run(rouge_info(1667962668,'水月'))
-    asyncio.run(rouge_detailed_info(1667962668,'水月'))
+    asyncio.run(rouge_info(1667962668,'水月'))
+    #asyncio.run(rouge_detailed_info(1667962668,'界园'))

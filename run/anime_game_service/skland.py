@@ -37,7 +37,10 @@ def main(bot, config):
         order_list=['sklandinfo','森空岛info','森空岛信息','我的森空岛']
         context, userid=event.pure_text, str(event.sender.user_id)
         if event.message_chain.has(At):userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
-        if context in order_list:await skland_info(userid, bot, event)
+        if context in order_list:
+            recall_id = await bot.send(event, f'开始查询您的森空岛信息，请耐心等待喵')
+            await skland_info(userid, bot, event)
+            await bot.recall(recall_id['data']['message_id'])
 
     #森空岛肉鸽战绩查询
     @bot.on(GroupMessageEvent)
@@ -49,7 +52,7 @@ def main(bot, config):
             if order_check in context:
                 flag=False
                 context = context.replace(' ', '').replace(order_check, '')
-        if flag is True or context not in ["傀影","水月", "萨米", "萨卡兹"]:return
+        if flag is True or context not in ["傀影","水月", "萨米", "萨卡兹",'界园']:return
         recall_id = await bot.send(event, f'开始查询您的{context}肉鸽信息，请耐心等待喵')
         await rouge_info(userid, context,bot=bot, event=event)
         await bot.recall(recall_id['data']['message_id'])
@@ -66,7 +69,7 @@ def main(bot, config):
                 context = context.replace(order_check, '').replace(' ', '')
         if flag is True :return
         flag=True
-        for check in ["傀影","水月", "萨米", "萨卡兹"]:
+        for check in ["傀影","水月", "萨米", "萨卡兹",'界园']:
             if check in context:
                 flag = False
                 rg_type = check
@@ -88,8 +91,8 @@ def main(bot, config):
             '[title]指令菜单：[/title]'
             '\n- 绑定森空岛账号：sklandbind, 森空岛绑定\n- 森空岛签到：sklandsign, 森空岛签到\n'
             '- 森空岛信息：sklandinfo, 森空岛info、森空岛信息、我的森空岛\n'
-            '- 森空岛肉鸽战绩查询：sklandrogue, sklandrg、肉鸽信息 + 傀影or水月or萨米or萨卡兹\n'
-            '- 森空岛肉鸽详细战绩查询：sklandrogueinfo, sklandrginfo、肉鸽查询、查询肉鸽 + 傀影or水月or萨米or萨卡兹 + 你想查询的最近场次\n'
+            '- 森空岛肉鸽战绩查询：sklandrogue, sklandrg、肉鸽信息 + 傀影or水月or萨米or萨卡兹or界园\n'
+            '- 森空岛肉鸽详细战绩查询：sklandrogueinfo, sklandrginfo、肉鸽查询、查询肉鸽 + 傀影or水月or萨米or萨卡兹or界园 + 你想查询的最近场次\n'
             'eg: 水月肉鸽查询1 or 肉鸽查询水月3\n'
             '等待开发，欢迎催更（咕咕咕\n'
             '[des]                                             Function By 漫朔[/des]'
