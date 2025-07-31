@@ -452,7 +452,7 @@ def ai_req():
         else:
             logger.warning("未能检测到CUDA版本，假设系统中未安装CUDA。")
     except Exception:
-        logger.exception('CUDA')
+        logger.error('CUDA')
         logger.warning("未能检测到CUDA版本或nvcc未安装，假设系统中未安装CUDA。")
         cuda_torch_suffix = None
 
