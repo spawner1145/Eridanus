@@ -19,6 +19,7 @@ help_menu: #不要在webui修改本文件！不要在webui修改本文件！
       \n  /切人设 {角色文件名} [des]/切人设 派蒙.txt[/des]
       \n  /全切人设 {角色文件名}  [des]/全切人设 派蒙.txt  管理员命令[/des]
       \n  可通过llm函数调用的方式使用bot的绝大多数功能，需bot管理员自行配置支持函数调用的模型。'],'layer':2}
+      - '   '
       - {'type': 'text','content': ['[title]语音合成[/title]
       \n  /xx说xxxx [des]/派蒙说该死的旅行者[/des]
       \n  可用角色  [des]列出所有可用的角色[/des]
@@ -243,3 +244,7 @@ help_menu: #不要在webui修改本文件！不要在webui修改本文件！
       - { 'type': 'text','content': [ '[title]森空岛功能[/title]
       \n 森空岛帮助    [des]将发送二级菜单。[/des]
       ' ],'layer': 2 }
+    page5:
+      - { 'type': 'basic_set', 'img_width': 1000,'img_name_save': 'help_menu_page5.png','img_height': 1500,'max_num_of_columns': 3 ,'font_common_size': 34,'font_des_size': 25, 'font_title_size': 46,'spacing': 3,'padding_up': 30}
+      - {'type': 'text','content': ['[title]ai写插件[/title]
+      \n  /写插件{具体需求}  [des]实验性功能，不保证稳定性和可用性[/des]'],'layer':2}

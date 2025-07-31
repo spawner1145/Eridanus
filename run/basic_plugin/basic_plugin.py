@@ -16,7 +16,10 @@ from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 供func call调用
 """
 async def call_menu(bot, event, config):
-    file_lists = ['help_menu_page1.png', 'help_menu_page2.png', 'help_menu_page3.png', 'help_menu_page4.png']
+    file_lists = []
+    for file in os.listdir('data/pictures/doc'):
+        if file.endswith('.png'):
+            file_lists.append(file)
     if config.common_config.menu["help_menu"]["send_as_node"]:
         node_list = [Node(
             content=[Text("项目文档：https://eridanus.netlify.app/\n项目地址：https://github.com/AOrbitron/Eridanus")])]
@@ -177,7 +180,7 @@ def main(bot, config):
         if event.pure_text in ["帮助", "菜单", "/help", "/menu"]:
             await call_menu(bot, event, config)
         if "/remenu"==event.pure_text and event.sender.user_id==config.common_config.basic_config["master"]["id"]:
-            file_lists = ['help_menu_page1.png', 'help_menu_page2.png', 'help_menu_page3.png', 'help_menu_page4.png']
+            file_lists = ['help_menu_page1.png', 'help_menu_page2.png', 'help_menu_page3.png', 'help_menu_page4.png', 'help_menu_page5.png']
             for file_name in file_lists:
                 if os.path.exists(os.path.join('data/pictures/cache', file_name)):
                     os.remove(os.path.join('data/pictures/cache', file_name))
