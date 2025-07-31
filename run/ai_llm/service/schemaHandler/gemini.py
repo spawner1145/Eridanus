@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional, Union
 
 from framework_common.utils.system_logger import get_logger
 
-logger=get_logger()
+logger=get_logger("gemini_chat")
 class GeminiFormattedChat:
     """
     一个封装了Gemini多轮对话和格式化JSON输出的异步客户端。
