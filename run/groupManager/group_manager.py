@@ -36,7 +36,7 @@ def main(bot: ExtendBot,config):
     @bot.on(GroupIncreaseNoticeEvent)
     async def GroupIncreaseNoticeHandler(event: GroupIncreaseNoticeEvent):
         if event.user_id!=event.self_id:
-            if config.ai_llm.config["llm"]["aiReplyCore"]:
+            if config.groupManager.config["启用ai入群欢迎"]:
                 data = await bot.get_group_member_info(group_id=event.group_id, user_id=event.user_id)
                 try:
                     name = data["data"]["nickname"]
@@ -46,7 +46,14 @@ def main(bot: ExtendBot,config):
                                              tools=None)
                 await bot.send(event, str(r))
             else:
-                await bot.send(event, f"有新的旅行伙伴加入哟~~")
+                flag=False
+                for single_group in config.groupManager.config["自定义入群欢迎"]:
+                    if event.group_id in single_group:
+                        mes=single_group[event.group_id]
+                        await bot.send(event, mes)
+                        flag=True
+                if not flag:
+                    await bot.send(event, config.groupManager.config["通用入群欢迎"])
     @bot.on(GroupMessageEvent)
     async def group_message(event: GroupMessageEvent):
         await quitgroup(event)
