@@ -11,6 +11,7 @@ from developTools.message.message_components import Record, Text, Image, File, N
 from framework_common.database_util.User import get_user
 
 from developTools.utils.logger import get_logger
+from framework_common.framework_util.websocket_fix import ExtendBot
 
 logger = get_logger()
 
@@ -231,7 +232,7 @@ async def send_contract(bot, event, config):
     return {"管理员id": config.common_config.basic_config["master"]['id']}
 
 
-def main(bot, config):
+def main(bot:ExtendBot, config):
     global send_next_message
     send_next_message = False
 
@@ -312,7 +313,13 @@ def main(bot, config):
                 await bot.handle_friend_request(event.flag, False, "你没有足够权限添加好友")
                 await bot.send_friend_message(config.common_config.basic_config["master"]['id'],
                                               f"收到好友请求，{event.user_id}({event.comment}) 拒绝（用户权限不足）")
-
+    @bot.on(GroupMessageEvent)
+    async def _(event: GroupMessageEvent):
+        r=await bot.get_group_info(event.group_id)
+        if r["data"]["member_count"]!=0 and (r["data"]["member_count"]<=config.common_config.basic_config["自动退出少于此人数的群"]
+                or r["data"]["member_count"]>=config.common_config.basic_config["自动退出多于此人数的群"]):
+            await bot.quit(event.group_id)
+            bot.logger.info_func(f"群{event.group_id}人数{r['data']['member_count']}，自动退出")
     @bot.on(GroupRequestEvent)
     async def GroupRequestHandler(event: GroupRequestEvent):
         if event.sub_type == "invite":
