@@ -491,7 +491,7 @@ def main(bot, config):
 
         # 处理图片和重绘命令
         if str(event.pure_text) == "tag" or event.sender.user_id in tag_user:
-            print(event.processed_message)
+            #print(event.processed_message)
             if await get_img(event.processed_message, bot, event):
                 if config.ai_generated_art.config['ai绘画']['sd审核和反推api'] == "" or \
                         config.ai_generated_art.config['ai绘画']['sd审核和反推api'] is None:
