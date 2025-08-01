@@ -2,6 +2,8 @@ import base64
 import random
 
 import asyncio
+import traceback
+
 import httpx
 import base64
 
@@ -32,12 +34,19 @@ async def get_img(processed_message, bot, event):
     for item in processed_message:
         if "image" in item or "mface" in item:
             try:
-                if "mface" in item:
-                    url = item["mface"]["url"]
-                else:
-                    url = item["image"]["url"]
+                try:
+                    if "mface" in item:
+                        url = item["mface"]["url"]
+                    else:
+                        url = item["image"]["url"]
+                except:
+                    if "mface" in item:
+                        url = item["mface"]["file"]
+                    else:
+                        url = item["image"]["file"]
                 return url
             except Exception as e:
+                traceback.print_exc()
                 bot.logger.warning(f"获取图片失败: {e}")
                 return False
         elif "reply" in item:
