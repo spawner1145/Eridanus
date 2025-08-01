@@ -171,7 +171,7 @@ def updaat(f=False, source=None, yamls:dict=None):
             # shutil.rmtree("./temp")
         logger.info("处理冲突文件完成")
         logger.info("旧的冲突文件被保存到了temp文件夹，以防万一你需要它们。")
-        logger.info("是否检查依赖？按任意键开始，如不需要请直接关闭此窗口。如后续启动报错，请返回此步骤并执行依赖检查。")
+        '''logger.info("是否检查依赖？按任意键开始，如不需要请直接关闭此窗口。如后续启动报错，请返回此步骤并执行依赖检查。")
         logger.warning("是否检查依赖？按任意键开始，如不需要请直接关闭此窗口。如后续启动报错，请返回此步骤并执行依赖检查。")
         logger.error("是否检查依赖？按任意键开始，如不需要请直接关闭此窗口。如后续启动报错，请返回此步骤并执行依赖检查。")
         input()
@@ -186,7 +186,7 @@ def updaat(f=False, source=None, yamls:dict=None):
         logger.warning("出现红色、黄色警告一般为正常现象，请忽略")
         logger.error("出现红色、黄色警告一般为正常现象，请忽略")
         logger.warning("出现红色、黄色警告一般为正常现象，请忽略")
-        fuck_requirements()
+        fuck_requirements()'''
         logger.info("更新成功，请关闭此窗口，重新启动bot")
         input()
     # 逐行检查错误信息
