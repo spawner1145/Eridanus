@@ -66,6 +66,7 @@ class Text(MessageComponent):
 class Face(MessageComponent):
     comp_type: str = "face"
     id: str = Field(description="QQ 表情 ID")
+    large: any = Field(description="QQ 表情大图 URL")
 
     def __init__(self, id: int | str) -> None:
         super().__init__(id=str(id))
