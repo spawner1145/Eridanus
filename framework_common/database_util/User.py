@@ -510,7 +510,7 @@ async def get_user(user_id, nickname="", _recursion_depth=0) -> User:
                           default_user["age"], default_user["city"], default_user["permission"],
                           default_user["signed_days"], default_user["registration_date"],
                           default_user["ai_token_record"], default_user["user_portrait"],
-                          default_user["portal_update_time"]))
+                          default_user["portrait_update_time"]))
                     await db.commit()
                     logger.info(f"用户 {user_id} 不在数据库中，已创建默认用户。")
 
