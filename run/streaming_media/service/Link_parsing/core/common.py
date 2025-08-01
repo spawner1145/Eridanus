@@ -7,7 +7,7 @@ import time
 from io import BytesIO
 from typing import List, Dict
 from urllib.parse import urlparse
-
+import base64
 import aiofiles
 import httpx
 import requests
@@ -33,7 +33,7 @@ GENERAL_REQ_LINK = "http://47.99.158.118/video-crack/v2/parse?content={}"
 # 解析列表文件名
 RESOLVE_SHUTDOWN_LIST_NAME = "resolver_shutdown_list"
 
-json_init={'status':False,'content':{},'reason':{},'pic_path':{},'url':{},'video_url':False,'soft_type':False}
+json_init={'status':False,'content':{},'reason':{},'pic_path':{},'url':{},'video_url':False,'soft_type':False,'pic_url_list':[]}
 filepath_init=f'{os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(bili_init))))}/data/cache/'
 if not os.path.exists(filepath_init):  # 初始化检测文件夹
     os.makedirs(filepath_init)
@@ -132,7 +132,8 @@ async def download_img(url: str, path: str = '', proxy: str = None, session=None
         top = (height - min_edge) // 2
         right = left + min_edge
         bottom = top + min_edge
-        return image.crop((left, top, right, bottom))
+        #return image.crop((left, top, right, bottom))
+        return image
     file_name=re.sub(r'[:]', '_', url.split('/').pop().split('?')[0])
     path=f'{path}{file_name}'
     if 'gif' in path:
@@ -190,6 +191,7 @@ async def download_img(url: str, path: str = '', proxy: str = None, session=None
                         square_image = square_image.convert("RGB")
                     square_image.save(path)
                     return path
+
 
 
 
