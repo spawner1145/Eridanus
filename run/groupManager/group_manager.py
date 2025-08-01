@@ -60,6 +60,7 @@ def main(bot: ExtendBot,config):
                 and event.group_id not in config.common_config.censor_group["whitelist"]:
             await bot.quit(event.group_id)
             bot.logger.info_func(f"群{event.group_id}人数{r['data']['member_count']}，自动退出")
+            await bot.send_friend_message(config.common_config.basic_config["master"]["id"], f"群{event.group_id}人数{r['data']['member_count']}，自动退出")
     @bot.on(PrivateMessageEvent)
     async def private_message(event: PrivateMessageEvent):
         await quitgroup(event)
