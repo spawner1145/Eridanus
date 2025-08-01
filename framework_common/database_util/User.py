@@ -4,6 +4,7 @@ import pickle
 import platform
 import subprocess
 import zipfile
+import sqlite3
 
 import aiosqlite
 import datetime
@@ -39,6 +40,121 @@ redis_client = None
 
 # 全局变量存储初始化状态
 _db_initialized: bool = False
+
+# 数据库连接重试配置
+DB_RETRY_ATTEMPTS = 3
+DB_RETRY_DELAY = 1.0  # 秒
+DB_CONNECTION_TIMEOUT = 30.0  # 秒
+
+
+def database_retry(max_attempts=DB_RETRY_ATTEMPTS, delay=DB_RETRY_DELAY):
+    """数据库操作重试装饰器"""
+
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            last_exception = None
+
+            for attempt in range(max_attempts):
+                try:
+                    return await func(*args, **kwargs)
+                except sqlite3.OperationalError as e:
+                    last_exception = e
+                    error_msg = str(e).lower()
+
+                    if "unable to open database" in error_msg or "database is locked" in error_msg:
+                        logger.warning(f"数据库连接失败 (尝试 {attempt + 1}/{max_attempts}): {e}")
+
+                        if attempt < max_attempts - 1:
+                            # 尝试修复数据库连接
+                            await _handle_database_connection_error()
+                            await asyncio.sleep(delay * (attempt + 1))  # 递增延迟
+                            continue
+                    raise e
+                except Exception as e:
+                    # 对于其他异常，不重试
+                    raise e
+
+            # 所有重试都失败了
+            logger.error(f"数据库操作在 {max_attempts} 次尝试后仍然失败")
+            raise last_exception
+
+        return wrapper
+
+    return decorator
+
+
+async def _handle_database_connection_error():
+    """处理数据库连接错误的恢复逻辑"""
+    global _db_initialized
+
+    try:
+        logger.info("🔧 尝试修复数据库连接...")
+
+        # 1. 检查数据库文件和目录权限
+        db_dir = os.path.dirname(dbpath)
+        if not os.path.exists(db_dir):
+            logger.info(f"📁 创建数据库目录: {db_dir}")
+            os.makedirs(db_dir, exist_ok=True)
+
+        # 2. 检查数据库文件是否存在和可访问
+        if os.path.exists(dbpath):
+            # 检查文件权限
+            if not os.access(dbpath, os.R_OK | os.W_OK):
+                logger.warning("⚠️ 数据库文件权限不足，尝试修复...")
+                try:
+                    os.chmod(dbpath, 0o664)
+                except Exception as chmod_error:
+                    logger.warning(f"修改文件权限失败: {chmod_error}")
+
+        # 3. 尝试打开数据库进行简单测试
+        try:
+            async with aiosqlite.connect(dbpath, timeout=DB_CONNECTION_TIMEOUT) as test_db:
+                await test_db.execute("SELECT 1")
+                logger.info("✅ 数据库连接测试成功")
+        except Exception as test_error:
+            logger.warning(f"数据库连接测试失败: {test_error}")
+
+            # 4. 如果连接测试失败，尝试备份并重新初始化
+            if os.path.exists(dbpath):
+                backup_path = f"{dbpath}.backup_{int(time.time())}"
+                try:
+                    os.rename(dbpath, backup_path)
+                    logger.info(f"📦 已备份损坏的数据库文件到: {backup_path}")
+                except Exception as backup_error:
+                    logger.warning(f"备份数据库失败: {backup_error}")
+
+        # 5. 重置初始化标志，强制重新初始化
+        _db_initialized = False
+
+        # 6. 清除相关缓存
+        if redis_client:
+            try:
+                # 清除所有用户缓存
+                for key in redis_client.scan_iter(match="user:*"):
+                    redis_client.delete(key)
+                logger.info("🧹 已清除Redis缓存")
+            except Exception as cache_error:
+                logger.debug(f"清除缓存失败: {cache_error}")
+
+        logger.info("🔧 数据库连接修复处理完成")
+
+    except Exception as recovery_error:
+        logger.error(f"❌ 数据库连接恢复失败: {recovery_error}")
+
+
+async def _safe_db_connect(timeout=DB_CONNECTION_TIMEOUT):
+    """安全的数据库连接函数"""
+    try:
+        # 确保目录存在
+        db_dir = os.path.dirname(dbpath)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+
+        return aiosqlite.connect(dbpath, timeout=timeout)
+    except Exception as e:
+        logger.error(f"创建数据库连接失败: {e}")
+        raise
 
 
 def extract_redis_from_local_zip():
@@ -121,6 +237,7 @@ async def ensure_db_initialized():
 
 
 # 初始化数据库，新增注册时间字段
+@database_retry()
 async def initialize_db():
     """初始化数据库表结构"""
     try:
@@ -129,7 +246,7 @@ async def initialize_db():
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir)
 
-        async with aiosqlite.connect(dbpath) as db:
+        async with await _safe_db_connect() as db:
             # 优化数据库设置
             await db.execute("PRAGMA journal_mode=WAL;")
             await db.execute("PRAGMA synchronous=NORMAL;")
@@ -204,12 +321,13 @@ class User:
                 f"portrait_update_time={self.portrait_update_time})")
 
 
+@database_retry()
 async def add_user(user_id, nickname, card, sex="0", age=0, city="通辽", permission=0, ai_token_record=0):
     """添加新用户"""
     # 确保数据库已初始化
     await ensure_db_initialized()
 
-    async with aiosqlite.connect(dbpath) as db:
+    async with await _safe_db_connect() as db:
         async with db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,)) as cursor:
             if await cursor.fetchone():
                 return f"✅ 用户 {user_id} 已存在，无法重复注册。"
@@ -231,6 +349,7 @@ async def add_user(user_id, nickname, card, sex="0", age=0, city="通辽", permi
         return f"✅ 用户 {user_id} 注册成功。"
 
 
+@database_retry()
 async def update_user(user_id, **kwargs):
     """更新用户信息"""
     # 确保数据库已初始化
@@ -239,7 +358,7 @@ async def update_user(user_id, **kwargs):
     valid_fields = ["nickname", "card", "sex", "age", "city", "permission",
                     'ai_token_record', 'user_portrait', 'portrait_update_time']
 
-    async with aiosqlite.connect(dbpath) as db:
+    async with await _safe_db_connect() as db:
         for key, value in kwargs.items():
             if key in valid_fields:
                 await db.execute(f"UPDATE users SET {key} = ? WHERE user_id = ?", (value, user_id))
@@ -258,8 +377,34 @@ async def update_user(user_id, **kwargs):
     return f"✅ 用户 {user_id} 的信息已更新：{kwargs}"
 
 
-async def get_user(user_id, nickname="") -> User:
+# 递归深度限制
+MAX_RECURSION_DEPTH = 3
+
+
+@database_retry()
+async def get_user(user_id, nickname="", _recursion_depth=0) -> User:
     """获取用户信息，如果不存在则创建默认用户"""
+    global _db_initialized
+
+    # 检查递归深度，防止无限递归
+    if _recursion_depth >= MAX_RECURSION_DEPTH:
+        logger.error(f"get_user 递归深度超限 ({_recursion_depth})，返回默认用户对象")
+        # 返回一个基本的用户对象，避免程序崩溃
+        return User(
+            user_id=user_id,
+            nickname=f"{nickname}" if nickname else f"用户{user_id}",
+            card="00000",
+            sex="0",
+            age=0,
+            city="通辽",
+            permission=0,
+            signed_days="[]",
+            registration_date=datetime.date.today().isoformat(),
+            ai_token_record=0,
+            user_portrait="",
+            portrait_update_time=""
+        )
+
     try:
         # 确保数据库已初始化
         await ensure_db_initialized()
@@ -291,7 +436,25 @@ async def get_user(user_id, nickname="") -> User:
             "portrait_update_time": ""
         }
 
-        async with aiosqlite.connect(dbpath) as db:
+        async with await _safe_db_connect() as db:
+            # 首先检查表是否存在
+            async with db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users';") as cursor:
+                table_exists = await cursor.fetchone()
+
+            if not table_exists:
+                logger.warning("用户表不存在，可能数据库被删除，重新初始化...")
+                _db_initialized = False
+                try:
+                    await ensure_db_initialized()
+                except Exception as init_error:
+                    logger.error(f"数据库初始化失败: {init_error}")
+                    # 初始化失败时，不要递归，直接返回默认用户
+                    if _recursion_depth < MAX_RECURSION_DEPTH - 1:
+                        return await get_user(user_id, nickname, _recursion_depth + 1)
+                    else:
+                        logger.error("数据库初始化多次失败，返回默认用户对象")
+                        return User(**default_user)
+
             # 检查表结构并添加缺失列
             async with db.execute("PRAGMA table_info(users);") as cursor:
                 columns = await cursor.fetchall()
@@ -347,7 +510,7 @@ async def get_user(user_id, nickname="") -> User:
                           default_user["age"], default_user["city"], default_user["permission"],
                           default_user["signed_days"], default_user["registration_date"],
                           default_user["ai_token_record"], default_user["user_portrait"],
-                          default_user["portrait_update_time"]))
+                          default_user["portal_update_time"]))
                     await db.commit()
                     logger.info(f"用户 {user_id} 不在数据库中，已创建默认用户。")
 
@@ -375,18 +538,39 @@ async def get_user(user_id, nickname="") -> User:
 
                 return user_obj
 
+    except sqlite3.OperationalError as db_error:
+        error_msg = str(db_error).lower()
+        if "no such table" in error_msg:
+            logger.warning(f"表不存在错误，重新初始化数据库: {db_error}")
+            _db_initialized = False
+            try:
+                await ensure_db_initialized()
+                # 仅在递归深度允许时才递归
+                if _recursion_depth < MAX_RECURSION_DEPTH - 1:
+                    return await get_user(user_id, nickname, _recursion_depth + 1)
+                else:
+                    logger.error("递归深度超限，返回默认用户对象")
+                    return User(**default_user)
+            except Exception as init_error:
+                logger.error(f"数据库初始化失败: {init_error}")
+                return User(**default_user)
+        else:
+            logger.error(f"获取用户 {user_id} 时数据库错误：{db_error}")
+            raise
     except Exception as e:
         logger.error(f"获取用户 {user_id} 时出错：{e}")
         logger.error(traceback.format_exc())
 
-        # 出错时清理可能损坏的数据
+        # 清理操作（但不递归）
         try:
-            async with aiosqlite.connect(dbpath) as db:
-                async with db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            async with await _safe_db_connect() as db:
+                async with db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users';") as cursor:
                     if await cursor.fetchone():
-                        await db.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
-                        await db.commit()
-                        logger.info(f"已删除损坏的用户数据: {user_id}")
+                        async with db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                            if await cursor.fetchone():
+                                await db.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+                                await db.commit()
+                                logger.info(f"已删除损坏的用户数据: {user_id}")
         except Exception as cleanup_error:
             logger.error(f"清理损坏数据失败: {cleanup_error}")
 
@@ -397,16 +581,21 @@ async def get_user(user_id, nickname="") -> User:
             except Exception:
                 pass
 
-        # 递归重试
-        return await get_user(user_id, nickname)
+        # 仅在递归深度允许时才递归
+        if _recursion_depth < MAX_RECURSION_DEPTH - 1:
+            return await get_user(user_id, nickname, _recursion_depth + 1)
+        else:
+            logger.error("递归深度超限，返回默认用户对象")
+            return User(**default_user)
 
 
+@database_retry()
 async def get_signed_days(user_id):
     """获取用户签到记录"""
     # 确保数据库已初始化
     await ensure_db_initialized()
 
-    async with aiosqlite.connect(dbpath) as db:
+    async with await _safe_db_connect() as db:
         async with db.execute("SELECT signed_days FROM users WHERE user_id = ?", (user_id,)) as cursor:
             result = await cursor.fetchone()
             if result and result[0]:
@@ -417,12 +606,13 @@ async def get_signed_days(user_id):
             return []
 
 
+@database_retry()
 async def record_sign_in(user_id, nickname="DefaultUser", card="00000"):
     """记录用户签到"""
     # 确保数据库已初始化
     await ensure_db_initialized()
 
-    async with aiosqlite.connect(dbpath) as db:
+    async with await _safe_db_connect() as db:
         async with db.execute("SELECT signed_days FROM users WHERE user_id = ?", (user_id,)) as cursor:
             result = await cursor.fetchone()
 
@@ -462,12 +652,13 @@ async def record_sign_in(user_id, nickname="DefaultUser", card="00000"):
             return f"用户 {user_id} 今天已经签到过了！"
 
 
+@database_retry()
 async def get_users_with_permission_above(permission_value):
     """查找权限高于指定值的用户"""
     # 确保数据库已初始化
     await ensure_db_initialized()
 
-    async with aiosqlite.connect(dbpath) as db:
+    async with await _safe_db_connect() as db:
         async with db.execute("SELECT user_id FROM users WHERE permission > ?", (permission_value,)) as cursor:
             result = await cursor.fetchall()
             return [user[0] for user in result]
@@ -480,4 +671,3 @@ def get_db_stats():
         "redis_connected": redis_client is not None,
         "db_path": dbpath
     }
-
