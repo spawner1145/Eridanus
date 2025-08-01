@@ -2,7 +2,7 @@ import shutil
 import os
 import json as json_handle
 from developTools.event.events import GroupMessageEvent
-from developTools.message.message_components import Image, File, Video
+from developTools.message.message_components import Image, File, Video, Node, Text, Image, Music
 from run.streaming_media.service.Link_parsing.core.login_core import ini_login_Link_Prising
 from run.streaming_media.service.Link_parsing.Link_parsing import download_video_link_prising
 from run.streaming_media.service.Link_parsing.music_link_parsing import netease_music_link_parse
@@ -11,33 +11,40 @@ from run.streaming_media.service.Link_parsing import *
 teamlist = {}
 
 
-async def call_bili_download_video(bot, event, config):
+async def call_bili_download_video(bot, event, config,type_download='video'):
     if event.group_id in teamlist:
-        json = teamlist[event.group_id]
+        json_linking = teamlist[event.group_id]
         teamlist.pop(event.group_id)
         if f'{event.group_id}_recall' in teamlist:
             await bot.recall(teamlist[f'{event.group_id}_recall']['data']['message_id'])
             teamlist.pop(f'{event.group_id}_recall')
     else:
         return {"status": "当前群聊没有已缓存的解析结果。"}
-    if json['soft_type'] not in {'bilibili', 'dy', 'wb', 'xhs', 'x'}:
-        await bot.send(event, '该类型视频暂未提供下载支持，敬请期待')
+    if json_linking['soft_type'] not in {'bilibili', 'dy', 'wb', 'xhs', 'x'}:
+        await bot.send(event, '该类型视频图片暂未提供下载支持，敬请期待')
         return
     proxy = config.common_config.basic_config["proxy"]["http_proxy"]
-    try:
-        video_json = await download_video_link_prising(json, filepath='data/pictures/cache/', proxy=proxy)
-        if 'video' in video_json['type']:
-            if video_json['type'] == 'video_bigger':recall_id =await bot.send(event, f'视频有些大，请耐心等待喵~~')
-            await bot.send(event, Video(file=video_json['video_path']))
-            if video_json['type'] == 'video_bigger':await bot.recall(recall_id['data']['message_id'])
-        elif video_json['type'] == 'file':
-            recall_id =await bot.send(event, f'好大的视频，小的将发送至群文件喵~')
-            await bot.send(event, File(file=video_json['video_path']))
-            await bot.recall(recall_id['data']['message_id'])
-        elif video_json['type'] == 'too_big':
-            await bot.send(event, f'太大了，罢工！')
-    except Exception as e:
-        await bot.send(event, f'下载失败\n{e}')
+    if type_download == 'video' and json_linking['video_url']:
+        try:
+            video_json = await download_video_link_prising(json_linking, filepath='data/pictures/cache/', proxy=proxy)
+            if 'video' in video_json['type']:
+                if video_json['type'] == 'video_bigger':recall_id =await bot.send(event, f'视频有些大，请耐心等待喵~~')
+                await bot.send(event, Video(file=video_json['video_path']))
+                if video_json['type'] == 'video_bigger':await bot.recall(recall_id['data']['message_id'])
+            elif video_json['type'] == 'file':
+                recall_id =await bot.send(event, f'好大的视频，小的将发送至群文件喵~')
+                await bot.send(event, File(file=video_json['video_path']))
+                await bot.recall(recall_id['data']['message_id'])
+            elif video_json['type'] == 'too_big':
+                await bot.send(event, f'太大了，罢工！')
+        except Exception as e:
+            await bot.send(event, f'下载失败\n{e}')
+    elif type_download == 'img' and json_linking['pic_url_list'] != []:
+        node_list = [Node(
+            content=[Text("小的找的图片如下，请君过目喵")])]
+        for pic_url in json_linking['pic_url_list']:
+            node_list.append(Node(content=[Image(file=await download_img(pic_url,'data/pictures/cache/', proxy=proxy))]))
+        await bot.send(event, node_list)
 
 
 def main(bot, config):
@@ -94,6 +101,9 @@ def main(bot, config):
                 else:
                     bot.logger.info('视频下载ing')
                     await call_bili_download_video(bot, event, config)
+            elif event.get("text") is not None and event.get("text")[0] == "下载图片":
+                bot.logger.info('图片下载ing')
+                await call_bili_download_video(bot, event, config,'img')
 
         link_prising_json = await link_prising(url, filepath='data/pictures/cache/', proxy=proxy)
         send_context = f'{botname}识别结果：'
@@ -107,10 +117,13 @@ def main(bot, config):
                     await call_bili_download_video(bot, event, config)
                     return
                 else:
-                    send_context = f'该视频可下载，发送“下载视频”以推送'
+                    send_context = f'该视频可下载，发送“下载视频”以推送喵'
                     if "QQ小程序" in url and config.streaming_media.config["bili_dynamic"]["is_QQ_chek"] is not True:
                         teamlist[f'{event.group_id}_recall'] = await bot.send(event, [f'{send_context}'])
                         return
+            elif link_prising_json['pic_url_list'] != []:
+                send_context = f'{botname}发现了图片哟，发送‘下载图片’来推送喵'
+                teamlist[event.group_id] = link_prising_json
             teamlist[f'{event.group_id}_recall'] = await bot.send(event, [f'{send_context}\n', Image(file=link_prising_json['pic_path'])])
         else:
             if link_prising_json['reason']:

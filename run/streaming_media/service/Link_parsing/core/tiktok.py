@@ -231,6 +231,7 @@ async def dy(url,filepath=None):
                              'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]" ], 'type_software': 'dy', },
                             {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': [context]}])
         #print(out_path)
+        json_check['pic_url_list'] = img_context
         return json_check
 
 

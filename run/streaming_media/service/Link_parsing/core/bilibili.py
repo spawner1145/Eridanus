@@ -18,7 +18,7 @@ from bilibili_api import dynamic
 from bilibili_api.opus import Opus
 from bilibili_api.video import VideoDownloadURLDataDetecter
 from .bili import bili_init,av_to_bv,download_b,info_search_bili
-from .common import name_qq_list,card_url_list,add_append_img,download_video,get_file_size_mb
+from .common import name_qq_list,card_url_list,add_append_img,download_video,get_file_size_mb,download_img
 try:
     from bilibili_api import select_client
     select_client("httpx")
@@ -146,6 +146,7 @@ async def bilibili(url,filepath=None,is_twice=None):
                     if is_twice is not True:
                         json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
                         json_check['time'] = pub_time
+                        json_check['pic_url_list'] = image_list
                         return json_check
                     return manshuo_draw_json
 
@@ -247,6 +248,7 @@ async def bilibili(url,filepath=None,is_twice=None):
                     if is_twice is not True:
                         json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
                         json_check['time'] = pub_time
+                        json_check['pic_url_list'] = image_list
                         return json_check
                     return manshuo_draw_json
                 elif orig_check ==2:
@@ -344,7 +346,7 @@ async def bilibili(url,filepath=None,is_twice=None):
 
         if is_twice is not True:
             json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
-
+            json_check['pic_url_list'].append(cover)
             return json_check
         return manshuo_draw_json
     # 专栏识别
@@ -427,6 +429,7 @@ async def bilibili(url,filepath=None,is_twice=None):
 
     if is_twice is not True:
         json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
+        json_check['pic_url_list'].append(video_cover)
         return json_check
     return manshuo_draw_json
 

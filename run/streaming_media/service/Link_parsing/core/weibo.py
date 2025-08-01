@@ -140,4 +140,5 @@ async def wb(url,filepath=None):
             {'type': 'avatar', 'subtype': 'common', 'img': [avatar_hd], 'upshift_extra': 20,
              'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]"], 'type_software': 'wb', },
             {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': [context]}])
+    json_check['pic_url_list'] = img_context
     return json_check
