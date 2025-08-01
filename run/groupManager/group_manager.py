@@ -61,6 +61,10 @@ def main(bot: ExtendBot,config):
     @bot.on(GroupMessageEvent)
     async def _(event: GroupMessageEvent):
         r = await bot.get_group_info(event.group_id)
+        try:
+            num=r["data"]["member_count"]
+        except:
+            return #管你这那的
         if r["data"]["member_count"] != 0 and (
                 r["data"]["member_count"] <= config.common_config.basic_config["自动退出少于此人数的群"]
                 or r["data"]["member_count"] >= config.common_config.basic_config["自动退出多于此人数的群"])\
