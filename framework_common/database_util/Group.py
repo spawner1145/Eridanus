@@ -524,7 +524,7 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
         # 设置三级缓存 - 使用Redis缓存管理器
         set_memory_cache(cache_key, fl)
         set_redis_cache(cache_key, fl)
-        print(fl)
+        #print(fl)
         return fl
 
     except Exception as e:
