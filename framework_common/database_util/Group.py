@@ -1,27 +1,20 @@
 import aiosqlite
 import json
 import asyncio
-import redis
 import time
 import os
 from collections import defaultdict
 from threading import Lock
 import hashlib
 from developTools.utils.logger import get_logger
+from framework_common.database_util.RedisCacheManager import create_group_cache_manager
 from run.ai_llm.service.aiReplyHandler.gemini import gemini_prompt_elements_construct
 from run.ai_llm.service.aiReplyHandler.openai import prompt_elements_construct, prompt_elements_construct_old_version
 
+# 导入Redis缓存管理器
+
+
 DB_NAME = "data/dataBase/group_messages.db"
-
-
-def is_running_in_docker():
-    return os.path.exists("/.dockerenv") or os.environ.get("IN_DOCKER") == "1"
-
-
-if is_running_in_docker():
-    REDIS_URL = "redis://redis:6379/0"
-else:
-    REDIS_URL = "redis://localhost"
 
 # 优化后的缓存配置
 REDIS_CACHE_TTL = 300  # 增加到5分钟
@@ -30,7 +23,8 @@ BATCH_SIZE = 10  # 批量写入大小
 
 logger = get_logger()
 
-redis_client = None
+# 使用Redis缓存管理器 (数据库0)
+redis_cache = create_group_cache_manager(cache_ttl=REDIS_CACHE_TTL)
 
 # 内存缓存和批量写入
 memory_cache = {}
@@ -38,89 +32,6 @@ cache_timestamps = {}
 pending_writes = defaultdict(list)
 write_lock = Lock()
 last_batch_write = time.time()
-
-import subprocess
-import platform
-import zipfile
-
-REDIS_EXECUTABLE = "redis-server.exe"
-REDIS_ZIP_PATH = os.path.join("data", "Redis-x64-5.0.14.1.zip")
-REDIS_FOLDER = os.path.join("data", "redis_extracted")
-
-
-def extract_redis_from_local_zip():
-    """从本地 zip 解压 Redis 到指定目录"""
-    if not os.path.exists(REDIS_FOLDER):
-        os.makedirs(REDIS_FOLDER)
-        logger.info("📦 正在从本地压缩包解压 Redis...")
-        with zipfile.ZipFile(REDIS_ZIP_PATH, 'r') as zip_ref:
-            zip_ref.extractall(REDIS_FOLDER)
-        logger.info("✅ Redis 解压完成")
-
-
-def start_redis_background():
-    """在后台启动 Redis（支持 Windows 和 Linux）"""
-    system = platform.system()
-    extract_redis_from_local_zip()
-    if system == "Windows":
-        redis_path = os.path.join(REDIS_FOLDER, REDIS_EXECUTABLE)
-        if not os.path.exists(redis_path):
-            logger.error(f"❌ 找不到 redis-server.exe 于 {redis_path}")
-            return
-        logger.info("🚀 启动 Redis 服务中 (Windows)...")
-        subprocess.Popen([redis_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    elif system == "Linux":
-        try:
-            logger.info("🚀 尝试在后台启动 Redis 服务 (Linux)...")
-            subprocess.Popen(["redis-server"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except FileNotFoundError:
-            logger.error("❌ 'redis-server' 命令未找到。请确保 Redis 已安装并在系统的 PATH 中。")
-        except Exception as e:
-            logger.error(f"❌ 在 Linux 上启动 Redis 失败: {e}")
-    else:
-        logger.warning(f"⚠️ 不支持在 {system} 系统上自动启动 Redis。")
-
-
-def init_redis():
-    global redis_client
-    if redis_client is not None:
-        return
-    try:
-        # 优化Redis连接配置
-        redis_client = redis.StrictRedis.from_url(
-            REDIS_URL,
-            socket_connect_timeout=5,
-            socket_timeout=5,
-            retry_on_timeout=True,
-            health_check_interval=30
-        )
-        redis_client.ping()
-        logger.info("✅ Redis 连接成功（数据库 db group）")
-    except redis.exceptions.ConnectionError:
-        logger.warning("⚠️ Redis 未运行，尝试自动启动 Redis...")
-        system = platform.system()
-        if system == "Windows" or system == "Linux":
-            start_redis_background()
-            time.sleep(2)
-            try:
-                redis_client = redis.StrictRedis.from_url(
-                    REDIS_URL,
-                    socket_connect_timeout=5,
-                    socket_timeout=5,
-                    retry_on_timeout=True,
-                    health_check_interval=30
-                )
-                redis_client.ping()
-                logger.info(f"✅ Redis 已在 {system} 上自动启动并连接成功（数据库 db1）")
-            except Exception as e:
-                logger.error(f"❌ Redis 自动启动后连接失败：{e}")
-                redis_client = None
-        else:
-            logger.error(f"❌ 非 Windows/Linux 系统，请手动安装并启动 Redis")
-            redis_client = None
-
-
-init_redis()
 
 
 # ======================= 优化的缓存管理 =======================
@@ -160,37 +71,18 @@ def set_memory_cache(key: str, value):
 
 
 def get_redis_cache(key: str):
-    """安全获取Redis缓存"""
-    if not redis_client:
-        return None
-    try:
-        cached = redis_client.get(key)
-        return json.loads(cached) if cached else None
-    except Exception as e:
-        logger.debug(f"Redis读取失败: {e}")
-        return None
+    """安全获取Redis缓存 - 使用Redis缓存管理器"""
+    return redis_cache.get(key)
 
 
 def set_redis_cache(key: str, value, ttl: int = REDIS_CACHE_TTL):
-    """安全设置Redis缓存"""
-    if not redis_client:
-        return
-    try:
-        redis_client.setex(key, ttl, json.dumps(value))
-    except Exception as e:
-        logger.debug(f"Redis写入失败: {e}")
+    """安全设置Redis缓存 - 使用Redis缓存管理器"""
+    redis_cache.set(key, value, ttl)
 
 
 def clear_redis_cache_pattern(pattern: str):
-    """清理Redis缓存模式"""
-    if not redis_client:
-        return
-    try:
-        keys = redis_client.keys(pattern)
-        if keys:
-            redis_client.delete(*keys)
-    except Exception as e:
-        logger.debug(f"Redis清理失败: {e}")
+    """清理Redis缓存模式 - 使用Redis缓存管理器"""
+    redis_cache.delete_pattern(pattern)
 
 
 # ======================= 优化的数据库操作 =======================
@@ -283,9 +175,9 @@ async def batch_write_pending():
                     )
 
         await db.commit()
-        #logger.debug(f"批量写入完成: {len(batch_data)} 个群组")
+        # logger.debug(f"批量写入完成: {len(batch_data)} 个群组")
 
-        # 清理相关缓存
+        # 清理相关缓存 - 使用Redis缓存管理器
         for group_id in batch_data.keys():
             clear_redis_cache_pattern(f"group:{group_id}:*")
             # 清理内存缓存
@@ -306,12 +198,11 @@ _periodic_task: Optional[asyncio.Task] = None
 _db_initialized: bool = False
 
 
-# 定期批量写入任务
 async def periodic_batch_write():
     """定期批量写入任务"""
     while True:
         try:
-            await asyncio.sleep(5)  # 每2秒检查一次
+            await asyncio.sleep(5)  # 每5秒检查一次
             await batch_write_pending()
         except Exception as e:
             logger.error(f"定期批量写入错误: {e}")
@@ -393,8 +284,6 @@ async def init_db():
 # ======================= 优化的添加消息 =======================
 async def add_to_group(group_id: int, message, delete_after: int = 50):
     """向群组添加消息（优化版：使用批量写入）"""
-    init_redis()
-
     # 确保数据库已初始化
     await ensure_db_initialized()
 
@@ -455,8 +344,6 @@ async def get_group_messages(group_id: int, limit: int = 50):
 async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, prompt_standard="gemini", bot=None,
                                             event=None):
     """获取最近的消息并转换为指定格式的 prompt（优化版）"""
-    init_redis()
-
     # 确保数据库已初始化
     await ensure_db_initialized()
 
@@ -468,7 +355,7 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
     if cached:
         return cached
 
-    # 2. 检查Redis缓存
+    # 2. 检查Redis缓存 - 使用Redis缓存管理器
     cached = get_redis_cache(cache_key)
     if cached:
         set_memory_cache(cache_key, cached)
@@ -560,7 +447,7 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
             fl.append({"role": "user", "content": all_parts if all_parts else all_parts_str})
             fl.append({"role": "assistant", "content": "嗯嗯我记住了"})
 
-        # 设置三级缓存
+        # 设置三级缓存 - 使用Redis缓存管理器
         set_memory_cache(cache_key, fl)
         set_redis_cache(cache_key, fl)
 
@@ -574,8 +461,6 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
 # ======================= 优化的清除消息 =======================
 async def clear_group_messages(group_id: int):
     """清除指定群组的所有消息（优化版）"""
-    init_redis()
-
     # 确保数据库已初始化
     await ensure_db_initialized()
 
@@ -593,7 +478,7 @@ async def clear_group_messages(group_id: int):
         await db.commit()
         logger.info(f"✅ 已清除 group_id={group_id} 的所有数据")
 
-        # 清除所有缓存
+        # 清除所有缓存 - 使用Redis缓存管理器
         clear_redis_cache_pattern(f"group:{group_id}:*")
 
         # 清理内存缓存
@@ -606,14 +491,133 @@ async def clear_group_messages(group_id: int):
         logger.error(f"❌ 清理 group_id={group_id} 数据时出错: {e}")
 
 
+# ======================= 新增：缓存管理功能 =======================
+async def clear_all_group_cache():
+    """清除所有群组相关的缓存"""
+    try:
+        # 清除Redis缓存
+        redis_cache.delete_pattern("group:*")
+        redis_cache.delete_pattern("messages:*")
+
+        # 清除内存缓存
+        memory_cache.clear()
+        cache_timestamps.clear()
+
+        logger.info("✅ 所有群组缓存已清除")
+        return True
+    except Exception as e:
+        logger.error(f"❌ 清除群组缓存失败: {e}")
+        return False
+
+
+async def get_group_cache_info(group_id: int):
+    """获取指定群组的缓存信息"""
+    try:
+        # 获取Redis中该群组的所有缓存键
+        redis_keys = redis_cache.get_keys(f"group:{group_id}:*")
+        redis_keys.extend(redis_cache.get_keys(f"messages:{group_id}:*"))
+
+        # 获取内存中该群组的缓存键
+        memory_keys = [k for k in memory_cache.keys() if f"group:{group_id}:" in k or f"messages:{group_id}:" in k]
+
+        # 获取待写入的消息数量
+        pending_count = len(pending_writes.get(group_id, []))
+
+        return {
+            "group_id": group_id,
+            "redis_cache_keys": len(redis_keys),
+            "memory_cache_keys": len(memory_keys),
+            "pending_writes": pending_count,
+            "redis_connected": redis_cache.is_connected()
+        }
+    except Exception as e:
+        logger.error(f"❌ 获取群组 {group_id} 缓存信息失败: {e}")
+        return {
+            "group_id": group_id,
+            "error": str(e)
+        }
+
+
 # ======================= 性能监控 =======================
 def get_cache_stats():
     """获取缓存统计信息"""
+    redis_info = redis_cache.get_info()
+
     return {
         "memory_cache_size": len(memory_cache),
         "pending_writes_groups": len(pending_writes),
         "pending_writes_total": sum(len(msgs) for msgs in pending_writes.values()),
-        "redis_connected": redis_client is not None,
+        "redis_connected": redis_cache.is_connected(),
+        "redis_info": redis_info,
         "db_initialized": _db_initialized,
         "periodic_task_running": _periodic_task is not None and not _periodic_task.done()
     }
+
+
+# ======================= 新增：手动缓存控制 =======================
+def force_cache_cleanup():
+    """强制清理过期的内存缓存"""
+    try:
+        current_time = time.time()
+        expired_keys = [
+            k for k, t in cache_timestamps.items()
+            if current_time - t > MEMORY_CACHE_TTL
+        ]
+
+        for k in expired_keys:
+            memory_cache.pop(k, None)
+            cache_timestamps.pop(k, None)
+
+        logger.info(f"✅ 清理了 {len(expired_keys)} 个过期的内存缓存项")
+        return len(expired_keys)
+    except Exception as e:
+        logger.error(f"❌ 强制清理缓存失败: {e}")
+        return 0
+
+
+async def preload_group_cache(group_id: int, data_length: int = 20):
+    """预加载群组缓存"""
+    try:
+        # 预加载不同prompt标准的缓存
+        standards = ["gemini", "new_openai", "old_openai"]
+
+        for standard in standards:
+            await get_last_20_and_convert_to_prompt(
+                group_id=group_id,
+                data_length=data_length,
+                prompt_standard=standard
+            )
+
+        # 预加载消息列表缓存
+        await get_group_messages(group_id, limit=50)
+
+        logger.info(f"✅ 群组 {group_id} 缓存预加载完成")
+        return True
+    except Exception as e:
+        logger.error(f"❌ 群组 {group_id} 缓存预加载失败: {e}")
+        return False
+
+
+# ======================= 关闭资源 =======================
+async def cleanup_resources():
+    """清理资源"""
+    try:
+        # 停止定期任务
+        stop_periodic_batch_write()
+
+        # 最后一次批量写入
+        await batch_write_pending()
+
+        # 关闭数据库连接
+        for db in CONNECTION_POOL.values():
+            await db.close()
+        CONNECTION_POOL.clear()
+
+        # 清理内存缓存
+        memory_cache.clear()
+        cache_timestamps.clear()
+        pending_writes.clear()
+
+        logger.info("✅ 群组消息模块资源清理完成")
+    except Exception as e:
+        logger.error(f"❌ 资源清理失败: {e}")

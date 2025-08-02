@@ -578,6 +578,12 @@ def main(bot, config):
         # 处理图片和重绘命令
         if event.pure_text == "重绘" or event.pure_text.startswith("重绘 ") or event.sender.user_id in UserGet:
             if await get_img(event.processed_message, bot, event):
+                user_info = await get_user(event.user_id)
+                if user_info.permission < config.ai_generated_art.config["ai绘画"]["ai绘画所需权限等级"]:
+                    bot.logger.info(f"reject text2img request: 权限不足")
+                    msg = await bot.send(event, "无绘图功能使用权限", True)
+                    await delay_recall(bot, msg)
+                    return
                 if str(event.pure_text).startswith("重绘"):
                     prompt = str(event.pure_text).replace("重绘 ", "").replace("重绘", "").strip()
                     UserGet[event.sender.user_id] = [prompt]
@@ -589,11 +595,7 @@ def main(bot, config):
                     if log:
                         await bot.send(event, log, True)
                 user_info = await get_user(event.user_id)
-                if user_info.permission < config.ai_generated_art.config["ai绘画"]["ai绘画所需权限等级"]:
-                    bot.logger.info(f"reject text2img request: 权限不足")
-                    msg = await bot.send(event, "无绘图功能使用权限", True)
-                    await delay_recall(bot, msg)
-                    return
+
                 bot.logger.info(f"接收来自群：{event.group_id} 用户：{event.sender.user_id} 的重绘指令 prompt: {prompts}")
 
                 # 获取图片路径
