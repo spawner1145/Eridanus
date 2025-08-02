@@ -285,6 +285,7 @@ def main(bot:ExtendBot, config):
                     mes_chain.append(Text(i.text))
                 elif isinstance(i,Image):
                     mes_chain.append(Image(file=i.file or i.url))
+            await bot.send(event,f"正在转发消息至所有群，请稍后...\n任务群数量：{len(groups['data'])}")
             for group in groups["data"]:
                 try:
                     bot.logger.info(f"转发消息至群{group['group_id']}")
