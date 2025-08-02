@@ -3,7 +3,10 @@ import json
 import asyncio
 import time
 import os
-from collections import defaultdict
+import threading
+import weakref
+import gc
+from collections import defaultdict, OrderedDict, deque
 from threading import Lock
 import hashlib
 from developTools.utils.logger import get_logger
@@ -26,48 +29,177 @@ logger = get_logger()
 # 使用Redis缓存管理器 (数据库0)
 redis_cache = create_group_cache_manager(cache_ttl=REDIS_CACHE_TTL)
 
-# 内存缓存和批量写入
-memory_cache = {}
-cache_timestamps = {}
-pending_writes = defaultdict(list)
+
+# ======================= 修复内存缓存管理 =======================
+class LRUMemoryCache:
+    """LRU内存缓存，防止无限增长"""
+
+    def __init__(self, max_size=500, ttl=50):
+        self.max_size = max_size
+        self.ttl = ttl
+        self.cache = OrderedDict()
+        self.timestamps = {}
+        self.lock = threading.Lock()
+
+    def get(self, key):
+        with self.lock:
+            if key in self.cache:
+                if time.time() - self.timestamps[key] < self.ttl:
+                    self.cache.move_to_end(key)  # LRU更新
+                    return self.cache[key]
+                else:
+                    # 过期清理
+                    del self.cache[key]
+                    del self.timestamps[key]
+            return None
+
+    def set(self, key, value):
+        with self.lock:
+            current_time = time.time()
+
+            if key in self.cache:
+                self.cache.move_to_end(key)
+            else:
+                # 如果缓存满了，移除最老的项
+                if len(self.cache) >= self.max_size:
+                    oldest = next(iter(self.cache))
+                    del self.cache[oldest]
+                    del self.timestamps[oldest]
+
+            self.cache[key] = value
+            self.timestamps[key] = current_time
+
+    def pop(self, key, default=None):
+        with self.lock:
+            self.timestamps.pop(key, None)
+            return self.cache.pop(key, default)
+
+    def keys(self):
+        with self.lock:
+            return list(self.cache.keys())
+
+    def __len__(self):
+        with self.lock:
+            return len(self.cache)
+
+    def clear(self):
+        with self.lock:
+            self.cache.clear()
+            self.timestamps.clear()
+
+    def cleanup_expired(self):
+        """手动清理过期项"""
+        with self.lock:
+            current_time = time.time()
+            expired_keys = [
+                k for k, t in self.timestamps.items()
+                if current_time - t > self.ttl
+            ]
+            for k in expired_keys:
+                self.cache.pop(k, None)
+                self.timestamps.pop(k, None)
+            return len(expired_keys)
+
+
+# 使用LRU缓存替代原有的字典
+memory_cache = LRUMemoryCache(max_size=500, ttl=MEMORY_CACHE_TTL)
+
+
+# ======================= 修复批量写入数据管理 =======================
+class BoundedPendingWrites:
+    """有界的待写入数据管理，防止无限累积"""
+
+    def __init__(self, max_per_group=100):
+        self.max_per_group = max_per_group
+        self.data = defaultdict(lambda: deque(maxlen=max_per_group))
+        self.lock = threading.Lock()
+
+    def append(self, group_id, message):
+        with self.lock:
+            self.data[group_id].append(message)
+
+    def get_and_clear_group(self, group_id):
+        with self.lock:
+            if group_id in self.data:
+                messages = list(self.data[group_id])
+                self.data[group_id].clear()
+                return messages
+            return []
+
+    def clear_all(self):
+        with self.lock:
+            result = {}
+            for group_id, messages in self.data.items():
+                if messages:
+                    result[group_id] = list(messages)
+                    messages.clear()
+            return result
+
+    def is_empty(self):
+        with self.lock:
+            return not any(self.data.values())
+
+    def get_group_size(self, group_id):
+        with self.lock:
+            return len(self.data.get(group_id, []))
+
+    def __len__(self):
+        with self.lock:
+            return len(self.data)
+
+    def total_messages(self):
+        with self.lock:
+            return sum(len(messages) for messages in self.data.values())
+
+
+pending_writes = BoundedPendingWrites(max_per_group=100)
 write_lock = Lock()
 last_batch_write = time.time()
 
+# ======================= 修复数据库连接管理 =======================
+# 优化后的数据库连接管理
+MAX_RETRIES = 3
+INITIAL_DELAY = 0.1
+_db_connection = None
+_connection_lock = threading.Lock()
 
-# ======================= 优化的缓存管理 =======================
+
+async def get_db_connection():
+    """获取数据库连接（单例模式，修复连接泄漏）"""
+    global _db_connection
+
+    if _db_connection is None:
+        with _connection_lock:
+            if _db_connection is None:
+                _db_connection = await aiosqlite.connect(DB_NAME)
+                # 优化数据库设置
+                await _db_connection.execute("PRAGMA journal_mode=WAL;")
+                await _db_connection.execute("PRAGMA synchronous=NORMAL;")
+                await _db_connection.execute("PRAGMA cache_size=10000;")
+                await _db_connection.execute("PRAGMA temp_store=MEMORY;")
+                await _db_connection.execute("PRAGMA busy_timeout=5000;")
+
+    return _db_connection
+
+
+# 跟踪异步任务，防止任务泄漏
+_running_tasks = weakref.WeakSet()
+
+
+# ======================= 保持原有的缓存管理接口 =======================
 def get_cache_key(group_id: int, prompt_standard: str, data_length: int = 20):
     """生成缓存键"""
     return f"group:{group_id}:{prompt_standard}:{data_length}"
 
 
 def get_memory_cache(key: str):
-    """获取内存缓存"""
-    if key in memory_cache:
-        timestamp = cache_timestamps.get(key, 0)
-        if time.time() - timestamp < MEMORY_CACHE_TTL:
-            return memory_cache[key]
-        else:
-            # 过期清理
-            memory_cache.pop(key, None)
-            cache_timestamps.pop(key, None)
-    return None
+    """获取内存缓存（保持原有接口）"""
+    return memory_cache.get(key)
 
 
 def set_memory_cache(key: str, value):
-    """设置内存缓存"""
-    memory_cache[key] = value
-    cache_timestamps[key] = time.time()
-
-    # 定期清理过期缓存
-    if len(memory_cache) > 1000:
-        current_time = time.time()
-        expired_keys = [
-            k for k, t in cache_timestamps.items()
-            if current_time - t > MEMORY_CACHE_TTL
-        ]
-        for k in expired_keys:
-            memory_cache.pop(k, None)
-            cache_timestamps.pop(k, None)
+    """设置内存缓存（保持原有接口）"""
+    memory_cache.set(key, value)
 
 
 def get_redis_cache(key: str):
@@ -86,26 +218,6 @@ def clear_redis_cache_pattern(pattern: str):
 
 
 # ======================= 优化的数据库操作 =======================
-MAX_RETRIES = 3
-INITIAL_DELAY = 0.1
-CONNECTION_POOL = {}
-
-
-async def get_db_connection():
-    """获取数据库连接（连接池）"""
-    thread_id = id(asyncio.current_task())
-    if thread_id not in CONNECTION_POOL:
-        db = await aiosqlite.connect(DB_NAME)
-        # 优化数据库设置
-        await db.execute("PRAGMA journal_mode=WAL;")
-        await db.execute("PRAGMA synchronous=NORMAL;")
-        await db.execute("PRAGMA cache_size=10000;")
-        await db.execute("PRAGMA temp_store=MEMORY;")
-        await db.execute("PRAGMA busy_timeout=5000;")
-        CONNECTION_POOL[thread_id] = db
-    return CONNECTION_POOL[thread_id]
-
-
 async def execute_with_retry(db, query, params=None):
     """优化的带重试机制的数据库操作"""
     for attempt in range(MAX_RETRIES):
@@ -130,23 +242,19 @@ async def execute_with_retry(db, query, params=None):
 
 # ======================= 批量写入优化 =======================
 async def batch_write_pending():
-    """批量写入待处理的数据"""
+    """批量写入待处理的数据（修复数据泄漏）"""
     global last_batch_write
     current_time = time.time()
 
     if current_time - last_batch_write < 1.0:  # 1秒内不重复写入
         return
 
-    with write_lock:
-        if not pending_writes:
-            return
-
-        batch_data = dict(pending_writes)
-        pending_writes.clear()
-        last_batch_write = current_time
-
+    # 获取并清空待写入数据
+    batch_data = pending_writes.clear_all()
     if not batch_data:
         return
+
+    last_batch_write = current_time
 
     try:
         db = await get_db_connection()
@@ -184,10 +292,13 @@ async def batch_write_pending():
             expired_keys = [k for k in memory_cache.keys() if f"group:{group_id}:" in k]
             for k in expired_keys:
                 memory_cache.pop(k, None)
-                cache_timestamps.pop(k, None)
 
     except Exception as e:
         logger.error(f"批量写入失败: {e}")
+        # 写入失败时，将数据重新放回队列（避免数据丢失）
+        for group_id, messages in batch_data.items():
+            for msg in messages:
+                pending_writes.append(group_id, msg)
 
 
 # ======================= 定期批量写入任务管理 =======================
@@ -204,6 +315,11 @@ async def periodic_batch_write():
         try:
             await asyncio.sleep(5)  # 每5秒检查一次
             await batch_write_pending()
+
+            # 定期清理过期缓存
+            if time.time() % 60 < 5:  # 大约每分钟清理一次
+                memory_cache.cleanup_expired()
+
         except Exception as e:
             logger.error(f"定期批量写入错误: {e}")
 
@@ -215,6 +331,7 @@ def start_periodic_batch_write():
         loop = asyncio.get_running_loop()
         if _periodic_task is None or _periodic_task.done():
             _periodic_task = loop.create_task(periodic_batch_write())
+            _running_tasks.add(_periodic_task)  # 跟踪任务
             logger.info("✅ 定期批量写入任务已启动")
     except RuntimeError:
         # 没有运行的事件循环，稍后再启动
@@ -236,6 +353,7 @@ def ensure_periodic_task():
         loop = asyncio.get_running_loop()
         if _periodic_task is None or _periodic_task.done():
             _periodic_task = loop.create_task(periodic_batch_write())
+            _running_tasks.add(_periodic_task)  # 跟踪任务
             logger.debug("✅ 定期批量写入任务已启动")
     except RuntimeError:
         # 没有事件循环，忽略
@@ -290,12 +408,20 @@ async def add_to_group(group_id: int, message, delete_after: int = 50):
     # 确保定期任务正在运行
     ensure_periodic_task()
 
-    with write_lock:
-        pending_writes[group_id].append(message)
+    pending_writes.append(group_id, message)
 
-        # 如果积累了足够的消息，立即写入
-        if len(pending_writes[group_id]) >= BATCH_SIZE:
-            asyncio.create_task(batch_write_pending())
+    # 如果积累了足够的消息，立即写入
+    if pending_writes.get_group_size(group_id) >= BATCH_SIZE:
+        # 检查是否已有批量写入任务在运行
+        has_running_batch_task = any(
+            not task.done() and hasattr(task, '_batch_write')
+            for task in _running_tasks
+        )
+
+        if not has_running_batch_task:
+            task = asyncio.create_task(batch_write_pending())
+            task._batch_write = True  # 标记任务类型
+            _running_tasks.add(task)
 
 
 async def get_group_messages(group_id: int, limit: int = 50):
@@ -390,7 +516,10 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
         final_list = []
         updates_needed = []  # 收集需要更新的数据
 
-        # 用于构建上下文摘要的信息
+        # 用于构建上下文摘要的信息（限制大小防止内存泄漏）
+        MAX_PARTICIPANTS = 20
+        MAX_ACTIVITIES = 10
+
         context_info = {
             'participants': set(),
             'message_count': len(rows),
@@ -402,10 +531,12 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
             message_id, raw_message, processed_message, timestamp = row
             raw_message = json.loads(raw_message)
 
-            # 收集上下文信息
+            # 收集上下文信息（限制大小）
             user_name = raw_message.get('user_name', '未知用户')
             user_id = raw_message.get('user_id', '')
-            context_info['participants'].add(f"{user_name}(ID:{user_id})")
+
+            if len(context_info['participants']) < MAX_PARTICIPANTS:
+                context_info['participants'].add(f"{user_name}(ID:{user_id})")
 
             # 分析消息内容类型
             message_content = raw_message.get("message", [])
@@ -416,11 +547,14 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
                     if text:
                         # 简单的话题提取（可以根据需要扩展）
                         if '?' in text or '？' in text:
-                            context_info['activities'].append('有人提问')
+                            if len(context_info['activities']) < MAX_ACTIVITIES:
+                                context_info['activities'].append('有人提问')
                         if any(word in text for word in ['图片', '照片', '看看']):
-                            context_info['activities'].append('讨论图片')
+                            if len(context_info['activities']) < MAX_ACTIVITIES:
+                                context_info['activities'].append('讨论图片')
                         if any(word in text for word in ['文件', '链接', 'http']):
-                            context_info['activities'].append('分享文件/链接')
+                            if len(context_info['activities']) < MAX_ACTIVITIES:
+                                context_info['activities'].append('分享文件/链接')
                 elif msg_part.get('type') == 'image':
                     content_types.append('图片')
                 elif msg_part.get('type') == 'file':
@@ -430,8 +564,8 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
                 elif msg_part.get('type') == 'video':
                     content_types.append('视频')
 
-            if content_types:
-                context_info['activities'].extend([f"发送了{ct}" for ct in content_types])
+            if content_types and len(context_info['activities']) < MAX_ACTIVITIES:
+                context_info['activities'].extend([f"发送了{ct}" for ct in content_types[:3]])  # 限制数量
 
             # 如果已经处理过，使用缓存的消息
             if processed_message:
@@ -524,7 +658,7 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
         # 设置三级缓存 - 使用Redis缓存管理器
         set_memory_cache(cache_key, fl)
         set_redis_cache(cache_key, fl)
-        #print(fl)
+        # print(fl)
         return fl
 
     except Exception as e:
@@ -540,8 +674,7 @@ async def clear_group_messages(group_id: int):
 
     try:
         # 先清理待写入的数据
-        with write_lock:
-            pending_writes.pop(group_id, None)
+        pending_writes.get_and_clear_group(group_id)
 
         db = await get_db_connection()
         await execute_with_retry(
@@ -559,7 +692,6 @@ async def clear_group_messages(group_id: int):
         expired_keys = [k for k in memory_cache.keys() if f"group:{group_id}:" in k or f"messages:{group_id}:" in k]
         for k in expired_keys:
             memory_cache.pop(k, None)
-            cache_timestamps.pop(k, None)
 
     except Exception as e:
         logger.error(f"❌ 清理 group_id={group_id} 数据时出错: {e}")
@@ -575,7 +707,6 @@ async def clear_all_group_cache():
 
         # 清除内存缓存
         memory_cache.clear()
-        cache_timestamps.clear()
 
         logger.info("✅ 所有群组缓存已清除")
         return True
@@ -627,71 +758,3 @@ def get_cache_stats():
         "periodic_task_running": _periodic_task is not None and not _periodic_task.done()
     }
 
-
-# ======================= 新增：手动缓存控制 =======================
-def force_cache_cleanup():
-    """强制清理过期的内存缓存"""
-    try:
-        current_time = time.time()
-        expired_keys = [
-            k for k, t in cache_timestamps.items()
-            if current_time - t > MEMORY_CACHE_TTL
-        ]
-
-        for k in expired_keys:
-            memory_cache.pop(k, None)
-            cache_timestamps.pop(k, None)
-
-        logger.info(f"✅ 清理了 {len(expired_keys)} 个过期的内存缓存项")
-        return len(expired_keys)
-    except Exception as e:
-        logger.error(f"❌ 强制清理缓存失败: {e}")
-        return 0
-
-
-async def preload_group_cache(group_id: int, data_length: int = 20):
-    """预加载群组缓存"""
-    try:
-        # 预加载不同prompt标准的缓存
-        standards = ["gemini", "new_openai", "old_openai"]
-
-        for standard in standards:
-            await get_last_20_and_convert_to_prompt(
-                group_id=group_id,
-                data_length=data_length,
-                prompt_standard=standard
-            )
-
-        # 预加载消息列表缓存
-        await get_group_messages(group_id, limit=50)
-
-        logger.info(f"✅ 群组 {group_id} 缓存预加载完成")
-        return True
-    except Exception as e:
-        logger.error(f"❌ 群组 {group_id} 缓存预加载失败: {e}")
-        return False
-
-
-# ======================= 关闭资源 =======================
-async def cleanup_resources():
-    """清理资源"""
-    try:
-        # 停止定期任务
-        stop_periodic_batch_write()
-
-        # 最后一次批量写入
-        await batch_write_pending()
-
-        # 关闭数据库连接
-        for db in CONNECTION_POOL.values():
-            await db.close()
-        CONNECTION_POOL.clear()
-
-        # 清理内存缓存
-        memory_cache.clear()
-        cache_timestamps.clear()
-        pending_writes.clear()
-
-        logger.info("✅ 群组消息模块资源清理完成")
-    except Exception as e:
-        logger.error(f"❌ 资源清理失败: {e}")
