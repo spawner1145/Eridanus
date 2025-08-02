@@ -467,7 +467,10 @@ def main(bot,config):
                         friendlist_get = await bot.get_group_member_list(event.group_id)
 
                         for friend in friendlist_get["data"]:
-                            if context_check in friend['nickname'] or context_check in friend['card']:
+                            friend_check=[]
+                            if 'nickname' in friend:friend_check.append(friend["nickname"])
+                            if 'card' in friend:friend_check.append(friend["card"])
+                            if context_check in friend_check:
                                 # print(friend)
                                 name_id_number_1 = friend['user_id']
                                 name_id_number_2 = 0
@@ -545,7 +548,7 @@ def main(bot,config):
                     except Exception:
                         bot.logger.error('透热门群友列表加载出错，执行全局随机')
 
-                    print(friendlist)
+                    #print(friendlist)
                     if not friendlist:
                         for friend in data["data"]:
                             # print(friend)
@@ -561,7 +564,7 @@ def main(bot,config):
                                 friendlist.append(data_test)
                             if flag_persona == 1 or flag_persona == 5:
                                 if data_check == 'owner': break
-                    print(friendlist)
+                    #print(friendlist)
 
                     number_target = len(friendlist)
                     target_number = random.randint(1, number_target)
