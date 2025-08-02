@@ -134,16 +134,16 @@ def main(bot, config):
                 #print(link_prising_json)
                 bot.logger.error(str('bili_link_error ') + link_prising_json['reason'])
     @bot.on(LifecycleMetaEvent)
-    async def cleanup_teamlist():
+    async def cleanup_teamlist(event: LifecycleMetaEvent):
         while True:
             bot.logger.info('清理链接解析过期缓存')
-            await asyncio.sleep(300)
             current_time = time()
             expired_keys = [k for k, v in teamlist.items() if v['expire_at'] < current_time]
             for key in expired_keys:
                 teamlist.pop(key)
             collected = gc.collect()
             bot.logger.info_func(f"回收了 {collected} 个对象")
+            await asyncio.sleep(300)
     @bot.on(GroupMessageEvent)
     async def Music_Link_Prising_search(event: GroupMessageEvent):
         url = event.pure_text
