@@ -1,14 +1,17 @@
+import asyncio
 import shutil
 import os
 import json as json_handle
-from developTools.event.events import GroupMessageEvent
+from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Image, File, Video, Node, Text, Image, Music
 from run.streaming_media.service.Link_parsing.core.login_core import ini_login_Link_Prising
 from run.streaming_media.service.Link_parsing.Link_parsing import download_video_link_prising
 from run.streaming_media.service.Link_parsing.music_link_parsing import netease_music_link_parse
 from run.streaming_media.service.Link_parsing import *
 
-teamlist = {}
+from collections import defaultdict
+from time import time
+teamlist = defaultdict(lambda: {'data': None, 'expire_at': 0})
 
 
 async def call_bili_download_video(bot, event, config,type_download='video'):
@@ -111,7 +114,7 @@ def main(bot, config):
         if link_prising_json['status']:
             bot.logger.info('链接解析成功，开始推送~~')
             if link_prising_json['video_url']:
-                teamlist[event.group_id] = link_prising_json
+                teamlist[event.group_id] = {'data': link_prising_json, 'expire_at': time() + 300}
                 if event.pure_text.startswith('下载视频'):
                     bot.logger.info('视频下载ing')
                     await call_bili_download_video(bot, event, config)
@@ -123,13 +126,20 @@ def main(bot, config):
                         return
             elif link_prising_json['pic_url_list'] != []:
                 send_context = f'{botname}发现了图片哟，发送‘下载图片’来推送喵'
-                teamlist[event.group_id] = link_prising_json
+                teamlist[event.group_id] = {'data': link_prising_json, 'expire_at': time() + 300}
             teamlist[f'{event.group_id}_recall'] = await bot.send(event, [f'{send_context}\n', Image(file=link_prising_json['pic_path'])])
         else:
             if link_prising_json['reason']:
                 #print(link_prising_json)
                 bot.logger.error(str('bili_link_error ') + link_prising_json['reason'])
-
+    @bot.on(LifecycleMetaEvent)
+    async def cleanup_teamlist():
+        while True:
+            await asyncio.sleep(300)
+            current_time = time()
+            expired_keys = [k for k, v in teamlist.items() if v['expire_at'] < current_time]
+            for key in expired_keys:
+                teamlist.pop(key)
     @bot.on(GroupMessageEvent)
     async def Music_Link_Prising_search(event: GroupMessageEvent):
         url = event.pure_text
