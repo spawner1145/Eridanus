@@ -341,6 +341,7 @@ async def get_group_messages(group_id: int, limit: int = 50):
 
 
 # ======================= 优化的获取并转换消息 =======================
+
 async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, prompt_standard="gemini", bot=None,
                                             event=None):
     """获取最近的消息并转换为指定格式的 prompt（优化版）"""
@@ -381,7 +382,7 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
         db = await get_db_connection()
         cursor = await execute_with_retry(
             db,
-            f"SELECT id, message, {selected_field} FROM group_messages WHERE group_id = ? ORDER BY timestamp DESC LIMIT ?",
+            f"SELECT id, message, {selected_field}, timestamp FROM group_messages WHERE group_id = ? ORDER BY timestamp DESC LIMIT ?",
             (group_id, data_length)
         )
         rows = await cursor.fetchall()
@@ -389,16 +390,65 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
         final_list = []
         updates_needed = []  # 收集需要更新的数据
 
-        for row in rows:
-            message_id, raw_message, processed_message = row
+        # 用于构建上下文摘要的信息
+        context_info = {
+            'participants': set(),
+            'message_count': len(rows),
+            'topics': [],
+            'activities': []
+        }
+
+        for i, row in enumerate(rows):
+            message_id, raw_message, processed_message, timestamp = row
             raw_message = json.loads(raw_message)
+
+            # 收集上下文信息
+            user_name = raw_message.get('user_name', '未知用户')
+            user_id = raw_message.get('user_id', '')
+            context_info['participants'].add(f"{user_name}(ID:{user_id})")
+
+            # 分析消息内容类型
+            message_content = raw_message.get("message", [])
+            content_types = []
+            for msg_part in message_content:
+                if msg_part.get('type') == 'text':
+                    text = msg_part.get('text', '').strip()
+                    if text:
+                        # 简单的话题提取（可以根据需要扩展）
+                        if '?' in text or '？' in text:
+                            context_info['activities'].append('有人提问')
+                        if any(word in text for word in ['图片', '照片', '看看']):
+                            context_info['activities'].append('讨论图片')
+                        if any(word in text for word in ['文件', '链接', 'http']):
+                            context_info['activities'].append('分享文件/链接')
+                elif msg_part.get('type') == 'image':
+                    content_types.append('图片')
+                elif msg_part.get('type') == 'file':
+                    content_types.append('文件')
+                elif msg_part.get('type') == 'audio':
+                    content_types.append('语音')
+                elif msg_part.get('type') == 'video':
+                    content_types.append('视频')
+
+            if content_types:
+                context_info['activities'].extend([f"发送了{ct}" for ct in content_types])
 
             # 如果已经处理过，使用缓存的消息
             if processed_message:
                 final_list.append(json.loads(processed_message))
             else:
+                # 构建更丰富的上下文提示信息
+                position_desc = "最新" if i == 0 else f"第{i + 1}条"
+
+                context_prompt = (
+                    f"【群聊上下文-{position_desc}消息】"
+                    f"发送者：{user_name}(ID:{user_id}) | "
+                    f"时间戳：{timestamp} | "
+                    f"消息位置：倒数第{i + 1}条"
+                )
+
                 raw_message["message"].insert(0, {
-                    "text": f"本条消息消息发送者为 {raw_message['user_name']} id为{raw_message['user_id']} 这是参考消息，当我再次向你提问时，请正常回复我。"
+                    "text": f"{context_prompt}\n这是群聊历史消息，用于理解当前对话上下文。当我再次向你提问时，请结合这些上下文信息正常回复我。"
                 })
 
                 if prompt_standard == "gemini":
@@ -407,13 +457,10 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
                 elif prompt_standard == "new_openai":
                     processed = await prompt_elements_construct(raw_message["message"], bot=bot, event=event)
                     final_list.append(processed)
-                    final_list.append(
-                        {"role": "assistant", "content": [{"type": "text", "text": "(群聊背景消息已记录)"}]})
                 else:
                     processed = await prompt_elements_construct_old_version(raw_message["message"], bot=bot,
                                                                             event=event)
                     final_list.append(processed)
-                    final_list.append({"role": "assistant", "content": "(群聊背景消息已记录)"})
 
                 # 收集更新数据
                 updates_needed.append((json.dumps(processed), message_id, selected_field))
@@ -428,15 +475,33 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
                 )
             await db.commit()
 
+        # 构建群聊概况摘要
+        participants_list = list(context_info['participants'])
+        activities_summary = list(set(context_info['activities'])) if context_info['activities'] else ['正常聊天']
+
+        group_summary = (
+            f"【群聊概况】参与人数：{len(participants_list)}人 | "
+            f"消息总数：{context_info['message_count']}条 | "
+            f"主要参与者：{', '.join(participants_list[:5])}{'...' if len(participants_list) > 5 else ''} | "
+            f"活动类型：{', '.join(activities_summary[:3])}{'...' if len(activities_summary) > 3 else ''}"
+        )
+
         # 处理最终格式化的消息
         fl = []
         if prompt_standard == "gemini":
             all_parts = [part for entry in final_list if entry['role'] == 'user' for part in entry['parts']]
+
+            # 在开头添加群聊概况
+            summary_part = {"text": f"{group_summary}\n以上是群聊历史消息上下文，帮助你理解对话背景。"}
+            all_parts.insert(0, summary_part)
+
             fl.append({"role": "user", "parts": all_parts})
-            fl.append({"role": "model", "parts": {"text": "嗯嗯，我记住了"}})
+            fl.append({"role": "model", "parts": {
+                "text": "我已经了解了群聊的上下文背景，包括参与成员、消息历史和主要活动。我会结合这些信息来更好地理解和回应后续的对话。"}})
         else:
             all_parts = []
-            all_parts_str = ""
+            all_parts_str = f"{group_summary}\n"
+
             for entry in final_list:
                 if entry['role'] == 'user':
                     if isinstance(entry['content'], str):
@@ -444,13 +509,22 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
                     else:
                         for part in entry['content']:
                             all_parts.append(part)
-            fl.append({"role": "user", "content": all_parts if all_parts else all_parts_str})
-            fl.append({"role": "assistant", "content": "嗯嗯我记住了"})
+
+            if all_parts:
+                # 在开头添加概况说明
+                summary_part = {"type": "text", "text": f"{group_summary}\n以上是群聊历史消息上下文："}
+                all_parts.insert(0, summary_part)
+                fl.append({"role": "user", "content": all_parts})
+            else:
+                fl.append({"role": "user", "content": all_parts_str + "以上是群聊历史消息上下文。"})
+
+            fl.append({"role": "assistant",
+                       "content": "我已经了解了群聊的上下文背景，包括参与成员、消息历史和主要活动。我会结合这些信息来更好地理解和回应后续的对话。"})
 
         # 设置三级缓存 - 使用Redis缓存管理器
         set_memory_cache(cache_key, fl)
         set_redis_cache(cache_key, fl)
-
+        print(fl)
         return fl
 
     except Exception as e:

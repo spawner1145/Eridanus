@@ -81,9 +81,12 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                 async with httpx.AsyncClient(timeout=60) as client:
                     res = await client.get(url)
                     # res.raise_for_status()  # Check for HTTP errors
-
-                    image = Image.open(io.BytesIO(res.content))
-                    image = image.convert("RGB")
+                    try:
+                        image = Image.open(io.BytesIO(res.content))
+                        image = image.convert("RGB")
+                    except Exception as e:
+                        logger.warning(f"下载图片失败:{url} 原因:{e}")
+                        continue
 
                     quality = 85
                     while True:

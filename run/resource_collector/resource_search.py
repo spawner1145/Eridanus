@@ -50,7 +50,7 @@ async def search_book_info(bot,event,config,info):
         forward_list = []
         for r in result:
             forward_list.append(Node(content=[Text(r[0]), Image(file=r[1])]))
-        print(forward_list)
+        #print(forward_list)
         await bot.send(event, forward_list)
         # await bot.send(event,Image(file=p)])
         # print(r)
