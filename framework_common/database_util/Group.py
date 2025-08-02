@@ -17,8 +17,8 @@ from run.ai_llm.service.aiReplyHandler.openai import prompt_elements_construct, 
 DB_NAME = "data/dataBase/group_messages.db"
 
 # 优化后的缓存配置
-REDIS_CACHE_TTL = 300  # 增加到5分钟
-MEMORY_CACHE_TTL = 60  # 内存缓存1分钟
+REDIS_CACHE_TTL = 250  # 增加到5分钟
+MEMORY_CACHE_TTL = 50  # 内存缓存1分钟
 BATCH_SIZE = 10  # 批量写入大小
 
 logger = get_logger()
