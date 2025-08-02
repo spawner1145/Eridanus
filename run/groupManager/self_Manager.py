@@ -279,10 +279,16 @@ def main(bot:ExtendBot, config):
         elif send_next_message and event.user_id==config.common_config.basic_config["master"]['id']:
             send_next_message = False
             groups = await bot.get_group_list()
+            mes_chain=[]
+            for i in event.message_chain:
+                if isinstance(i,Text):
+                    mes_chain.append(Text(i.text))
+                elif isinstance(i,Image):
+                    mes_chain.append(Image(file=i.file or i.url))
             for group in groups["data"]:
                 try:
                     bot.logger.info(f"转发消息至群{group['group_id']}")
-                    await bot.send_group_message(group["group_id"],event.message_chain)
+                    await bot.send_group_message(group["group_id"],mes_chain)
                     await sleep(4)
                 except Exception as e:
                     bot.logger.error(f"发送群消息失败：{group['group_id']} 原因: {e}")
