@@ -477,8 +477,20 @@ class PluginManager:
             self.logger.info(f"加载批次 {batch_idx + 1}/{total_batches}: {batch_plugins}")
 
             # 检查内存是否充足
+            # 检查内存是否充足
             if not self.memory_monitor.is_memory_sufficient(self.load_config.memory_threshold_mb):
-                self.logger.warning(f"内存不足，跳过批次 {batch_idx + 1}")
+                self.logger.warning(f"内存不足，批次 {batch_idx + 1} 将逐个加载")
+
+                for plugin_name in batch_plugins:
+                    try:
+                        result = await self.load_plugin_with_retry(plugin_name)
+                        if result.success:
+                            self.logger.info(f"插件 {plugin_name} 在内存不足情况下成功加载")
+                        else:
+                            self.logger.error(f"插件 {plugin_name} 在内存不足情况下加载失败")
+                        await self._force_garbage_collection()
+                    except Exception as e:
+                        self.logger.error(f"逐个加载插件 {plugin_name} 时发生错误: {e}")
                 continue
 
             # 并发加载当前批次的插件
