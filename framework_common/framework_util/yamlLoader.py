@@ -3,19 +3,25 @@ from ruamel.yaml import YAML
 from typing import Any
 from concurrent.futures import ThreadPoolExecutor
 import threading
+import time
 
 from framework_common.utils.install_and_import import install_and_import
 
-watchdog=install_and_import("watchdog")
+watchdog = install_and_import("watchdog")
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 from framework_common.utils.system_logger import get_logger
 
-logger=get_logger("YAMLManager")
+logger = get_logger("YAMLManager")
+
+
 class YAMLFileHandler(FileSystemEventHandler):
     def __init__(self, yaml_manager):
         self.yaml_manager = yaml_manager
+        self.pending_reloads = {}  # 待处理的重载任务
+        self.debounce_delay = 0.3  # 防抖延迟时间（秒）
+        self.lock = threading.Lock()
         super().__init__()
 
     def on_modified(self, event):
@@ -24,7 +30,27 @@ class YAMLFileHandler(FileSystemEventHandler):
 
         file_path = event.src_path
         if file_path.endswith(('.yaml', '.yml')):
-            self.yaml_manager.reload_file(file_path)
+            self._schedule_reload(file_path)
+
+    def _schedule_reload(self, file_path):
+        """调度文件重载，使用定时器防抖"""
+        with self.lock:
+            if file_path in self.pending_reloads:
+                self.pending_reloads[file_path].cancel()
+
+            timer = threading.Timer(self.debounce_delay, self._execute_reload, args=[file_path])
+            self.pending_reloads[file_path] = timer
+            timer.start()
+
+    def _execute_reload(self, file_path):
+        """执行实际的文件重载"""
+        with self.lock:
+            # 清理已完成的任务
+            if file_path in self.pending_reloads:
+                del self.pending_reloads[file_path]
+
+        # 执行重载
+        self.yaml_manager.reload_file(file_path)
 
 
 class PluginConfig:
@@ -143,35 +169,28 @@ class YAMLManager:
         self.observer.schedule(self.event_handler, self.run_dir, recursive=True)
         self.observer.start()
 
-
-
-    def _update_with_merge(self, old_data, new_data):
+    def _update_with_override(self, old_data, new_data):
         """
-        使用你的合并逻辑更新现有对象，保持引用和注释
+        用新数据完全覆盖旧数据，保持对象引用和注释
 
         :param old_data: 原始数据对象（要保持引用）
         :param new_data: 新加载的数据
         """
-        from ruamel.yaml.comments import CommentedMap, CommentedSeq
+        from ruamel.yaml.comments import CommentedMap
 
         if not isinstance(old_data, (dict, CommentedMap)) or not isinstance(new_data, (dict, CommentedMap)):
             return new_data
 
-        # 使用你的合并逻辑
-
-
-        # 现在new_data包含了合并后的结果，我们需要将其同步到old_data
         # 清空old_data但保持对象引用
         old_data.clear()
 
-        # 将合并结果复制回old_data
+        # 将新数据复制到old_data
         for key, value in new_data.items():
             old_data[key] = value
 
         # 保留注释信息
         if isinstance(new_data, CommentedMap) and hasattr(new_data, 'ca'):
             if not hasattr(old_data, 'ca'):
-                # 创建与new_data相同类型的ca对象
                 old_data.ca = type(new_data.ca)()
 
             for attr_name in dir(new_data.ca):
@@ -184,7 +203,7 @@ class YAMLManager:
                         pass
 
     def reload_file(self, file_path):
-        """重新加载单个文件，使用你的合并逻辑保留配置和注释"""
+        """重新加载单个文件，用新数据完全覆盖旧数据"""
         if file_path not in self.path_to_key:
             return
 
@@ -194,7 +213,7 @@ class YAMLManager:
             # 创建新的YAML实例以保持注释
             yaml_loader = YAML()
             yaml_loader.preserve_quotes = True
-            yaml_loader.indent(mapping=2, sequence=4, offset=2)  # 使用你的缩进设置
+            yaml_loader.indent(mapping=2, sequence=4, offset=2)
             yaml_loader.allow_duplicate_keys = True
             yaml_loader.width = 4096
 
@@ -205,14 +224,14 @@ class YAMLManager:
                 # 根目录文件
                 old_data = self.data[config_name]
                 if isinstance(old_data, dict) and isinstance(new_data, dict):
-                    self._update_with_merge(old_data, new_data)
+                    self._update_with_override(old_data, new_data)
                 else:
                     self.data[config_name] = new_data
             else:
                 # 插件配置
                 old_data = self.data[plugin_name][config_name]
                 if isinstance(old_data, dict) and isinstance(new_data, dict):
-                    self._update_with_merge(old_data, new_data)
+                    self._update_with_override(old_data, new_data)
                 else:
                     self.data[plugin_name][config_name] = new_data
 
@@ -222,25 +241,6 @@ class YAMLManager:
             logger.error(f"重新加载文件时出错 {file_path}: {e}")
             import traceback
             traceback.print_exc()
-
-    def conflict_file_dealter(self, file_old, file_new):
-        """
-        你的原始冲突文件处理方法，作为独立工具保留
-        """
-        # 加载旧的YAML文件
-        with open(file_old, 'r', encoding="utf-8") as file:
-            old_data = self.yaml.load(file)
-
-        # 加载新的YAML文件
-        with open(file_new, 'r', encoding="utf-8") as file:
-            new_data = self.yaml.load(file)
-
-        # 遍历旧的YAML数据并更新新的YAML数据中的相应值
-        self.merge_dicts(old_data, new_data)
-
-        # 把新的YAML数据保存到新的文件中，保留注释
-        with open(file_new, 'w', encoding="utf-8") as file:
-            self.yaml.dump(new_data, file)
 
     def stop_watching(self):
         """停止文件监控"""
@@ -302,10 +302,9 @@ class YAMLManager:
         self.stop_watching()
 
 
-# 测试你的合并逻辑的使用示例
+# 测试示例
 if __name__ == "__main__":
     import tempfile
+
     config = YAMLManager()
-    print(config.ai_llm.config,type(config.ai_llm.config))
-
-
+    print(config.ai_llm.config, type(config.ai_llm.config))
