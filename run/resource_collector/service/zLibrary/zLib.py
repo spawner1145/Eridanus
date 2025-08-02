@@ -1,4 +1,4 @@
-
+from framework_common.manshuo_draw import manshuo_draw
 from run.resource_collector.service.zLibrary.canvas import create_book_image
 
 # Create Zlibrary object and login
@@ -7,14 +7,23 @@ from run.resource_collector.service.zLibrary.canvas import create_book_image
 # Search for books
 
 # Getting image content
-def search_book(Z,book,num):
+async def search_book(Z,book,num):
     results = Z.search(message=book, order="bestmatch")
-    #print(results)
+
+    return await parse_result(results,num)
+async def parse_result(data,num):
     result=[]
-    for book_result in results['books'][:num]:
+    for book in data["books"][:num]:
         try:
-            p=create_book_image(book_result)
-            result.append([f"book_id: {book_result['id']}\nhash: {book_result['hash']}",p])
+            text=(f"[title]{book['title']}[/title]"
+                  f"\n 作者：{book['author']}"
+                  f"\n 年份：{book['year']}"
+                  f"\n 出版商：{book['publisher']}"
+                  f"\n 文件大小：{book['filesizeString']}  格式：{book['extension']}"
+                  f"\n 简介：\n {book['description']}")
+            r=await manshuo_draw([{ 'type': 'basic_set', 'img_width': 2000,'img_height': 2500,'max_num_of_columns': 3 ,'font_common_size': 34,'font_des_size': 25, 'font_title_size': 46,'spacing': 3,'padding_up': 30},
+                            {'type': 'img', 'subtype': 'common_with_des_right', 'img': [book['cover']], 'content': [text.replace('<br>', '\n ')]}])
+            result.append([f"book_id: {book['id']}\nhash: {book['hash']}",r])
         except:
             continue
     return result

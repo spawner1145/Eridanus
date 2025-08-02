@@ -46,7 +46,7 @@ async def search_book_info(bot,event,config,info):
     if user_info.permission >= config.resource_collector.config["z_library"]["search_operate_level"]:
 
         await bot.send(event, "正在搜索中，请稍候...")
-        result = search_book(Z, info, config.resource_collector.config["z_library"]["search_num"])
+        result =await search_book(Z, info, config.resource_collector.config["z_library"]["search_num"])
         forward_list = []
         for r in result:
             forward_list.append(Node(content=[Text(r[0]), Image(file=r[1])]))
