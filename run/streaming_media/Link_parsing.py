@@ -17,7 +17,7 @@ teamlist = defaultdict(lambda: {'data': None, 'expire_at': 0})
 
 async def call_bili_download_video(bot, event, config,type_download='video'):
     if event.group_id in teamlist:
-        json_linking = teamlist[event.group_id]
+        json_linking = teamlist[event.group_id]['data']
         teamlist.pop(event.group_id)
         if f'{event.group_id}_recall' in teamlist:
             await bot.recall(teamlist[f'{event.group_id}_recall']['data']['message_id'])
@@ -97,7 +97,7 @@ def main(bot, config):
         if 'http' not in url: url = event.raw_message
         #print(url)
         if event.group_id in teamlist:
-            json = teamlist[event.group_id]
+            json = teamlist[event.group_id]['data']
             if event.get("text") is not None and event.get("text")[0] == "下载视频":
                 if json['soft_type'] not in {'bilibili', 'dy', 'wb', 'xhs', 'x'}:
                     await bot.send(event, '该类型视频暂未提供下载支持，敬请期待')
@@ -138,12 +138,29 @@ def main(bot, config):
         while True:
             bot.logger.info('清理链接解析过期缓存')
             current_time = time()
-            expired_keys = [k for k, v in teamlist.items() if v['expire_at'] < current_time]
+            expired_keys = []
+            for k, v in teamlist.items():
+                if k.endswith('_recall'):
+                    continue
+                if isinstance(v, dict) and 'expire_at' in v:
+                    if v['expire_at'] < current_time:
+                        expired_keys.append(k)
+                else:
+                    expired_keys.append(k)
+                    bot.logger.warning(f"teamlist[{k}] 格式错误，强制清理: {type(v)}")
+
             for key in expired_keys:
-                teamlist.pop(key)
+                # 同时清理对应的 _recall 键（如果存在）
+                recall_key = f'{key}_recall'
+                teamlist.pop(key, None)
+                teamlist.pop(recall_key, None)
+                bot.logger.debug(f"清理 teamlist 键: {key} 和 {recall_key}")
+
+            bot.logger.debug(f"teamlist 当前键数: {len(teamlist)}")
             collected = gc.collect()
             bot.logger.info_func(f"回收了 {collected} 个对象")
-            await asyncio.sleep(300)
+            await asyncio.sleep(1000)
+
     @bot.on(GroupMessageEvent)
     async def Music_Link_Prising_search(event: GroupMessageEvent):
         url = event.pure_text
