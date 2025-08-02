@@ -257,7 +257,7 @@ def main(bot, config):
 
     def prefix_check(message: str, prefix: list):
         for p in prefix:
-            if message.startswith(p):
+            if message.startswith(p) and p != "":
                 bot.logger.info(f"消息{message}匹配到关键词{p}")
                 return True
         return False
