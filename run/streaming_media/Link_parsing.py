@@ -1,4 +1,5 @@
 import asyncio
+import gc
 import shutil
 import os
 import json as json_handle
@@ -135,11 +136,14 @@ def main(bot, config):
     @bot.on(LifecycleMetaEvent)
     async def cleanup_teamlist():
         while True:
+            bot.logger.info('清理链接解析过期缓存')
             await asyncio.sleep(300)
             current_time = time()
             expired_keys = [k for k, v in teamlist.items() if v['expire_at'] < current_time]
             for key in expired_keys:
                 teamlist.pop(key)
+            collected = gc.collect()
+            bot.logger.info_func(f"回收了 {collected} 个对象")
     @bot.on(GroupMessageEvent)
     async def Music_Link_Prising_search(event: GroupMessageEvent):
         url = event.pure_text
