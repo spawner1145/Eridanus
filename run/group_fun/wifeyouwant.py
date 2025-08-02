@@ -406,11 +406,11 @@ def main(bot,config):
             count_check = await manage_group_status(from_id, target_group, 'group_owner_record')
             if count_check != 0:await manage_group_status(from_id, target_group, 'group_owner_record',count_check+1)
             else:await manage_group_status(from_id, target_group, 'group_owner_record',1)
-        if not f'{wifePrefix}' in event.pure_text:
-            return
         context = event.pure_text
         if context == '':
             context = event.raw_message
+        if not f'{wifePrefix}' in context:
+            return
         if f'{wifePrefix}' in context:  # 前置触发词
             target_id_aim = None
             flag_persona = 0
@@ -425,7 +425,7 @@ def main(bot,config):
             elif '透管理' in context:
                 flag_persona = 2
                 check = 'admin'
-            elif '透群友' in context:
+            elif '透群友' in context or '透' in context:
                 flag_persona = 3
                 pass
             elif '娶群友' in context:
