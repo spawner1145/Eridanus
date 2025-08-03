@@ -119,10 +119,10 @@ async def render_rogue_card(props: RogueData, bg: str | Url) -> bytes:
         else:status = '失败'
         index += 1
         per_rogue_info=[{'type': 'text', 'content': [f'[title]{record.mode} - {record.modeGrade}            {status}[/title]'
-                                                     f'\n得分：{record.score}     {record.lastStage}'], 'layer': 2},
-                        {'type': 'img', 'number_per_row': 8, 'layer': 2,'is_shadow_img': False,'img': [ charId_to_avatarUrl(char.id) for char in record.lastChars],},
+                                                     f'\n得分：{record.score}     {record.lastStage}'], 'layer': 3},
+                        {'type': 'img', 'number_per_row': 8, 'layer': 3,'is_shadow_img': False,'img': [ charId_to_avatarUrl(char.id) for char in record.lastChars],},
                         {'type': 'text',
-                         'content': [f'id：{index}     {format_timestamp_str(record.endTs)}'], 'layer': 2},
+                         'content': [f'id：{index}     {format_timestamp_str(record.endTs)}'], 'layer': 3},
                         ]
         if index == 1:rogue_favour_info = rogue_favour_info + per_rogue_info
         else:rogue_favour_info = rogue_favour_info + [{'type': 'text', 'content': ['  '], 'layer': 2}] + per_rogue_info
@@ -134,10 +134,10 @@ async def render_rogue_card(props: RogueData, bg: str | Url) -> bytes:
         else:status = '失败'
         index += 1
         per_rogue_info=[{'type': 'text', 'content': [f'[title]{record.mode} - {record.modeGrade}            {status}[/title]'
-                                                     f'\n得分：{record.score}     {record.lastStage}'], 'layer': 2},
-                        {'type': 'img', 'number_per_row': 8, 'layer': 2,'is_shadow_img': False,'img': [ charId_to_avatarUrl(char.id) for char in record.lastChars],},
+                                                     f'\n得分：{record.score}     {record.lastStage}'], 'layer': 3},
+                        {'type': 'img', 'number_per_row': 8, 'layer': 3,'is_shadow_img': False,'img': [ charId_to_avatarUrl(char.id) for char in record.lastChars],},
                         {'type': 'text',
-                         'content': [f'id：{index}     {format_timestamp_str(record.endTs)}'], 'layer': 2},
+                         'content': [f'id：{index}     {format_timestamp_str(record.endTs)}'], 'layer': 3},
                         ]
         #print(per_rogue_info)
         if index == 1:rogue_history_info = rogue_history_info + per_rogue_info
@@ -158,6 +158,7 @@ async def render_rogue_card(props: RogueData, bg: str | Url) -> bytes:
     ]
     draw_json = draw_json + rogue_favour_info + rogue_history_info
     draw_json+=['[des]                                             Function By 漫朔[/des]']
+    #pprint.pprint(draw_json)
     img_path=await manshuo_draw(draw_json)
     return img_path
 

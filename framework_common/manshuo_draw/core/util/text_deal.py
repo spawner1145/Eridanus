@@ -141,7 +141,12 @@ async def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_s
         x_limit, y_limit = (params['img_width'] - params['padding'] * 2, params['img_height'])  # 初始位置
     else:
         x_limit, y_limit = limit_box
-    if content == '' or content is None:
+    #必要的检测流程
+    if 'content' in params:params_check = params['content']
+    elif 'label' in params:params_check = params['label']
+    else:params_check = []
+    if content == '' or content is None or content == [] or content == [[]]:
+        if 'number_count' in params and params["number_count"] < len(params_check):params_check[params["number_count"]] = []
         return {'canvas': canvas, 'canvas_bottom': y}
     if isinstance(content, list):content_list=content
     else:content_list = await deal_text_with_tag(content)
@@ -187,15 +192,20 @@ async def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_s
 
             x += char_width + 1
             i += 1
-            if (x + char_width > x_limit and i < len(text)) or text[i - 1] == '\n':
-                if x != box[0] + char_width + 1 :
-                    x = box[0]
+            if params['auto_line_change'] is True:
+                if (x + char_width > x_limit and i < len(text)) or text[i - 1] == '\n':
+                    if x != box[0] + char_width + 1 :
+                        x = box[0]
+                        line_height_list.append(per_max_height)
+                        per_max_height=0
+                    if x == box[0] + char_width + 1 and text[i - 1] == '\n' :#检测是否在一行最开始换行，若是则修正
+                        x -= char_width + 1
+            else:
+                if text[i - 1] == '\n':
                     line_height_list.append(per_max_height)
-                    per_max_height=0
-                if x == box[0] + char_width + 1 and text[i - 1] == '\n' :#检测是否在一行最开始换行，若是则修正
-                    x -= char_width + 1
-
-    line_height_list.append(params[f'font_{last_tag}_size'])
+                    x, per_max_height = box[0], 0
+    if per_max_height == 0:line_height_list.append(params[f'font_{last_tag}_size'])
+    else:line_height_list.append(per_max_height)
     line_height_list.append(params[f'font_common_size'])
 
 
@@ -252,21 +262,24 @@ async def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_s
 
             x += char_width + 1
             i += 1
-            if (x + char_width * 2 > x_limit and i < len(text) and ellipsis) or text[i - 1] == '\n':
-                if y > y_limit - (params[f'font_common_size'])  - params['padding_up'] - line_height_list[line_count + 1]:
-                    draw.text((x, y), '...', font=font, fill=eval(str(params[f'font_{last_tag}_color'])))
-                    should_break = True
-                    break
-            if (x + char_width > x_limit and i - 1 < len(text)) or text[i - 1] == '\n':
-                if x != box[0] + char_width + 1 :
-                    line_count += 1
+            if params['auto_line_change'] is True:
+                if (x + char_width * 2 > x_limit and i < len(text) and ellipsis) or text[i - 1] == '\n':
+                    if y > y_limit - (params[f'font_common_size'])  - params['padding_up'] - line_height_list[line_count + 1]:
+                        draw.text((x, y), '...', font=font, fill=eval(str(params[f'font_{last_tag}_color'])))
+                        should_break = True
+                        break
+                if (x + char_width > x_limit and i - 1 < len(text)) or text[i - 1] == '\n':
+                    if x != box[0] + char_width + 1 :
+                        line_count += 1
+                        y += params[f'font_common_size'] + params['padding_up'] + line_height_list[line_count] - params[f'font_common_size']
+                        x = box[0]
+                    if x == box[0] + char_width + 1 and text[i - 1] == '\n' :#检测是否在一行最开始换行，若是则修正
+                        x -= char_width + 1
+            else:
+                if text[i - 1] == '\n':
+                    line_count,x =line_count + 1,box[0]
                     y += params[f'font_common_size'] + params['padding_up'] + line_height_list[line_count] - params[f'font_common_size']
-                    x = box[0]
-                if x == box[0] + char_width + 1 and text[i - 1] == '\n' :#检测是否在一行最开始换行，若是则修正
-                    x -= char_width + 1
     canvas_bottom = y + params[f'font_common_size'] + 2
-    if 'content' in params:params_check = params['content']
-    elif 'label' in params:params_check = params['label']
 
     if text and params["number_count"] < len(params_check):
         content_left['content']=text[i:]

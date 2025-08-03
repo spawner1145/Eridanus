@@ -44,7 +44,22 @@ basic_set:
   padding_with: 15                  #模块内元素之间的间距
   padding_up: 20                    #模块内元素的上间距
   spacing: 1                        #文字绘制时候每个字之间的间距
+  auto_line_change: true            #是否实现自动换行，关掉就是不由程序判断文本直接粘贴
 
+  is_rounded_corners_img: true      #是否对模块进行圆角处理
+  rounded_img_radius: 20            #圆角处理半径
+
+  is_stroke_img: true               #是否对模块进行描边处理
+  stroke_img_radius: 23             #描边的圆角弧度
+  stroke_img_width: 10              #描边的圆角宽度
+  stroke_img_color: (255, 255, 255, 80) #描边的圆角颜色
+
+  is_shadow_img: true               #是否对模块进行阴影处理
+  shadow_offset_img: 10                 #阴影的偏移量
+  shadow_opacity_img: 50                #阴影的透明度
+  blur_radius_img: 10                   #阴影模糊半径
+
+  #以下为字体的的前置设置
   font_common: framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf  #字体路径
   font_common_size: 24                     #字体大小
   font_common_color: (0,0,0)               #字体颜色
@@ -64,21 +79,9 @@ basic_set:
   font_label: framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf
   font_label_size: 34
   font_label_color: (255,255,255)
-  label: []                            #默认的label内容
+  label: []                             #默认的label内容
   label_color: (251,114,153,255)      #默认label颜色
 
-  is_rounded_corners_img: true      #是否对模块进行圆角处理
-  rounded_img_radius: 20            #圆角处理半径
-
-  is_stroke_img: true               #是否对模块进行描边处理
-  stroke_img_radius: 23             #描边的圆角弧度
-  stroke_img_width: 10              #描边的圆角宽度
-  stroke_img_color: (255, 255, 255, 80) #描边的圆角颜色
-
-  is_shadow_img: true               #是否对模块进行阴影处理
-  shadow_offset_img: 10                 #阴影的偏移量
-  shadow_opacity_img: 50                #阴影的透明度
-  blur_radius_img: 10                   #阴影模糊半径
 
   is_rounded_corners_label: true      #是否对标签进行圆角处理
   rounded_label_radius: 10            #圆角处理半径
@@ -94,8 +97,6 @@ basic_set:
   blur_radius_label: 10                   #阴影模糊半径
 
 
-
-
 backdrop:
   one_color:
     color: (194, 228, 255)
@@ -104,8 +105,8 @@ backdrop:
     right_color: (185, 246, 236)
   img:
     background: None        #请输入您的背景路径或url
-    is_blurred: True
-    is_shadow: False
+    is_blurred: true
+    is_shadow: false
 
 
 text:
@@ -166,8 +167,8 @@ avatar:
 
   judge_flag: default #此处判断头像的背景处理方式，目前有：'common'平铺样式、'list'列表样式、'default'自动判断
   is_name: Ture                   #是否在头像右侧旁添加名字
-  is_blurred: True
-  is_shadow: True
+  is_blurred: true
+  is_shadow: true
 
   software_list:
     - {'type': 'bilibili', 'background': framework_common/manshuo_draw/data/img/type_software/bili.png, 'right_icon': framework_common/manshuo_draw/data/img/type_software/bili_icon.png}

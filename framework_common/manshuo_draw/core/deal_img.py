@@ -2,7 +2,7 @@ import os
 import gc
 from .classic_collection import *
 from .util import *
-
+import pprint
 
 async def layer_deal(basic_img_info,json_img,json_img_left,layer=1):
     layer_img_info = LayerSet(basic_img_info)
@@ -16,16 +16,26 @@ async def layer_deal(basic_img_info,json_img,json_img_left,layer=1):
         if 'layer' not in per_json_img:layer_check=1
         else:layer_check=int(per_json_img['layer'])
 
+        #首先进行正确性检验
+        right_flag=False
+        if 'content' in per_json_img and per_json_img['content'] == [[]] and 'img' not in per_json_img:right_flag=True
+        elif 'img' in per_json_img and per_json_img['img'] == []:right_flag=True
+        if right_flag:
+            json_img.pop(json_img.index(per_json_img))
+            continue
+
         if layer_check == layer:
             json_img.pop(json_img.index(per_json_img))
             count_number += 1
             if layer_img_info.img_height <= 0:
-                if layer == layer_check and per_json_img['type'] not in ['layer_processed','backdrop']: json_img_left.append(per_json_img)
+                if layer == layer_check and per_json_img['type'] not in ['layer_processed','backdrop']:json_img_left.append(per_json_img)
                 return {'content':None}
             if layer_img_info.img_height_limit_flag:
                 if per_json_img['type'] not in ['layer_processed','backdrop']:json_img_left.append(per_json_img)
                 continue
-            if per_json_img['type'] not in ['layer_processed', 'backdrop']: printf(per_json_img)
+            #调试时输出日志，并进行正确性判断
+            if per_json_img['type'] not in ['layer_processed', 'backdrop']:
+                printf(per_json_img)
             #print(layer_img_info.img_height_limit)
             match per_json_img['type']:
                 case 'text':    json_check = await getattr(TextModule(layer_img_info, per_json_img), per_json_img['subtype'])()
@@ -41,9 +51,10 @@ async def layer_deal(basic_img_info,json_img,json_img_left,layer=1):
                 if layer_img_info.img_height_limit <= 0 or json_check['without_draw']:
                     layer_img_info.img_height_limit, layer_img_info.img_height_limit_flag = 0, True
                 #若模块返回相应值未绘制值，则添加
-                if json_check['json_img_left_module']: json_img_left.append(json_check['json_img_left_module'])
+                if json_check['json_img_left_module']:json_img_left.append(json_check['json_img_left_module'])
                 #print(json_check['canvas_bottom'] + layer_img_info.padding_up_layer, layer_img_info.img_height_limit, json_check['canvas_bottom'] + layer_img_info.padding_up_layer+layer_img_info.img_height_limit)
         elif layer_check > layer:
+
             json_check=await layer_deal(layer_img_info,json_img,json_img_left,layer=layer+1)
             json_img=add_append_img([{'type':'layer_processed','content':json_check['content'],'layer':layer}],json_img)
         elif layer_check < layer:
@@ -87,12 +98,12 @@ async def deal_img(json_img): #此函数将逐个解析json文件中的每个字
         else: json_img_deal = json_img_left
         json_img_left=[]
         layer_img_canvas=(await layer_deal(basic_img_info,json_img_deal,json_img_left))['layer_img_canvas']
+        #pprint.pprint(json_img_left)
+        #printf('------------------------------------------------------------------')
         #layer_img_canvas.show()
         canves_layer_list.append(layer_img_canvas)
         if not json_img_left:break
 
-    printf('\n')
-    for item in json_img_left:printf(item)
     #layer_img_canvas.show()
     #将之前的模块粘贴到实现绘制的无色中间层上
     basic_img = await basic_img_info.creatbasicimgnobackdrop(canves_layer_list)
@@ -109,7 +120,6 @@ async def deal_img(json_img): #此函数将逐个解析json文件中的每个字
 
     basic_img.save(img_path, "PNG")
     if basic_img_info.debug is True:
-        pass
         basic_img.show()
 
     try:#做好对应资源关闭并释放，以免卡顿
