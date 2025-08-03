@@ -131,7 +131,7 @@ async def handle_lifecycle(event: LifecycleMetaEvent):
             await bot1.send_friend_message(config.common_config.basic_config["master"]["id"],"内存占用过高，准备重启...")
             bot1.logger.error("内存占用过高，准备重启...")
             os.execv(sys.executable, ['python'] + sys.argv)
-        await asyncio.sleep(100)
+        await asyncio.sleep(600)
 
 async def reload_all_plugins():
     """重载所有插件的便捷函数"""
