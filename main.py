@@ -115,8 +115,23 @@ async def handler(bot, event: GroupMessageEvent | PrivateMessageEvent):
         status = await get_plugin_status()
         print(status)
     elif event.pure_text == "/test":
-        print(config.ai_llm.config["test"])
+        plugin_memory = plugin_manager.get_plugin_memory_usage("插件名")
 
+        memory_report = plugin_manager.get_memory_usage_report()
+        print(memory_report)
+        # 手动输出内存报告
+        r=plugin_manager.log_memory_report()
+        await bot.send(event, r)
+@bot1.on(LifecycleMetaEvent)
+async def handle_lifecycle(event: LifecycleMetaEvent):
+    while True:
+        r = plugin_manager.get_memory_usage_report()
+        memory_occupid=int(r['current_memory']['rss'])
+        if memory_occupid>=400:
+            await bot1.send_friend_message(config.common_config.basic_config["master"]["id"],"内存占用过高，准备重启...")
+            bot1.logger.error("内存占用过高，准备重启...")
+            os.execv(sys.executable, ['python'] + sys.argv)
+        await asyncio.sleep(100)
 
 async def reload_all_plugins():
     """重载所有插件的便捷函数"""

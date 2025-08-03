@@ -81,6 +81,32 @@ class MemoryMonitor:
     @staticmethod
     def is_memory_sufficient(threshold_mb: int = 100) -> bool:
         return MemoryMonitor.get_available_memory() > threshold_mb
+
+    @staticmethod
+    def get_detailed_memory_info():
+        """获取详细的内存信息"""
+        try:
+            process = psutil.Process()
+            memory_info = process.memory_info()
+            return {
+                'rss': memory_info.rss / 1024 / 1024,  # 物理内存
+                'vms': memory_info.vms / 1024 / 1024,  # 虚拟内存
+                'percent': process.memory_percent(),  # 内存占用百分比
+                'available': psutil.virtual_memory().available / 1024 / 1024
+            }
+        except:
+            return None
+
+    @staticmethod
+    def calculate_memory_diff(before, after):
+        """计算内存差异"""
+        if not before or not after:
+            return None
+        return {
+            'rss_diff': after['rss'] - before['rss'],
+            'vms_diff': after['vms'] - before['vms'],
+            'percent_diff': after['percent'] - before['percent']
+        }
 class PluginAwareExtendBot(ExtendBot):
     """继承ExtendBot，添加插件感知的事件管理功能"""
 
@@ -192,7 +218,12 @@ class PluginManager:
             'retry_count': 0,
             'total_memory_used': 0.0
         }
-
+        """
+        内存监控
+        """
+        # 插件内存跟踪
+        self.plugin_memory_usage: Dict[str, Dict] = {}
+        self.memory_snapshots: Dict[str, Dict] = {}
     def _enhance_bot_instance(self, bot: ExtendBot):
         """动态增强现有bot实例，添加插件感知功能"""
         # 添加插件相关属性
@@ -347,7 +378,8 @@ class PluginManager:
 
         # 输出加载统计
         self._log_load_statistics()
-
+        # 启动定期内存监控
+        await self.start_memory_monitoring()
     async def stop(self):
         """停止插件管理器"""
         self.logger.info("停止插件管理器...")
@@ -542,23 +574,46 @@ class PluginManager:
 
     async def load_plugin_with_retry(self, plugin_name: str) -> PluginLoadResult:
         """带重试机制的插件加载"""
+
+
         result = PluginLoadResult(plugin_name=plugin_name, success=False)
 
         for attempt in range(self.load_config.max_retries + 1):
             try:
                 start_time = time.time()
-                memory_before = self.memory_monitor.get_memory_usage()
+
+                # 记录加载前的详细内存信息
+                memory_before = self.memory_monitor.get_detailed_memory_info()
+                gc_before = len(gc.get_objects())  # 记录对象数量
 
                 success = await self.load_plugin(plugin_name)
 
                 if success:
+                    # 记录加载后的详细内存信息
+                    memory_after = self.memory_monitor.get_detailed_memory_info()
+                    gc_after = len(gc.get_objects())
+
+                    memory_diff = self.memory_monitor.calculate_memory_diff(memory_before, memory_after)
+
+                    # 保存插件内存使用信息
+                    self.plugin_memory_usage[plugin_name] = {
+                        'memory_before': memory_before,
+                        'memory_after': memory_after,
+                        'memory_diff': memory_diff,
+                        'object_count_diff': gc_after - gc_before,
+                        'load_time': time.time() - start_time,
+                        'load_timestamp': time.time(),
+                        'retry_count': attempt
+                    }
+
                     result.success = True
                     result.load_time = time.time() - start_time
-                    result.memory_used = self.memory_monitor.get_memory_usage() - memory_before
+                    result.memory_used = memory_diff['rss_diff'] if memory_diff else 0
                     result.retry_count = attempt
 
-                    self.load_statistics['successful_loads'] += 1
-                    self.load_statistics['total_memory_used'] += result.memory_used
+                    #self.logger.info(
+                        #f"插件 {plugin_name} 内存使用: RSS +{memory_diff['rss_diff']:.2f}MB, 对象 +{gc_after - gc_before}")
+
                     return result
                 else:
                     raise Exception("插件加载返回False")
@@ -581,6 +636,85 @@ class PluginManager:
         self.logger.error(f"插件 {plugin_name} 加载最终失败")
         return result
 
+    def get_plugin_memory_usage(self, plugin_name: str = None) -> Dict:
+        """获取插件内存使用情况"""
+        if plugin_name:
+            return self.plugin_memory_usage.get(plugin_name, {})
+        else:
+            return dict(self.plugin_memory_usage)
+
+    def get_memory_usage_report(self) -> Dict:
+        """生成内存使用报告"""
+        total_memory_increase = 0
+        total_objects_increase = 0
+        plugin_rankings = []
+
+        for plugin_name, usage_info in self.plugin_memory_usage.items():
+            memory_diff = usage_info.get('memory_diff', {})
+            rss_diff = memory_diff.get('rss_diff', 0)
+            obj_diff = usage_info.get('object_count_diff', 0)
+
+            total_memory_increase += rss_diff
+            total_objects_increase += obj_diff
+
+            plugin_rankings.append({
+                'plugin_name': plugin_name,
+                'memory_increase_mb': rss_diff,
+                'object_increase': obj_diff,
+                'load_time': usage_info.get('load_time', 0),
+                'event_handlers': self.bot._get_plugin_handlers_count(plugin_name)
+            })
+
+        # 按内存增长排序
+        plugin_rankings.sort(key=lambda x: x['memory_increase_mb'], reverse=True)
+
+        current_memory = self.memory_monitor.get_detailed_memory_info()
+
+        return {
+            'current_memory': current_memory,
+            'total_memory_increase_mb': total_memory_increase,
+            'total_objects_increase': total_objects_increase,
+            'plugin_count': len(self.loaded_plugins),
+            'plugin_rankings': plugin_rankings,
+            'top_memory_consumers': plugin_rankings[:5]  # 前5个内存消耗大户
+        }
+
+    def log_memory_report(self):
+        """输出内存使用报告"""
+        report = self.get_memory_usage_report()
+
+        self.logger.info("=== 插件内存使用报告 ===")
+        self.logger.info(f"当前内存使用: {report['current_memory']['rss']:.2f} MB")
+        self.logger.info(f"插件总内存增长: {report['total_memory_increase_mb']:.2f} MB")
+        self.logger.info(f"插件总对象增长: {report['total_objects_increase']}")
+
+        self.logger.info("内存消耗排行:")
+        full_test=f"当前内存使用: {report['current_memory']['rss']:.2f} MB\n插件总内存增长: {report['total_memory_increase_mb']:.2f} MB\n插件总对象增长: {report['total_objects_increase']}\n\n内存消耗排行:\n"
+        for i, plugin in enumerate(report['top_memory_consumers'], 1):
+            self.logger.info(f"  {i}. {plugin['plugin_name']}: "
+                             f"+{plugin['memory_increase_mb']:.2f}MB, "
+                             f"+{plugin['object_increase']}对象, "
+                             f"{plugin['event_handlers']}个处理器")
+        return full_test
+    async def start_memory_monitoring(self, interval: int = 300):
+        """启动定期内存监控 (默认5分钟间隔)"""
+
+        async def memory_monitor_task():
+            while True:
+                try:
+                    await asyncio.sleep(interval)
+                    #self.log_memory_report()
+
+                    # 检查是否有内存泄漏风险
+                    report = self.get_memory_usage_report()
+                    if report['current_memory']['rss'] > 500:  # 超过500MB
+                        self.logger.warning("内存使用过高，建议检查插件!")
+
+                except Exception as e:
+                    self.logger.error(f"内存监控任务出错: {e}")
+
+        # 启动后台监控任务
+        asyncio.create_task(memory_monitor_task())
     def _discover_plugins(self) -> List[str]:
         """发现所有可加载的插件"""
         plugin_dirs = [d for d in self.plugins_dir.iterdir()
