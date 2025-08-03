@@ -5,6 +5,7 @@ import os
 import sys
 from PIL import Image, ImageDraw, ImageFont, ImageOps,ImageFilter
 import platform
+import psutil
 
 global debug_mode #设定全局变量，表示绘图是否开启调试功能
 debug_mode = False
@@ -105,7 +106,5 @@ async def crop_to_square(img_list):
 
 
 
-
 if __name__ == '__main__':
-    path='framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf'
-    color_emoji_maker('❤️',(0,0,0))
+    pass

@@ -152,6 +152,8 @@ async def get_user_data(steam_id: int, proxy='http://127.0.0.1:7890'):
     avatar_url = re.search(r'<link rel="image_src" href="(.*?)"', html)
     if avatar_url:
         result["avatar_url"] = avatar_url.group(1)
+    else:
+        result["avatar_url"] = 'https://gal.manshuo.ink/usr/uploads/2025/01/1664675676.png'
 
     # recent 2 week play time
     # \t<div class="recentgame_quicklinks recentgame_recentplaytime">\r\n\t\t\t\t\t\t\t\t\t<div>15.5 小时（过去 2 周）</div>

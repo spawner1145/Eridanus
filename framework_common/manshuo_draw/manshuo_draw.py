@@ -1,7 +1,7 @@
 from framework_common.manshuo_draw.core.deal_img import *
 import asyncio
 import copy
-
+from framework_common.manshuo_draw.core.util.test import *
 
 async def manshuo_draw(json_img):
     json_img=copy.deepcopy(json_img)
@@ -11,21 +11,6 @@ async def manshuo_draw(json_img):
 
 if __name__ == '__main__':
 
-    """
-        定义一个json和内容文件，方便后续进行调试维护,并在此处阐明各个标签的用途
-    :type:表示该组件的类型，如text表示文字，img表示图片，avatar表示头像
-    :content:表示该组件的内容，如文本内容，图片地址，头像地址
-    :font:表示字体类型，如default表示默认字体
-    :color:表示字体颜色，如#000000表示黑色
-    :size:表示字体大小，如24表示24号字体
-    :padding_ahind:表示该组件与上一个组件之间的距离
-    :padding_with:表示内容与内容之间的距离
-    :img:表示图片地址，如https://i.imgur.com/5y9y95L.jpg
-    :label:表示图片标签，如['标签1','标签2']
-    :label_color:表示标签颜色，如#000000表示黑色
-    :number_per_row:表示每行显示的图片数量，如1表示一行显示一个图片
-    :is_crop:表示是否裁剪图片，如True表示裁剪图片为一个正方形
-    """
     contents=[
         {'type': 'basic_set', 'debug': True},
 
@@ -42,7 +27,7 @@ if __name__ == '__main__':
     ]
 
     contents2=[
-        {'type': 'basic_set', 'debug': True,'img_width':1500,'img_height':1000,},
+        {'type': 'basic_set', 'debug': False,'img_width':1500,'img_height':1000,},
 
         {'type': 'backdrop', 'subtype': 'img'},
 
@@ -68,17 +53,10 @@ if __name__ == '__main__':
          'content': [f"[name]漫朔_manshuo[/name]\n[time]发言次数：230次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]test[/name]\n[time]发言次数：205次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]","[name]荔枝[/name]\n[time]发言次数：215次[/time]"],'number_per_row':2,
          'background':['framework_common/manshuo_draw/data/cache/manshuo.jpg',f"https://q1.qlogo.cn/g?b=qq&nk=1280433782&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=3552663628&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=2702495766&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=1687148274&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=1124901768&s=640",f"https://q1.qlogo.cn/g?b=qq&nk=2319804644&s=640"],
          },
-
     ]
 
-    contents_not=[{'type': 'basic_set', 'debug': True},
-        'https://avatars.fastly.steamstatic.com/93947d71b3900b1bb1a5144d62a9af99a4338bba_full.jpg',
-        'https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1329410/capsule_184x69.jpg'
-        ]
-
-
     contentsWithNoTag=[
-        {'type': 'basic_set', 'debug': True,'img_width':1000,'img_height':980,'max_num_of_columns':4},
+        {'type': 'basic_set', 'debug': False,'img_width':1000,'img_height':980,'max_num_of_columns':4},
         {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'layer':1,
          'content': [f"[name]漫朔_manshuo[/name]\n[time]2025年 05月27日 20:32[/time]"]},
         '这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]',
@@ -100,7 +78,7 @@ if __name__ == '__main__':
          'content': ['这部分是测manshuo！\n这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n[des]这里是介绍[/des]']},
     ]
 
-    games_content=[{'type': 'basic_set', 'debug': True},
+    games_content=[{'type': 'basic_set', 'debug': False},
         {'type': 'avatar', 'subtype': 'common', 'img': ['https://i0.hdslb.com/bfs/face/035c2c9e95c5487d0a9aca28c36f0cb20b0afc3f.jpg'],
                     'upshift_extra': 20, 'content': ['[name]一颗小兔娘[/name]\n[time]2025年07月20日 19:22[/time]'], 'type_software': 'bilibili'},
                    {'type': 'text', 'content': ['都怪你们不给力，害得爱播赚不了这份钱[emoji]https://i0.hdslb.com/bfs/emote/ca94ad1c7e6dac895eb5b33b7836b634c614d1c0.png[/emoji]'
@@ -108,9 +86,12 @@ if __name__ == '__main__':
                                                 '[emoji]https://i0.hdslb.com/bfs/emote/ca94ad1c7e6dac895eb5b33b7836b634c614d1c0.png[/emoji]']},
                    {'type': 'img', 'img': ['http://i0.hdslb.com/bfs/new_dyn/9cd316e9b7f15b48cc12383fc1e446b5498099165.jpg']}]
 
+    text_content=[{'type': 'basic_set', 'debug': False,'img_width':500,'img_height':1000,'auto_line_change':False},
+        '这部分是测manshuo！\n'
+        '这manshuo！这里是测试！这里是测试！这里是测试！这里是测试！这里是测试！'
+        '这里是测试！这里是测试！这里是测试！这里是测试！这里是测试\n'
+        '[des]这里是介绍[/des]']
 
 
+    asyncio.run(manshuo_draw(text_content))
 
-
-    asyncio.run(manshuo_draw(contents2))
-    #asyncio.run(manshuo_draw(contents_not))

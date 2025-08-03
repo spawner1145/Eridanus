@@ -55,7 +55,6 @@ def main(bot, config):
         number_speeches_check_list = []
         #处理得出本群的人员信息表
         for user in all_users:
-
             if 'number_speeches' in all_users[user] and f'{target_group}' in all_users[user]['number_speeches'] and current_day in all_users[user]['number_speeches'][f'{target_group}']:
                 try:
                     target_name = (await bot.get_group_member_info(target_group, user))['data']['nickname']
@@ -65,14 +64,13 @@ def main(bot, config):
         number_speeches_check_list_nolimited = sorted(number_speeches_check_list, key=lambda x: x["number_speeches_count"], reverse=True)
         number_speeches_check_list=[]
         for item in number_speeches_check_list_nolimited:
-            if len(item['nicknime']) > 13: item['nicknime']=item['nicknime'][:13]
             number_speeches_check_list.append(item)
             if len(number_speeches_check_list) >= 16: break
         for idx, item in enumerate(number_speeches_check_list, start=1):
             item["rank"] = idx
         bot.logger.info(f"进入图片制作")
         number_speeches_check_draw_list = [
-            {'type': 'basic_set','img_width':1200},
+            {'type': 'basic_set','img_width':1200,'auto_line_change':False},
             {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],
              'content': [f"[name]{context}发言排行榜[/name]\n[time]{datetime.now().strftime('%Y年%m月%d日 %H:%M')}[/time]"]},
             {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={list['name']}&s=640" for list in number_speeches_check_list],
@@ -118,14 +116,13 @@ def main(bot, config):
         number_speeches_check_list_nolimited = sorted(number_speeches_check_list, key=lambda x: x["number_speeches_count"], reverse=True)
         number_speeches_check_list=[]
         for item in number_speeches_check_list_nolimited:
-            if len(item['nicknime']) > 13: item['nicknime'] = item['nicknime'][:13]
             number_speeches_check_list.append(item)
             if len(number_speeches_check_list) >= 16: break
         for idx, item in enumerate(number_speeches_check_list, start=1):
             item["rank"] = idx
         bot.logger.info(f"进入图片制作")
         number_speeches_check_draw_list = [
-            {'type': 'basic_set','img_width':1400},
+            {'type': 'basic_set','img_width':1400,'auto_line_change':False},
             {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],
              'content': [f"[name]{context}发言排行榜[/name]\n[time]{datetime.now().strftime('%Y年%m月%d日 %H:%M')}[/time]"]},
             {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={list['name']}&s=640" for list in number_speeches_check_list],
