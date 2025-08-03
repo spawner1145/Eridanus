@@ -282,12 +282,13 @@ async def final_img_deal(params, type='img'):#判断是否需要增减
     for item in ['img','content','label','right_icon','background']:
         if item in params['params']:
             if type == 'avatar':number_check=params["number_count"]
-            else:number_check=int(params["number_count"] - params["number_per_row"])
+            else:number_check=int(params["number_count"])
             if number_check < 0: number_check = 0
             params['params'][item] = params['params'][item][number_check:]
     if params['draw_limited_height_check']:
         params['params']['draw_limited_height'] = params['draw_limited_height_check'] + params['draw_limited_height_remain']
-    if params['json_img_left_module_flag']: params['json_img_left_module'] = params['params']
+    if params['json_img_left_module_flag']:
+        params['json_img_left_module'] = params['params']
 
 
     #print(params['img_height_limit'],params['current_y'])
