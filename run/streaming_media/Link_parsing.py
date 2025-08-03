@@ -80,6 +80,8 @@ def main(bot, config):
             bot.logger.info('✅ 系统已正确读取到node.js')
     except:
         pass
+    global Cachecleaner
+    Cachecleaner=False
 
     @bot.on(GroupMessageEvent)
     async def Link_Prising_search(event: GroupMessageEvent):
@@ -135,8 +137,12 @@ def main(bot, config):
                 bot.logger.error(str('bili_link_error ') + link_prising_json['reason'])
     @bot.on(LifecycleMetaEvent)
     async def cleanup_teamlist(event: LifecycleMetaEvent):
+        global Cachecleaner
+        if Cachecleaner:
+            return
         while True:
             bot.logger.info('清理链接解析过期缓存')
+            Cachecleaner=True
             current_time = time()
             expired_keys = []
             for k, v in teamlist.items():
