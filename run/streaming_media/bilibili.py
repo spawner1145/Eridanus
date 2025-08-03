@@ -87,6 +87,8 @@ def bili_main(bot, config):
 
     @bot.on(LifecycleMetaEvent)
     async def _(event):
+        if not config.streaming_media.config["bili_dynamic"]["enable"]:
+            return
         global bili_activate
         if not bili_activate:
             bili_activate = True

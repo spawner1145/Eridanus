@@ -140,7 +140,7 @@ def main(bot, config):
             current_time = time()
             expired_keys = []
             for k, v in teamlist.items():
-                if k.endswith('_recall'):
+                if isinstance(k,str) and k.endswith('_recall'):
                     continue
                 if isinstance(v, dict) and 'expire_at' in v:
                     if v['expire_at'] < current_time:
