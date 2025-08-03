@@ -11,6 +11,7 @@ import pprint
 from framework_common.utils.install_and_import import install_and_import
 dateutil=install_and_import('qrcode', 'qrcode')
 import qrcode
+import pprint
 from developTools.message.message_components import Text, Image, At
 from framework_common.manshuo_draw import *
 from framework_common.framework_util.yamlLoader import YAMLManager
@@ -57,6 +58,7 @@ async def qrcode_get(userid,bot=None,event=None):
             'id' : userid,
             'user_id' : cred.userId,
         }
+        #pprint.pprint(user_dict)
         db.write_user(userid, {'skland':{'user_info':user_dict}})
         character_dict=await get_characters_and_bind(user_dict, userid, db)
         if bot and event:await bot.send(event, f'绑定成功，欢迎 {character_dict["nickname"]}')

@@ -14,6 +14,7 @@ async def get_characters_and_bind(user, userid, db):
     cred = CRED(cred=user['cred'], token=user['cred_token'])
     binding_app_list = await SklandAPI.get_binding(cred)
     for app in binding_app_list:
+        if 'appCode' not in app or app['appCode'] != 'arknights': continue
         for character in app["bindingList"]:
             character_dict = {
                 'id':user['id'],
