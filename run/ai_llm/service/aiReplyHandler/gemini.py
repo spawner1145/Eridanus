@@ -80,6 +80,8 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                 # 下载图片转base64
                 async with httpx.AsyncClient(timeout=60) as client:
                     res = await client.get(url)
+                    image = None
+                    img_byte_arr = None
                     # res.raise_for_status()  # Check for HTTP errors
                     try:
                         image = Image.open(io.BytesIO(res.content))
@@ -96,12 +98,20 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                         if size_kb <= 400 or quality <= 10:
                             break
                         quality -= 5
+                        img_byte_arr.close()  # 添加这行，关闭之前的BytesIO
                     img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
                 prompt_elements.append({"inline_data": {"mime_type": "image/jpeg", "data": img_base64}})
                 #prompt_elements.append({"type":"image_url","image_url":i["image"]["url"]})
             except Exception as e:
                 traceback.print_exc()
                 prompt_elements.append({"text": f"系统提示：下载图片失败"})
+            finally:
+                # 清理资源
+                if image is not None:
+                    image.close()
+                if img_byte_arr is not None:
+                    img_byte_arr.close()
+                del res
 
         elif "record" in i:
             origin_voice_url=i["record"]["file"]
@@ -114,13 +124,19 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
             r=await bot.get_record(origin_voice_url)
 
             mp3_filepath=r["data"]["file"]
-            with open(mp3_filepath, "rb") as mp3_file:
-                mp3_data = mp3_file.read()
-                base64_encoded_data = base64.b64encode(mp3_data)
-                base64_message = base64_encoded_data.decode('utf-8')
-                prompt_elements.append({"inline_data": {"mime_type": "audio/mp3", "data": base64_message}})
-            #prompt_elements.append({"type":"voice","voice":i["voice"]})
+            try:
+                with open(mp3_filepath, "rb") as mp3_file:
+                    mp3_data = mp3_file.read()
+                    base64_encoded_data = base64.b64encode(mp3_data)
+                    base64_message = base64_encoded_data.decode('utf-8')
+                    prompt_elements.append({"inline_data": {"mime_type": "audio/mp3", "data": base64_message}})
+                #prompt_elements.append({"type":"voice","voice":i["voice"]})
+            finally:
+                if mp3_data is not None:
+                    del mp3_data
         elif "video" in i:
+            mp4_data=None
+            base64_encoded_data=None
             video_url=i["video"]["url"]
             base64_match = BASE64_PATTERN.match(video_url)
             if base64_match:
@@ -144,6 +160,11 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
             except Exception as e:
                 logger.warning(f"下载视频失败:{video_url} 原因:{e}")
                 prompt_elements.append({"text": str(i)})
+            finally:
+                if mp4_data is not None:
+                    del mp4_data
+                if base64_encoded_data is not None:
+                    del base64_encoded_data
         elif "reply" in i:
             try:
                 event_obj=await bot.get_msg(int(event.get("reply")[0]["id"]))
