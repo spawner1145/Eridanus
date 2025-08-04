@@ -26,16 +26,11 @@ def main(bot,config):
             else:
                 return
                 #await bot.send(event,f"收到表情包：{summary}，地址：{url}")
+            if summary=="[图片]":
+                return
             bot.logger.info(f"收到表情包：{summary}，地址：{url}")
             try:
                 await download_img(url,f"data/pictures/Mface/{summary}.{url.split('.')[-1]}")
             except:
                 bot.logger.error(f"下载表情包失败：{summary}，地址：{url}")
-                
-    @bot.on(GroupMessageEvent)
-    async def send_mface(event: GroupMessageEvent):
-        if event.message_chain.has(At) and event.message_chain.get(At)[0].qq==bot.id:
-            pass
-            """
-            弄成概率插嘴
-            """
+
