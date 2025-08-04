@@ -14,6 +14,9 @@ def main(bot: ExtendBot,config: YAMLManager):
             if user_info.permission>config.ai_code_generator.ai_coder["code_generation_permission_need"]:
                 prompt=event.pure_text.replace(config.ai_code_generator.ai_coder["prefix"],"").strip()
                 bot.logger.info(f"AI插件生成器收到需求:{prompt}")
+                if prompt=="":
+                    await bot.send(event, "请输入需求")
+                    return
                 r=await code_generate(config,prompt,event.user_id)
                 await bot.send(event, "请查看控制台输出以验证")
             else:
