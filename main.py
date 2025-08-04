@@ -122,7 +122,7 @@ async def handler(bot, event: GroupMessageEvent | PrivateMessageEvent):
         # 手动输出内存报告
         r=plugin_manager.log_memory_report()
         await bot.send(event, r)
-@bot1.on(LifecycleMetaEvent)
+""""@bot1.on(LifecycleMetaEvent)
 async def handle_lifecycle(event: LifecycleMetaEvent):
     while True:
         r = plugin_manager.get_memory_usage_report()
@@ -132,7 +132,7 @@ async def handle_lifecycle(event: LifecycleMetaEvent):
             bot1.logger.error("内存占用过高，准备重启...")
             os.execv(sys.executable, ['python'] + sys.argv)
         await asyncio.sleep(600)
-
+"""
 async def reload_all_plugins():
     """重载所有插件的便捷函数"""
     if plugin_manager:
