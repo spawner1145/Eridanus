@@ -127,7 +127,7 @@ async def handle_lifecycle(event: LifecycleMetaEvent):
     while True:
         r = plugin_manager.get_memory_usage_report()
         memory_occupid=int(r['current_memory']['rss'])
-        if memory_occupid>=400:
+        if memory_occupid>=500:
             await bot1.send_friend_message(config.common_config.basic_config["master"]["id"],"内存占用过高，准备重启...")
             bot1.logger.error("内存占用过高，准备重启...")
             os.execv(sys.executable, ['python'] + sys.argv)
