@@ -152,7 +152,7 @@ class BoundedPendingWrites:
             return sum(len(messages) for messages in self.data.values())
 
 
-pending_writes = BoundedPendingWrites(max_per_group=100)
+pending_writes = BoundedPendingWrites(max_per_group=50)
 write_lock = Lock()
 last_batch_write = time.time()
 
