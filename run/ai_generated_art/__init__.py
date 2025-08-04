@@ -26,7 +26,7 @@ function_declarations=[
             },
     {
                 "name": "call_text2img",
-                "description": "调用text to image模型，根据文本生成图片。专注于创造纯英文的AI绘画提示词，擅长将用户需求转化为精准的图像描述。对各种艺术风格和技法了如指掌，能准确把握画面重点和细节。注重提示词的逻辑性和组合效果，确保生成的画面既美观又符合预期。",
+                "description": "根据文本生成图片。将用户需求转化为精准的图像描述。",
                 "parameters": {
                     "type": "object",
                     "properties": {
