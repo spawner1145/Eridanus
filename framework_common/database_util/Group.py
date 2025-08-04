@@ -1,3 +1,5 @@
+import traceback
+
 import aiosqlite
 import json
 import asyncio
@@ -662,6 +664,7 @@ async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, promp
         return fl
 
     except Exception as e:
+        traceback.print_exc()
         logger.info(f"Error getting last 20 and converting to prompt for group {group_id}: {e}")
         return []
 
