@@ -25,6 +25,7 @@ def main(bot, config):
 
     else:
         tools = None
+
     if config.ai_llm.config["llm"]["联网搜索"]:
         if config.ai_llm.config["llm"]["model"] == "gemini":
             if tools is None:
@@ -223,6 +224,8 @@ def main(bot, config):
             await delete_user_history(event.user_id)
             await delete_user_history(int(f"{event.user_id}1024"))
             await clear_group_messages(event.group_id)
+            await update_user(event.user_id, user_portrait="默认用户")
+            await update_user(event.user_id, portrait_update_time=datetime.datetime.now().isoformat())
             await bot.send(event, "历史记录已清除", True)
         elif event.pure_text == "/clear group":
             await clear_group_messages(event.group_id)
