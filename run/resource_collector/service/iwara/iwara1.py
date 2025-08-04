@@ -2,7 +2,7 @@ from io import BytesIO
 
 from framework_common.utils.install_and_import import install_and_import
 
-install_and_import("cloudscraper")
+cloudscraper=install_and_import("cloudscraper")
 import asyncio
 import os
 import re
