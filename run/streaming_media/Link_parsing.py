@@ -166,21 +166,3 @@ def main(bot, config):
             collected = gc.collect()
             bot.logger.info_func(f"回收了 {collected} 个对象")
             await asyncio.sleep(1000)
-
-    @bot.on(GroupMessageEvent)
-    async def Music_Link_Prising_search(event: GroupMessageEvent):
-        url = event.pure_text
-        if config.streaming_media.config["网易云卡片"]["enable"]:
-            if "music.163.com" not in url:
-                return
-            link_parsing_json = await netease_music_link_parse(url, filepath='data/pictures/cache/')
-            if link_parsing_json['status']:
-                bot.logger.info('网易云音乐链接解析成功，开始推送~~~')
-                await bot.send(event, Image(file=link_parsing_json['pic_path']))
-                if config.streaming_media.config["网易云卡片"]["解析自带音频下载url"]:
-                    try:
-                        await bot.send(event, File(file='data/pictures/cache/不允许进行传播、销售等商业活动!!.txt'))
-                    except Exception as e:
-                        bot.logger.logger(f"{e}\n没有开启解析自带音频下载url，不给你发")
-                os.remove('data/pictures/cache/不允许进行传播、销售等商业活动!!.txt')
-            return
