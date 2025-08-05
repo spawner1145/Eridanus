@@ -1,47 +1,52 @@
+from sys import getsizeof
+
 import httpx
 import asyncio
 from bs4 import BeautifulSoup
-import gc
 import re
 import time
 from urllib.parse import urljoin, quote, unquote
+import gc
+
+#from test1 import analyze_objects
+
 
 async def fetch_url(url, headers):
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, headers=headers)
-        content = response.text
-        response = None
-        return content
+        response = await client.get(url, headers=headers, timeout=20.0)
+        return response
+
 
 def extract_div_contents(html_content):
+    """从Baidu搜索结果HTML中提取标题、链接和内容。"""
     soup = BeautifulSoup(html_content, 'html.parser')
     result_op_divs = soup.find_all('div', class_='result-op c-container new-pmd')
     result_xpath_log_divs = soup.find_all('div', class_='result c-container xpath-log new-pmd')
-    
+
     entries = []
-    
+
     for div in result_op_divs + result_xpath_log_divs:
         title_tag = div.find('h3')
         title = title_tag.get_text(strip=True) if title_tag else "无标题"
         link_tag = div.find('a', href=True)
         link = link_tag['href'] if link_tag else "无链接"
-        
+
         all_texts = [text for text in div.stripped_strings if text != title]
         content = ' '.join(all_texts)
-        
-        content = re.sub(r'UTC\+8(\d{5}:\d{2}:\d{2})', lambda x: 'UTC+8 ' + ':'.join([x.group(1)[i:i+2] for i in range(0, len(x.group(1)), 2)]).lstrip(':'), content)
+
+        content = re.sub(r'UTC\+8(\d{5}:\d{2}:\d{2})', lambda x: 'UTC+8 ' + ':'.join(
+            [x.group(1)[i:i + 2] for i in range(0, len(x.group(1)), 2)]).lstrip(':'), content)
         content = re.sub(r'(\d{2}:\d{2})(\d{4}-\d{2}-\d{2})', r'\1 \2', content)
         content = re.sub(r'(\d{2}) (\d{2}) : (\d{2}) (\d{2}) : (\d{2}) (\d{2})', r'\1:\3:\5', content)
-        
+
         entries.append({
             'title': title,
             'link': link,
             'content': content
         })
 
-    soup = None
-    gc.collect()
     return entries
+
 
 async def baidu_search(query):
     current_timestamp = int(time.time())
@@ -66,18 +71,20 @@ async def baidu_search(query):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0",
         "X-Custom-Time": str(current_timestamp),
     }
-    
-    html_content = await fetch_url(url, headers)
+
+    response = await fetch_url(url, headers)
+    html_content = response.text
     entries = extract_div_contents(html_content)
-    
-    output = "baidu搜索结果:\n"
+
+    del response
+    del html_content
+
+    result_parts = ["baidu搜索结果:"]
     for entry in entries:
-        output += f"标题: {entry['title']}\n"
-        output += f"链接: {entry['link']}\n"
-        output += f"内容: {entry['content']}\n"
-        output += "- " * 10 + "\n"
-    
-    return output
+        result_parts.append(f"标题: {entry['title']}\n链接: {entry['link']}\n内容: {entry['content']}\n" + "- " * 10)
+
+    return "\n".join(result_parts)
+
 
 async def searx_search(query):
     url = 'https://searx.bndkt.io/search'
@@ -90,7 +97,7 @@ async def searx_search(query):
         'safesearch': '0',
         'theme': 'simple'
     }
-    
+
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "Accept-Encoding": "gzip, deflate, br, zstd",
@@ -116,34 +123,33 @@ async def searx_search(query):
 
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get(url, params=params, headers=headers)
+            response = await client.get(url, params=params, headers=headers, timeout=20.0)
             response.raise_for_status()
-            
+
             soup = BeautifulSoup(response.text, 'html.parser')
-            
+            del response
+
             articles = soup.find_all('article', class_='result result-default category-general')
-            
+
             results = []
             for article in articles:
                 title = article.find('h3').get_text(strip=True)
                 link = article.find('a', class_='url_header')['href']
                 content = article.find('p', class_='content').get_text(strip=True)
-                results.append(f"标题: {title}\n链接: {link}\n内容: {content}\n{'- '* 10}")
+                results.append(f"标题: {title}\n链接: {link}\n内容: {content}\n{'- ' * 10}")
+            del soup
 
-            final = "searx搜索结果:\n" + "\n".join(results)
-            return final
+            final_output = "searx搜索结果:\n" + "\n".join(results)
+            return final_output
+
         except httpx.HTTPStatusError as exc:
-            print(f"An HTTP error occurred: {exc}")
-            print(exc.response.text)
+            return f"HTTP错误: {exc}\n响应内容: {exc.response.text}"
         except httpx.RequestError as exc:
-            print(f"An error occurred while making the request: {exc}")
-        finally:
-            soup = None
-            articles = None
-            results = None
-            gc.collect()
+            return f"请求错误: {exc}"
+
 
 async def html_read(url, config=None):
+    """内存优化版本的html_read函数"""
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
@@ -161,130 +167,110 @@ async def html_read(url, config=None):
         "Upgrade-Insecure-Requests": "1",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0"
     }
+
     proxies = None
-    if config is not None and config.common_config.basic_config["proxy"]["http_proxy"]:
-        proxies = {
-            "http://": config.common_config.basic_config["proxy"]["http_proxy"],
-            "https://": config.common_config.basic_config["proxy"]["http_proxy"]
-        }
-    
+    if config and config.common_config.basic_config["proxy"]["http_proxy"]:
+        proxies = {"http://": config.common_config.basic_config["proxy"]["http_proxy"],
+                   "https://": config.common_config.basic_config["proxy"]["http_proxy"]}
+
     decoded_url = unquote(url)
     parsed_url = httpx.URL(decoded_url)
     encoded_path = quote(parsed_url.path)
     encoded_url = str(parsed_url.copy_with(path=encoded_path))
-    
-    async with httpx.AsyncClient(follow_redirects=True, timeout=None, proxies=proxies, headers=headers) as client:
-        try:
+
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=None, proxies=proxies, headers=headers) as client:
             response = await client.get(encoded_url)
-            response.raise_for_status()
-            
-            html_content = response.text
-            response = None
-            
-            soup = BeautifulSoup(html_content, 'html.parser')
-            html_content = None
-            
-            if not soup.html:
-                print("未找到<html>标签，请确认网页内容是否正确加载。")
-                soup = None
-                gc.collect()
-                return "未找到<html>标签，请确认网页内容是否正确加载。"
-            
-            for script_or_style in soup(['script', 'style']):
-                script_or_style.decompose()
+        #analyze_objects("检查点-2") #client后续会自己回收。
+        base_url = url
+        soup = BeautifulSoup(response.text, 'lxml')
+        #analyze_objects("检查点-1")
+        if not soup.html:
+            return "未找到<html>标签，请确认网页内容是否正确加载。"
+        # 批量移除不需要的标签
+        for selector in ['script', 'style', 'meta', 'link']:
+            for tag in soup.select(selector):
+                tag.extract()
+        #analyze_objects("检查点0")
+        def recurse_generator(node, level=0, base_url_for_join=None):
+            """使用生成器减少内存使用"""
+            indent = '  ' * level
 
-            def iterate_nodes(root_node):
-                stack = [(root_node, 0)]
-                result = []
-                url_attributes = {'a': 'href', 'img': 'src', 'link': 'href', 'iframe': 'src'}
-                
-                while stack:
-                    node, level = stack.pop()
-                    indent = '  ' * level
-                    
-                    if not hasattr(node, 'name'):
-                        if isinstance(node, str) and node.strip():
-                            text = node.strip()
-                            if not (text.startswith("//<![CDATA[") and text.endswith("//]]>")):
-                                result.append(f"{indent}{text}")
-                        continue
-                    
-                    tag_name = node.name.lower()
-                    
-                    if tag_name in ['script', 'style']:
-                        continue
-                    
-                    if tag_name in ['pre', 'code']:
-                        all_lines = []
-                        spans = node.find_all('span', recursive=False)
-                        if spans:
-                            for span in spans:
-                                line_parts = [
-                                    part.get_text() if hasattr(part, "get_text") else str(part)
-                                    for part in span.contents
-                                ]
-                                full_line = ''.join(line_parts)
-                                if full_line.strip() or (full_line and not full_line.isspace()):
-                                    all_lines.append(full_line)
-                        else:
-                            code_text = node.get_text()
-                            for line in code_text.split('\n'):
-                                if line.strip() or (line and not line.isspace()):
-                                    all_lines.append(line)
-                        formatted_code = "\n".join([f"{indent}{line}" for line in all_lines])
-                        result.append(f"{indent}```yaml\n{formatted_code}\n{indent}```")
-                        continue
-                    
-                    if tag_name in url_attributes:
-                        attr = url_attributes[tag_name]
-                        url_attr_value = node.get(attr, '')
-                        
-                        if tag_name == 'a' and url_attr_value.lower().startswith('javascript:'):
-                            continue
-                        
-                        full_url = urljoin(encoded_url, url_attr_value)
-                        if tag_name == 'a':
-                            img_tag = node.find('img')
-                            if img_tag:
-                                alt = img_tag.get('alt', 'No description')
-                                result.append(f"{indent}[{alt}]({full_url})")
-                            else:
-                                link_text = ' '.join(node.stripped_strings)
-                                result.append(f"{indent}[{link_text}]({full_url})")
-                        elif tag_name == 'img':
-                            alt = node.get('alt', 'No description')
-                            result.append(f"{indent}[{alt}]({full_url})")
-                        else:
-                            result.append(f"{indent}[URL]({full_url})")
-                    else:
-                        for child in reversed(list(node.children)):
-                            stack.append((child, level + 1))
-                
-                return result
+            if hasattr(node, 'name') and node.name is not None:
+                tag_name = node.name.lower()
 
-            root_node = soup.html.body if (soup.html and soup.html.body) else soup.html
-            extracted_info = iterate_nodes(root_node)
-            
-            soup = None
-            root_node = None
-            gc.collect()
-            
-            return "\n".join(extracted_info)
-        
-        except httpx.RequestError as e:
-            return f"请求发生错误：{e}"
-        finally:
-            gc.collect()
+                if tag_name in ['script', 'style']:
+                    return
+
+                if tag_name in ['pre', 'code']:
+                    code_text = node.get_text()
+                    if code_text.strip():
+                        lines = [line for line in code_text.split('\n') if line.strip()]
+                        formatted_code = "\n".join([f"{indent}{line}" for line in lines])
+                        yield f"{indent}```\n{formatted_code}\n{indent}```"
+                    return
+
+                url_attributes = {'a': 'href', 'img': 'src', 'iframe': 'src'}
+                if tag_name in url_attributes:
+                    attr = url_attributes[tag_name]
+                    url_attr_value = node.get(attr, '')
+
+                    if url_attr_value and not url_attr_value.lower().startswith('javascript:'):
+                        full_url = urljoin(base_url_for_join, url_attr_value)
+                        text_content = ' '.join(node.stripped_strings) or node.get('alt', 'link')
+                        yield f"{indent}[{text_content}]({full_url})"
+                    return
+
+                # 递归处理子节点
+                for child in node.children:
+                    yield from recurse_generator(child, level + 1, base_url_for_join)
+
+            elif isinstance(node, str) and node.strip():
+                text = ' '.join(node.strip().split())
+                if text and not text.startswith("//<![CDATA[") and not text.endswith("//]]>"):
+                    yield f"{indent}{text}"
+
+        target_node = soup.body if soup.body else soup
+        #analyze_objects("检查点1")
+        # 使用生成器和join来优化内存使用
+        result = "\n".join(recurse_generator(target_node, base_url_for_join=base_url))
+
+        # 彻底清理BeautifulSoup对象
+        soup.decompose()  # 彻底销毁所有节点
+        del soup
+        del target_node
+
+        return result
+
+    except httpx.RequestError as e:
+        return f"请求发生错误：{e}"
+    except Exception as e:
+        return f"处理时发生未知错误: {e}"
+    finally:
+        if client is not None:
+            await client.aclose()
+
 
 async def main():
     while True:
         url = input("请输入要测试的URL（或输入'exit'退出）：")
         if url.lower() == 'exit':
             break
-        try:
-            print(await html_read(url))
-        except Exception as e:
-            print(f"发生错误：{e}")
+
+        if url.startswith("baidu:"):
+            query = url.split(":", 1)[1]
+            result = await baidu_search(query)
+        elif url.startswith("searx:"):
+            query = url.split(":", 1)[1]
+            result = await searx_search(query)
+        else:
+            result = await html_read(url)
+
+        print(result)
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n程序已退出。")

@@ -17,10 +17,15 @@ async def iwara_search(bot:ExtendBot,event:GroupMessageEvent,config,aim:str,oper
             return
         await bot.send(event, Text(f"正在iwara搜索{aim}"))
         try:
-            list = await search_videos(aim, config,config.resource_collector.config["iwara"]["iwara_gray_layer"])
-            if len(list) == 0:
-                await bot.send(event, Text(f"未搜索到{aim}相关iwara视频"))
-                return
+            list=[]
+            count_round = 0
+            while len(list) == 0:
+                list = await search_videos(aim, config, config.resource_collector.config["iwara"]["iwara_gray_layer"])
+                count_round += 1
+                if count_round > 3:
+                    await bot.send(event, Text(f"未搜索到{aim}相关iwara视频"))
+                    return
+
             node_list = [
                 Node(content=[Text(i.get('title')), Text("\nvideo_id:"), Text(i.get('video_id')), Image(file=i.get('path'))])
                 for i in list
