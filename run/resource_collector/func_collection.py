@@ -16,25 +16,25 @@ async def iwara_search(bot:ExtendBot,event:GroupMessageEvent,config,aim:str,oper
             await bot.send(event, "无权限")
             return
         await bot.send(event, Text(f"正在iwara搜索{aim}"))
-        try:
-            list=[]
-            count_round = 0
-            while len(list) == 0:
-                list = await search_videos(aim, config, config.resource_collector.config["iwara"]["iwara_gray_layer"])
-                count_round += 1
-                if count_round > 3:
+        count_num=0
+        while count_num<4:
+            try:
+                list = await search_videos(aim, config,config.resource_collector.config["iwara"]["iwara_gray_layer"])
+                if len(list) == 0:
                     await bot.send(event, Text(f"未搜索到{aim}相关iwara视频"))
                     return
-
-            node_list = [
-                Node(content=[Text(i.get('title')), Text("\nvideo_id:"), Text(i.get('video_id')), Image(file=i.get('path'))])
-                for i in list
-            ]
-            bot.logger.info(node_list)
-            await bot.send(event, node_list)
-        except Exception as e:
-            traceback.print_exc()
-            await bot.send(event, Text(f"iwara搜索{aim}失败：{e}"))
+                node_list = [
+                    Node(content=[Text(i.get('title')), Text("\nvideo_id:"), Text(i.get('video_id')), Image(file=i.get('path'))])
+                    for i in list
+                ]
+                bot.logger.info(node_list)
+                await bot.send(event, node_list)
+                return
+            except Exception as e:
+                traceback.print_exc()
+            finally:
+                count_num+=1
+        await bot.send(event, Text(f"iwara搜索{aim}失败：{e}"))
     elif operation=="download":
         if not user_info.permission >= config.resource_collector.config["iwara"]["iwara_download_level"]:
             await bot.send(event, "无权限")
