@@ -1,12 +1,18 @@
+import json
+
 from framework_common.manshuo_draw.core.deal_img import *
 import asyncio
 import copy
 from framework_common.manshuo_draw.core.util.test import *
 
 async def manshuo_draw(json_img):
-    json_img=copy.deepcopy(json_img)
-    json_img=json_check(json_img)   #检查并补正输入的参数
+    #json_img = json.loads(json.dumps(json_img))
+    json_img = json_check(json_img)
+
+    #analyze_objects("0")
     img_path=await deal_img(json_img)
+    del json_img
+    #analyze_objects("1")
     return img_path
 
 if __name__ == '__main__':
