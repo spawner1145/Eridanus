@@ -1,6 +1,7 @@
 import httpx
 import asyncio
 from bs4 import BeautifulSoup
+import gc
 import re
 import time
 from urllib.parse import urljoin, quote, unquote
@@ -8,7 +9,9 @@ from urllib.parse import urljoin, quote, unquote
 async def fetch_url(url, headers):
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=headers)
-        return response.text
+        content = response.text
+        response = None
+        return content
 
 def extract_div_contents(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
@@ -35,7 +38,9 @@ def extract_div_contents(html_content):
             'link': link,
             'content': content
         })
-    
+
+    soup = None
+    gc.collect()
     return entries
 
 async def baidu_search(query):
@@ -132,9 +137,13 @@ async def searx_search(query):
             print(exc.response.text)
         except httpx.RequestError as exc:
             print(f"An error occurred while making the request: {exc}")
+        finally:
+            soup = None
+            articles = None
+            results = None
+            gc.collect()
 
-
-async def html_read(url, config = None):
+async def html_read(url, config=None):
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
@@ -152,11 +161,12 @@ async def html_read(url, config = None):
         "Upgrade-Insecure-Requests": "1",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0"
     }
+    proxies = None
     if config is not None and config.common_config.basic_config["proxy"]["http_proxy"]:
-        proxies = {"http://": config.common_config.basic_config["proxy"]["http_proxy"], "https://": config.common_config.basic_config["proxy"]["http_proxy"]}
-    else:
-        proxies = None
-    #proxies = {"http://" : "http://127.0.0.1:7890", "https://" : "http://127.0.0.1:7890"}
+        proxies = {
+            "http://": config.common_config.basic_config["proxy"]["http_proxy"],
+            "https://": config.common_config.basic_config["proxy"]["http_proxy"]
+        }
     
     decoded_url = unquote(url)
     parsed_url = httpx.URL(decoded_url)
@@ -168,66 +178,71 @@ async def html_read(url, config = None):
             response = await client.get(encoded_url)
             response.raise_for_status()
             
-            soup = BeautifulSoup(response.text, 'html.parser')
+            html_content = response.text
+            response = None
+            
+            soup = BeautifulSoup(html_content, 'html.parser')
+            html_content = None
+            
             if not soup.html:
                 print("未找到<html>标签，请确认网页内容是否正确加载。")
+                soup = None
+                gc.collect()
                 return "未找到<html>标签，请确认网页内容是否正确加载。"
             
             for script_or_style in soup(['script', 'style']):
                 script_or_style.decompose()
 
-            url_attributes = {
-                'a': 'href',
-                'img': 'src',
-                'link': 'href',
-                'iframe': 'src',
-            }
-
-            def recurse(node, level=0):
-                indent = '  ' * level
+            def iterate_nodes(root_node):
+                stack = [(root_node, 0)]
                 result = []
+                url_attributes = {'a': 'href', 'img': 'src', 'link': 'href', 'iframe': 'src'}
                 
-                if hasattr(node, 'name') and node.name is not None:
+                while stack:
+                    node, level = stack.pop()
+                    indent = '  ' * level
+                    
+                    if not hasattr(node, 'name'):
+                        if isinstance(node, str) and node.strip():
+                            text = node.strip()
+                            if not (text.startswith("//<![CDATA[") and text.endswith("//]]>")):
+                                result.append(f"{indent}{text}")
+                        continue
+                    
                     tag_name = node.name.lower()
                     
                     if tag_name in ['script', 'style']:
-                        return result
+                        continue
                     
-                    if tag_name == 'pre' or tag_name == 'code':
+                    if tag_name in ['pre', 'code']:
                         all_lines = []
-                        # 检查是否有直接的`<span>`子元素
                         spans = node.find_all('span', recursive=False)
                         if spans:
                             for span in spans:
-                                # 获取每个span的所有子孙节点的文本，并保持其中的空白字符
-                                line_parts = [part.get_text() if hasattr(part, "get_text") else str(part) for part in span.contents]
+                                line_parts = [
+                                    part.get_text() if hasattr(part, "get_text") else str(part)
+                                    for part in span.contents
+                                ]
                                 full_line = ''.join(line_parts)
-
-                                # 如果行中只包含空白字符，也添加到all_lines中
-                                stripped_line = full_line.strip()
-                                if stripped_line or (full_line and not full_line.isspace()):
+                                if full_line.strip() or (full_line and not full_line.isspace()):
                                     all_lines.append(full_line)
                         else:
-                            # 如果没有`<span>`子元素，则直接使用`<code>`标签内的文本，并保持其中的空白字符
                             code_text = node.get_text()
-                            lines = code_text.split('\n')
-                            for line in lines:
-                                stripped_line = line.strip()
-                                if stripped_line or (line and not line.isspace()):
+                            for line in code_text.split('\n'):
+                                if line.strip() or (line and not line.isspace()):
                                     all_lines.append(line)
-
                         formatted_code = "\n".join([f"{indent}{line}" for line in all_lines])
                         result.append(f"{indent}```yaml\n{formatted_code}\n{indent}```")
-                        return result
+                        continue
                     
                     if tag_name in url_attributes:
                         attr = url_attributes[tag_name]
                         url_attr_value = node.get(attr, '')
                         
                         if tag_name == 'a' and url_attr_value.lower().startswith('javascript:'):
-                            return result
+                            continue
                         
-                        full_url = urljoin(str(response.url), url_attr_value)
+                        full_url = urljoin(encoded_url, url_attr_value)
                         if tag_name == 'a':
                             img_tag = node.find('img')
                             if img_tag:
@@ -242,20 +257,24 @@ async def html_read(url, config = None):
                         else:
                             result.append(f"{indent}[URL]({full_url})")
                     else:
-                        for child in node.children:
-                            result.extend(recurse(child, level + 1))
-                elif isinstance(node, str) and node.strip():
-                    text = node.strip()
-                    if text and not text.startswith("//<![CDATA[") and not text.endswith("//]]>"):
-                        result.append(f"{indent}{text}")
+                        for child in reversed(list(node.children)):
+                            stack.append((child, level + 1))
                 
                 return result
 
-            extracted_info = recurse(soup.html.body if soup.html and soup.html.body else soup.html)
+            root_node = soup.html.body if (soup.html and soup.html.body) else soup.html
+            extracted_info = iterate_nodes(root_node)
+            
+            soup = None
+            root_node = None
+            gc.collect()
+            
             return "\n".join(extracted_info)
+        
         except httpx.RequestError as e:
-            #print(f"请求发生错误：{e}")
             return f"请求发生错误：{e}"
+        finally:
+            gc.collect()
 
 async def main():
     while True:
