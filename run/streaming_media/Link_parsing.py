@@ -1,5 +1,6 @@
 import asyncio
 import gc
+import re
 import shutil
 import os
 import json as json_handle
@@ -87,8 +88,9 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def Link_Prising_search(event: GroupMessageEvent):
         url = event.pure_text
-        #print(url)
-        if url == '' and 'json' in event.processed_message[0]:
+
+        # 处理小程序消息
+        if not url and event.processed_message and 'json' in event.processed_message[0]:
             try:
                 url = event.processed_message[0]['json']['data']
                 event_context = json_handle.loads(event.message_chain[0].data)
@@ -96,7 +98,7 @@ def main(bot, config):
                     url = "QQ小程序" + event_context['meta']['detail_1']['qqdocurl']
             except:
                 pass
-        if 'http' not in url: url = event.raw_message
+
         #print(url)
         if event.group_id in teamlist:
             json = teamlist[event.group_id]['data']
@@ -110,7 +112,8 @@ def main(bot, config):
             elif event.get("text") is not None and event.get("text")[0] == "下载图片":
                 bot.logger.info('图片下载ing')
                 await call_bili_download_video(bot, event, config,'img')
-
+        if not re.search(r'https?://', url or '') and not url.startswith("QQ小程序"):
+            return
         link_prising_json = await link_prising(url, filepath='data/pictures/cache/', proxy=proxy)
         send_context = f'{botname}识别结果：'
         #print(link_prising_json)
