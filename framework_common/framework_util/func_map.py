@@ -1,18 +1,17 @@
-#为func_calling提供函数映射
+
 import importlib
 import inspect
-import json
 import os
 import traceback
 
 from developTools.utils.logger import get_logger
 
-logger=get_logger()
+logger = get_logger()
 PLUGIN_DIR = "run"
 dynamic_imports = {}
 
+# 加载 __init__.py 中的 dynamic_imports
 for root, dirs, files in os.walk(PLUGIN_DIR):
-    # 检查路径中是否包含 service 文件夹
     if "service" in root.split(os.sep):
         continue
 
@@ -21,7 +20,7 @@ for root, dirs, files in os.walk(PLUGIN_DIR):
         try:
             module = importlib.import_module(module_name)
             if hasattr(module, "dynamic_imports"):
-                dynamic_imports.update(module.dynamic_imports)
+                dynamic_imports[module_name] = module.dynamic_imports
                 logger.info(f"✅ 函数调用映射加载成功: {module_name}.dynamic_imports")
             else:
                 logger.warning(f"⚠️ {module_name} 未定义 dynamic_imports")
@@ -31,19 +30,37 @@ for root, dirs, files in os.walk(PLUGIN_DIR):
 
 loaded_functions = {}
 
-
-# 动态导入
-for module_name, functions in dynamic_imports.items():
+# 处理 dynamic_imports（支持字典和列表两种格式）
+for module_name, imports in dynamic_imports.items():
     try:
-        module = importlib.import_module(module_name)  # 动态导入模块
-        for func in functions:
-            if hasattr(module, func):
-                loaded_functions[func] = getattr(module, func)  # 存入字典
-                #logger.info(f"✅ 成功加载 {module_name}.{func}")
-            else:
-                logger.warning(f"⚠️ {module_name} 中不存在 {func}")
+        # 情况 1: dynamic_imports 是字典+字符串，旧导入方式。
+        if isinstance(imports, dict):
+            for sub_module_name, functions in imports.items():
+                try:
+                    module = importlib.import_module(sub_module_name)
+                    for func_name in functions:
+                        if hasattr(module, func_name):
+                            loaded_functions[func_name] = getattr(module, func_name)
+                            logger.info(f"✅ 成功加载 {sub_module_name}.{func_name}")
+                        else:
+                            logger.warning(f"⚠️ {sub_module_name} 中不存在 {func_name}")
+                except Exception as e:
+                    logger.error(f"❌ 无法导入模块 {sub_module_name}: {e}")
+                    traceback.print_exc()
+
+        # 情况 2: dynamic_imports 是列表（新格式，函数对象）
+        elif isinstance(imports, list):
+            for func in imports:
+                if callable(func):
+                    func_name = func.__name__
+                    loaded_functions[func_name] = func
+                    logger.info(f"✅ 成功加载 {module_name}.{func_name}")
+                else:
+                    logger.warning(f"⚠️ {module_name} 中的 {func} 不是可调用对象")
+        else:
+            logger.warning(f"⚠️ {module_name} 的 dynamic_imports 格式不正确")
     except Exception as e:
-        logger.error(f"❌ 无法导入模块 {module_name}: {e}")
+        logger.error(f"❌ 处理模块 {module_name} 时出错: {e}")
         traceback.print_exc()
 
 async def call_quit_chat(bot, event, config):
@@ -62,19 +79,14 @@ async def call_func(bot, event, config, func_name, params):
     """
     print(f"Calling function '{func_name}' with parameters: {params}")
 
-    # **改成从 `loaded_functions` 获取函数**
     func = loaded_functions.get(func_name)
-
     if func is None:
         raise ValueError(f"Function '{func_name}' not found in loaded_functions.")
 
-    # 检查是否为可调用对象
     if not callable(func):
         raise TypeError(f"'{func_name}' is not callable.")
-
 
     if not inspect.iscoroutinefunction(func):
         raise TypeError(f"'{func_name}' is not an async function.")
 
-    # 调用函数并传入参数
     return await func(bot, event, config, **params)

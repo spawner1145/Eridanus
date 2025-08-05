@@ -10,6 +10,7 @@ from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Image, Text, Card
 from framework_common.database_util.User import get_users_with_permission_above, get_user
 from framework_common.framework_util.websocket_fix import ExtendBot
+from framework_common.manshuo_draw import RedisDatabase, manshuo_draw
 from framework_common.utils.random_str import random_str
 from framework_common.utils.utils import download_img
 from run.ai_llm.service.aiReplyCore import aiReplyCore
@@ -133,7 +134,7 @@ def main(bot: ExtendBot, config):
             weekdays = ["一", "二", "三", "四", "五", "六", "日"]
             bangumi_json = await bangumi_PILimg(filepath='data/pictures/cache/',
                                                 type_soft=f'bangumi 周{weekdays[weekday]}放送',
-                                                name=f'bangumi 周{weekdays[weekday]}放送', type='calendar')
+                                                name=f'bangumi 周{weekdays[weekday]}放送', type='calendar',bot_id=None)
             if bangumi_json['status']:
                 logger.info_func("推送bangumi每日番剧")
                 for group_id in config.scheduled_tasks.sheduled_tasks_push_groups_ordinary["bangumi"]["groups"]:
@@ -228,6 +229,65 @@ def main(bot: ExtendBot, config):
                 except Exception as e:
                     logger.error(f"向群{group_id}推送{task_name}失败，原因：{e}")
                     continue
+        elif task_name == "每日壁画王":
+            logger.info(f"获取到发言排行榜查询需求")
+            db_json = config.common_config.basic_config['redis']
+
+            db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
+            for group_id in config.scheduled_tasks.sheduled_tasks_push_groups_ordinary[task_name]["groups"]:
+                if group_id == 0: continue
+                try:
+
+
+
+                    today = datetime.datetime.now()
+
+
+                    year, month, day = today.year, today.month, today.day
+                    current_day = f'{year}_{month}_{day}'
+                    all_users = db.read_all_users()
+                    target_group = group_id
+                    number_speeches_check_list = []
+                    # 处理得出本群的人员信息表
+                    for user in all_users:
+                        if 'number_speeches' in all_users[user] and f'{target_group}' in all_users[user][
+                            'number_speeches'] and current_day in all_users[user]['number_speeches'][f'{target_group}']:
+                            target_name = (await bot.get_group_member_info(target_group, user))['data']['nickname']
+                            number_speeches_check_list.append({'name': user, 'nicknime': target_name,
+                                                               'number_speeches_count':
+                                                                   all_users[user]['number_speeches'][
+                                                                       f'{target_group}'][current_day]})
+                    number_speeches_check_list_nolimited = sorted(number_speeches_check_list,
+                                                                  key=lambda x: x["number_speeches_count"],
+                                                                  reverse=True)
+                    number_speeches_check_list = []
+                    for item in number_speeches_check_list_nolimited:
+                        number_speeches_check_list.append(item)
+                        if len(number_speeches_check_list) >= 16: break
+                    for idx, item in enumerate(number_speeches_check_list, start=1):
+                        item["rank"] = idx
+                    bot.logger.info(f"进入图片制作")
+                    number_speeches_check_draw_list = [
+                        {'type': 'basic_set', 'img_width': 1200},
+                        {'type': 'avatar', 'subtype': 'common',
+                         'img': [f"https://q1.qlogo.cn/g?b=qq&nk={bot.id}&s=640"],
+                         'content': [
+                             f"[name]发言排行榜[/name]\n[time]{datetime.datetime.now().strftime('%Y年%m月%d日 %H:%M')}[/time]"]},
+                        {'type': 'avatar', 'subtype': 'common',
+                         'img': [f"https://q1.qlogo.cn/g?b=qq&nk={list['name']}&s=640" for list in
+                                 number_speeches_check_list],
+                         'content': [
+                             f"[name]{list['nicknime']}[/name]\n[time]发言次数：{list['number_speeches_count']}次 排名：{list['rank']}[/time]"
+                             for list in number_speeches_check_list], 'number_per_row': 2,
+                         'background': [f"https://q1.qlogo.cn/g?b=qq&nk={list['name']}&s=640" for list in
+                                        number_speeches_check_list]},
+                    ]
+                    await bot.send_group_message(group_id, Image(file=(await manshuo_draw(number_speeches_check_draw_list))))
+                    await bot.send_group_message(group_id, "今日壁画王")
+                    await sleep(6)
+                except Exception as e:
+                    logger.error(f"向群{group_id}推送{task_name}失败，原因：{e}")
+                    continue
 
     def create_dynamic_jobs():
         for task_name, task_info in scheduledTasks.items():
@@ -256,7 +316,7 @@ def main(bot: ExtendBot, config):
         scheduler.start()
 
     allow_args = ["忍术大学习", "每日天文", "bing每日图像", "单向历", "bangumi", "nightASMR", "摸鱼人日历", "新闻",
-                  "免费游戏喜加一", "早安", "晚安", "午安"]
+                  "免费游戏喜加一", "早安", "晚安", "午安","每日壁画王"]
 
     @bot.on(GroupMessageEvent)
     async def _(event: GroupMessageEvent):

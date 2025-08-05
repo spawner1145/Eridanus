@@ -1,11 +1,10 @@
 plugin_description="群管理"
+
+
 dynamic_imports={
     "run.groupManager.self_Manager": [
         "call_operate_blandwhite", "garbage_collection",
         "report_to_master", "send", "send_contract"
-    ],
-    "run.groupManager.group_manager": [
-        "quit_group"
     ]
 }
 function_declarations=[
@@ -84,25 +83,4 @@ function_declarations=[
             ]
         }
     },
-    {
-        "name": "quit_group",
-        "description": "退出群聊。可选择超出指定人数，或低于指定人数的群",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "th": {
-                    "type": "integer",
-                    "description": "退群人数阈值"
-                },
-                "mode": {
-                    "type": "string",
-                    "enum": ["above", "below"], "description": "超出(above)或低于(below)低于人数阈值则退群。"
-                }
-            },
-            "required": [
-                "th",
-                "mode"
-            ]
-        }
-    }
 ]

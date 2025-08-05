@@ -18,7 +18,7 @@ from bilibili_api import dynamic
 from bilibili_api.opus import Opus
 from bilibili_api.video import VideoDownloadURLDataDetecter
 from .bili import bili_init,av_to_bv,download_b,info_search_bili
-from .common import name_qq_list,card_url_list,add_append_img,download_video,get_file_size_mb
+from .common import name_qq_list,card_url_list,add_append_img,download_video,get_file_size_mb,download_img
 try:
     from bilibili_api import select_client
     select_client("httpx")
@@ -67,7 +67,9 @@ async def bilibili(url,filepath=None,is_twice=None):
         url: str = str(resp.url)
         #print(f'url:{url}')
     # AV/BV处理
-    if "av" in url:url= 'https://www.bilibili.com/video/' + av_to_bv(url)
+    if "av" in url:
+        return
+        url= 'https://www.bilibili.com/video/' + av_to_bv(url)
     if re.match(r'^BV[1-9a-zA-Z]{10}$', url):
         url = 'https://www.bilibili.com/video/' + url
     json_check['url'] = url
@@ -131,12 +133,12 @@ async def bilibili(url,filepath=None,is_twice=None):
 
                     if len(image_list) != 1:
                         manshuo_draw_json=[
-                            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 25,
+                            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                              'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
                              'type_software': 'bilibili', 'label': label_list}, {'type': 'text','content': [context]},{'type': 'img','img': image_list}]
                     else:
                         manshuo_draw_json=[
-                            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 25,
+                            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                              'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
                              'type_software': 'bilibili', },
                             {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list,
@@ -144,6 +146,7 @@ async def bilibili(url,filepath=None,is_twice=None):
                     if is_twice is not True:
                         json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
                         json_check['time'] = pub_time
+                        json_check['pic_url_list'] = image_list
                         return json_check
                     return manshuo_draw_json
 
@@ -224,28 +227,28 @@ async def bilibili(url,filepath=None,is_twice=None):
                         type_software = 'BiliBili 投稿'
                     if len(image_list) == 1 and type_software in {'直播',}:
                         manshuo_draw_json=[
-                                {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 25,
+                                {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                                  'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
                                  'type_software': 'bilibili', },
                                 {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list, 'label': [type_software],
                                  'content': [context]}]
                     elif len(image_list) == 1 and type_software in {'BiliBili 投稿'}:
                         manshuo_draw_json=[
-                                {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 25,
+                                {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                                  'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
                                  'type_software': 'bilibili', },
                                 {'type': 'img', 'subtype': 'common_with_des', 'img': image_list, 'label': [type_software],
                                  'content': [context]}]
                     else:
                         manshuo_draw_json=[
-                            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 25,
+                            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                              'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
                              'type_software': 'bilibili'},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
-
 
                     if is_twice is not True:
                         json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
                         json_check['time'] = pub_time
+                        json_check['pic_url_list'] = image_list
                         return json_check
                     return manshuo_draw_json
                 elif orig_check ==2:
@@ -287,12 +290,12 @@ async def bilibili(url,filepath=None,is_twice=None):
                         if orig_pub_time == '': orig_pub_time = pub_time
                         if len(image_list) != 1:
                             manshuo_draw_json = [
-                                {'type': 'avatar', 'subtype': 'common', 'img': [orig_owner_cover], 'upshift_extra': 25,
+                                {'type': 'avatar', 'subtype': 'common', 'img': [orig_owner_cover], 'upshift_extra': 20,
                                  'content': [f"[name]{orig_owner_name}[/name]\n[time]{orig_pub_time}[/time]"],
                                  'type_software': 'bilibili', 'label': label_list},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
                         else:
                             manshuo_draw_json = [
-                                {'type': 'avatar', 'subtype': 'common', 'img': [orig_owner_cover], 'upshift_extra': 25,
+                                {'type': 'avatar', 'subtype': 'common', 'img': [orig_owner_cover], 'upshift_extra': 20,
                                  'content': [f"[name]{orig_owner_name}[/name]\n[time]{orig_pub_time}[/time]"],
                                  'type_software': 'bilibili', },
                                 {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list,
@@ -303,7 +306,7 @@ async def bilibili(url,filepath=None,is_twice=None):
                     manshuo_draw_json2=await bilibili(orig_url,f'{filepath}orig_',is_twice=True)
 
                     manshuo_draw_json = [
-                        {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 25,
+                        {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                          'content': [f"[name]{owner_name}[/name]  [time]{pub_time}[/time]"],'avatar_size':50,
                          'label': label_list}, {'type': 'text','content': [text_list_check]}]
 
@@ -335,7 +338,7 @@ async def bilibili(url,filepath=None,is_twice=None):
             pub_time = datetime.fromtimestamp(live_start_time).astimezone().strftime("%Y-%m-%d %H:%M:%S")
         else:pub_time='暂未开启直播'
         manshuo_draw_json = [
-            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 25,
+            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
              'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
              'type_software': 'bilibili', },
             {'type': 'img', 'subtype': 'common_with_des_right', 'img': [cover],'label': ['直播'],
@@ -343,7 +346,7 @@ async def bilibili(url,filepath=None,is_twice=None):
 
         if is_twice is not True:
             json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
-
+            json_check['pic_url_list'].append(cover)
             return json_check
         return manshuo_draw_json
     # 专栏识别
@@ -418,7 +421,7 @@ async def bilibili(url,filepath=None,is_twice=None):
         json_check['video_url'] = False
     context += f'[title]{video_title}[/title]\n[des]{video_desc} [/des]'
     manshuo_draw_json = [
-        {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover_url], 'upshift_extra': 25,
+        {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover_url], 'upshift_extra': 20,
          'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
          'type_software': 'bilibili', },
         {'type': 'img', 'subtype': 'common_with_des', 'img': [video_cover],'label': ['视频'],
@@ -426,6 +429,7 @@ async def bilibili(url,filepath=None,is_twice=None):
 
     if is_twice is not True:
         json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
+        json_check['pic_url_list'].append(video_cover)
         return json_check
     return manshuo_draw_json
 

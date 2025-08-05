@@ -32,3 +32,4 @@ scikit-learn
 psutil
 pyzipper
 pycairo
+watchdog

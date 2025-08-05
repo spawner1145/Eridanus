@@ -12,6 +12,7 @@ from framework_common.database_util.llmDB import delete_user_history, clear_all_
 from framework_common.framework_util.func_map_loader import gemini_func_map, openai_func_map
 from run.ai_llm.service.aiReplyCore import aiReplyCore, end_chat, judge_trigger, send_text, count_tokens_approximate
 from run.ai_llm.service.auto_talk import check_message_similarity
+from run.ai_llm.service.schemaReplyCore import schemaReplyCore
 
 
 def main(bot, config):
@@ -24,6 +25,7 @@ def main(bot, config):
 
     else:
         tools = None
+
     if config.ai_llm.config["llm"]["联网搜索"]:
         if config.ai_llm.config["llm"]["model"] == "gemini":
             if tools is None:
@@ -51,10 +53,7 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def aiReply(event: GroupMessageEvent):
         await check_commands(event)
-        if (event.message_chain.has(At) and event.message_chain.get(At)[0].qq == bot.id
-                or prefix_check(str(event.pure_text), config.ai_llm.config["llm"]["prefix"])  #前缀判断
-                or await judge_trigger(event.processed_message, event.user_id, config, tools=tools, bot=bot,
-                                       event=event)):  #触发cd判断
+        if (event.message_chain.has(At) and event.message_chain.get(At)[0].qq in [bot.id,1000000]) or prefix_check(str(event.pure_text), config.ai_llm.config["llm"]["prefix"]) or await judge_trigger(event.processed_message, event.user_id, config, tools=tools, bot=bot,event=event):  #触发cd判断
             bot.logger.info(f"接受消息{event.processed_message}")
 
             ## 权限判断
@@ -160,6 +159,29 @@ def main(bot, config):
                     bot.logger.exception(f"用户 {uid} 处理出错: {e}")
                 finally:
                     user_state[uid]["queue"].task_done()
+                    """
+                    判断用户是否有继续对话的意图
+                    """
+                    if config.ai_llm.config["llm"]["自主继续对话"]:
+                        schema = {
+                            "type": "object",
+                            "properties": {
+                                "continute_intent": {"type": "boolean", "description": "当前用户是否想继续聊天"}
+                            },
+                            "required": ["continute_intent"]
+                        }
+                        result = await schemaReplyCore(config, schema, "判断当前用户是否有继续对话意图", event.user_id)
+                        if result["continute_intent"]:
+                            reply_message = await aiReplyCore(
+                                [{
+                                    'text': 'system: 请继续当前聊天话题，可以适当主动提问或表达自己的观点和偏好，不要一直提问。直接发送文本，不必回复此条消息。直接发送面向用户的回复'}],
+                                current_event.user_id,
+                                config,
+                                system_instruction="你是一个群聊机器人，请继续当前话题",
+                                bot=bot,
+                                event=current_event,
+                            )
+                            await send_text(bot, event, config, reply_message.strip())
                     #print(user_state[uid]["queue"])
                     """
                     总结用户特征，伪长期记忆人格
@@ -200,7 +222,10 @@ def main(bot, config):
             await bot.send(event, "退出聊天~")
         elif event.pure_text == "/clear" or t == "/clear":
             await delete_user_history(event.user_id)
+            await delete_user_history(int(f"{event.user_id}1024"))
             await clear_group_messages(event.group_id)
+            await update_user(event.user_id, user_portrait="默认用户")
+            await update_user(event.user_id, portrait_update_time=datetime.datetime.now().isoformat())
             await bot.send(event, "历史记录已清除", True)
         elif event.pure_text == "/clear group":
             await clear_group_messages(event.group_id)
@@ -235,7 +260,7 @@ def main(bot, config):
 
     def prefix_check(message: str, prefix: list):
         for p in prefix:
-            if message.startswith(p):
+            if message.startswith(p) and p != "":
                 bot.logger.info(f"消息{message}匹配到关键词{p}")
                 return True
         return False
@@ -259,3 +284,4 @@ def main(bot, config):
                 return
             # 锁机制
             await handle_message(event)
+

@@ -24,20 +24,20 @@ class Backdrop:
             for key, value in vars(self).items():
                 setattr(self, key, get_abs_path(value))
 
-    def one_color(self,basic_img):
-        canvas = Image.new("RGBA", (basic_img.width, basic_img.height), eval(self.color))
+    async def one_color(self,basic_img):
+        canvas = Image.new("RGBA", (basic_img.width, basic_img.height), eval(str(self.color)))
         canvas.paste(basic_img, (0, 0), mask=basic_img)
         return canvas
 
-    def no_color(self,basic_img):
+    async def no_color(self,basic_img):
         canvas = Image.new("RGBA", (basic_img.width, basic_img.height), (0, 0, 0, 0))
         canvas.paste(basic_img, (0, 0), mask=basic_img)
         return canvas
 
-    def gradient(self,basic_img):
+    async def gradient(self,basic_img):
         width, height = basic_img.size
-        color1=eval(self.left_color)
-        color2 = eval(self.right_color)
+        color1=eval(str(self.left_color))
+        color2 = eval(str(self.right_color))
         gradient = Image.new("RGB", (width, height), color1)  # 创建初始图像
         draw = gradient.load()  # 加载像素点
 
@@ -53,3 +53,9 @@ class Backdrop:
 
         gradient.paste(basic_img, (0, 0), mask=basic_img)
         return gradient
+
+    async def img(self,basic_img):
+        canvas = Image.new("RGBA", (basic_img.width, basic_img.height), (0,0,0,0))
+        canvas = await backdrop_process(self.__dict__, canvas,(canvas.width, canvas.height))
+        canvas.paste(basic_img, (0, 0), mask=basic_img)
+        return canvas

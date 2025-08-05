@@ -4,3 +4,9 @@ user_info.yaml
 log/
 .idea/
 chat_files/
+
+merge-to-main.sh
+pushMyBranch.sh
+sync-with-main.sh
+
+.history/*

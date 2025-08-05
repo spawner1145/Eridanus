@@ -2,6 +2,8 @@ import base64
 import random
 
 import asyncio
+import traceback
+
 import httpx
 import base64
 
@@ -32,12 +34,19 @@ async def get_img(processed_message, bot, event):
     for item in processed_message:
         if "image" in item or "mface" in item:
             try:
-                if "mface" in item:
-                    url = item["mface"]["url"]
-                else:
-                    url = item["image"]["url"]
+                try:
+                    if "mface" in item:
+                        url = item["mface"]["url"]
+                    else:
+                        url = item["image"]["url"]
+                except:
+                    if "mface" in item:
+                        url = item["mface"]["file"]
+                    else:
+                        url = item["image"]["file"]
                 return url
             except Exception as e:
+                traceback.print_exc()
                 bot.logger.warning(f"获取图片失败: {e}")
                 return False
         elif "reply" in item:
@@ -90,33 +99,47 @@ def parse_arguments(arg_string, original_dict):
         i += 1
     return original_dict
 
-async def download_img(url,path,gray_layer=False,proxy=None):
+
+async def download_img(url, path, gray_layer=False, proxy=None):
     if url.startswith("data:image"):
         match = re.match(r"data:image/(.*?);base64,(.+)", url)
         if not match:
             raise ValueError("Invalid Data URI format")
-
         img_type, base64_data = match.groups()
-        img_data = base64.b64decode(base64_data)  # 解码 Base64 数据
-
-        # 保存图片文件
-        with open(path, "wb") as f:
-            f.write(img_data)
+        img_data = base64.b64decode(base64_data)
+        try:
+            with open(path, "wb") as f:
+                f.write(img_data)
+        finally:
+            del img_data
         return path
-    if proxy is not None and proxy!= '':
+
+    if proxy is not None and proxy != '':
         proxies = {"http://": proxy, "https://": proxy}
     else:
         proxies = None
+
     async with httpx.AsyncClient(proxies=proxies) as client:
         response = await client.get(url)
+
         if gray_layer:
-            img = Image.open(BytesIO(response.content))  # 从二进制数据创建图片对象
-            image_raw = img
-            image_black_white = image_raw.convert('1')
-            image_black_white.save(path)
+            img = None
+            try:
+                img = Image.open(BytesIO(response.content))  # 从二进制数据创建图片对象
+                image_raw = img
+                image_black_white = image_raw.convert('1')
+                image_black_white.save(path)
+            finally:
+                if img is not None:
+                    img.close()
+                del response
         else:
-            with open(path, 'wb') as f:
-                f.write(response.content)
+            try:
+                with open(path, 'wb') as f:
+                    f.write(response.content)
+            finally:
+                del response
+
         return path
 async def download_file(url,path,proxy=None):
     if proxy is not None and proxy!= '':

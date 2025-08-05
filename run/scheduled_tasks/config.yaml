@@ -53,3 +53,6 @@ scheduledTasks:    #其他定时任务模块的内容会陆续转到这里
   晚安:    #群聊晚安问候
     enable: true
     time: 22/31
+  每日壁画王:
+    enable: true
+    time: 17/12

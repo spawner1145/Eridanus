@@ -1,4 +1,6 @@
 plugin_description="群聊娱乐功能"
+
+
 dynamic_imports ={
     "run.group_fun.func_collection": ["random_ninjutsu","query_ninjutsu"],
 }

@@ -104,9 +104,10 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 prompt,
                 config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"][
                     "enable_proxy"] else None,
+                config.ai_llm.config["llm"]["default"]["model"],
             )
             if not response_message:
-                reply_message = "NetWork Error!"
+                reply_message = "当前模型类别设置为default，已失效，请自行配置其他模型。"
             else:
                 reply_message = response_message['content']
             await prompt_database_updata(user_id, response_message, config)
@@ -405,14 +406,14 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
         if recursion_times <= config.ai_llm.config["llm"]["recursion_limit"]:
 
             logger.warning(f"Recursion times: {recursion_times}")
-            if recursion_times + 3 == config.ai_llm.config["llm"]["recursion_limit"] and config.ai_llm.config["llm"][
+            if recursion_times + 2 == config.ai_llm.config["llm"]["recursion_limit"] and config.ai_llm.config["llm"][
                 "auto_clear_when_recursion_failed"]:
-                logger.warning(f"clear ai reply history for user: {event.user_id}")
-                await delete_user_history(event.user_id)
+                logger.warning(f"clear ai reply history for user: {user_id}")
+                await delete_user_history(user_id)
             if recursion_times+2 == config.ai_llm.config["llm"]["recursion_limit"]:
-                logger.warning(f"update user portrait for user: {event.user_id}")
-                await update_user(event.user_id, user_portrait="normal_user")
-                await update_user(event.user_id, portrait_update_time=datetime.datetime.now().isoformat())
+                logger.warning(f"update user portrait for user: {user_id}")
+                await update_user(user_id, user_portrait="normal_user")
+                await update_user(user_id, portrait_update_time=datetime.datetime.now().isoformat())
             return await aiReplyCore(processed_message, user_id, config, tools=tools, bot=bot, event=event,
                                      system_instruction=system_instruction, func_result=func_result,
                                      recursion_times=recursion_times + 1, do_not_read_context=True)

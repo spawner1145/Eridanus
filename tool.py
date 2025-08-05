@@ -16,6 +16,10 @@ from framework_common.utils.install_and_import import install_and_import
 获取环境
 """
 logger = get_logger()
+logger.warning("请在关闭bot主程序的情况下运行更新程序")
+logger.warning("请在关闭bot主程序的情况下运行更新程序")
+logger.warning("请在关闭bot主程序的情况下运行更新程序")
+
 parent_dir = os.path.dirname(os.getcwd())
 # 检测上一级目录下的environments/MinGit/cmd/git.exe是否存在
 custom_git_path = os.path.join(parent_dir, "environments", "MinGit", "cmd", "git.exe")
@@ -43,7 +47,9 @@ async def main():
         [4].开发者工具
         [5].若只的检测相关ai库(如奶龙检测)
         [6].B站 or 抖音 or 小红书 登录。不登也不影响你用
-        [7].退出""")
+        [7].导出配置文件
+        [8].导入配置文件
+        [9].退出""")
     user_input = input("请输入指令序号：")
     if user_input == "1":
         logger.info("youtube登录")
@@ -101,7 +107,15 @@ async def main():
 
         from run.streaming_media.service.Link_parsing.core.login_core import login_core_select
         await login_core_select()
-
+    elif user_input == "7":
+        logger.info("导出配置文件")
+        export_yaml()
+        logger.info("配置文件导出完成")
+        logger.warning("请将old_yamls文件夹复制到新的Eridanus目录下。如有必要，请自行覆盖新的data文件夹")
+    elif user_input == "8":
+        logger.info("导入配置文件")
+        import_yaml()
+        logger.info("配置文件导入完成")
 
 def updaat(f=False, source=None, yamls:dict=None):
     if not yamls:
@@ -157,7 +171,7 @@ def updaat(f=False, source=None, yamls:dict=None):
             # shutil.rmtree("./temp")
         logger.info("处理冲突文件完成")
         logger.info("旧的冲突文件被保存到了temp文件夹，以防万一你需要它们。")
-        logger.info("是否检查依赖？按任意键开始，如不需要请直接关闭此窗口。如后续启动报错，请返回此步骤并执行依赖检查。")
+        '''logger.info("是否检查依赖？按任意键开始，如不需要请直接关闭此窗口。如后续启动报错，请返回此步骤并执行依赖检查。")
         logger.warning("是否检查依赖？按任意键开始，如不需要请直接关闭此窗口。如后续启动报错，请返回此步骤并执行依赖检查。")
         logger.error("是否检查依赖？按任意键开始，如不需要请直接关闭此窗口。如后续启动报错，请返回此步骤并执行依赖检查。")
         input()
@@ -172,7 +186,7 @@ def updaat(f=False, source=None, yamls:dict=None):
         logger.warning("出现红色、黄色警告一般为正常现象，请忽略")
         logger.error("出现红色、黄色警告一般为正常现象，请忽略")
         logger.warning("出现红色、黄色警告一般为正常现象，请忽略")
-        fuck_requirements()
+        fuck_requirements()'''
         logger.info("更新成功，请关闭此窗口，重新启动bot")
         input()
     # 逐行检查错误信息
@@ -256,9 +270,11 @@ def merge_dicts(old, new):
             merge_dicts(v, new[k])
         # 如果值是列表，且新旧值都是列表，则合并并去重
         elif isinstance(v, list) and k in new and isinstance(new[k], list):
-            if k == "api_keys" or k == "sdUrl" or k == "其他默认绘图参数" or k == "card_index":  # 特殊处理, 保留旧值
+            if k == "api_keys" or k == "sdUrl" or k == "其他默认绘图参数" or k == "card_index" or k=="steam_api_key":  # 特殊处理, 保留旧值
                 logger.info(f"覆盖列表 key: {k}")
                 new[k] = v  # 使用旧的列表覆盖新的列表
+            elif k.startswith("page"):
+                logger.warning(f"当前任务为菜单，使用最新配置覆盖旧配置。")
             else:
                 logger.info(f"合并列表 key: {k}")
                 new[k] = list(dict.fromkeys(new[k] + v))  # 保持顺序去重
@@ -348,12 +364,14 @@ def get_installed_packages():
     """
     使用 pip 获取已安装的包和版本信息。
     """
+
     result = subprocess.run(
-        ['pip', 'freeze'],
+        [sys.executable, '-m', 'pip', 'freeze'],  # 避免找不到 pip
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
+
     installed_packages = {}
     logger.info(f"获取已安装包中...")
     logger.info(f"{result.stdout}")
@@ -434,7 +452,7 @@ def ai_req():
         else:
             logger.warning("未能检测到CUDA版本，假设系统中未安装CUDA。")
     except Exception:
-        logger.exception('CUDA')
+        logger.error('CUDA')
         logger.warning("未能检测到CUDA版本或nvcc未安装，假设系统中未安装CUDA。")
         cuda_torch_suffix = None
 
@@ -454,6 +472,55 @@ def ai_req():
 
     logger.info("ai相关库安装成功完成")
     return
+def export_yaml(base_dir="run"):
+    if not os.path.exists("old_yamls"):
+        os.mkdir("old_yamls")
+    """
+    导出yaml文件到old_yamls文件夹
+    """
 
+    yaml_files = []
+    for root, _, files in os.walk(base_dir):
+        for file in files:
+            if file.endswith(".yaml"):
+                full_path = os.path.join(root, file)
+                relative_path = os.path.relpath(full_path, base_dir)
+                yaml_files.append(relative_path)
+    def copy_to_old_yamls(yaml_files, target_dir="old_yamls"):
+        for rel_path in yaml_files:
+            src_path = os.path.join(base_dir, rel_path)
+            dst_path = os.path.join(target_dir, rel_path)
+
+            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+            shutil.copy2(src_path, dst_path)
+            print(f"Copied: {src_path} -> {dst_path}")
+
+    copy_to_old_yamls(yaml_files)
+    logger.info("导出yaml文件到old_yamls文件夹完成")
+    logger.info("请将old_yamls文件夹复制到新的Eridanus目录下，放在run目录旁边。路径应当为：Eridanus/old_yamls")
+    logger.info("在新目录下运行Eridanus/tool.py或更新脚本，选择导入旧配置即可。")
+    return yaml_files
+def import_yaml(base_dir="run"):
+    yaml_files = []
+    for root, _, files in os.walk(base_dir):
+        for file in files:
+            if file.endswith(".yaml"):
+                full_path = os.path.join(root, file)
+                relative_path = os.path.relpath(full_path, base_dir)
+                yaml_files.append(relative_path)
+    failed_files = []
+    for files in yaml_files:
+        if os.path.exists(os.path.join(base_dir, files)):
+            logger.warning(f"开始处理冲突文件{files}...")
+            try:
+                conflict_file_dealter(os.path.join("old_yamls", files), os.path.join(base_dir, files))
+            except Exception as e:
+                logger.error(f"处理冲突文件{files}失败：{e}")
+                continue
+        else:
+            logger.warning(f"文件{files}在新配置中不存在，跳过")
+            continue
+    if failed_files:
+        logger.warning(f"以下文件处理失败：{failed_files}，建议手动处理")
 if __name__ == '__main__':
     asyncio.run(main())

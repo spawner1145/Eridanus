@@ -5,6 +5,7 @@ import os
 import sys
 from PIL import Image, ImageDraw, ImageFont, ImageOps,ImageFilter
 import platform
+import psutil
 
 global debug_mode #设定全局变量，表示绘图是否开启调试功能
 debug_mode = False
@@ -30,6 +31,7 @@ def random_str(length=10):
     return random_string
 
 def add_append_img(contents,contents2,tag=None,tag_item=None,replace_item=None):
+
     for item in contents2:
         if isinstance(item, dict) and tag is not None and tag_item is not None:
             item[f'{tag}']=tag_item
@@ -54,7 +56,7 @@ def get_abs_path(path,is_ignore_judge=False):
 
     """获取绝对路径"""
     #判断传入的是否为路径
-    if not (isinstance(path, str) and os.path.splitext(path)[1].lower() in [".jpg", ".png", ".jpeg", '.webp',".ttf",".yaml"]):
+    if not (isinstance(path, str) and os.path.splitext(path)[1].lower() in [".jpg", ".png", ".jpeg", '.webp',".ttf",".yaml",".yml"]):
         return path
     try:
         os.path.normpath(path)  # 尝试规范化路径
@@ -74,7 +76,7 @@ def get_abs_path(path,is_ignore_judge=False):
 
 
 
-def crop_to_square(img_list):
+async def crop_to_square(img_list):
     """
     将一个 Pillow 图像对象裁剪为居中的正方形。
     """
@@ -104,7 +106,5 @@ def crop_to_square(img_list):
 
 
 
-
 if __name__ == '__main__':
-    path='framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf'
-    color_emoji_maker('❤️',(0,0,0))
+    pass

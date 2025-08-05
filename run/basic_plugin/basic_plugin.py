@@ -1,6 +1,7 @@
+import os
 import random
 import traceback
-
+import shutil
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Node, Text, Image, Music
 from framework_common.database_util.User import get_user
@@ -14,7 +15,21 @@ from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 """
 供func call调用
 """
-
+async def call_menu(bot, event, config):
+    file_lists = []
+    for file in os.listdir('data/pictures/doc'):
+        if file.endswith('.png'):
+            file_lists.append(file)
+    if config.common_config.menu["help_menu"]["send_as_node"]:
+        node_list = [Node(
+            content=[Text("项目文档：https://eridanus.netlify.app/\n项目地址：https://github.com/AOrbitron/Eridanus")])]
+        for file_name in file_lists:
+            node_list.append(Node(content=[Image(file=os.path.join('data/pictures/doc', file_name))]))
+        await bot.send(event, node_list)
+    else:
+        for file_name in file_lists:
+            await bot.send(event, Image(file=os.path.join('data/pictures/doc', file_name)))
+        await bot.send(event, "项目文档：https://eridanus.netlify.app/\n项目地址：https://github.com/AOrbitron/Eridanus")
 
 async def call_quit_chat(bot, event, config):
     return False
@@ -103,7 +118,9 @@ async def call_tarot(bot, event, config):
         await bot.send(event, [Text(f"{text}"), Image(file=card_path)])
         return {"text": "开出彩蛋牌，来源：jojo的奇妙冒险", "img": card_path}
     txt, img = tarotChoice(config.basic_plugin.config["tarot"]["mode"])
-    await bot.send(event, [Text(txt), Image(file=img)])
+    await bot.send(event, Image(file=(await manshuo_draw([{'type': 'basic_set', 'img_width': 750},
+                                                          {'type': 'img', 'subtype': 'common_with_des_right',
+                                                           'img': [img], 'content': [txt]}]))))
     return {"text": txt, "img": img}
 
 
@@ -159,6 +176,29 @@ def main(bot, config):
     async def cyber_divination(event: GroupMessageEvent):
         if event.pure_text == "运势":
             await call_fortune(bot, event, config)
+
+    @bot.on(GroupMessageEvent)
+    async def help_menu(event: GroupMessageEvent):
+        if event.pure_text in ["帮助", "菜单", "/help", "/menu"]:
+            await call_menu(bot, event, config)
+        if "/remenu"==event.pure_text and event.sender.user_id==config.common_config.basic_config["master"]["id"]:
+            file_lists = ['help_menu_page1.png', 'help_menu_page2.png', 'help_menu_page3.png', 'help_menu_page4.png', 'help_menu_page5.png']
+            for file_name in file_lists:
+                if os.path.exists(os.path.join('data/pictures/cache', file_name)):
+                    os.remove(os.path.join('data/pictures/cache', file_name))
+
+            help_menu_list, reply_list = {}, []
+            for page_number in config.common_config.menu['help_menu']['content']:
+                help_menu_list[page_number] = []
+                for item in config.common_config.menu['help_menu']['content'][page_number]:
+                    help_menu_list[page_number].append(item)
+            for page_number in help_menu_list:
+                reply_list.append(Node(content=[Image(file=await manshuo_draw(help_menu_list[page_number]))]))
+            for file_name in file_lists:
+                if os.path.exists(os.path.join('data/pictures/cache', file_name)):
+                    shutil.copy(os.path.join('data/pictures/cache', file_name), 'data/pictures/doc')
+            await bot.send(event, reply_list)
+
 
     @bot.on(GroupMessageEvent)
     async def cyber_divination_tarot(event: GroupMessageEvent):

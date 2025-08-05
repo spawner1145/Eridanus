@@ -1,0 +1,1 @@
+plugin_description = "Anime Game Service"

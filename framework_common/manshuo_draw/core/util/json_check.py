@@ -1,62 +1,112 @@
-import json
-import os
+from typing import List,Dict,Any,Tuple,Optional,Iterable,Union,TypeVar,Literal
 
-def json_check(json_img):
+
+def json_check(json_img: List[Any]) -> List[Dict[str, Any]]:
+    """内存优化版本 - 解决内存泄漏问题"""
     if not isinstance(json_img, list):
         raise ValueError("input must be a list")
 
-    json_check_reload=[]
+    json_check_reload = []
+
+    # 预定义常量，避免重复字符串比较
+    img_extensions = frozenset([".jpg", ".png", ".jpeg", ".webp"])  # 使用frozenset减少内存
+    valid_types = frozenset(['avatar', 'img', 'text', 'games'])
+    special_types = frozenset(['basic_set', 'backdrop'])
+
     for per_json_check in json_img:
-        if isinstance(per_json_check, dict):#判断是否为正确格式（字典）若是，则检查其中参数是否完整
-            if 'type' in per_json_check and per_json_check['type'] in ['avatar','img','text','games']:#判断是否有一级分类
-                if 'subtype' not in per_json_check:#判断是否有二级分类，若没有，统一分给common类
-                    per_json_check['subtype']='common'
+        if isinstance(per_json_check, dict):
+            item_type = per_json_check.get('type')  # 避免重复访问
+            if item_type in valid_types:
+                if 'subtype' not in per_json_check:
+                    per_json_check['subtype'] = 'common'
                 json_check_reload.append(per_json_check)
-            elif 'type' in per_json_check and per_json_check['type'] in ['basic_set','backdrop']:#判断是否有基础设置
+            elif item_type in special_types:
                 json_check_reload.append(per_json_check)
-            else:
-                continue
-        elif isinstance(per_json_check, set) or isinstance(per_json_check, list):
-            collect_img,collect_text=[],[]
+            # 移除else continue，减少分支
+        elif isinstance(per_json_check, (set, list)):
+            collect_img = []
+            collect_text = []
+
             for per_json_check_per in per_json_check:
-                if os.path.splitext(per_json_check_per)[1].lower() in [".jpg", ".png", ".jpeg", '.webp'] or per_json_check_per.startswith("http"):
-                    collect_img.append(per_json_check_per)
+                # 优化字符串检测，避免重复创建临时字符串
+                if isinstance(per_json_check_per, str):
+                    if per_json_check_per.startswith("http"):
+                        collect_img.append(per_json_check_per)
+                    else:
+                        # 优化文件扩展名检测，避免splitext创建临时对象
+                        dot_pos = per_json_check_per.rfind('.')
+                        if dot_pos != -1:
+                            ext = per_json_check_per[dot_pos:].lower()
+                            if ext in img_extensions:
+                                collect_img.append(per_json_check_per)
+                            else:
+                                collect_text.append(per_json_check_per)
+                        else:
+                            collect_text.append(per_json_check_per)
                 else:
                     collect_text.append(per_json_check_per)
-            if collect_img:
-                json_check_reload.append({'type':'img','subtype':'common','img':collect_img})
-            if collect_text:
-                json_check_reload.append({'type':'text','subtype':'common','content':collect_text})
-        else:
-            collect_img,collect_text=[],[]
-            if isinstance(per_json_check, str) and (os.path.splitext(per_json_check)[1].lower() in [".jpg", ".png", ".jpeg",'.webp'] or per_json_check.startswith("http")):
-                collect_img.append(per_json_check)
-            else:
-                collect_text.append(f'{per_json_check}')
-            if collect_img:
-                json_check_reload.append({'type':'img','subtype':'common','img':collect_img})
-            if collect_text:
-                json_check_reload.append({'type':'text','subtype':'common','content':collect_text})
 
-    if  'basic_set' not in [per_json_check['type'] for per_json_check in json_check_reload]:
+            # 批量添加，减少append调用
+            if collect_img:
+                json_check_reload.append({'type': 'img', 'subtype': 'common', 'img': collect_img})
+            if collect_text:
+                json_check_reload.append({'type': 'text', 'subtype': 'common', 'content': collect_text})
+        else:
+            # 简化单项处理逻辑
+            if isinstance(per_json_check, str):
+                if per_json_check.startswith("http"):
+                    json_check_reload.append({'type': 'img', 'subtype': 'common', 'img': [per_json_check]})
+                else:
+                    # 同样优化扩展名检测
+                    dot_pos = per_json_check.rfind('.')
+                    if dot_pos != -1 and per_json_check[dot_pos:].lower() in img_extensions:
+                        json_check_reload.append({'type': 'img', 'subtype': 'common', 'img': [per_json_check]})
+                    else:
+                        json_check_reload.append({'type': 'text', 'subtype': 'common', 'content': [per_json_check]})
+            else:
+                json_check_reload.append({'type': 'text', 'subtype': 'common', 'content': [str(per_json_check)]})
+
+    # 优化类型检查 - 只遍历一次，使用更高效的方式
+    has_basic_set = False
+    has_backdrop = False
+
+    for item in json_check_reload:
+        item_type = item.get('type')
+        if item_type == 'basic_set':
+            has_basic_set = True
+        elif item_type == 'backdrop':
+            has_backdrop = True
+        # 如果两个都找到了，提前退出
+        if has_basic_set and has_backdrop:
+            break
+
+    if not has_basic_set:
         json_check_reload.append({'type': 'basic_set'})
-    if 'backdrop' not in [per_json_check['type'] for per_json_check in json_check_reload]:
+    if not has_backdrop:
         json_check_reload.append({'type': 'backdrop', 'subtype': 'gradient'})
 
-    #进行轻量级绘图设置
+    # 轻量级绘图设置 - 优化YAML管理器的使用
+    yaml_manager = None
     try:
-        from framework_common.framework_util.yamlLoader import YAMLManager
+        is_lightweight = False
+
         for item in json_check_reload:
-            if 'type' in item and item['type'] in ['basic_set']:
+            if item.get('type') == 'basic_set':
+                if is_lightweight:
+                    item['is_rounded_corners_front'] = False
+                    item['is_stroke_front'] = False
+                    item['is_shadow_front'] = False
                 if 'config_path' not in item:
-                    if YAMLManager("run").system_plugin.config['draw_frame']['is_lightweight'] is True:
-                        item['config_path']='framework_common/manshuo_draw/data/config/lightweight_config.yaml'
-                    else:
-                        item['config_path'] = 'framework_common/manshuo_draw/data/config/manshuodraw_config.yaml'
-    except:pass
+                    item['config_path'] = 'framework_common/manshuo_draw/data/config/manshuodraw_config.yaml'
+    except Exception:
+        pass
+    finally:
+        # 确保YAML管理器被正确清理
+        if yaml_manager is not None:
+            try:
+                del yaml_manager
+            except Exception:
+                pass
+        yaml_manager = None
 
     return json_check_reload
-
-
-if __name__ == '__main__':
-    pass

@@ -1,4 +1,6 @@
 plugin_description="图片审核"
+
+
 dynamic_imports={
     "run.character_detection.func_collection": ["operate_group_censor"],
 }

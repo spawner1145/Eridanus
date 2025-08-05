@@ -58,6 +58,21 @@ async def call_tts(bot,event,config,text,speaker=None,mood="中立"):
 
 async def call_all_speakers(bot,event,config):
     return await Tts.get_speakers(bot=bot)
+async def get_all_speakers(bot,event,config):
+    all_speakers = await call_all_speakers(bot, event, config)
+    all_speakers = all_speakers["speakers"]
+    napcat_speakers = all_speakers[0]
+    modelscope_speakers = all_speakers[1]
+    vits_speakers = all_speakers[2]
+    online_vits2_speakers = all_speakers[3]
+    blue_archive_speakers = all_speakers[4]
+    await bot.send(event, [
+        Node(content=[Text(f"使用 /xx说xxxxx")]),
+        Node(content=[Text(f"napcat_tts可用角色：\n{napcat_speakers}")]),
+        Node(content=[Text(f"modelscope_tts可用角色：\n{modelscope_speakers}")]),
+        Node(content=[Text(f"blue_archive_speakers可用角色：\n{blue_archive_speakers}")]),
+        Node(content=[Text(f"vits可用角色：\n{vits_speakers}")]),
+        Node(content=[Text(f"online_vits2可用角色：\n{online_vits2_speakers}")])], )
 
 def main(bot: ExtendBot,config: YAMLManager):
     @bot.on(GroupMessageEvent)
@@ -69,17 +84,4 @@ def main(bot: ExtendBot,config: YAMLManager):
             if r.get("audio"):
                 await bot.send(event, Record(file=r.get("audio")))
         elif event.pure_text=="可用角色":
-            all_speakers = await call_all_speakers(bot, event, config)
-            all_speakers = all_speakers["speakers"]
-            napcat_speakers = all_speakers[0]
-            modelscope_speakers = all_speakers[1]
-            vits_speakers = all_speakers[2]
-            online_vits2_speakers = all_speakers[3]
-            blue_archive_speakers = all_speakers[4]
-            await bot.send(event, [
-                Node(content=[Text(f"使用 /xx说xxxxx")]),
-                Node(content=[Text(f"napcat_tts可用角色：\n{napcat_speakers}")]),
-                Node(content=[Text(f"modelscope_tts可用角色：\n{modelscope_speakers}")]),
-                Node(content=[Text(f"blue_archive_speakers可用角色：\n{blue_archive_speakers}")]),
-                Node(content=[Text(f"vits可用角色：\n{vits_speakers}")]),
-                Node(content=[Text(f"online_vits2可用角色：\n{online_vits2_speakers}")])],)
+            await get_all_speakers(bot,event,config)

@@ -36,7 +36,7 @@ def main(bot: ExtendBot,config):
     @bot.on(GroupIncreaseNoticeEvent)
     async def GroupIncreaseNoticeHandler(event: GroupIncreaseNoticeEvent):
         if event.user_id!=event.self_id:
-            if config.ai_llm.config["llm"]["aiReplyCore"]:
+            if config.groupManager.config["启用ai入群欢迎"]:
                 data = await bot.get_group_member_info(group_id=event.group_id, user_id=event.user_id)
                 try:
                     name = data["data"]["nickname"]
@@ -46,10 +46,32 @@ def main(bot: ExtendBot,config):
                                              tools=None)
                 await bot.send(event, str(r))
             else:
-                await bot.send(event, f"有新的旅行伙伴加入哟~~")
+                flag=False
+                for single_group in config.groupManager.config["自定义入群欢迎"]:
+                    if event.group_id in single_group:
+                        mes=single_group[event.group_id]
+                        await bot.send(event, mes)
+                        flag=True
+                if not flag:
+                    await bot.send(event, config.groupManager.config["通用入群欢迎"])
     @bot.on(GroupMessageEvent)
     async def group_message(event: GroupMessageEvent):
         await quitgroup(event)
+
+    @bot.on(GroupMessageEvent)
+    async def _(event: GroupMessageEvent):
+        r = await bot.get_group_info(event.group_id)
+        try:
+            num=r["data"]["member_count"]
+        except:
+            return #管你这那的
+        if r["data"]["member_count"] != 0 and (
+                r["data"]["member_count"] <= config.common_config.basic_config["自动退出少于此人数的群"]
+                or r["data"]["member_count"] >= config.common_config.basic_config["自动退出多于此人数的群"])\
+                and event.group_id not in config.common_config.censor_group["whitelist"]:
+            await bot.quit(event.group_id)
+            bot.logger.info_func(f"群{event.group_id}人数{r['data']['member_count']}，自动退出")
+            await bot.send_friend_message(config.common_config.basic_config["master"]["id"], f"群{event.group_id}人数{r['data']['member_count']}，自动退出")
     @bot.on(PrivateMessageEvent)
     async def private_message(event: PrivateMessageEvent):
         await quitgroup(event)

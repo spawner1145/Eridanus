@@ -11,6 +11,7 @@ from developTools.message.message_components import Record, Text, Image, File, N
 from framework_common.database_util.User import get_user
 
 from developTools.utils.logger import get_logger
+from framework_common.framework_util.websocket_fix import ExtendBot
 
 logger = get_logger()
 
@@ -28,7 +29,7 @@ async def delete_old_files_async(folder_path):
     async def process_file(file_path) -> None:
         nonlocal deleted_file_sizes
         try:
-            if file_path.endswith(".py") or file_path.endswith(".ttf"):
+            if file_path.endswith(".py") or file_path.endswith(".ttf") or file_path.startswith("help_menu_page"):
                 #print(f"跳过文件: {file_path}")
                 return None
 
@@ -231,7 +232,7 @@ async def send_contract(bot, event, config):
     return {"管理员id": config.common_config.basic_config["master"]['id']}
 
 
-def main(bot, config):
+def main(bot:ExtendBot, config):
     global send_next_message
     send_next_message = False
 
@@ -278,10 +279,17 @@ def main(bot, config):
         elif send_next_message and event.user_id==config.common_config.basic_config["master"]['id']:
             send_next_message = False
             groups = await bot.get_group_list()
+            mes_chain=[]
+            for i in event.message_chain:
+                if isinstance(i,Text):
+                    mes_chain.append(Text(i.text))
+                elif isinstance(i,Image):
+                    mes_chain.append(Image(file=i.file or i.url))
+            await bot.send(event,f"正在转发消息至所有群，请稍后...\n任务群数量：{len(groups['data'])}")
             for group in groups["data"]:
                 try:
                     bot.logger.info(f"转发消息至群{group['group_id']}")
-                    await bot.send_group_message(group["group_id"],event.message_chain)
+                    await bot.send_group_message(group["group_id"],mes_chain)
                     await sleep(4)
                 except Exception as e:
                     bot.logger.error(f"发送群消息失败：{group['group_id']} 原因: {e}")

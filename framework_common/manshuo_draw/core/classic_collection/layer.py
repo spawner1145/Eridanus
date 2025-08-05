@@ -6,39 +6,42 @@ class LayerSet:
     def __init__(self,basic_img_set,layer_set=1):
         for key, value in vars(basic_img_set).items():#继承父类属性，主要是图片基本设置类
             setattr(self, key, value)
-        self.img_width = self.img_width - self.padding_left_common * layer_set * 2
+        self.img_width,self.img_height = self.img_width - self.padding_left_common  * 2, self.img_height_limit
 
-    def paste_img(self,params):
+        self.img_height_limit, self.img_height_limit_flag = self.img_height_limit - self.padding_up_common * 2, False
+
+
+    async def paste_img(self,params):
         #layer_canvas = Image.new("RGBA", (self.img_width, self.img_height), (103, 195, 243, 255))
-        layer_canvas=self.backdrop_draw(self.backdrop_mode,self.backdrop_color)
+        layer_canvas=await self.backdrop_draw(self.backdrop_mode,self.backdrop_color)
+        #layer_canvas.show()
+
         layer_bottom=int(self.padding_up_common)
-
         for param in params:
-
             if params[param] is None: continue
             x_offest = (self.img_width - params[param]['canvas'].width) // 2
             layer_canvas.paste(params[param]['canvas'], (x_offest, int(layer_bottom - params[param]['upshift'])), mask=params[param]['canvas'])
             layer_bottom += params[param]['canvas_bottom'] + self.padding_up_layer
-
+        #print(int(layer_bottom + self.padding_up_common - self.padding_up_layer))
         layer_canvas = layer_canvas.crop((0, 0, self.img_width, int(layer_bottom + self.padding_up_common - self.padding_up_layer)))
         #layer_canvas.show()
 
         width, height = layer_canvas.size
-        basic_img = Image.new("RGBA", (width + self.padding_left_common * 2,height+ self.padding_up_common * 2), (0, 0, 0, 0))  # 初始化透明图层
-        basic_img = img_process(self.__dict__,basic_img, layer_canvas,self.padding_left_common,self.padding_up_common,0,'layer')
+        basic_img = Image.new("RGBA", (width + self.padding_left_common * 2,height+ self.padding_up_common * 3), (0, 0, 0, 0))  # 初始化   透明图层
+        basic_img = await img_process(self.__dict__,basic_img, layer_canvas,self.padding_left_common,self.padding_up_common,self.padding_up_common,'layer')
         return basic_img
 
 
-    def backdrop_draw(self,backdrop_mode,backdrop_color):
+    async def backdrop_draw(self,backdrop_mode,backdrop_color):
         match backdrop_mode:
             case 'no_color':
-                layer_canvas = Image.new("RGBA", (self.img_width, self.img_height), (0, 0, 0, 0))
+                layer_canvas = Image.new("RGBA", (self.img_width, self.img_height + self.padding_up_common * 2), (0, 0, 0, 0))
             case 'one_color':
-                layer_canvas = Image.new("RGBA", (self.img_width, self.img_height), eval(self.backdrop_color['color1']))
+                layer_canvas = Image.new("RGBA", (self.img_width, self.img_height + self.padding_up_common * 2), eval(str(self.backdrop_color['color1'])))
             case 'gradient':
                 color1 = eval(self.backdrop_color['color1'])
                 color2 = eval(self.backdrop_color['color2'])
-                layer_canvas = Image.new("RGB", (self.img_width, self.img_height), color1)  # 创建初始图像
+                layer_canvas = Image.new("RGB", (self.img_width, self.img_height + self.padding_up_common * 2), color1)  # 创建初始图像
                 draw = layer_canvas.load()  # 加载像素点
 
                 # 遍历每个像素，计算其颜色
@@ -52,6 +55,7 @@ class LayerSet:
                         draw[x, y] = (r, g, b)
             case _:
                 pass
+        #layer_canvas = Image.new("RGBA", (self.img_width, self.img_height), (255, 0, 0, 255))
         return layer_canvas
 
 

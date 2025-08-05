@@ -3,9 +3,11 @@ from PIL import Image, ImageDraw, ImageFilter, ImageOps,ImageFont
 import platform
 from .download_img import process_img_download
 from .common import add_append_img
+import copy
 
-def deal_text_with_tag(input_string):
+async def deal_text_with_tag(input_string):
     pattern = r'\[(\w+)\](.*?)\[/\1\]'
+    input_string=input_string.replace("\\n", "\n")
     matches = list(re.finditer(pattern, str(input_string), flags=re.DOTALL))
     result = []
     last_end = 0  # 记录上一个匹配结束的位置
@@ -38,7 +40,7 @@ def deal_text_with_tag(input_string):
     return result
 
 
-def can_render_character(font, character,params):
+async def can_render_character(font, character,params):
     """
     检测文字是否可以正常绘制
     此处受限于pillow自身的绘制缺陷
@@ -73,7 +75,7 @@ def can_render_character(font, character,params):
         # 如果抛出异常，说明字体不支持该字符
         return False
 
-def color_emoji_maker(text,color,size=40):
+async def color_emoji_maker(text,color,size=40):
     try:
         #此绘图方式win暂不可用，仅限于mac与linux使用
         import gi
@@ -106,12 +108,12 @@ def color_emoji_maker(text,color,size=40):
         return image
     except Exception as e:
         system = platform.system()
-        image_size = 40
+        image_size, x_offest = 40, 0
         if system == "Darwin":  # macOS 系统标识
             font_path = "/System/Library/Fonts/Apple Color Emoji.ttc"
         elif system == "Windows":
             font_path = r"C:\Windows\Fonts\seguiemj.ttf"
-            image_size = 55
+            x_offest=8
         elif system == "Linux":
             font_path = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
         else:
@@ -120,13 +122,13 @@ def color_emoji_maker(text,color,size=40):
         image = Image.new('RGBA', (image_size, image_size), (255, 255, 255, 0))  # 背景透明
         draw = ImageDraw.Draw(image)
         font = ImageFont.truetype(font_path, size)
-        draw.text((0, 0), text, font=font, fill=color)
+        draw.text((0-x_offest, 0), text, font=font, fill=color)
     #image.show()
     return image
 
 
 
-def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=False,ellipsis=True):
+async def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=False,ellipsis=True):
     """
     #此方法不同于其余绘制方法
     #其余绘制方法仅返回自身绘制画面
@@ -139,10 +141,15 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
         x_limit, y_limit = (params['img_width'] - params['padding'] * 2, params['img_height'])  # 初始位置
     else:
         x_limit, y_limit = limit_box
-    if content == '' or content is None:
+    #必要的检测流程
+    if 'content' in params:params_check = params['content']
+    elif 'label' in params:params_check = params['label']
+    else:params_check = []
+    if content == '' or content is None or content == [] or content == [[]]:
+        if 'number_count' in params and params["number_count"] < len(params_check):params_check[params["number_count"]] = []
         return {'canvas': canvas, 'canvas_bottom': y}
-
-    content_list = deal_text_with_tag(content)
+    if isinstance(content, list):content_list=content
+    else:content_list = await deal_text_with_tag(content)
 
     #将所有的emoji转换成pillow对象
     content_list_convert,emoji_list=[],[]
@@ -150,7 +157,7 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
         if item['tag'] == 'emoji':
             if not isinstance(item['content'], dict):emoji_list=[item['content']]
             else:emoji_list=item['content']
-            for pillow_emoji in process_img_download(emoji_list, params['is_abs_path_convert']):
+            for pillow_emoji in (await process_img_download(emoji_list, params['is_abs_path_convert'])):
                 if 'last_tag' not in item: item['last_tag']='common'
                 content_list_convert.append({'content': [pillow_emoji.convert("RGBA")], 'tag': 'emoji','last_tag': item['last_tag']})
         else:content_list_convert.append(item)
@@ -185,25 +192,33 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
 
             x += char_width + 1
             i += 1
-            if (x + char_width > x_limit and i < len(text)) or text[i - 1] == '\n':
-                if x != box[0] + char_width + 1 :
-                    x = box[0]
+            if params['auto_line_change'] is True:
+                if (x + char_width > x_limit and i < len(text)) or text[i - 1] == '\n':
+                    if x != box[0] + char_width + 1 :
+                        x = box[0]
+                        line_height_list.append(per_max_height)
+                        per_max_height=0
+                    if x == box[0] + char_width + 1 and text[i - 1] == '\n' :#检测是否在一行最开始换行，若是则修正
+                        x -= char_width + 1
+            else:
+                if text[i - 1] == '\n':
                     line_height_list.append(per_max_height)
-                    per_max_height=0
-                if x == box[0] + char_width + 1 and text[i - 1] == '\n' :#检测是否在一行最开始换行，若是则修正
-                    x -= char_width + 1
-    line_height_list.append(params[f'font_common_size'])
+                    x, per_max_height = box[0], 0
+    if per_max_height == 0:line_height_list.append(params[f'font_{last_tag}_size'])
+    else:line_height_list.append(per_max_height)
     line_height_list.append(params[f'font_common_size'])
 
 
     #这一部分开始进行实际绘制
+    left_content_list = copy.deepcopy(content_list)
     if box is None: box = (params['padding'], 0)  # 初始位置
     x, y = box
-    should_break, last_tag, line_count = False, 'common',0
+    should_break, last_tag, line_count,text,content_left = False, 'common',0 , None, []
     font = ImageFont.truetype(params[f'font_{last_tag}'], params[f'font_{last_tag}_size'])
     #对初始位置进行修正
     if ellipsis: y += line_height_list[0] - params[f'font_common_size']
     for content in content_list:
+        left_content_list.pop(left_content_list.index(content))
         # 依据字符串处理的字典加载对应的字体
         if content['tag'] == 'emoji':
             pass
@@ -219,7 +234,7 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
         draw = ImageDraw.Draw(canvas)
         i = 0
         # 对文字进行逐个绘制
-        text = content['content']
+        text, content_left = content['content'], content
         while i < len(text):  # 遍历每一个字符
             if text[i] == '': continue
             if content['tag'] == 'emoji':
@@ -233,12 +248,12 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
             #绘制文字与图片
             if content['tag'] == 'emoji':
                 canvas.paste(text[i], (int(x), int(y - upshift_font + 3)), mask=text[i])
-            elif can_render_character(font, text[i],params):
+            elif await can_render_character(font, text[i],params):
                 if is_shadow: draw.text((x + 2, y - upshift_font + 2), text[i], font=font, fill=(148, 148,148))
-                draw.text((x, y - upshift_font), text[i], font=font, fill=eval(params[f'font_{last_tag}_color']))
+                draw.text((x, y - upshift_font), text[i], font=font, fill=eval(str(params[f'font_{last_tag}_color'])))
             else:
                 try:
-                    emoji_img = color_emoji_maker(text[i], eval(params[f'font_{last_tag}_color']))
+                    emoji_img = await color_emoji_maker(text[i], eval(str(params[f'font_{last_tag}_color'])))
                     emoji_img = emoji_img.resize((char_width, int(char_width * emoji_img.height / emoji_img.width)))
                     canvas.paste(emoji_img, (int(x), int(y + 3 - upshift_font)), mask=emoji_img)
                 except Exception as e:
@@ -247,20 +262,34 @@ def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=
 
             x += char_width + 1
             i += 1
-            if (x + char_width * 2 > x_limit and i < len(text) and ellipsis) or text[i - 1] == '\n':
-                if y > y_limit - (params[f'font_common_size'])  - params['padding_up'] - line_height_list[line_count + 1]:
-                    draw.text((x, y), '...', font=font, fill=eval(params[f'font_{last_tag}_color']))
-                    should_break = True
-                    break
-            if (x + char_width > x_limit and i - 1 < len(text)) or text[i - 1] == '\n':
-                if x != box[0] + char_width + 1 :
-                    line_count += 1
+            if params['auto_line_change'] is True:
+                if (x + char_width * 2 > x_limit and i < len(text) and ellipsis) or text[i - 1] == '\n':
+                    if y > y_limit - (params[f'font_common_size'])  - params['padding_up'] - line_height_list[line_count + 1]:
+                        draw.text((x, y), '...', font=font, fill=eval(str(params[f'font_{last_tag}_color'])))
+                        should_break = True
+                        break
+                if (x + char_width > x_limit and i - 1 < len(text)) or text[i - 1] == '\n':
+                    if x != box[0] + char_width + 1 :
+                        line_count += 1
+                        y += params[f'font_common_size'] + params['padding_up'] + line_height_list[line_count] - params[f'font_common_size']
+                        x = box[0]
+                    if x == box[0] + char_width + 1 and text[i - 1] == '\n' :#检测是否在一行最开始换行，若是则修正
+                        x -= char_width + 1
+            else:
+                if text[i - 1] == '\n':
+                    line_count,x =line_count + 1,box[0]
                     y += params[f'font_common_size'] + params['padding_up'] + line_height_list[line_count] - params[f'font_common_size']
-                    x = box[0]
-                if x == box[0] + char_width + 1 and text[i - 1] == '\n' :#检测是否在一行最开始换行，若是则修正
-                    x -= char_width + 1
     canvas_bottom = y + params[f'font_common_size'] + 2
-    return {'canvas': canvas, 'canvas_bottom': canvas_bottom}
+
+    if text and params["number_count"] < len(params_check):
+        content_left['content']=text[i:]
+        #print(f'left_content_list: {left_content_list},content_left: {content_left["content"]}')
+        if content_left['content'] == '' or content_left['content'] == []:
+            params_check[params["number_count"]]=left_content_list
+        else:
+            params_check[params["number_count"]]=add_append_img([content_left],left_content_list)
+    #print(f"params['content']: {params['content'][params['number_count']]}")
+    return {'canvas': canvas, 'canvas_bottom': canvas_bottom,}
 
 
 if __name__ == '__main__':

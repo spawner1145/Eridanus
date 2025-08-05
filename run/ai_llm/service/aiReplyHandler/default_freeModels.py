@@ -4,10 +4,10 @@ import asyncio
 import httpx
 
 
-async def meta_llama(prompt, proxies):
-    url = "https://apiserver.alcex.cn/v1/chat/completions"
+async def free_models(prompt,proxies=None,model_name="gpt-4o-mini"):
+    url="https://apiserver.alcex.cn/v1/chat/completions"
     data = {
-        "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "model": model_name,
         "messages": prompt,
         "stream": False
     }
@@ -17,40 +17,13 @@ async def meta_llama(prompt, proxies):
         return r.json()["choices"][0]["message"]
 
 
-async def free_phi_3_5(prompt,proxies):
-    url = "https://apiserver.alcex.cn/v1/chat/completions"
-    data = {
-        "model": "phi-3.5",
-        "messages": prompt,
-        "stream": False
-    }
-    async with httpx.AsyncClient(proxies=proxies, timeout=200) as client:
-        r = await client.post(url, json=data)
-
-        return r.json()["choices"][0]["message"]
-
-
-async def free_gemini(prompt,proxies):
-    url = f"https://apiserver.alcex.cn/v1/chat/completions"
-    headers = {
-        "Content-Type": "application/json",
-        "Cookie": "sl-session=Ei97VrWfame4ViswzDZ/IQ=="
-    }
-    data ={
-        "model": "gemini-1.5-flash",
-        "messages": prompt,
-        "stream": False
-    }
-
-    async with httpx.AsyncClient(proxies=proxies, headers=headers, timeout=200) as client:
-        r = await client.post(url, json=data)
-
-        return r.json()["choices"][0]["message"]
-async def free_model_result(prompt, proxies=None):
+async def free_model_result(prompt, proxies=None,model_name="gpt-4o-mini"):
     functions = [
-        meta_llama(prompt,proxies),
-        free_phi_3_5(prompt, proxies),
-        free_gemini(prompt,proxies)
+        free_models(prompt, proxies,model_name),
+        #free_phi_3_5(prompt, proxies),
+        #free_gemini(prompt,proxies),
+        #claude_free(prompt,proxies),
+        #free_gpt4(prompt,proxies)
     ]
 
     for future in asyncio.as_completed(functions):

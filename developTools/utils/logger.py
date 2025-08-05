@@ -2,12 +2,59 @@ import logging
 import os
 from datetime import datetime
 from logging import Logger
+import threading
 
 import colorlog
 
 # 全局变量，用于存储 logger 实例和屏蔽的日志类别
 _logger = None
-_blocked_loggers = ["INFO_MSG"]
+_blocked_loggers = ["INFO_MSG", "DEBUG"]  # 默认禁用DEBUG
+_lock = threading.Lock()  # 添加线程锁
+
+
+class CategoryHandler(logging.StreamHandler):
+    """自定义Handler，根据消息类型使用不同的formatter"""
+
+    def __init__(self):
+        super().__init__()
+        # 为不同类别创建不同的formatter
+        self.formatters = {
+            'default': self._create_formatter(
+                '%(log_color)s%(asctime)s [%(name)s] - %(levelname)s - [bot] %(message)s',
+                {'DEBUG': 'white', 'INFO': 'cyan', 'WARNING': 'yellow', 'ERROR': 'red', 'CRITICAL': 'bold_red'}
+            ),
+            'msg': self._create_formatter(
+                '%(log_color)s%(asctime)s - %(name)s - %(levelname)s - [MSG] %(message)s',
+                {'DEBUG': 'white', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'red', 'CRITICAL': 'bold_red'}
+            ),
+            'func': self._create_formatter(
+                '%(log_color)s%(asctime)s - %(name)s - %(levelname)s - [FUNC] %(message)s',
+                {'DEBUG': 'white', 'INFO': 'blue', 'WARNING': 'yellow', 'ERROR': 'red', 'CRITICAL': 'bold_red'}
+            ),
+            'server': self._create_formatter(
+                '%(log_color)s%(asctime)s - %(name)s - %(levelname)s - [SERVER] %(message)s',
+                {'DEBUG': 'white', 'INFO': 'purple', 'WARNING': 'yellow', 'ERROR': 'red', 'CRITICAL': 'bold_red'}
+            )
+        }
+        # 设置默认formatter
+        self.setFormatter(self.formatters['default'])
+
+    def _create_formatter(self, format_str, colors):
+        return colorlog.ColoredFormatter(format_str, log_colors=colors)
+
+    def emit(self, record):
+        # 根据record中的category属性选择合适的formatter
+        category = getattr(record, 'category', 'default')
+        formatter = self.formatters.get(category, self.formatters['default'])
+
+        # 使用线程锁确保formatter切换的原子性
+        with _lock:
+            original_formatter = self.formatter
+            self.setFormatter(formatter)
+            try:
+                super().emit(record)
+            finally:
+                self.setFormatter(original_formatter)
 
 
 def createLogger(blocked_loggers=None):
@@ -22,61 +69,28 @@ def createLogger(blocked_loggers=None):
 
     # 创建一个 logger 对象
     logger = logging.getLogger("Eridanus")
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)  # 设置为INFO级别，禁用DEBUG
     logger.propagate = False  # 防止重复日志
+
+    # 清除已有的handlers，避免重复添加
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
 
     # 自定义过滤器，用于屏蔽指定的日志类别
     class BlockLoggerFilter(logging.Filter):
         def filter(self, record):
             if record.levelname in _blocked_loggers:
                 return False
+            # 检查自定义的category屏蔽
+            category = getattr(record, 'category', None)
+            if category and f"INFO_{category.upper()}" in _blocked_loggers:
+                return False
             return True
 
-    # 设置控制台日志格式和颜色
-    console_handler = logging.StreamHandler()
-    console_format = '%(log_color)s%(asctime)s - %(name)s - %(levelname)s - [bot] %(message)s'
-    console_colors = {
-        'DEBUG': 'white',
-        'INFO': 'cyan',
-        'WARNING': 'yellow',
-        'ERROR': 'red',
-        'CRITICAL': 'bold_red',
-    }
-    console_formatter = colorlog.ColoredFormatter(console_format, log_colors=console_colors)
-    console_handler.setFormatter(console_formatter)
+    # 使用自定义的CategoryHandler
+    console_handler = CategoryHandler()
     console_handler.addFilter(BlockLoggerFilter())
     logger.addHandler(console_handler)
-
-    # --- 增加颜色区分消息、功能和服务器 ---
-    console_format_msg = '%(log_color)s%(asctime)s - %(name)s - %(levelname)s - [MSG] %(message)s'
-    console_format_func = '%(log_color)s%(asctime)s - %(name)s - %(levelname)s - [FUNC] %(message)s'
-    console_format_server = '%(log_color)s%(asctime)s - %(name)s - %(levelname)s - [SERVER] %(message)s'
-
-    console_colors_msg = {
-        'DEBUG': 'white',
-        'INFO': 'green',
-        'WARNING': 'yellow',
-        'ERROR': 'red',
-        'CRITICAL': 'bold_red',
-    }
-    console_colors_func = {
-        'DEBUG': 'white',
-        'INFO': 'blue',
-        'WARNING': 'yellow',
-        'ERROR': 'red',
-        'CRITICAL': 'bold_red',
-    }
-    console_colors_server = {
-        'DEBUG': 'white',
-        'INFO': 'purple',  # 使用紫色代替粉红色（colorlog 不支持直接的 pink，但 purple 接近）
-        'WARNING': 'yellow',
-        'ERROR': 'red',
-        'CRITICAL': 'bold_red',
-    }
-
-    console_formatter_msg = colorlog.ColoredFormatter(console_format_msg, log_colors=console_colors_msg)
-    console_formatter_func = colorlog.ColoredFormatter(console_format_func, log_colors=console_colors_func)
-    console_formatter_server = colorlog.ColoredFormatter(console_format_server, log_colors=console_colors_server)
 
     # 设置文件日志格式
     file_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -108,56 +122,130 @@ def createLogger(blocked_loggers=None):
 
     # 在 logger 上绑定更新日志文件的函数
     logger.update_log_file = update_log_file
-
-    # --- 添加区分消息、功能和服务器的函数 ---
-    def info_msg(self, message, *args, **kwargs):
-        if self.isEnabledFor(logging.INFO) and "INFO_MSG" not in _blocked_loggers:
-            console_handler.setFormatter(console_formatter_msg)
-            self._log(logging.INFO, message, args, **kwargs)
-            console_handler.setFormatter(console_formatter)
-
-    def info_func(self, message, *args, **kwargs):
-        if self.isEnabledFor(logging.INFO) and "INFO_FUNC" not in _blocked_loggers:
-            console_handler.setFormatter(console_formatter_func)
-            self._log(logging.INFO, message, args, **kwargs)
-            console_handler.setFormatter(console_formatter)
-
-    def server(self, message, *args, **kwargs):
-        if self.isEnabledFor(logging.INFO) and "SERVER" not in _blocked_loggers:
-            console_handler.setFormatter(console_formatter_server)
-            self._log(logging.INFO, message, args, **kwargs)
-            console_handler.setFormatter(console_formatter)
-
-    # 将新函数绑定到 logger 类
-    logging.Logger.info_msg = info_msg
-    logging.Logger.info_func = info_func
-    logging.Logger.server = server
-    # --- 结束添加区分消息、功能和服务器的函数 ---
-
     _logger = logger
 
 
-def get_logger(blocked_loggers=None) -> Logger:
+class LoggerWrapper:
+    """Logger包装器，用于支持自定义name显示"""
+
+    def __init__(self, logger, custom_name=None):
+        self._logger = logger
+        self._custom_name = custom_name or "Eridanus"
+
+    def _log_with_category(self, level, message, category=None, *args, **kwargs):
+        """带类别的日志记录方法"""
+        # 创建LogRecord
+        record = self._logger.makeRecord(
+            self._custom_name,  # 使用自定义名称
+            level,
+            __file__,
+            0,
+            message,
+            args,
+            None
+        )
+
+        # 添加category属性
+        if category:
+            record.category = category
+
+        # 发送记录
+        self._logger.handle(record)
+
+    def debug(self, message, *args, **kwargs):
+        # DEBUG被禁用，直接返回
+        pass
+
+    def info(self, message, *args, **kwargs):
+        if self._logger.isEnabledFor(logging.INFO):
+            self._log_with_category(logging.INFO, message, None, *args, **kwargs)
+
+    def warning(self, message, *args, **kwargs):
+        if self._logger.isEnabledFor(logging.WARNING):
+            self._log_with_category(logging.WARNING, message, None, *args, **kwargs)
+
+    def error(self, message, *args, **kwargs):
+        if self._logger.isEnabledFor(logging.ERROR):
+            self._log_with_category(logging.ERROR, message, None, *args, **kwargs)
+
+    def critical(self, message, *args, **kwargs):
+        if self._logger.isEnabledFor(logging.CRITICAL):
+            self._log_with_category(logging.CRITICAL, message, None, *args, **kwargs)
+
+    def info_msg(self, message, *args, **kwargs):
+        if self._logger.isEnabledFor(logging.INFO) and "INFO_MSG" not in _blocked_loggers:
+            self._log_with_category(logging.INFO, message, 'msg', *args, **kwargs)
+
+    def info_func(self, message, *args, **kwargs):
+        if self._logger.isEnabledFor(logging.INFO) and "INFO_FUNC" not in _blocked_loggers:
+            self._log_with_category(logging.INFO, message, 'func', *args, **kwargs)
+
+    def server(self, message, *args, **kwargs):
+        if self._logger.isEnabledFor(logging.INFO) and "SERVER" not in _blocked_loggers:
+            self._log_with_category(logging.INFO, message, 'server', *args, **kwargs)
+
+    def update_log_file(self):
+        """更新日志文件"""
+        if hasattr(self._logger, 'update_log_file'):
+            self._logger.update_log_file()
+
+
+def get_logger(name=None, blocked_loggers=None) -> LoggerWrapper:
+    """
+    获取logger实例，支持自定义显示名称
+
+    Args:
+        name: 自定义的显示名称，如果为None则使用默认的"Eridanus"
+        blocked_loggers: 要屏蔽的日志类别列表
+
+    Returns:
+        LoggerWrapper: 包装后的logger实例
+    """
     global _logger
-    if _logger is None:
-        createLogger(blocked_loggers)
-    _logger.update_log_file()
-    return _logger
+    with _lock:  # 使用锁确保线程安全
+        if _logger is None:
+            createLogger(blocked_loggers)
+        _logger.update_log_file()
+    return LoggerWrapper(_logger, name)
 
 
 # 使用示例
 if __name__ == "__main__":
-    # 精确屏蔽 INFO_MSG 和 DEBUG 类型日志
-    logger = get_logger(blocked_loggers=["INFO_MSG"])
-    logger.debug("This is a debug message.")  # 不会显示
-    logger.info("This is an info message.")  # 会显示
-    logger.warning("This is a warning message.")  # 会显示
-    logger.error("This is an error message.")  # 会显示
-    logger.critical("This is a critical message.")  # 会显示
+    import time
+    import threading
 
-    logger.info_msg("This is a server message.")  # 不会显示
-    logger.info_func("This is a function info.")  # 会显示
-    logger.server("This is a server-specific message.")  # 会显示（紫色）
 
-    logger2 = get_logger()
-    print(f"logger == logger2: {logger == logger2}")
+    def test_logger(thread_name):
+        """测试函数，模拟多线程环境"""
+        logger = get_logger(thread_name)
+
+        for i in range(5):
+            logger.info(f"Info message {i}")
+            logger.info_msg(f"MSG message {i}")
+            logger.info_func(f"FUNC message {i}")
+            logger.server(f"SERVER message {i}")
+            logger.warning(f"Warning message {i}")
+            time.sleep(0.1)  # 模拟一些处理时间
+
+
+    # 测试单线程
+    print("=== 单线程测试 ===")
+    test_logger("SingleThread")
+
+    print("\n=== 多线程测试 ===")
+    # 测试多线程
+    threads = []
+    for i in range(3):
+        thread = threading.Thread(target=test_logger, args=[f"Thread-{i}"])
+        threads.append(thread)
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+
+    print("\n=== 测试完成 ===")
+
+    # 验证单例模式
+    logger1 = get_logger("Test1")
+    logger2 = get_logger("Test2")
+    print(f"Both loggers use the same underlying instance: {logger1._logger == logger2._logger}")

@@ -1,3 +1,4 @@
+import traceback
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Text, Node, File, Image
 from framework_common.database_util.User import get_user
@@ -27,6 +28,7 @@ async def iwara_search(bot:ExtendBot,event:GroupMessageEvent,config,aim:str,oper
             bot.logger.info(node_list)
             await bot.send(event, node_list)
         except Exception as e:
+            traceback.print_exc()
             await bot.send(event, Text(f"iwara搜索{aim}失败：{e}"))
     elif operation=="download":
         if not user_info.permission >= config.resource_collector.config["iwara"]["iwara_download_level"]:

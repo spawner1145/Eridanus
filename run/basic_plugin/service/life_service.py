@@ -30,8 +30,8 @@ async def chaijun():
     path = "data/pictures/cache/" + random_str() + ".png"
     async with httpx.AsyncClient(timeout=20, headers=headers) as client:
         r = await client.get(url)
-        img = Image.open(BytesIO(r.content))  # 从二进制数据创建图片对象
-        img.save(path)  # 使用PIL库保存图片
+        with open(path, 'wb') as f:
+            f.write(r.content)
         # print(path)
         return path
 
@@ -53,8 +53,8 @@ async def danxianglii():
     path = "data/pictures/cache/" + random_str() + ".png"
     async with httpx.AsyncClient(timeout=20, headers=headers) as client:
         r = await client.get(url)
-        img = Image.open(BytesIO(r.content))  # 从二进制数据创建图片对象
-        img.save(path)  # 使用PIL库保存图片
+        with open(path, 'wb') as f:
+            f.write(r.content)
         # print(path)
         return path
 
@@ -83,8 +83,8 @@ async def xingzuo():
     # print(r.json().get("data").get("image")) # 从二进制数据创建图片对象
     async with httpx.AsyncClient(timeout=200, headers=get_headers()) as client:
         r = await client.get(url)
-        img = Image.open(BytesIO(r.content))  # 从二进制数据创建图片对象
-        img.save(path)  # 使用PIL库保存图片
+        with open(path, 'wb') as f:
+            f.write(r.content)
         return None
         # return path
 
@@ -100,8 +100,8 @@ async def nong(url, name):
         # print(r.json().get("data").get("image")) # 从二进制数据创建图片对象
         async with httpx.AsyncClient(timeout=200, headers=get_headers()) as client:
             r = await client.get(url)
-            img = Image.open(BytesIO(r.content))  # 从二进制数据创建图片对象
-            img.save(path)  # 使用PIL库保存图片
+            with open(path, 'wb') as f:
+                f.write(r.content)
             # rint(path)
             return path
 
@@ -114,8 +114,8 @@ async def sd(url, path):
 
     async with httpx.AsyncClient(timeout=200, headers=get_headers()) as client:
         r = await client.get(url)
-        img = Image.open(BytesIO(r.content))  # 从二进制数据创建图片对象
-        img.save(path)  # 使用PIL库保存图片
+        with open(path, 'wb') as f:
+            f.write(r.content)
         # rint(path)
         return path
 
@@ -125,8 +125,8 @@ async def handwrite(msg):
     path = "data/pictures/cache/" + random_str() + ".png"
     async with httpx.AsyncClient(timeout=200, headers=get_headers()) as client:
         r = await client.get(url)
-        img = Image.open(BytesIO(r.content))  # 从二进制数据创建图片对象
-        img.save(path)  # 使用PIL库保存图片
+        with open(path, 'wb') as f:
+            f.write(r.content)
         # rint(path)
         return path
 
@@ -139,8 +139,8 @@ async def bingEveryDay():
         text = r.json()["images"][0]["title"] + "\n" + r.json()["images"][0]["copyright"]
         url = "https://cn.bing.com" + r.json()["images"][0]["url"]
         r = await client.get(url)
-        img = Image.open(BytesIO(r.content))  # 从二进制数据创建图片对象
-        img.save(path)
+        with open(path, 'wb') as f:
+            f.write(r.content)
         return text, path
 
 
