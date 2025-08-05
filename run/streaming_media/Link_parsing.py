@@ -82,10 +82,10 @@ def main(bot, config):
         pass
     global Cachecleaner
     Cachecleaner=False
+    proxy = config.common_config.basic_config["proxy"]["http_proxy"]
 
     @bot.on(GroupMessageEvent)
     async def Link_Prising_search(event: GroupMessageEvent):
-        proxy = config.common_config.basic_config["proxy"]["http_proxy"]
         url = event.pure_text
         #print(url)
         if url == '' and 'json' in event.processed_message[0]:
