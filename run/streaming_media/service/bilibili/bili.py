@@ -1,5 +1,7 @@
 import sys
 import asyncio
+import traceback
+
 import httpx
 from playwright.async_api import async_playwright
 
@@ -42,7 +44,7 @@ async def fetch_latest_dynamic_id(uid,bot=None):
         return d1,d2
 
     except Exception as e:
-
+        traceback.print_exc()
         dy_id_1,dy_id_2=await fetch_latest_dynamic_id_api(uid)
         return dy_id_1,dy_id_2
 
