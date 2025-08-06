@@ -2,6 +2,8 @@ import sys
 import asyncio
 import httpx
 from playwright.async_api import async_playwright
+
+from framework_common.utils.cloudscraper import AsyncWebClient
 from run.streaming_media.service.Link_parsing.Link_parsing import link_prising
 from framework_common.utils.random_str import random_str
 from run.streaming_media.service.Link_parsing.core.bili import fetch_latest_dynamic_id_api
@@ -11,7 +13,6 @@ if sys.platform == 'win32':
 headers = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
     'Accept-Language': 'zh-CN,zh;q=0.9',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36',
     'Cookie': 'buvid3=...; b_nut=...; _uuid=...; buvid4=...;'
 }
 
@@ -23,13 +24,13 @@ async def fetch_latest_dynamic_id(uid):
         "host_mid": uid
     }
     try:
-
-        async with httpx.AsyncClient(headers=headers) as client:
-            response = await client.get(url, params=params, headers=headers,timeout=5)
-            data = response.json()
-            d1=data['data']['items'][0]['id_str']
-            d2=data['data']['items'][1]['id_str']  # 返回最新动态id
-            return d1,d2
+        client = AsyncWebClient.get_instance()
+        headers['User-Agent'] = client.get_current_user_agent()
+        response = await client.get(url, params=params, headers=headers)
+        data = response.json()
+        d1=data['data']['items'][0]['id_str']
+        d2=data['data']['items'][1]['id_str']  # 返回最新动态id
+        return d1,d2
 
     except Exception as e:
 

