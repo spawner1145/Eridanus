@@ -74,7 +74,7 @@ async def check_bili_dynamic(bot, config):
     else:
         for target_uid in config.streaming_media.bili_dynamic:
             await check_single_uid(target_uid, bilibili_type_draw)
-            await sleep(30)
+            await sleep(10)
     bot.logger.info_func("完成 B 站动态更新检查")
 
 
