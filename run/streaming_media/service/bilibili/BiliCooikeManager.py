@@ -124,7 +124,7 @@ class BiliCookieManager:
 
             # 验证Cookie有效性
             if self.cookies and await self._validate_cookies():
-                logger.info("使用本地有效Cookie")
+                #logger.info("使用本地有效Cookie")
                 return self.cookies.copy()
 
             # Cookie无效或不存在，尝试自动登录
@@ -183,7 +183,8 @@ class BiliCookieManager:
             is_valid = user_info is not None
 
             if is_valid:
-                logger.info("Cookie验证成功")
+                #logger.info("Cookie验证成功")
+                pass
             else:
                 logger.warning("Cookie验证失败")
 
