@@ -28,17 +28,16 @@ async def fetch_latest_dynamic_id(uid,bot=None):
     }
     cookies=await get_bili_cookies(bot=bot)
     result={}
-    target_names=['buvid3', 'b_nut', '_uuid', 'buvid4']
     for cookie in cookies:
-        if cookie.get('name') in target_names:
-            result[cookie['name']] = cookie['value']
+        result[cookie['name']] = cookie['value']
     headers['Cookie']='; '.join([f'{k}={v}' for k,v in result.items()])
 
     try:
         client = AsyncWebClient.get_instance()
         headers['User-Agent'] = client.get_current_user_agent()
-        response = await client.get(url, params=params, headers=headers)
-        data = response.json()
+        async with httpx.AsyncClient(headers=headers) as client:
+            response = await client.get(url, params=params,headers=headers)
+            data = response.json()
         d1=data['data']['items'][0]['id_str']
         d2=data['data']['items'][1]['id_str']  # 返回最新动态id
         return d1,d2
