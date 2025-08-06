@@ -66,7 +66,7 @@ async def check_bili_dynamic(bot, config):
                                                                                         latest_dynamic_id2]
                 config.save_yaml("bili_dynamic", plugin_name="streaming_media")
         except Exception as e:
-            traceback.print_exc()
+            #traceback.print_exc()
             bot.logger.error(f"动态抓取失败{e} uid: {target_uid}")
 
     bilibili_type_draw = config.streaming_media.config["bili_dynamic"]["draw_type"]

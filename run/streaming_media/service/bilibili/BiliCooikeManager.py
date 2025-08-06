@@ -145,7 +145,7 @@ class BiliCookieManager:
             try:
                 with open(self.cookie_file, 'r', encoding='utf-8') as f:
                     self.cookies = json.load(f)
-                logger.info(f"已加载 {len(self.cookies)} 个Cookie")
+                #logger.info(f"已加载 {len(self.cookies)} 个Cookie")
             except Exception as e:
                 logger.error(f"加载Cookie失败: {e}")
                 self.cookies = []
