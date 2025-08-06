@@ -40,7 +40,7 @@ async def operate_group_push_tasks(bot,event:GroupMessageEvent,config,task_type:
                     await bot.send(event, "订阅成功")
             else:
                 try:
-                    latest_dynamic_id1, latest_dynamic_id2 = await fetch_latest_dynamic_id(int(target_uid))
+                    latest_dynamic_id1, latest_dynamic_id2 = await fetch_latest_dynamic_id(int(target_uid),bot)
                 except:
                     await bot.send(event, "获取动态id失败，但任务已添加至配置文件。")
                     latest_dynamic_id1, latest_dynamic_id2 = 0, 0
@@ -48,7 +48,7 @@ async def operate_group_push_tasks(bot,event:GroupMessageEvent,config,task_type:
                 config.save_yaml("bili_dynamic",plugin_name="streaming_media")
                 await bot.send(event, "订阅成功")
             try:
-                p=await fetch_latest_dynamic(target_uid,config)
+                p=await fetch_latest_dynamic(target_uid,config,bot)
                 await bot.send(event,Image(file=p))
             except:
                 bot.logger.error(f"获取动态失败 群号：{event.group_id} 关注id: {target_uid}")

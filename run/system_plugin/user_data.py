@@ -79,6 +79,7 @@ def main(bot,config):
     授权#{target_qq}#{level} #授权某人相应权限，为高等级权限专有指令
     """
     master_id = config.common_config.basic_config["master"]["id"]
+    bot.master=master_id
     master_name = config.common_config.basic_config["master"]["name"]
 
     async def setup_users():

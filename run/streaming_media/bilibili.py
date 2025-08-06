@@ -21,7 +21,7 @@ async def check_bili_dynamic(bot, config):
     async def check_single_uid(target_uid, bilibili_type_draw):
 
         try:
-            latest_dynamic_id1, latest_dynamic_id2 = await fetch_latest_dynamic_id(int(target_uid))
+            latest_dynamic_id1, latest_dynamic_id2 = await fetch_latest_dynamic_id(int(target_uid),bot)
             dy_store = [config.streaming_media.bili_dynamic[target_uid]["latest_dynamic_id"][0],
                         config.streaming_media.bili_dynamic[target_uid]["latest_dynamic_id"][1]]
             if latest_dynamic_id1 not in dy_store or latest_dynamic_id2 not in dy_store:
@@ -121,7 +121,7 @@ def main(bot, config):
         if event.pure_text.startswith("看看动态"):
             target_id = event.pure_text.split("看看动态")[1]
             bot.logger.info(f"Fetching dynamic id of {target_id}")
-            dynamic_id1, dynamic_id2 = await fetch_latest_dynamic_id(target_id)
+            dynamic_id1, dynamic_id2 = await fetch_latest_dynamic_id(target_id,bot)
             bot.logger.info(f"Dynamic id of {target_id} is {dynamic_id1} {dynamic_id2}")
             p = await fetch_dynamic(dynamic_id1, config.streaming_media.config["bili_dynamic"]["screen_shot_mode"])
             await bot.send(event, Image(file=p))
