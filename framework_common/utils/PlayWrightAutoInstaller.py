@@ -16,7 +16,7 @@ def check_and_install_playwright():
             result = subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'],
                                     capture_output=True, text=True, timeout=300)
             if result.returncode == 0:
-                logger.info("Playwright Chromium安装完成")
+                logger.info("Playwright Chromium已在本设备安装完成")
             else:
                 logger.warning(f"Playwright安装可能失败: {result.stderr}")
         except subprocess.TimeoutExpired:

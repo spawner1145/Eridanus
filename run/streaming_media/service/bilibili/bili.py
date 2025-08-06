@@ -24,7 +24,7 @@ async def fetch_latest_dynamic_id(uid,bot=None):
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'Accept-Language': 'zh-CN,zh;q=0.9',
     }
-    cookies=await get_bili_cookies(bot=None)
+    cookies=await get_bili_cookies(bot=bot)
     result={}
     target_names=['buvid3', 'b_nut', '_uuid', 'buvid4']
     for cookie in cookies:

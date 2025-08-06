@@ -1,6 +1,7 @@
 import asyncio
 import json
 import time
+import traceback
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from playwright.async_api import async_playwright, Browser, Page
@@ -244,10 +245,11 @@ class BiliCookieManager:
             logger.info(f"二维码已保存到: {self.qr_file.absolute()}")
             try:
                 from developTools.message.message_components import Image
-                await bot.send_friend_message(bot.master,Image(file=self.qr_file.absolute()))
+                #print(bot.master,type(bot.master))
+                await bot.send_friend_message(bot.master,Image(file=str(self.qr_file.absolute())))
                 await bot.send_friend_message(bot.master,"请使用bilibili扫描二维码登录...")
             except:
-                pass
+                traceback.print_exc()
             logger.info("请扫描二维码登录...")
 
             # 等待登录成功
