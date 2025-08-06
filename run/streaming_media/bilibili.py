@@ -13,7 +13,8 @@ from run.system_plugin.func_collection import operate_group_push_tasks
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-
+bili_task = None
+bili_task_lock = asyncio.Lock()
 async def check_bili_dynamic(bot, config):
     bot.logger.info_func("开始检查 B 站动态更新")
 
@@ -77,33 +78,43 @@ async def check_bili_dynamic(bot, config):
     bot.logger.info_func("完成 B 站动态更新检查")
 
 
+async def bili_dynamic_loop(bot, config):
+    """B站动态检查的主循环"""
+    bot.logger.info_func("B站动态监控循环启动")
+    while True:
+        try:
+            if not config.streaming_media.config["bili_dynamic"]["enable"]:
+                bot.logger.info_func("B站动态监控已被禁用，退出循环")
+                break
+            await check_bili_dynamic(bot, config)
+
+        except Exception as e:
+            bot.logger.error(f"B站动态检查出错：{e}")
+
+        interval = config.streaming_media.config["bili_dynamic"]["dynamic_interval"]
+        await asyncio.sleep(interval)
+
+
 def main(bot, config):
-    threading.Thread(target=bili_main(bot, config), daemon=True).start()
-
-
-def bili_main(bot, config):
-    global bili_activate
-    bili_activate = False
+    """插件主入口，不需要创建线程"""
 
     @bot.on(LifecycleMetaEvent)
-    async def _(event):
+    async def start_bili_monitor(event):
+        """生命周期事件处理"""
         if not config.streaming_media.config["bili_dynamic"]["enable"]:
             return
-        global bili_activate
-        if not bili_activate:
-            bili_activate = True
-            loop = asyncio.get_running_loop()
-            while True:
-                try:
-                    with ThreadPoolExecutor() as executor:
-                        pass
-                        await loop.run_in_executor(executor, asyncio.run, check_bili_dynamic(bot, config))
-                    # await check_bili_dynamic(bot,config)
-                except Exception as e:
-                    bot.logger.error(e)
-                await asyncio.sleep(config.streaming_media.config["bili_dynamic"]["dynamic_interval"])  # 哈哈
-        else:
-            bot.logger.info("B站动态更新检查已启动")
+
+        global bili_task, bili_task_lock
+
+        async with bili_task_lock:
+            # 检查是否已有任务在运行
+            if bili_task is not None and not bili_task.done():
+                bot.logger.info("B站动态监控已在运行中")
+                return
+
+            # 创建新的监控任务
+            bili_task = asyncio.create_task(bili_dynamic_loop(bot, config))
+            bot.logger.info_func("B站动态监控任务已启动")
 
     @bot.on(GroupMessageEvent)
     async def _(event):
