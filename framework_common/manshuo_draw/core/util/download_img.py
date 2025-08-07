@@ -85,8 +85,6 @@ async def process_img_download(img_list,is_abs_path_convert=True,gray_layer=Fals
                 pass
             finally:
                 # 清理资源
-                if bio is not None:
-                    bio.close()
                 if img_data is not None:
                     del img_data
     return processed_img
