@@ -1,0 +1,158 @@
+{
+  "3": {
+    "inputs": {
+      "seed": 461379120366450,
+      "steps": 28,
+      "cfg": 4,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "smooth",
+      "denoise": 0.4,
+      "model": [
+        "32",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "latent_image": [
+        "35",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "K采样器"
+    }
+  },
+  "6": {
+    "inputs": {
+      "text": "You are an assistant designed to generate anime images based on textual prompts. <Prompt Start>,\ndraw by @rafaelaaa,@jvn,@nixeu,(liang xing:0.45),(atdan:0.85),(@piromizu:1.1),fov ps,tokkyu,omone hokoma agm,yoneyama mai,void 0,\n\n1girl in a maid dress is smiling towards the viewer.her left eye is purple and her right eye is blue.she has long white hair.\n\n\n极致的细节, 精彩的光影, 动态光影, \n超高对比度，明暗对比\n厚涂3d质感,极致的细节,精彩的光影, 动态光影,极致的景深效果,高对比度,色彩丰富,精细光线,漏光效果,焦外虚化,前景模糊,光线追踪,镜头光晕,电影级打光，超写实背景,光晕，线条清晰,明暗对比,超高清,最高画质,强光,细腻渲染,丰富的细节,高质量,写实逼真,超清晰,\n\n\nmasterpiece, best quality,",
+      "clip": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
+    }
+  },
+  "7": {
+    "inputs": {
+      "text": "You are an assistant designed to generate images based on textual prompts. <Prompt Start> ai generated image.blurry, worst quality, low quality",
+      "clip": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
+    }
+  },
+  "8": {
+    "inputs": {
+      "samples": [
+        "3",
+        0
+      ],
+      "vae": [
+        "12",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE解码"
+    }
+  },
+  "9": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "保存图像"
+    }
+  },
+  "10": {
+    "inputs": {
+      "unet_name": "checkpoint-e3_s9658.pth",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "UNet加载器"
+    }
+  },
+  "11": {
+    "inputs": {
+      "clip_name": "gemma_2_2b_fp16.safetensors",
+      "type": "lumina2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "加载CLIP"
+    }
+  },
+  "12": {
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "加载VAE"
+    }
+  },
+  "32": {
+    "inputs": {
+      "rel_l1_thresh": 10.000000000000002,
+      "start_percent": 0,
+      "end_percent": 1,
+      "coefficients_string": "[225.7042019806413, -608.8453716535591, 304.1869942338369, 124.21267720116742, -1.4089066892956552]",
+      "model": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "TeaCache_Lumina2",
+    "_meta": {
+      "title": "Lumina2 TeaCahe"
+    }
+  },
+  "33": {
+    "inputs": {
+      "image": "ComfyUI_00213_.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "加载图像"
+    }
+  },
+  "35": {
+    "inputs": {
+      "pixels": [
+        "33",
+        0
+      ],
+      "vae": [
+        "12",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE编码"
+    }
+  }
+}
