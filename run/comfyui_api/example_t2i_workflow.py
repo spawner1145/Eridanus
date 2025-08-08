@@ -38,7 +38,7 @@ async def run_workflow(prompt, config, output_dir: str = "data/pictures/cache"):
     if not os.path.exists(WORKFLOW_JSON_PATH):
         print(f"错误: 找不到工作流文件: {WORKFLOW_JSON_PATH}"); return
     
-    async with ComfyUIClient(current_server_url, proxy=current_server_url, proxy=config.common_config.basic_config["proxy"]["http_proxy"] if config.common_config.basic_config["proxy"].get("http_proxy") else None) as client:
+    async with ComfyUIClient(current_server_url, proxy=config.common_config.basic_config["proxy"]["http_proxy"] if config.common_config.basic_config["proxy"].get("http_proxy") else None) as client:
         
         workflow = ComfyWorkflow(WORKFLOW_JSON_PATH)
 
