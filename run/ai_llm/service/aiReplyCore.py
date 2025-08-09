@@ -12,6 +12,7 @@ import asyncio
 from developTools.message.message_components import Record, Text, Node, Image
 from developTools.utils.logger import get_logger
 from framework_common.database_util.Group import get_last_20_and_convert_to_prompt, add_to_group
+from framework_common.utils.GeminiKeyManager import GeminiKeyManager
 from run.ai_llm.service.aiReplyHandler.default import defaultModelRequest
 from run.ai_llm.service.aiReplyHandler.gemini import geminiRequest, construct_gemini_standard_prompt, \
     get_current_gemini_prompt
@@ -38,7 +39,7 @@ def call_func(*args, **kwargs):
 
 last_trigger_time = defaultdict(float)
 
-logger = get_logger()
+logger = get_logger("aiReplyCore")
 
 
 async def judge_trigger(processed_message, user_id, config, tools=None, bot=None, event=None, system_instruction=None,
@@ -272,7 +273,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             response_message = await geminiRequest(
                 prompt,
                 config.ai_llm.config["llm"]["gemini"]["base_url"],
-                random.choice(config.ai_llm.config["llm"]["gemini"]["api_keys"]),
+                await GeminiKeyManager.get_gemini_apikey(),
                 config.ai_llm.config["llm"]["gemini"]["model"],
                 config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"][
                     "enable_proxy"] else None,
