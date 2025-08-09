@@ -34,7 +34,7 @@ async def _check_single_gemini_key_status(
         elif response.status_code in [401, 403]:
             return api_key, False, f"HTTP {response.status_code}: {response.text}"
         else:
-            return api_key, False, f"HTTP {response.status_code}: {response.text}"
+            return api_key, True, f"HTTP {response.status_code}: {response.text[:100]}..."
 
     except httpx.RequestError as exc:
         return api_key, False, f"网络或请求错误: {exc}"
