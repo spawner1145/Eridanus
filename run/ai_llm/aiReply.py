@@ -20,7 +20,7 @@ from run.ai_llm.service.schemaReplyCore import schemaReplyCore
 def main(bot, config):
     apikey_check = False
     removed_keys=[]
-
+    cleanup_tasks = {}
     if config.ai_llm.config["llm"]["func_calling"]:
         if config.ai_llm.config["llm"]["model"] == "gemini":
             tools = gemini_func_map()
@@ -74,7 +74,7 @@ def main(bot, config):
                     await bot.send(event, "您的ai对话token已用完，请耐心等待下一次刷新～～")
                     return
             await handle_message(event)
-        elif config.ai_llm.config["llm"]["延时相关性判断"]:  # 新增：延时相关性判断
+        elif config.ai_llm.config["llm"]["仁济模式"]["延时相关性"]["enable"]:
             global recent_interactions
             if event.user_id in recent_interactions and recent_interactions[event.user_id] == event.group_id:
                 # 使用schema判断当前消息是否与bot相关
@@ -93,7 +93,7 @@ def main(bot, config):
                         "properties": {
                             "bot_related": {
                                 "type": "boolean",
-                                "description": "判断用户消息是否真正需要bot回复。满足以下任一条件返回true：1)直接提问或寻求帮助 2)回应之前bot的回复内容 3)明确表达想要继续对话的意愿 4)分享需要反馈的内容。排除：纯表情、简单应答词(如'好的''嗯''哦')、与他人对话、无关闲聊"
+                                "description": "判断用户消息是否真正需要bot回复。返回true的条件：1)直接提问或寻求帮助 2)回应bot的回复内容并期待进一步交流 3)分享观点或内容并期待反馈。返回false的条件：1)明确表达结束对话意愿(如'结束对话''不聊了''再见'等) 2)纯表情、简单应答词(如'好的''嗯''哦''知道了') 3)明显与他人对话 4)无关闲聊或测试性消息 5)礼貌性结束语"
                             },
                             "confidence": {
                                 "type": "number",
@@ -111,17 +111,28 @@ def main(bot, config):
 
                     # 构建更详细的判断提示
                     analysis_prompt = f"""
-                    分析以下情况：
-                    - 当前用户消息："{event.processed_message}"
-                    - 用户ID：{event.user_id}
-                    - 最近群聊上下文：{group_messages_bg[-3:] if group_messages_bg else "无"}
+                                分析以下情况：
+                                - 当前用户消息："{event.processed_message}"
+                                - 用户ID：{event.user_id}
+                                - 最近群聊上下文：{group_messages_bg[-3:] if group_messages_bg else "无"}
 
-                    请严格判断该消息是否需要bot回复。注意：
-                    1. 纯表情符号、简单应答词(好、嗯、哦、ok等)通常不需要回复
-                    2. 明显是与其他用户对话的消息不需要回复
-                    3. 无意义的闲聊或测试性消息不需要回复
-                    4. 只有真正的提问、求助、分享观点或明确希望互动的消息才需要回复
-                    """
+                                请严格判断该消息是否需要bot回复。重要原则：
+
+                                **明确不需要回复的情况(返回false)：**
+                                1. 用户明确表达结束对话意愿："结束对话"、"不聊了"、"再见"、"停止"、"结束吧"等
+                                2. 纯表情符号或简单应答词："好"、"嗯"、"哦"、"ok"、"知道了"、"明白"等
+                                3. 明显是与其他用户对话，不是对bot说话
+                                4. 无意义的闲聊、测试性消息或重复内容
+                                5. 礼貌性的结束语或告别
+
+                                **需要回复的情况(返回true)：**
+                                1. 直接的问题或求助
+                                2. 分享观点并明显期待回应
+                                3. 对bot之前回复的有意义回应，且希望继续交流
+                                4. 明确的互动请求
+
+                                注意：如果用户说要结束对话，那就是明确的结束信号，绝对不应该继续回复！
+                                """
 
                     result = await schemaReplyCore(
                         config,
@@ -134,11 +145,9 @@ def main(bot, config):
                     bot.logger.info(f"延时相关性判断结果: {result}")
 
                     # 增加置信度阈值和更严格的判断条件
-                    confidence_threshold = 0.7  # 置信度阈值
+                    confidence_threshold = config.ai_llm.config["llm"]["仁济模式"]["延时相关性"]["置信度阈值"]
 
-                    if (result["bot_related"] and
-                            result.get("confidence", 0) >= confidence_threshold and
-                            len(event.processed_message.strip()) > 1):  # 排除单字符消息
+                    if result["bot_related"] and result.get("confidence") >= confidence_threshold:  # 排除单字符消息
 
                         bot.logger.info(
                             f"延时相关性判断触发 - 消息: '{event.processed_message}' | 置信度: {result.get('confidence', 0)} | 理由: {result.get('reason', 'N/A')}")
@@ -164,7 +173,7 @@ def main(bot, config):
                             f"延时相关性判断未触发 - 消息: '{event.processed_message}' | bot_related: {result['bot_related']} | 置信度: {result.get('confidence', 0)} | 理由: {result.get('reason', 'N/A')}")
 
                 except Exception as e:
-                    bot.logger.exception(f"延时相关性判断出错: {e}")
+                    bot.logger.error(f"延时相关性判断出错: {e}")
 
         elif config.ai_llm.config["llm"]["仁济模式"]["随机回复概率"] > 0:  # 仁济模式第一层(随机)
             if random.randint(1, 100) < config.ai_llm.config["llm"]["仁济模式"]["随机回复概率"]:
@@ -258,14 +267,21 @@ def main(bot, config):
                     bot.logger.exception(f"用户 {uid} 处理出错: {e}")
                 finally:
                     user_state[uid]["queue"].task_done()
+
                     async def delayed_cleanup():
-                        await asyncio.sleep(config.ai_llm.config["llm"]["延时清理间隔"])  # 默认5分钟
+                        await asyncio.sleep(config.ai_llm.config["llm"]["仁济模式"]["延时相关性"]["有效延时"])
                         if event.user_id in recent_interactions:
                             del recent_interactions[event.user_id]
                             bot.logger.info(f"清理用户 {event.user_id} 的延时交互记录")
+                        # 清理完成后移除任务记录
+                        if event.user_id in cleanup_tasks:
+                            del cleanup_tasks[event.user_id]
 
-                    # 启动延时清理任务
-                    asyncio.create_task(delayed_cleanup())
+                    # 启动延时清理任务前先取消之前的任务
+                    if event.user_id in cleanup_tasks:
+                        cleanup_tasks[event.user_id].cancel()
+
+                    cleanup_tasks[event.user_id] = asyncio.create_task(delayed_cleanup())
                     """
                     判断用户是否有继续对话的意图
                     """
