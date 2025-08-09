@@ -170,27 +170,7 @@ async def garbage_collection(bot, event, config):
 
     async def safe_delete(folder):
         try:
-            folder_path = Path(folder)
-            if not folder_path.exists():
-                bot.logger.warning(f"文件夹不存在: {folder}")
-                return 0
-
-            total_size = 0
-            for item in folder_path.iterdir():
-                try:
-                    if item.is_dir():
-                        dir_size = sum(f.stat().st_size for f in item.rglob('*') if f.is_file())
-                        total_size += dir_size / (1024 * 1024)
-                        shutil.rmtree(item)
-                        bot.logger.info(f"已删除子文件夹: {item}")
-                    elif item.is_file():
-                        file_size = item.stat().st_size / (1024 * 1024)
-                        total_size += file_size
-                except Exception as e:
-                    bot.logger.error(f"处理{item}时出错: {e}")
-                    continue
-
-            return total_size
+            return await delete_old_files_async(folder)
         except Exception as e:
             bot.logger.error(f"处理文件夹 {folder} 时发生错误: {e}")
             return 0
