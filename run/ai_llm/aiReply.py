@@ -12,7 +12,7 @@ from framework_common.database_util.llmDB import delete_user_history, clear_all_
     get_folder_chara, set_all_users_chara, clear_all_users_chara, clear_user_chara, delete_latest2_history
 from framework_common.framework_util.func_map_loader import gemini_func_map, openai_func_map
 from framework_common.utils.GeminiKeyManager import GeminiKeyManager
-from run.ai_llm.service.aiReplyCore import aiReplyCore, end_chat, judge_trigger, send_text, count_tokens_approximate
+from run.ai_llm.service.aiReplyCore import aiReplyCore, send_text, count_tokens_approximate
 from run.ai_llm.service.auto_talk import check_message_similarity
 from run.ai_llm.service.schemaReplyCore import schemaReplyCore
 
@@ -58,7 +58,7 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def aiReply(event: GroupMessageEvent):
         await check_commands(event)
-        if (event.message_chain.has(At) and event.message_chain.get(At)[0].qq in [bot.id,1000000]) or prefix_check(str(event.pure_text), config.ai_llm.config["llm"]["prefix"]) or await judge_trigger(event.processed_message, event.user_id, config, tools=tools, bot=bot,event=event):  #触发cd判断
+        if (event.message_chain.has(At) and event.message_chain.get(At)[0].qq in [bot.id,1000000]) or prefix_check(str(event.pure_text), config.ai_llm.config["llm"]["prefix"]):
             bot.logger.info(f"接受消息{event.processed_message}")
 
             ## 权限判断
@@ -162,6 +162,9 @@ def main(bot, config):
         # 锁机制
         uid = event.user_id
         user_info = await get_user(event.user_id)
+
+        if hasattr(event, 'group_id'):
+            recent_interactions[event.user_id] = event.group_id
         # 初始化该用户的状态
         if uid not in user_state:
             user_state[uid] = {
@@ -323,10 +326,8 @@ def main(bot, config):
         else:
             t = ""
         user_info = await get_user(event.user_id)
-        if event.pure_text == "退出":
-            await end_chat(event.user_id)
-            await bot.send(event, "退出聊天~")
-        elif event.pure_text == "/clear" or t == "/clear":
+
+        if event.pure_text == "/clear" or t == "/clear":
             await delete_user_history(event.user_id)
             await delete_user_history(int(f"{event.user_id}1024"))
             await clear_group_messages(event.group_id)

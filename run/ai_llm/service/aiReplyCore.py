@@ -37,29 +37,10 @@ def call_func(*args, **kwargs):
     return func_map.call_func(*args, **kwargs)
 
 
-last_trigger_time = defaultdict(float)
-
 logger = get_logger("aiReplyCore")
 
 
-async def judge_trigger(processed_message, user_id, config, tools=None, bot=None, event=None, system_instruction=None,
-                        func_result=False):
-    trigger = False
-    if event.user_id in last_trigger_time:
-        bot.logger.info(f"last_trigger_time: {last_trigger_time.get(event.user_id)}")
-        if (time.time() - last_trigger_time.get(event.user_id)) <= config.ai_llm.config["llm"]["focus_time"]:
-            trigger = True
-        else:
-            last_trigger_time.pop(event.user_id)
-            trigger = False
-    return trigger
 
-
-async def end_chat(user_id):
-    try:
-        last_trigger_time.pop(user_id)
-    except:
-        print("end_chat error。已不存在对应trigger")
 
 
 async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, event=None, system_instruction=None,
@@ -96,8 +77,6 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
         system_instruction+=f"\n以下为当前用户的用户画像：{temp_user.user_portrait}"
 
     try:
-        if recursion_times == 0 and processed_message:
-            last_trigger_time[user_id] = time.time()
         if config.ai_llm.config["llm"]["model"] == "default":
             prompt, original_history = await construct_openai_standard_prompt(processed_message, system_instruction,
                                                                               user_id)
@@ -210,8 +189,6 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                     else:
                         try:
                             r = await call_func(bot, event, config, func_name, json.loads(args))  # 真是到处都不想相互兼容。
-                            if not r:
-                                await end_chat(user_id)
                             if r:
                                 func_call = True
                                 temp_history.append({
@@ -355,8 +332,6 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                         try:
 
                             r = await call_func(bot, event, config, func_name, args)
-                            if not r:
-                                await end_chat(user_id)
                             if r:
                                 func_r = {
                                     "functionResponse": {
