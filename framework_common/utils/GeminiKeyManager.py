@@ -8,8 +8,8 @@ from developTools.utils.logger import get_logger
 from framework_common.framework_util.yamlLoader import YAMLManager
 
 logger=get_logger("GeminiKeyManager")
-
-GEMINI_API_MODELS_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+base_url = YAMLManager.get_instance().ai_llm.config["llm"]["gemini"]["base_url"]
+GEMINI_API_MODELS_URL = f"{base_url}/v1beta/models"
 
 
 class NoAvailableAPIKeyError(Exception):
