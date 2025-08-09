@@ -130,7 +130,7 @@ def main(bot, config):
 
                     group_messages_bg = await get_last_20_and_convert_to_prompt(
                         event.group_id,
-                        config.ai_llm.config["llm"]["可获取的群聊上下文长度"],
+                        10,
                         "gemini",
                         bot
                     )
