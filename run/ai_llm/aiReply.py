@@ -289,7 +289,7 @@ def main(bot, config):
             # 锁机制
             await handle_message(event)
     @bot.on(LifecycleMetaEvent)
-    async def _():
+    async def _(event: LifecycleMetaEvent):
         nonlocal apikey_check,removed_keys
         if not apikey_check:
             apikey_check = True
