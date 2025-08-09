@@ -112,8 +112,8 @@ def main(bot, config):
             elif event.get("text") is not None and event.get("text")[0] == "下载图片":
                 bot.logger.info('图片下载ing')
                 await call_bili_download_video(bot, event, config,'img')
-        if not re.search(r'https?://', url or '') and not url.startswith("QQ小程序"):
-            return
+        #if not re.search(r'https?://', url or '') and not url.startswith("QQ小程序"):
+           # return
         link_prising_json = await link_prising(url, filepath='data/pictures/cache/', proxy=proxy)
         send_context = f'{botname}识别结果：'
         #print(link_prising_json)
