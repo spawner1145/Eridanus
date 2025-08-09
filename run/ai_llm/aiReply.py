@@ -79,44 +79,90 @@ def main(bot, config):
             if event.user_id in recent_interactions and recent_interactions[event.user_id] == event.group_id:
                 # 使用schema判断当前消息是否与bot相关
                 try:
+                    # 获取更多上下文消息用于准确判断
+                    group_messages_bg = await get_last_20_and_convert_to_prompt(
+                        event.group_id,
+                        15,  # 增加消息数量获取更好的上下文
+                        "gemini",
+                        bot
+                    )
+
+                    # 优化schema，增加更具体的判断标准
                     schema = {
                         "type": "object",
                         "properties": {
                             "bot_related": {
                                 "type": "boolean",
-                                "description": "用户是否表现出想要继续交流的意愿（如：提出问题、分享想法、表达情感、寻求建议等）"
+                                "description": "判断用户消息是否真正需要bot回复。满足以下任一条件返回true：1)直接提问或寻求帮助 2)回应之前bot的回复内容 3)明确表达想要继续对话的意愿 4)分享需要反馈的内容。排除：纯表情、简单应答词(如'好的''嗯''哦')、与他人对话、无关闲聊"
+                            },
+                            "confidence": {
+                                "type": "number",
+                                "description": "判断的置信度，0-1之间的数值",
+                                "minimum": 0,
+                                "maximum": 1
+                            },
+                            "reason": {
+                                "type": "string",
+                                "description": "判断理由的简短说明"
                             }
                         },
-                        "required": ["bot_related"]
+                        "required": ["bot_related", "confidence", "reason"]
                     }
 
-                    group_messages_bg = await get_last_20_and_convert_to_prompt(
-                        event.group_id,
-                        10,
-                        "gemini",
-                        bot
-                    )
+                    # 构建更详细的判断提示
+                    analysis_prompt = f"""
+                    分析以下情况：
+                    - 当前用户消息："{event.processed_message}"
+                    - 用户ID：{event.user_id}
+                    - 最近群聊上下文：{group_messages_bg[-3:] if group_messages_bg else "无"}
+
+                    请严格判断该消息是否需要bot回复。注意：
+                    1. 纯表情符号、简单应答词(好、嗯、哦、ok等)通常不需要回复
+                    2. 明显是与其他用户对话的消息不需要回复
+                    3. 无意义的闲聊或测试性消息不需要回复
+                    4. 只有真正的提问、求助、分享观点或明确希望互动的消息才需要回复
+                    """
 
                     result = await schemaReplyCore(
                         config,
                         schema,
-                        "分析用户的对话意图和当前聊天氛围，判断是否适合继续交流",
+                        analysis_prompt,
                         user_id=event.user_id,
                         group_messages_bg=group_messages_bg,
                     )
-                    bot.logger.info(f"schemaReplyCore result: {result}")
-                    if result["bot_related"]:
-                        bot.logger.info(f"延时相关性判断触发：{event.processed_message}")
+
+                    bot.logger.info(f"延时相关性判断结果: {result}")
+
+                    # 增加置信度阈值和更严格的判断条件
+                    confidence_threshold = 0.7  # 置信度阈值
+
+                    if (result["bot_related"] and
+                            result.get("confidence", 0) >= confidence_threshold and
+                            len(event.processed_message.strip()) > 1):  # 排除单字符消息
+
+                        bot.logger.info(
+                            f"延时相关性判断触发 - 消息: '{event.processed_message}' | 置信度: {result.get('confidence', 0)} | 理由: {result.get('reason', 'N/A')}")
+
                         # 执行权限判断
                         user_info = await get_user(event.user_id, event.sender.nickname)
                         if not user_info.permission >= config.ai_llm.config["core"]["ai_reply_group"]:
+                            bot.logger.debug(f"用户 {event.user_id} 权限不足，跳过回复")
                             return
+
                         if event.group_id == 913122269 and not user_info.permission >= 66:
+                            bot.logger.debug(f"特定群组 {event.group_id} 权限不足，跳过回复")
                             return
+
                         if not user_info.permission >= config.ai_llm.config["core"]["ai_token_limt"]:
                             if user_info.ai_token_record >= config.ai_llm.config["core"]["ai_token_limt_token"]:
+                                bot.logger.debug(f"用户 {event.user_id} token限制，跳过回复")
                                 return
+
                         await handle_message(event)
+                    else:
+                        bot.logger.debug(
+                            f"延时相关性判断未触发 - 消息: '{event.processed_message}' | bot_related: {result['bot_related']} | 置信度: {result.get('confidence', 0)} | 理由: {result.get('reason', 'N/A')}")
+
                 except Exception as e:
                     bot.logger.exception(f"延时相关性判断出错: {e}")
 
@@ -398,7 +444,7 @@ def main(bot, config):
     @bot.on(LifecycleMetaEvent)
     async def _(event: LifecycleMetaEvent):
         nonlocal apikey_check,removed_keys
-        if not apikey_check:
+        if not apikey_check and config.ai_llm.config["llm"]["自动清理无效apikey"]:
             apikey_check = True
             while True:
                 try:

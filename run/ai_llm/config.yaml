@@ -30,6 +30,7 @@ llm:
   Quote: False     #回复时引用
   语音回复几率: 30
   语音回复附带文本: True
+  自动清理无效apikey: False
   recursion_limit: 10                  #对话模型最大递归深度，出错时自动递归。
   auto_clear_when_recursion_failed: True #对话模型递归失败时自动清除历史记录。
   openai:          #兼容所有openai标准接口。https://platform.openai.com/docs/overview
