@@ -1,8 +1,9 @@
 import asyncio
 import datetime
 import random
+import traceback
 
-from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
+from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Text, At
 from framework_common.database_util.Group import clear_group_messages
 from framework_common.database_util.Group import get_group_messages
@@ -10,13 +11,16 @@ from framework_common.database_util.User import get_user, update_user
 from framework_common.database_util.llmDB import delete_user_history, clear_all_history, change_folder_chara, \
     get_folder_chara, set_all_users_chara, clear_all_users_chara, clear_user_chara, delete_latest2_history
 from framework_common.framework_util.func_map_loader import gemini_func_map, openai_func_map
+from framework_common.utils.GeminiKeyManager import GeminiKeyManager
 from run.ai_llm.service.aiReplyCore import aiReplyCore, end_chat, judge_trigger, send_text, count_tokens_approximate
 from run.ai_llm.service.auto_talk import check_message_similarity
 from run.ai_llm.service.schemaReplyCore import schemaReplyCore
 
 
 def main(bot, config):
-    # 持续注意用户发言
+    apikey_check = False
+    removed_keys=[]
+
     if config.ai_llm.config["llm"]["func_calling"]:
         if config.ai_llm.config["llm"]["model"] == "gemini":
             tools = gemini_func_map()
@@ -284,4 +288,32 @@ def main(bot, config):
                 return
             # 锁机制
             await handle_message(event)
+    @bot.on(LifecycleMetaEvent)
+    async def _():
+        nonlocal apikey_check,removed_keys
+        if not apikey_check:
+            apikey_check = True
+            while True:
+                try:
+                    initial_keys_from_config = config.ai_llm.config["llm"]["gemini"]["api_keys"]
+                    key_manager = GeminiKeyManager(initial_api_keys=initial_keys_from_config,
+                                                   check_interval_seconds=60)  # 每60秒检测一次
 
+
+                    bot.logger.info("\n--- 检查当前 Key 状态 ---")
+                    bot.logger.info(f"可用 Key ({len(key_manager._available_keys)}个): {key_manager._available_keys}")
+                    bot.logger.info(f"不可用 Key ({len(key_manager._unavailable_keys)}个): {list(key_manager._unavailable_keys.keys())}")
+
+                    for k in list(key_manager._unavailable_keys.keys()):
+                        if k not in removed_keys:
+                            bot.logger.info(f"已移除不可用 Key {k} 失效理由: {key_manager._unavailable_keys[k]}")
+                            await bot.send_friend_message(config.common_config.basic_config["master"]["id"],
+                                                          f"已自动移除不可用apikey: {k}")
+                            config.ai_llm.config["llm"]["gemini"]["api_keys"].remove(k)
+                            removed_keys.append(k)
+                    config.save_yaml("config", plugin_name="ai_llm")
+                    await asyncio.sleep(5000)
+                except Exception as e:
+                    bot.logger.exception(f"检查 Key 状态出错: {e}")
+                    traceback.print_exc()
+                    await asyncio.sleep(60)
