@@ -159,23 +159,50 @@ async def call_operate_group_whitelist(bot, event, config, target_group_id, stat
 
 async def garbage_collection(bot, event, config):
     bot.logger.info_func("开始清理缓存")
-    folders = [
-        "data/pictures/cache",
+    # 普通清理的文件夹（不递归，只删文件）
+    normal_folders = [
         "data/pictures/galgame",
         "data/video/cache",
         "data/voice/cache",
         "run/streaming_media/service/Link_parsing/data",
         "data/pictures/benzi"
     ]
+    
+    # 需要递归清理的文件夹（删除文件和子目录）
+    recursive_folders = [
+        "data/pictures/cache",
+    ]
 
-    async def safe_delete(folder):
+    async def safe_delete(folder, recursive=False):
         try:
-            return await delete_old_files_async(folder)
+            folder_path = Path(folder)
+            if not folder_path.exists():
+                bot.logger.warning(f"文件夹不存在: {folder}")
+                return 0
+
+            total_deleted = await delete_old_files_async(str(folder_path))
+            
+            if recursive:
+                for item in folder_path.iterdir():
+                    if item.is_dir():
+                        try:
+                            size = sum(f.stat().st_size for f in item.rglob('*') if f.is_file())
+                            size_mb = size // (1024 ** 2)
+                            await asyncio.to_thread(shutil.rmtree, item)
+                            bot.logger.info(f"已删除子目录: {item} (大小: {size_mb:.2f} MB)")
+                            total_deleted += size_mb
+                        except Exception as e:
+                            bot.logger.error(f"删除子目录 {item} 失败: {e}")
+            
+            return total_deleted
         except Exception as e:
             bot.logger.error(f"处理文件夹 {folder} 时发生错误: {e}")
             return 0
 
-    folder_sizes = await asyncio.gather(*[safe_delete(folder) for folder in folders], return_exceptions=True)
+    normal_tasks = [safe_delete(folder, recursive=False) for folder in normal_folders]
+    recursive_tasks = [safe_delete(folder, recursive=True) for folder in recursive_folders]
+    
+    folder_sizes = await asyncio.gather(*normal_tasks, *recursive_tasks, return_exceptions=True)
 
     total_size = sum(size for size in folder_sizes if isinstance(size, (int, float)))
     bot.logger.info_func(f"本次清理了 {total_size:.2f} MB 的缓存")
