@@ -251,6 +251,8 @@ def main(bot, config):
             if chara_file == "0":
                 reply = await set_all_users_chara(config.ai_llm.config["llm"]["chara_file_name"])
             else:
+                config.ai_llm.config["llm"]["chara_file_name"] = chara_file
+                config.save_yaml("config", plugin_name="ai_llm")
                 reply = await set_all_users_chara(chara_file)
             await bot.send(event, reply, True)
         elif event.pure_text == "/查人设":
