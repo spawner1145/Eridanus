@@ -114,6 +114,7 @@ def main(bot, config):
                         return
                 await handle_message(event)
         elif config.ai_llm.config["llm"].get("延时相关性判断", False):  # 新增：延时相关性判断
+            global recent_interactions
             if event.user_id in recent_interactions and recent_interactions[event.user_id] == event.group_id:
                 # 使用schema判断当前消息是否与bot相关
                 try:

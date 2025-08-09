@@ -18,7 +18,7 @@ class NoAvailableAPIKeyError(Exception):
 async def _check_single_gemini_key_status(
         client: httpx.AsyncClient,
         api_key: str,
-        timeout: float = 10.0
+        timeout: float = 20.0
 ) -> Tuple[str, bool, str]:
     """异步检测单个 Gemini API Key 的可用性。"""
     try:
@@ -51,7 +51,7 @@ class GeminiKeyManager:
             cls._instance = super(GeminiKeyManager, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, initial_api_keys: List[str], check_interval_seconds: int = 300,
+    def __init__(self, initial_api_keys: List[str], check_interval_seconds: int = 1000,
                  timeout_per_key: float = 10.0, max_concurrent_checks: int = 20):
         if self._initialized:
             return
