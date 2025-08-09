@@ -309,7 +309,7 @@ def main(bot,config):
 
     logger = bot.logger
 
-
+    asmr_task_activated = False
     @bot.on(GroupMessageEvent)
     async def book_resource_search(event):
 
@@ -337,15 +337,17 @@ def main(bot,config):
 
     @bot.on(LifecycleMetaEvent)
     async def _(event):
-        loop = asyncio.get_running_loop()
+        if not asmr_task_activated:
+            asyncio.create_task(asmr_monitor_loop(bot, event, config))
+
+    async def asmr_monitor_loop(bot, event, config):
+        """ASMR监控循环"""
         while True:
             try:
-                with ThreadPoolExecutor() as executor:
-                    await loop.run_in_executor(executor, asyncio.run, check_latest_asmr(bot,event ,config))
-                # await check_bili_dynamic(bot,config)
+                await check_latest_asmr(bot, event, config)
             except Exception as e:
                 bot.logger.error(e)
-            await asyncio.sleep(700)  # 每 11 分钟检查一次
+            await asyncio.sleep(700)
     """
     以下为jm的功能实现
     """
