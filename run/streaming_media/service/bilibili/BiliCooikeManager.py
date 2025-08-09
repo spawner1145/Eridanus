@@ -63,17 +63,22 @@ class BiliCookieManager:
     async def _initialize(self):
         """初始化浏览器和页面"""
         if self.browser is None:
-            self._playwright = await async_playwright().start()
-            self.browser = await self._playwright.chromium.launch(
-                headless=True,
-                args=[
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor'
-                ]
-            )
+            try:
+                self._playwright = await async_playwright().start()
+                self.browser = await self._playwright.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-web-security',
+                        '--disable-features=VizDisplayCompositor'
+                    ]
+                )
+            except Exception as e:
+                #traceback.print_exc()
+                pass
+
 
     async def _cleanup(self):
         """清理资源"""
@@ -108,7 +113,7 @@ class BiliCookieManager:
             finally:
                 self._playwright = None
 
-    async def get_cookies(self, auto_login: bool = True,bot=None,group_id=None) -> List[Dict[str, Any]]:
+    async def get_cookies(self, auto_login: bool = True,bot=None,group_id=None,check_cookie=True) -> List[Dict[str, Any]]:
         """
         获取Cookie
 
@@ -121,6 +126,7 @@ class BiliCookieManager:
         async with self._lock:
             # 先尝试加载本地Cookie
             await self._load_cookies()
+            if check_cookie is False:return self.cookies.copy()
 
             # 验证Cookie有效性
             if self.cookies and await self._validate_cookies() and group_id is None:
@@ -391,7 +397,7 @@ class BiliCookieManager:
 
 
 # 便捷函数
-async def get_bili_cookies(auto_login: bool = True,bot=None) -> List[Dict[str, Any]]:
+async def get_bili_cookies(auto_login: bool = True,bot=None,check=True) -> List[Dict[str, Any]]:
     """
     获取B站Cookie的便捷函数
 
@@ -402,7 +408,7 @@ async def get_bili_cookies(auto_login: bool = True,bot=None) -> List[Dict[str, A
         Cookie列表
     """
     async with BiliCookieManager() as manager:
-        cookies = await manager.get_cookies(auto_login,bot)
+        cookies = await manager.get_cookies(auto_login,bot,check_cookie=check)
         await manager._cleanup()
         return cookies
 

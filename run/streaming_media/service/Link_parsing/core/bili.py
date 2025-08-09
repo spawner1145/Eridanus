@@ -11,20 +11,32 @@ from PIL import Image, ImageDraw, ImageFont
 import time
 from io import BytesIO
 from run.streaming_media.service.Link_parsing.core.login_core import ini_login_Link_Prising
+from run.streaming_media.service.bilibili.BiliCooikeManager import get_bili_cookies
 import random
+import pprint
 
-def bili_init():
+async def bili_init():
     BILIBILI_HEADER = {
         'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 '
             'Safari/537.36',
         'referer': 'https://www.bilibili.com',
     }
-
+    try:cookies = await get_bili_cookies(bot=None,check=False)
+    except:cookies=[]
+    #pprint.pprint(cookies)
     if ini_login_Link_Prising(type=1) is not None:
         data = ini_login_Link_Prising(type=1)
         BILI_SESSDATA: Optional[str] = f'{data["sessdata"]}'
-        credential = Credential(sessdata=BILI_SESSDATA, bili_jct=data['bili_jct'],ac_time_value=data['ac_time_value'])
+        credential = Credential(sessdata=BILI_SESSDATA, bili_jct=data['bili_jct'])
+    elif cookies:
+        BILI_SESSDATA,bili_jct,buvid3,DedeUserID='','','',''
+        for cookie in cookies:
+            if cookie['name'] == 'SESSDATA':BILI_SESSDATA = cookie['value']
+            elif cookie['name'] == 'bili_jct': bili_jct=cookie['value']
+            elif cookie['name'] == 'buvid3': buvid3 = cookie['value']
+            elif cookie['name'] == 'DedeUserID':DedeUserID = cookie['value']
+        credential = Credential(sessdata=BILI_SESSDATA, bili_jct=bili_jct, buvid3=buvid3,dedeuserid=DedeUserID)
     else:
         BILI_SESSDATA: Optional[str] = f' '
         credential = Credential(sessdata=BILI_SESSDATA)
@@ -241,8 +253,6 @@ def av_to_bv(av_link):
 async def fetch_latest_dynamic_id_api(uid):
     BILIBILI_HEADER, credential, BILI_SESSDATA = bili_init()
     time.sleep(1)
-    if sync(credential.check_refresh()):
-        sync(credential.refresh())
     if BILI_SESSDATA == ' ':
         raise ValueError(" credential失效，请先登录或重新配置")
     try:
