@@ -299,7 +299,7 @@ def main(bot, config):
                     key_manager = GeminiKeyManager(initial_api_keys=initial_keys_from_config,
                                                    check_interval_seconds=60)  # 每60秒检测一次
 
-
+                    await asyncio.sleep(5)
                     bot.logger.info("\n--- 检查当前 Key 状态 ---")
                     bot.logger.info(f"可用 Key ({len(key_manager._available_keys)}个): {key_manager._available_keys}")
                     bot.logger.info(f"不可用 Key ({len(key_manager._unavailable_keys)}个): {list(key_manager._unavailable_keys.keys())}")
