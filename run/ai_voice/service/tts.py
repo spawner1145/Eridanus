@@ -4,6 +4,7 @@ import re
 from developTools.utils.logger import get_logger
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.ai_translate import Translator
+from run.ai_voice.service.PrettyDerbyTTS import get_PrettyDerby_speakers
 from run.ai_voice.service.blue_archive_tts import get_huggingface_blue_archive_speakers, huggingface_blue_archive_tts
 from run.ai_voice.service.modelscopeTTS import modelscope_tts, get_modelscope_tts_speakers
 from run.ai_voice.service.napcat_tts import napcat_tts_speak, napcat_tts_speakers
@@ -132,8 +133,9 @@ class TTS:
             get_huggingface_online_vits2_speakers,
             error_msg="Error in get_huggingface_online_vits2_speakers"
         )
+        PrettyDerby_speakers=await fetch_speakers(get_PrettyDerby_speakers,error_msg="Error in get_PrettyDerby_speakers")
         blue_archive_speakers=await fetch_speakers(get_huggingface_blue_archive_speakers,error_msg="Error in get_huggingface_blue_archive_speakers")
-        return {"speakers": [nc_speakers,  vits_speakers, online_vits2_speakers,blue_archive_speakers,["otto"]]}
+        return {"speakers": [nc_speakers,PrettyDerby_speakers,  vits_speakers, online_vits2_speakers,blue_archive_speakers,["otto"]]}
 
 
 
