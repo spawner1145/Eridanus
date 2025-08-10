@@ -30,7 +30,7 @@ async def _check_single_gemini_key_status(
             if "models" in response_json and isinstance(response_json["models"], list):
                 return api_key, True, "API Key 有效，成功获取模型列表。"
             else:
-                return api_key, False, f"响应200但内容异常: {response.text[:100]}..."
+                return api_key, True, f"响应200但内容异常: {response.text[:100]}..."
         elif response.status_code in [401, 403]:
             return api_key, False, f"HTTP {response.status_code}: {response.text}"
         else:
