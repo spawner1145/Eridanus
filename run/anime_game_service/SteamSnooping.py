@@ -103,7 +103,8 @@ def main(bot, config):
                      f"\n成就：{game.get('completed_achievement_number')} / {game.get('total_achievement_number')}"
                      for game in player_data["game_data"]], 'number_per_row': 1,'is_crop':False}
             ]
-        
+        if len(player_data["game_data"]) == 0:
+            draw_json.append('如果未查询到您的游玩记录，请检查您自己的隐私设置后再来尝试')
         #for item in draw_json:print(item)
         await bot.send(event, Image(file=(await manshuo_draw(draw_json))))
         await bot.recall(recall_id['data']['message_id'])

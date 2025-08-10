@@ -38,7 +38,7 @@ async def bilibili(url,filepath=None,is_twice=None):
     """
     # 消息
     #url: str = str(event.message).strip()
-    BILIBILI_HEADER, credential,BILI_SESSDATA=bili_init()#获取构建credential
+    BILIBILI_HEADER, credential,BILI_SESSDATA=await bili_init()#获取构建credential
     json_check = copy.deepcopy(json_init)
     json_check['soft_type'] = 'bilibili'
     json_check['status'] = True

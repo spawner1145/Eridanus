@@ -8,6 +8,7 @@ from developTools.message.message_components import Image
 from run.streaming_media.service.Link_parsing.Link_parsing import link_prising
 from run.streaming_media.service.bilibili.bili import fetch_latest_dynamic_id, fetch_dynamic
 import sys
+from run.streaming_media.service.bilibili.BiliCooikeManager import BiliCookieManager
 
 from run.system_plugin.func_collection import operate_group_push_tasks
 
@@ -174,3 +175,10 @@ def main(bot, config):
             bot.logger.info_func(f"取消动态关注 群号：{event.group_id} 关注id: {target_id}")
             await operate_group_push_tasks(bot, event, config, task_type="bilibili", operation=False,
                                            target_uid=int(target_id))
+
+    @bot.on(GroupMessageEvent)
+    async def _(event):
+        if event.pure_text == "/bili login":
+            async with BiliCookieManager() as manager:
+                await manager.get_cookies(auto_login=True,bot=bot,group_id=event.group_id)
+                await manager._cleanup()
