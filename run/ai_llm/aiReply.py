@@ -138,6 +138,7 @@ def main(bot, config):
                         config,
                         schema,
                         analysis_prompt,
+                        keep_history=False,
                         user_id=event.user_id,
                         group_messages_bg=group_messages_bg,
                     )
@@ -317,6 +318,7 @@ def main(bot, config):
                             config,
                             schema,
                             "分析用户的对话意图和当前聊天氛围，判断是否适合继续交流",
+                            keep_history=False,
                             user_id=event.user_id,
                             group_messages_bg=group_messages_bg,
                         )
