@@ -17,6 +17,7 @@ from developTools.event.base import EventBase
 from developTools.event.eventFactory import EventFactory
 from developTools.message.message_chain import MessageChain
 from developTools.message.message_components import MessageComponent, Text, Reply, Node, File
+from developTools.utils.cq_code_handler import parse_message_2processed_message
 from developTools.utils.logger import get_logger
 
 
@@ -369,6 +370,9 @@ class WebSocketBot:
         if source_msg["data"].get("group_id") is None:
             source_msg["data"]["group_id"] = 0
         event_obj = EventFactory.create_event(source_msg['data'])
+        if hasattr(event_obj,"processed_message"):
+            if event_obj.processed_message==[]:
+                event_obj.processed_message=parse_message_2processed_message(event_obj.message)
         return event_obj
     """
     撤回、禁言等群管类
