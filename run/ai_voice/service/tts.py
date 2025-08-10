@@ -4,7 +4,7 @@ import re
 from developTools.utils.logger import get_logger
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.ai_translate import Translator
-from run.ai_voice.service.PrettyDerbyTTS import get_PrettyDerby_speakers
+from run.ai_voice.service.PrettyDerbyTTS import get_PrettyDerby_speakers, PrettyDerby_TTS
 from run.ai_voice.service.blue_archive_tts import get_huggingface_blue_archive_speakers, huggingface_blue_archive_tts
 from run.ai_voice.service.modelscopeTTS import modelscope_tts, get_modelscope_tts_speakers
 from run.ai_voice.service.napcat_tts import napcat_tts_speak, napcat_tts_speakers
@@ -83,10 +83,10 @@ class TTS:
             if speaker in spkss:
                 speaker=spkss[speaker]
             return await napcat_tts_speak(bot, config, text, speaker)
-        elif mode=="modelscope_tts":
+        elif mode=="PrettyDerby":
             if speaker is None:
-                speaker=config.ai_voice.config["tts"]["modelscope_tts"]["speaker"]
-            return await modelscope_tts(text,speaker)
+                speaker=config.ai_voice.config["tts"]["PrettyDerby"]["speaker"]
+            return await PrettyDerby_TTS(text,speaker)
         elif mode=="vits":
             if speaker is None:
                 speaker=config.ai_voice.config["tts"]["vits"]["speaker"]
