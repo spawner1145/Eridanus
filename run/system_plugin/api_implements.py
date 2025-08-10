@@ -1,12 +1,8 @@
 import random
-import time
-from typing import Optional
 
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, startUpMetaEvent, \
-    ProfileLikeEvent, PokeNotifyEvent, GroupBanNoticeEvent, Sender
-from developTools.message.message_chain import MessageChain
+    ProfileLikeEvent, PokeNotifyEvent, GroupBanNoticeEvent
 from developTools.message.message_components import Record, Node, Text, Image
-from framework_common.framework_util.func_map_loader import gemini_func_map, openai_func_map
 from run.ai_llm.service.aiReplyCore import aiReplyCore
 from framework_common.database_util.User import update_user, add_user, get_user
 from framework_common.utils.utils import download_img
@@ -19,35 +15,6 @@ def main(bot, config):
 
     avatar = False
     nudge_list = []
-    if config.ai_llm.config["llm"]["func_calling"]:
-        if config.ai_llm.config["llm"]["model"] == "gemini":
-            tools = gemini_func_map()
-        else:
-            tools = openai_func_map()
-
-    else:
-        tools = None
-
-    if config.ai_llm.config["llm"]["联网搜索"]:
-        if config.ai_llm.config["llm"]["model"] == "gemini":
-            if tools is None:
-                tools = [
-
-                    {"googleSearch": {}},
-                ]
-            else:
-                tools = [
-                    {"googleSearch": {}},
-                    tools
-                ]
-        else:
-            if tools is None:
-                tools = [{"type": "function", "function": {"name": "googleSearch"}}]
-            else:
-                tools = [
-                    {"type": "function", "function": {"name": "googleSearch"}},
-                    tools
-                ]
 
     @bot.on(GroupMessageEvent)
     async def sendLike(event: GroupMessageEvent):
@@ -155,9 +122,10 @@ def main(bot, config):
                     text = f"{user_info.nickname}{event.raw_info[2]['txt']}{bot_name}{event.raw_info[4]['txt']}"
                 except:
                     bot.logger.error("获取不到戳一戳文本")
-                    text = random.choice(["戳一戳你~","摸摸头","拍拍你"])
+                    text = "戳一戳你~"
                 bot.logger.info(text)
                 # print(text)
+
                 if config.system_plugin.config['api_implements']['nudge']['is_Reply_with_meme']:
                     if random.randint(1, 100) < config.system_plugin.config['api_implements']['nudge'][
                         'Reply_with_meme_probability']:
@@ -180,14 +148,7 @@ def main(bot, config):
                         await bot.send_group_message(event.group_id, Image(file=img_path))
                         return
                 if config.ai_llm.config["llm"]["aiReplyCore"]:
-                    r = await aiReplyCore(
-                        [{"text": text}],
-                        event.user_id,
-                        config,
-                        tools=tools,
-                        bot=bot,
-                        event=poke_notify_to_group_message(event),
-                    )
+                    r = await aiReplyCore([{"text": text}], event.user_id, config, bot=bot)
                 else:
                     reply_list = config.system_plugin.config['api_implements']['nudge']['replylist']
                     nonlocal nudge_list
@@ -210,14 +171,7 @@ def main(bot, config):
                 text = f"{user_info.nickname}{event.raw_info[2]['txt']}{bot_name}{event.raw_info[4]['txt']}"
                 bot.logger.info(text)
                 if config.ai_llm.config["llm"]["aiReplyCore"]:
-                    r = await aiReplyCore(
-                        [{"text": text}],
-                        event.user_id,
-                        config,
-                        tools=tools,
-                        bot=bot,
-                        event=poke_notify_to_group_message(event),
-                    )
+                    r = await aiReplyCore([{"text": text}], event.user_id, config, bot=bot)
 
                 else:
                     reply_list = config.system_plugin.config['api_implements']['nudge']['replylist']
@@ -227,67 +181,3 @@ def main(bot, config):
                     'counter_probability']:
                     await bot.friend_poke(event.user_id)
         # await bot.send_friend_message(event.user_id, "你戳我干啥？")
-
-    def poke_notify_to_group_message(poke_event: PokeNotifyEvent,
-                                     message_content: str = "[戳一戳]",
-                                     message_id: Optional[int] = None) -> GroupMessageEvent:
-        """
-        将 PokeNotifyEvent 转换为 GroupMessageEvent
-
-        Args:
-            poke_event: 戳一戳通知事件
-            message_content: 转换后的消息内容，默认为 "[戳一戳]"
-            message_id: 消息ID，如果不提供则使用当前时间戳
-
-        Returns:
-            GroupMessageEvent: 转换后的群消息事件
-        """
-        # 生成消息ID（如果未提供）
-        if message_id is None:
-            message_id = int(time.time() * 1000)  # 使用毫秒时间戳作为消息ID
-
-        # 构造消息结构
-        message_dict = {"type": "text", "data": {"text": message_content}}
-        message_list = [message_dict]
-
-        # 构造默认的发送者信息
-        sender = Sender(
-            user_id=poke_event.user_id,
-            nickname="",  # 默认为空，可以根据需要填充
-            sex="unknown",
-            age=0,
-            card="",
-            area="",
-            level="",
-            role="member",  # 默认为普通成员
-            title=""
-        )
-
-        # 创建 GroupMessageEvent 实例
-        group_message_event = GroupMessageEvent(
-            # 从 PokeNotifyEvent 继承的字段
-            post_type="message",
-            message_type="group",
-            user_id=poke_event.user_id,
-            group_id=poke_event.group_id or 0,  # 如果为 None 则设为 0
-            time=getattr(poke_event, 'time', int(time.time())),  # 使用事件时间或当前时间
-
-            # GroupMessageEvent 特有字段
-            sub_type="normal",
-            message_id=message_id,
-            message=message_list,
-            _raw_message=message_content,
-            font=0,  # 默认字体
-            sender=sender,
-            to_me=False,  # 默认不是@机器人
-            reply=None,  # 默认不是回复消息
-            anonymous=None,  # 默认不是匿名消息
-
-            # 其他默认字段
-            original_message=None,
-            processed_message=[],  # 会在 __init__ 中自动处理
-            message_chain=MessageChain([]),  # 会在 __init__ 中自动设置
-            pure_text=""  # 会在 __init__ 中自动设置
-        )
-
-        return group_message_event
