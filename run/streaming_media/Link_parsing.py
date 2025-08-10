@@ -43,7 +43,7 @@ async def call_bili_download_video(bot, event, config,type_download='video'):
             elif video_json['type'] == 'too_big':
                 await bot.send(event, f'太大了，罢工！')
         except Exception as e:
-            await bot.send(event, f'下载失败\n{e}')
+            await bot.send(event, f'下载失败\n{e} 请安装ffmpeg')
     elif type_download == 'img' and json_linking['pic_url_list'] != []:
         node_list = [Node(
             content=[Text("小的找的图片如下，请君过目喵")])]

@@ -98,6 +98,7 @@ def main(bot,config):
         config.save_yaml("censor_user",plugin_name="common_config")
     @bot.on(LifecycleMetaEvent)
     async def handle_lifecycle_event(event):
+        await sleep(10)
         await add_user(master_id, master_name, master_name),
         await update_user(master_id, permission=9999, nickname=master_name),
         await update_user(111111111, permission=9999, nickname="主人")

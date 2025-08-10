@@ -10,7 +10,7 @@ from framework_common.framework_util.yamlLoader import YAMLManager
 logger=get_logger("GeminiKeyManager")
 base_url = YAMLManager.get_instance().ai_llm.config["llm"]["gemini"]["base_url"]
 GEMINI_API_MODELS_URL = f"{base_url}/v1beta/models"
-
+proxy=YAMLManager.get_instance().common_config.basic_config["proxy"]["http_proxy"]
 
 class NoAvailableAPIKeyError(Exception):
     pass
@@ -30,16 +30,16 @@ async def _check_single_gemini_key_status(
             if "models" in response_json and isinstance(response_json["models"], list):
                 return api_key, True, "API Key 有效，成功获取模型列表。"
             else:
-                return api_key, False, f"响应200但内容异常: {response.text[:100]}..."
+                return api_key, True, f"响应200但内容异常: {response.text[:100]}..."
         elif response.status_code in [401, 403]:
             return api_key, False, f"HTTP {response.status_code}: {response.text}"
         else:
             return api_key, True, f"HTTP {response.status_code}: {response.text[:100]}..."
 
     except httpx.RequestError as exc:
-        return api_key, False, f"网络或请求错误: {exc}"
+        return api_key, True, f"网络或请求错误: {exc}"
     except Exception as exc:
-        return api_key, False, f"未知错误: {exc}"
+        return api_key, True, f"未知错误: {exc}"
 
 
 class GeminiKeyManager:
@@ -65,8 +65,12 @@ class GeminiKeyManager:
         self._check_interval_seconds = check_interval_seconds
         self._timeout_per_key = timeout_per_key
         self._max_concurrent_checks = max_concurrent_checks
-
-        self._client: httpx.AsyncClient = httpx.AsyncClient()
+        if proxy and proxy!="":
+            proxies={"http://": proxy, "https://": proxy}
+        else:
+            proxies=None
+        logger.info(f"初始化 GeminiKeyManager，代理：{proxies} base_url: {base_url}")
+        self._client: httpx.AsyncClient = httpx.AsyncClient(proxies=proxies)
         self._checker_task: Optional[asyncio.Task] = None
 
         self._initialized = True

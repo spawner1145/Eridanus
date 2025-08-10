@@ -12,6 +12,9 @@ from io import BytesIO
 
 from PIL import Image
 
+from developTools.message.message_components import Reply, Mface, Image
+from developTools.message.message_components import Image as Bot_Image
+
 async def delay_recall(bot, msg, interval=20):
     """
     延迟撤回消息的非阻塞封装函数，撤回机器人自身消息可以先msg = await bot.send(event, 'xxx')然后调用await delay_recall(bot, msg, 20)这样来不阻塞的撤回，默认20秒后撤回
@@ -27,38 +30,25 @@ async def delay_recall(bot, msg, interval=20):
 
     asyncio.create_task(recall_task())
 
-async def get_img(processed_message, bot, event):
+async def get_img(event,bot):
     """
     获取消息中或者引用消息中的图片url，如果没有找到返回False
     """
-    for item in processed_message:
-        if "image" in item or "mface" in item:
-            try:
-                try:
-                    if "mface" in item:
-                        url = item["mface"]["url"]
-                    else:
-                        url = item["image"]["url"]
-                except:
-                    if "mface" in item:
-                        url = item["mface"]["file"]
-                    else:
-                        url = item["image"]["file"]
-                return url
-            except Exception as e:
-                traceback.print_exc()
-                bot.logger.warning(f"获取图片失败: {e}")
+    if event.message_chain.has(Reply):
+            msg = await bot.get_msg(event.message_chain.get(Reply)[0].id)
+            bot.logger.info(f"获取到的消息：{msg.message_chain}")
+            if msg.message_chain.has(Bot_Image):
+                return msg.message_chain.get(Bot_Image)[0].url or msg.message_chain.get(Bot_Image)[0].file
+            elif msg.message_chain.has(Mface):
+                return msg.message_chain.get(Mface)[0].url or msg.message_chain.get(Mface)[0].file
+            else:
                 return False
-        elif "reply" in item:
-            try:
-                event_obj = await bot.get_msg(int(event.get("reply")[0]["id"]))
-                message = await get_img(event_obj.processed_message, bot, event)
-                if message:
-                    return message
-            except Exception as e:
-                bot.logger.warning(f"引用消息解析失败: {e}")
-                return False
-    return False
+    elif event.message_chain.has(Bot_Image):
+        return event.message_chain.get(Bot_Image)[0].url or event.message_chain.get(Bot_Image)[0].file
+    elif event.message_chain.has(Mface):
+        return event.message_chain.get(Mface)[0].url or event.message_chain.get(Mface)[0].file
+    else:
+        return False
 
 async def url_to_base64(url):
     async with httpx.AsyncClient(timeout=9000) as client:

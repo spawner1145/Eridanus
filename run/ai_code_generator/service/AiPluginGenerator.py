@@ -579,6 +579,7 @@ async def code_generate(config,prompt,user_id):
     from framework_common.framework_util.yamlLoader import YAMLManager
     ai_response = await schemaReplyCore(
         config=config,
+        keep_history=True,
         schema=generator._get_plugin_schema(),
         user_message=ai_prompt,
         user_id=int(f"{user_id}1024")

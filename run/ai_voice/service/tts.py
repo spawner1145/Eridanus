@@ -4,6 +4,7 @@ import re
 from developTools.utils.logger import get_logger
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.ai_translate import Translator
+from run.ai_voice.service.PrettyDerbyTTS import get_PrettyDerby_speakers, PrettyDerby_TTS
 from run.ai_voice.service.blue_archive_tts import get_huggingface_blue_archive_speakers, huggingface_blue_archive_tts
 from run.ai_voice.service.modelscopeTTS import modelscope_tts, get_modelscope_tts_speakers
 from run.ai_voice.service.napcat_tts import napcat_tts_speak, napcat_tts_speakers
@@ -82,10 +83,10 @@ class TTS:
             if speaker in spkss:
                 speaker=spkss[speaker]
             return await napcat_tts_speak(bot, config, text, speaker)
-        elif mode=="modelscope_tts":
+        elif mode=="PrettyDerby":
             if speaker is None:
-                speaker=config.ai_voice.config["tts"]["modelscope_tts"]["speaker"]
-            return await modelscope_tts(text,speaker)
+                speaker=config.ai_voice.config["tts"]["PrettyDerby"]["speaker"]
+            return await PrettyDerby_TTS(text,speaker)
         elif mode=="vits":
             if speaker is None:
                 speaker=config.ai_voice.config["tts"]["vits"]["speaker"]
@@ -122,7 +123,7 @@ class TTS:
                 bot.logger.error(f"{error_msg}: {e}")
                 return None
         nc_speakers = await fetch_speakers(napcat_tts_speakers, bot, error_msg="Error in napcat_tts_speakers")
-        modelscope_speakers = get_modelscope_tts_speakers()
+
         vits_speakers = await fetch_speakers(
             get_vits_speakers,
             self.config.ai_voice.config["tts"]["vits"]["base_url"], None,
@@ -132,8 +133,9 @@ class TTS:
             get_huggingface_online_vits2_speakers,
             error_msg="Error in get_huggingface_online_vits2_speakers"
         )
+        PrettyDerby_speakers=await fetch_speakers(get_PrettyDerby_speakers,error_msg="Error in get_PrettyDerby_speakers")
         blue_archive_speakers=await fetch_speakers(get_huggingface_blue_archive_speakers,error_msg="Error in get_huggingface_blue_archive_speakers")
-        return {"speakers": [nc_speakers, modelscope_speakers, vits_speakers, online_vits2_speakers,blue_archive_speakers,["otto"]]}
+        return {"speakers": [nc_speakers,PrettyDerby_speakers,  vits_speakers, online_vits2_speakers,blue_archive_speakers,["otto"]]}
 
 
 

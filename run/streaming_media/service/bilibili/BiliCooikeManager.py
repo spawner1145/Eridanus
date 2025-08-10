@@ -41,8 +41,8 @@ class BiliCookieManager:
 
         self._initialized = True
         self.cookies: List[Dict[str, Any]] = []
-        self.cookie_file = Path('./bilibili_cookies.json')
-        self.qr_file = Path('./bilibili_qr.png')
+        self.cookie_file = Path(__file__).parent.resolve() / 'bilibili_cookies.json'
+        self.qr_file = Path(__file__).parent.resolve() / 'bilibili_qr.png'
         self.last_update_time = 0
         self.update_interval = 3600 * 12  # 12小时检查一次
         self.browser: Optional[Browser] = None
@@ -63,17 +63,22 @@ class BiliCookieManager:
     async def _initialize(self):
         """初始化浏览器和页面"""
         if self.browser is None:
-            self._playwright = await async_playwright().start()
-            self.browser = await self._playwright.chromium.launch(
-                headless=True,
-                args=[
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor'
-                ]
-            )
+            try:
+                self._playwright = await async_playwright().start()
+                self.browser = await self._playwright.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-web-security',
+                        '--disable-features=VizDisplayCompositor'
+                    ]
+                )
+            except Exception as e:
+                #traceback.print_exc()
+                pass
+
 
     async def _cleanup(self):
         """清理资源"""
@@ -108,7 +113,7 @@ class BiliCookieManager:
             finally:
                 self._playwright = None
 
-    async def get_cookies(self, auto_login: bool = True,bot=None) -> List[Dict[str, Any]]:
+    async def get_cookies(self, auto_login: bool = True,bot=None,group_id=None,check_cookie=True) -> List[Dict[str, Any]]:
         """
         获取Cookie
 
@@ -121,16 +126,17 @@ class BiliCookieManager:
         async with self._lock:
             # 先尝试加载本地Cookie
             await self._load_cookies()
+            if check_cookie is False:return self.cookies.copy()
 
             # 验证Cookie有效性
-            if self.cookies and await self._validate_cookies():
+            if self.cookies and await self._validate_cookies() and group_id is None:
                 #logger.info("使用本地有效Cookie")
                 return self.cookies.copy()
 
             # Cookie无效或不存在，尝试自动登录
             if auto_login:
                 logger.info("Cookie无效或不存在，开始自动登录...")
-                cookies = await self._login_and_get_cookies(bot)
+                cookies = await self._login_and_get_cookies(bot,group_id)
                 if cookies:
                     self.cookies = cookies
                     await self._save_cookies()
@@ -200,7 +206,7 @@ class BiliCookieManager:
                 except Exception as e:
                     logger.warning(f"关闭验证页面时出错: {e}")
 
-    async def _login_and_get_cookies(self,bot=None) -> Optional[List[Dict[str, Any]]]:
+    async def _login_and_get_cookies(self,bot=None,group_id=None) -> Optional[List[Dict[str, Any]]]:
         """登录并获取Cookie"""
         page = None
         try:
@@ -247,8 +253,12 @@ class BiliCookieManager:
             try:
                 from developTools.message.message_components import Image
                 #print(bot.master,type(bot.master))
-                await bot.send_friend_message(bot.master,Image(file=str(self.qr_file.absolute())))
-                await bot.send_friend_message(bot.master,"请使用bilibili扫描二维码登录...")
+                if group_id is not None:
+                    recall_id1=await bot.send_group_message(group_id, Image(file=str(self.qr_file.absolute())))
+                    recall_id2=await bot.send_group_message(group_id, "请使用bilibili扫描二维码登录...")
+                elif group_id is None:
+                    await bot.send_friend_message(bot.master,Image(file=str(self.qr_file.absolute())))
+                    await bot.send_friend_message(bot.master,"请使用bilibili扫描二维码登录...")
             except:
                 traceback.print_exc()
             logger.info("请扫描二维码登录...")
@@ -258,6 +268,13 @@ class BiliCookieManager:
 
             if login_success:
                 logger.info("登录成功！正在获取cookies...")
+                if bot is not None:
+                    if group_id is not None:
+                        await bot.recall(recall_id1['data']['message_id'])
+                        await bot.recall(recall_id2['data']['message_id'])
+                        await bot.send_group_message(group_id, "登录成功！")
+                    elif group_id is None:
+                        await bot.send_friend_message(bot.master,"登录成功！")
                 cookies = await page.context.cookies()
                 bilibili_cookies = [cookie for cookie in cookies if 'bilibili.com' in cookie['domain']]
 
@@ -274,6 +291,7 @@ class BiliCookieManager:
 
         except Exception as e:
             logger.error(f"登录过程出错: {e}")
+            print(self.qr_file)
             return None
         finally:
             if page:
@@ -380,7 +398,7 @@ class BiliCookieManager:
 
 
 # 便捷函数
-async def get_bili_cookies(auto_login: bool = True,bot=None) -> List[Dict[str, Any]]:
+async def get_bili_cookies(auto_login: bool = True,bot=None,check=True) -> List[Dict[str, Any]]:
     """
     获取B站Cookie的便捷函数
 
@@ -391,7 +409,7 @@ async def get_bili_cookies(auto_login: bool = True,bot=None) -> List[Dict[str, A
         Cookie列表
     """
     async with BiliCookieManager() as manager:
-        cookies = await manager.get_cookies(auto_login,bot)
+        cookies = await manager.get_cookies(auto_login,bot,check_cookie=check)
         await manager._cleanup()
         return cookies
 

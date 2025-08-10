@@ -31,7 +31,7 @@ logger = get_logger()
 # 使用Redis缓存管理器 (数据库0)
 redis_cache = create_group_cache_manager(cache_ttl=REDIS_CACHE_TTL)
 
-
+_db_initialized: bool = False
 # ======================= 修复内存缓存管理 =======================
 class LRUMemoryCache:
     """LRU内存缓存，防止无限增长"""
@@ -308,7 +308,8 @@ from typing import Optional
 
 # 全局变量存储任务和初始化状态
 _periodic_task: Optional[asyncio.Task] = None
-_db_initialized: bool = False
+_init_lock = threading.Lock()
+
 
 
 async def periodic_batch_write():
@@ -329,15 +330,15 @@ async def periodic_batch_write():
 def start_periodic_batch_write():
     """启动定期批量写入任务"""
     global _periodic_task
-    try:
-        loop = asyncio.get_running_loop()
-        if _periodic_task is None or _periodic_task.done():
-            _periodic_task = loop.create_task(periodic_batch_write())
-            _running_tasks.add(_periodic_task)  # 跟踪任务
-            logger.info("✅ 定期批量写入任务已启动")
-    except RuntimeError:
-        # 没有运行的事件循环，稍后再启动
-        logger.debug("暂时无法启动定期任务，等待事件循环启动")
+    with _init_lock:  # 添加这行
+        try:
+            loop = asyncio.get_running_loop()
+            if _periodic_task is None or _periodic_task.done():
+                _periodic_task = loop.create_task(periodic_batch_write())
+                _running_tasks.add(_periodic_task)
+                logger.info("✅ 定期批量写入任务已启动")
+        except RuntimeError:
+            logger.debug("暂时无法启动定期任务，等待事件循环启动")
 
 
 def stop_periodic_batch_write():
@@ -351,15 +352,15 @@ def stop_periodic_batch_write():
 def ensure_periodic_task():
     """确保定期任务正在运行"""
     global _periodic_task
-    try:
-        loop = asyncio.get_running_loop()
-        if _periodic_task is None or _periodic_task.done():
-            _periodic_task = loop.create_task(periodic_batch_write())
-            _running_tasks.add(_periodic_task)  # 跟踪任务
-            logger.debug("✅ 定期批量写入任务已启动")
-    except RuntimeError:
-        # 没有事件循环，忽略
-        pass
+    with _init_lock:  # 添加这行
+        try:
+            loop = asyncio.get_running_loop()
+            if _periodic_task is None or _periodic_task.done():
+                _periodic_task = loop.create_task(periodic_batch_write())
+                _running_tasks.add(_periodic_task)
+                logger.debug("✅ 定期批量写入任务已启动")
+        except RuntimeError:
+            pass
 
 
 async def ensure_db_initialized():
@@ -396,7 +397,7 @@ async def init_db():
 
         # 启动定期任务
         start_periodic_batch_write()
-
+        _db_initialized = True
     except Exception as e:
         logger.warning(f"Error initializing database: {e}")
 
@@ -744,7 +745,6 @@ async def get_group_cache_info(group_id: int):
             "group_id": group_id,
             "error": str(e)
         }
-
 
 # ======================= 性能监控 =======================
 def get_cache_stats():

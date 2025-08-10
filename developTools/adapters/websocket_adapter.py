@@ -357,7 +357,17 @@ class WebSocketBot:
         :param message_id:
         :return:
         """
-        source_msg=await self._call_api("get_msg", {"message_id": message_id})
+        source_msg = await self._call_api("get_msg", {"message_id": message_id})
+        if source_msg["data"].get("post_type") is None:
+            source_msg["data"]["post_type"] = "message"
+        if source_msg["data"].get("sub_type") is None:
+            source_msg["data"]["sub_type"] = "normal"
+        if source_msg["data"].get("font") is None:
+            source_msg["data"]["font"] = 0
+        if source_msg["data"].get("user_id") is None:
+            source_msg["data"]["user_id"] = source_msg["data"]["sender"]["user_id"]
+        if source_msg["data"].get("group_id") is None:
+            source_msg["data"]["group_id"] = 0
         event_obj = EventFactory.create_event(source_msg['data'])
         return event_obj
     """

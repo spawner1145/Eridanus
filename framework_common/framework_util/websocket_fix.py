@@ -123,6 +123,9 @@ class ExtendBot(WebSocketBot):
             components = [Text(components)]
         if not isinstance(components, list):
             components = [components]
+        if hasattr(event, "message_id"):
+            if event.message_id==114514:   #自己构建的假事件没有真正的message_id，这里直接跳过
+                Quote=False
         if self.config.common_config.basic_config["adapter"]["name"] == "Lagrange":
             if Quote:
                 components.insert(0, Reply(id=str(event.message_id)))
