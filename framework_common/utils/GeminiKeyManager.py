@@ -10,7 +10,7 @@ from framework_common.framework_util.yamlLoader import YAMLManager
 logger=get_logger("GeminiKeyManager")
 base_url = YAMLManager.get_instance().ai_llm.config["llm"]["gemini"]["base_url"]
 GEMINI_API_MODELS_URL = f"{base_url}/v1beta/models"
-
+proxy=YAMLManager.get_instance().common_config.basic_config["proxy"]["http_proxy"]
 
 class NoAvailableAPIKeyError(Exception):
     pass
@@ -66,7 +66,7 @@ class GeminiKeyManager:
         self._timeout_per_key = timeout_per_key
         self._max_concurrent_checks = max_concurrent_checks
 
-        self._client: httpx.AsyncClient = httpx.AsyncClient()
+        self._client: httpx.AsyncClient = httpx.AsyncClient(proxies={"http://": proxy, "https://": proxy})
         self._checker_task: Optional[asyncio.Task] = None
 
         self._initialized = True
