@@ -30,7 +30,7 @@ async def delay_recall(bot, msg, interval=20):
 
     asyncio.create_task(recall_task())
 
-async def get_img(bot, event):
+async def get_img(event,bot):
     """
     获取消息中或者引用消息中的图片url，如果没有找到返回False
     """
