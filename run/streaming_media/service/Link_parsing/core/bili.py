@@ -251,7 +251,7 @@ def av_to_bv(av_link):
         raise ValueError("输入链接中不包含有效的 AV 号")
 
 async def fetch_latest_dynamic_id_api(uid):
-    BILIBILI_HEADER, credential, BILI_SESSDATA = bili_init()
+    BILIBILI_HEADER, credential, BILI_SESSDATA = await bili_init()
     time.sleep(1)
     if BILI_SESSDATA == ' ':
         raise ValueError(" credential失效，请先登录或重新配置")

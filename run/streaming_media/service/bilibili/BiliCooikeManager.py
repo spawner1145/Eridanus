@@ -42,7 +42,7 @@ class BiliCookieManager:
         self._initialized = True
         self.cookies: List[Dict[str, Any]] = []
         self.cookie_file = Path(__file__).parent.resolve() / 'bilibili_cookies.json'
-        self.qr_file = Path(__file__).parent.resolve() / '/bilibili_qr.png'
+        self.qr_file = Path(__file__).parent.resolve() / 'bilibili_qr.png'
         self.last_update_time = 0
         self.update_interval = 3600 * 12  # 12小时检查一次
         self.browser: Optional[Browser] = None
@@ -291,6 +291,7 @@ class BiliCookieManager:
 
         except Exception as e:
             logger.error(f"登录过程出错: {e}")
+            print(self.qr_file)
             return None
         finally:
             if page:
