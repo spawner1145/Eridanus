@@ -31,7 +31,7 @@ logger = get_logger()
 # 使用Redis缓存管理器 (数据库0)
 redis_cache = create_group_cache_manager(cache_ttl=REDIS_CACHE_TTL)
 
-
+_db_initialized: bool = False
 # ======================= 修复内存缓存管理 =======================
 class LRUMemoryCache:
     """LRU内存缓存，防止无限增长"""
@@ -309,7 +309,7 @@ from typing import Optional
 # 全局变量存储任务和初始化状态
 _periodic_task: Optional[asyncio.Task] = None
 _init_lock = threading.Lock()
-_db_initialized: bool = False
+
 
 
 async def periodic_batch_write():
@@ -367,10 +367,8 @@ async def ensure_db_initialized():
     """确保数据库已初始化"""
     global _db_initialized
     if not _db_initialized:
-        with _init_lock:  # 添加这行
-            if not _db_initialized:  # 双重检查
-                await init_db()
-                _db_initialized = True
+        await init_db()
+        _db_initialized = True
 
 
 # ======================= 初始化 =======================
@@ -399,7 +397,7 @@ async def init_db():
 
         # 启动定期任务
         start_periodic_batch_write()
-
+        _db_initialized = True
     except Exception as e:
         logger.warning(f"Error initializing database: {e}")
 
@@ -748,7 +746,7 @@ async def get_group_cache_info(group_id: int):
             "error": str(e)
         }
 
-
+init_db()
 # ======================= 性能监控 =======================
 def get_cache_stats():
     """获取缓存统计信息"""
