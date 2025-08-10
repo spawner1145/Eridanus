@@ -746,7 +746,6 @@ async def get_group_cache_info(group_id: int):
             "error": str(e)
         }
 
-init_db()
 # ======================= 性能监控 =======================
 def get_cache_stats():
     """获取缓存统计信息"""
