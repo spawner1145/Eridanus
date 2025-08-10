@@ -285,7 +285,7 @@ def main(bot, config):
     ai_img_recognize = {}
 
     @bot.on(GroupMessageEvent)
-    async def search_image(event):
+    async def search_image(event:GroupMessageEvent):
         try:
             if str(event.pure_text) == "ai图检测" or (
                     event.get("at") and event.get("at")[0]["qq"] == str(bot.id) and event.get("text")[0] == "ai图检测"):
@@ -293,8 +293,8 @@ def main(bot, config):
                 await delay_recall(bot, msg)
                 ai_img_recognize[event.sender.user_id] = []
             if "ai图检测" in str(event.pure_text) or event.sender.user_id in ai_img_recognize:
-                if await get_img(event.processed_message, bot, event):
-                    img_url = await get_img(event.processed_message, bot, event)
+                if await get_img(event,bot):
+                    img_url = await get_img(event,bot)
                     await call_aiArtModerate(bot, event, config, img_url)
                     ai_img_recognize.pop(event.sender.user_id)
         except Exception as e:
@@ -478,7 +478,7 @@ def main(bot, config):
         global tag_user
 
         if str(event.pure_text) == "tag":
-            if not await get_img(event.processed_message, bot, event):
+            if not await get_img(event,bot):
                 if config.ai_generated_art.config['ai绘画']['sd审核和反推api'] == "" or \
                         config.ai_generated_art.config['ai绘画']['sd审核和反推api'] is None:
                     msg = await bot.send(event, "未配置审核和反推api")
@@ -492,7 +492,7 @@ def main(bot, config):
         # 处理图片和重绘命令
         if str(event.pure_text) == "tag" or event.sender.user_id in tag_user:
             #print(event.processed_message)
-            if await get_img(event.processed_message, bot, event):
+            if await get_img(event,bot):
                 if config.ai_generated_art.config['ai绘画']['sd审核和反推api'] == "" or \
                         config.ai_generated_art.config['ai绘画']['sd审核和反推api'] is None:
                     msg = await bot.send(event, "未配置审核和反推api")
@@ -506,7 +506,7 @@ def main(bot, config):
 
                 # 获取图片路径
                 path = f"data/pictures/cache/{random_str()}.png"
-                img_url = await get_img(event.processed_message, bot, event)
+                img_url = await get_img(event,bot)
                 bot.logger.info(f"发起反推tag请求，path:{path}")
                 tag_user.pop(event.sender.user_id)
 
@@ -559,7 +559,7 @@ def main(bot, config):
 
         if event.pure_text == "重绘" or event.pure_text.startswith("重绘 "):
             user_info = await get_user(event.user_id)
-            if not await get_img(event.processed_message, bot, event):
+            if not await get_img(event,bot):
                 prompt = str(event.pure_text).replace("重绘 ", "").replace("重绘", "").strip()
                 if user_info.permission < config.ai_generated_art.config["ai绘画"]["ai绘画所需权限等级"]:
                     bot.logger.info(f"reject text2img request: 权限不足")
@@ -577,7 +577,7 @@ def main(bot, config):
 
         # 处理图片和重绘命令
         if event.pure_text == "重绘" or event.pure_text.startswith("重绘 ") or event.sender.user_id in UserGet:
-            if await get_img(event.processed_message, bot, event):
+            if await get_img(event,bot):
                 user_info = await get_user(event.user_id)
                 if user_info.permission < config.ai_generated_art.config["ai绘画"]["ai绘画所需权限等级"]:
                     bot.logger.info(f"reject text2img request: 权限不足")
@@ -600,7 +600,7 @@ def main(bot, config):
 
                 # 获取图片路径
                 path = f"data/pictures/cache/{random_str()}.png"
-                img_url = await get_img(event.processed_message, bot, event)
+                img_url = await get_img(event,bot)
                 bot.logger.info(f"发起SDai重绘请求，path:{path}|prompt:{prompts}")
                 prompts_str = ' '.join(UserGet[event.sender.user_id]) + ' '
                 UserGet.pop(event.sender.user_id)
@@ -740,7 +740,7 @@ def main(bot, config):
         global n4re
 
         if str(event.pure_text) == "n4re" or str(event.pure_text).startswith("n4re "):
-            if not await get_img(event.processed_message, bot, event):
+            if not await get_img(event,bot):
                 prompt = str(event.pure_text).replace("n4re ", "").replace("n4re", "").strip()
                 n4re[event.sender.user_id] = [prompt]
                 msg = await bot.send(event, "请发送要重绘的图片")
@@ -749,7 +749,7 @@ def main(bot, config):
 
         # 处理图片和重绘命令
         if str(event.pure_text) == "n4re" or str(event.pure_text).startswith("n4re ") or event.sender.user_id in n4re:
-            if await get_img(event.processed_message, bot, event):
+            if await get_img(event,bot):
                 if str(event.pure_text).startswith("n4re"):
                     prompt = str(event.pure_text).replace("n4re ", "").replace("n4re", "").strip()
                     n4re[event.sender.user_id] = [prompt]
@@ -764,7 +764,7 @@ def main(bot, config):
 
                 # 获取图片路径
                 path = f"data/pictures/cache/{random_str()}.png"
-                img_url = await get_img(event.processed_message, bot, event)
+                img_url = await get_img(event,bot)
                 bot.logger.info(f"发起n4re请求，path:{path}|prompt:{prompts}")
                 prompts_str = ' '.join(n4re[event.sender.user_id]) + ' '
                 msg = await bot.send(event, "正在nai4重绘", True)
@@ -803,7 +803,7 @@ def main(bot, config):
         global n3re
 
         if str(event.pure_text) == "n3re" or str(event.pure_text).startswith("n3re "):
-            if not await get_img(event.processed_message, bot, event):
+            if not await get_img(event,bot):
                 prompt = str(event.pure_text).replace("n3re ", "").replace("n3re", "").strip()
                 n3re[event.sender.user_id] = [prompt]
                 msg = await bot.send(event, "请发送要重绘的图片")
@@ -812,7 +812,7 @@ def main(bot, config):
 
         # 处理图片和重绘命令
         if str(event.pure_text) == "n3re" or str(event.pure_text).startswith("n3re ") or event.sender.user_id in n3re:
-            if await get_img(event.processed_message, bot, event):
+            if await get_img(event,bot):
                 if str(event.pure_text).startswith("n3re"):
                     prompt = str(event.pure_text).replace("n3re ", "").replace("n3re", "").strip()
                     n3re[event.sender.user_id] = [prompt]
@@ -827,7 +827,7 @@ def main(bot, config):
 
                 # 获取图片路径
                 path = f"data/pictures/cache/{random_str()}.png"
-                img_url = await get_img(event.processed_message, bot, event)
+                img_url = await get_img(event,bot)
                 bot.logger.info(f"发起n3re请求，path:{path}|prompt:{prompts}")
                 prompts_str = ' '.join(n3re[event.sender.user_id]) + ' '
                 msg = await bot.send(event, "正在nai3重绘", True)
@@ -868,7 +868,7 @@ def main(bot, config):
         global mask
 
         if str(event.pure_text) == "局部重绘" or str(event.pure_text).startswith("局部重绘 "):
-            if not await get_img(event.processed_message, bot, event):
+            if not await get_img(event,bot):
                 prompt = str(event.pure_text).replace("局部重绘 ", "").replace("局部重绘", "").strip()
                 UserGetm[event.sender.user_id] = prompt  # 直接将值设置为字符串
                 msg = await bot.send(event, "请发送要局部重绘的图片")
@@ -877,7 +877,7 @@ def main(bot, config):
             else:
                 prompt = str(event.pure_text).replace("局部重绘 ", "").replace("局部重绘", "").strip()
                 UserGetm[event.sender.user_id] = prompt
-                img_url = await get_img(event.processed_message, bot, event)
+                img_url = await get_img(event,bot)
                 msg = await bot.send(event, "请发送蒙版")
                 await delay_recall(bot, msg, 20)
                 mask[event.sender.user_id] = img_url
@@ -885,18 +885,18 @@ def main(bot, config):
 
         # 处理图片和重绘命令
         if event.sender.user_id in UserGetm and event.sender.user_id not in mask:
-            if await get_img(event.processed_message, bot, event):
-                img_url = await get_img(event.processed_message, bot, event)
+            if await get_img(event,bot):
+                img_url = await get_img(event,bot)
                 msg = await bot.send(event, "请发送蒙版")
                 await delay_recall(bot, msg, 20)
                 mask[event.sender.user_id] = img_url
                 return
 
         if event.sender.user_id in UserGetm and event.sender.user_id in mask:
-            if await get_img(event.processed_message, bot, event):
+            if await get_img(event,bot):
                 path = f"data/pictures/cache/{random_str()}.png"
                 prompts = UserGetm[event.sender.user_id]  # 直接使用字符串
-                mask_url = await get_img(event.processed_message, bot, event)
+                mask_url = await get_img(event,bot)
                 img_url = mask[event.sender.user_id]  # 直接使用字符串
                 bot.logger.info(
                     f"接收来自群：{event.group_id} 用户：{event.sender.user_id} 的局部重绘指令 prompt: {prompts}")
@@ -973,7 +973,7 @@ def main(bot, config):
         global info_user
 
         if str(event.pure_text) == "imginfo":
-            if not await get_img(event.processed_message, bot, event):
+            if not await get_img(event,bot):
                 if config.ai_generated_art.config["ai绘画"]["sdUrl"][0] == "" or \
                         config.ai_generated_art.config["ai绘画"]["sdUrl"][0] is None:
                     msg = await bot.send(event, "sd api未配置，无法读图")
@@ -985,7 +985,7 @@ def main(bot, config):
                 return
 
         if str(event.pure_text) == "imginfo" or event.sender.user_id in info_user:
-            if await get_img(event.processed_message, bot, event):
+            if await get_img(event,bot):
                 if config.ai_generated_art.config["ai绘画"]["sdUrl"][0] == "" or \
                         config.ai_generated_art.config["ai绘画"]["sdUrl"][0] is None:
                     msg = await bot.send(event, "sd api未配置，无法读图")
@@ -997,7 +997,7 @@ def main(bot, config):
                 bot.logger.info(f"接收来自群：{event.group_id} 用户：{event.sender.user_id} 的读图指令")
 
                 path = f"data/pictures/cache/{random_str()}.png"
-                img_url = await get_img(event.processed_message, bot, event)
+                img_url = await get_img(event,bot)
                 bot.logger.info(f"发起读图请求，path:{path}")
                 info_user.pop(event.sender.user_id)
 
