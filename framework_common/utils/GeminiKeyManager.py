@@ -37,9 +37,9 @@ async def _check_single_gemini_key_status(
             return api_key, True, f"HTTP {response.status_code}: {response.text[:100]}..."
 
     except httpx.RequestError as exc:
-        return api_key, False, f"网络或请求错误: {exc}"
+        return api_key, True, f"网络或请求错误: {exc}"
     except Exception as exc:
-        return api_key, False, f"未知错误: {exc}"
+        return api_key, True, f"未知错误: {exc}"
 
 
 class GeminiKeyManager:
