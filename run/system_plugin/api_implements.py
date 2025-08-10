@@ -158,8 +158,6 @@ def main(bot, config):
                     text = random.choice(["戳一戳你~","摸摸头","拍拍你"])
                 bot.logger.info(text)
                 # print(text)
-                event.message_id=114514
-                event.sender.user_id=event.user_id
                 if config.system_plugin.config['api_implements']['nudge']['is_Reply_with_meme']:
                     if random.randint(1, 100) < config.system_plugin.config['api_implements']['nudge'][
                         'Reply_with_meme_probability']:
