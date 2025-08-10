@@ -123,6 +123,9 @@ class ExtendBot(WebSocketBot):
             components = [Text(components)]
         if not isinstance(components, list):
             components = [components]
+        if hasattr(event, "message_id"):
+            if event.message_id==114514:
+                Quote=False
         if self.config.common_config.basic_config["adapter"]["name"] == "Lagrange":
             if Quote:
                 components.insert(0, Reply(id=str(event.message_id)))
