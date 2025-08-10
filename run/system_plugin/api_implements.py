@@ -3,7 +3,6 @@ import random
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, startUpMetaEvent, \
     ProfileLikeEvent, PokeNotifyEvent, GroupBanNoticeEvent
 from developTools.message.message_components import Record, Node, Text, Image
-from framework_common.framework_util.func_map_loader import gemini_func_map, openai_func_map
 from run.ai_llm.service.aiReplyCore import aiReplyCore
 from framework_common.database_util.User import update_user, add_user, get_user
 from framework_common.utils.utils import download_img
@@ -16,35 +15,6 @@ def main(bot, config):
 
     avatar = False
     nudge_list = []
-    if config.ai_llm.config["llm"]["func_calling"]:
-        if config.ai_llm.config["llm"]["model"] == "gemini":
-            tools = gemini_func_map()
-        else:
-            tools = openai_func_map()
-
-    else:
-        tools = None
-
-    if config.ai_llm.config["llm"]["联网搜索"]:
-        if config.ai_llm.config["llm"]["model"] == "gemini":
-            if tools is None:
-                tools = [
-
-                    {"googleSearch": {}},
-                ]
-            else:
-                tools = [
-                    {"googleSearch": {}},
-                    tools
-                ]
-        else:
-            if tools is None:
-                tools = [{"type": "function", "function": {"name": "googleSearch"}}]
-            else:
-                tools = [
-                    {"type": "function", "function": {"name": "googleSearch"}},
-                    tools
-                ]
 
     @bot.on(GroupMessageEvent)
     async def sendLike(event: GroupMessageEvent):
@@ -152,11 +122,10 @@ def main(bot, config):
                     text = f"{user_info.nickname}{event.raw_info[2]['txt']}{bot_name}{event.raw_info[4]['txt']}"
                 except:
                     bot.logger.error("获取不到戳一戳文本")
-                    text = random.choice(["戳一戳你~","摸摸头","拍拍你"])
+                    text = "戳一戳你~"
                 bot.logger.info(text)
                 # print(text)
-                event.message_id=114514
-                event.sender.user_id=event.user_id
+
                 if config.system_plugin.config['api_implements']['nudge']['is_Reply_with_meme']:
                     if random.randint(1, 100) < config.system_plugin.config['api_implements']['nudge'][
                         'Reply_with_meme_probability']:
@@ -179,14 +148,7 @@ def main(bot, config):
                         await bot.send_group_message(event.group_id, Image(file=img_path))
                         return
                 if config.ai_llm.config["llm"]["aiReplyCore"]:
-                    r = await aiReplyCore(
-                        [{"text": text}],
-                        event.user_id,
-                        config,
-                        tools=tools,
-                        bot=bot,
-                        event=event,
-                    )
+                    r = await aiReplyCore([{"text": text}], event.user_id, config, bot=bot)
                 else:
                     reply_list = config.system_plugin.config['api_implements']['nudge']['replylist']
                     nonlocal nudge_list
@@ -209,14 +171,7 @@ def main(bot, config):
                 text = f"{user_info.nickname}{event.raw_info[2]['txt']}{bot_name}{event.raw_info[4]['txt']}"
                 bot.logger.info(text)
                 if config.ai_llm.config["llm"]["aiReplyCore"]:
-                    r = await aiReplyCore(
-                        [{"text": text}],
-                        event.user_id,
-                        config,
-                        tools=tools,
-                        bot=bot,
-                        event=event,
-                    )
+                    r = await aiReplyCore([{"text": text}], event.user_id, config, bot=bot)
 
                 else:
                     reply_list = config.system_plugin.config['api_implements']['nudge']['replylist']
