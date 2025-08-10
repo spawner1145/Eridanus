@@ -199,7 +199,8 @@ def main(bot, config):
                         else:
                             break
                     nudge_list.append(r)
-                await bot.send_group_message(event.group_id, r)
+                if r:
+                    await bot.send_group_message(event.group_id, r)
 
                 if random.randint(1, 100) < config.system_plugin.config['api_implements']['nudge'][
                     'counter_probability']:
@@ -222,7 +223,8 @@ def main(bot, config):
                 else:
                     reply_list = config.system_plugin.config['api_implements']['nudge']['replylist']
                     r = random.choice(reply_list)
-                await bot.send_friend_message(event.user_id, r)
+                if r:
+                    await bot.send_friend_message(event.user_id, r)
                 if random.randint(1, 100) < config.system_plugin.config['api_implements']['nudge'][
                     'counter_probability']:
                     await bot.friend_poke(event.user_id)
