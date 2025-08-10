@@ -65,8 +65,12 @@ class GeminiKeyManager:
         self._check_interval_seconds = check_interval_seconds
         self._timeout_per_key = timeout_per_key
         self._max_concurrent_checks = max_concurrent_checks
-
-        self._client: httpx.AsyncClient = httpx.AsyncClient(proxies={"http://": proxy, "https://": proxy})
+        if proxy and proxy!="":
+            proxies={"http://": proxy, "https://": proxy}
+        else:
+            proxies=None
+        logger.info(f"初始化 GeminiKeyManager，代理：{proxies} base_url: {base_url}")
+        self._client: httpx.AsyncClient = httpx.AsyncClient(proxies=proxies)
         self._checker_task: Optional[asyncio.Task] = None
 
         self._initialized = True
