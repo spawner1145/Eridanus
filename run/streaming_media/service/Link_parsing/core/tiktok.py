@@ -6,6 +6,8 @@ import shutil
 import httpx
 import re
 import copy
+
+from framework_common.utils.install_and_import import install_and_import
 from .login_core import ini_login_Link_Prising
 from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME
 from urllib.parse import urlparse
@@ -70,7 +72,7 @@ def generate_x_bogus_url(url, headers):
     abogus_file_path = f'{os.path.dirname(os.path.abspath(__file__))}/a-bogus.js'
     with open(abogus_file_path, 'r', encoding='utf-8') as abogus_file:
         abogus_file_path_transcoding = abogus_file.read()
-    import execjs
+    execjs=install_and_import("PyExecJS",'execjs')
     abogus = execjs.compile(abogus_file_path_transcoding).call('generate_a_bogus', query, headers['User-Agent'])
     #print('生成的A-Bogus签名为: {}'.format(abogus))
     return url + "&a_bogus=" + abogus
