@@ -100,7 +100,10 @@ async def prompt_elements_construct(precessed_message,bot=None,func_result=False
             prompt_elements.append({"type":"text", "text":i["text"]})
         elif "image" in i or "mface" in i:
             if "mface" in i:
-                url = i["mface"]["url"]
+                try:
+                    url = i["mface"]["url"]
+                except:
+                    url = i["mface"]["file"]
             else:
                 try:
                     url = i["image"]["url"]
