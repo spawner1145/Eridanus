@@ -84,11 +84,11 @@ async def call_simple_draw(bot, event, config, prompt): # 主调用逻辑和@bot
             msg = await bot.send(event, "杂鱼，色图不给你！", True)
             await delay_recall(bot, msg, 10)
             return # 审核逻辑结束，如果不想要审核可以把开始到结束的一段都删了
-    await bot.send(event, [Text("neta lumina:"), Image(file=path)], True)
+    await bot.send(event, [Text("cui结果:"), Image(file=path)], True)
     
 def main(bot: ExtendBot,config: YAMLManager):
     @bot.on(GroupMessageEvent)
     async def handle_group_message(event: GroupMessageEvent):
-        if event.pure_text.startswith("#cui "):
+        if event.pure_text.startswith("#cui "): # 触发指令前缀
             prompt = event.pure_text.replace("#cui ","")
             await call_simple_draw(bot, event, config, prompt)
