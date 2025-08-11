@@ -10,17 +10,20 @@ class CloudMusicParser:
     def __init__(self,proxies=None):
         self.proxies=proxies
         self.client = httpx.AsyncClient(proxies=proxies)
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0"
+        }
     def parse(self, url):
         pass
     async def getSongDetail(self, url):
         url=f"https://api.toubiec.cn/wyapi/getSongDetail.php?id={url}"
-        async with httpx.AsyncClient(proxies=self.proxies) as client:
+        async with httpx.AsyncClient(proxies=self.proxies,headers=self.headers) as client:
             response = await client.get(url)
             logger.info(response)
             return response.json()
     async def getMusicUrl(self, url,level="exhigh"):
         url=f"https://api.toubiec.cn/wyapi/getMusicUrl.php?id={url}&level={level}"
-        async with httpx.AsyncClient(proxies=self.proxies) as client:
+        async with httpx.AsyncClient(proxies=self.proxies,headers=self.headers) as client:
             response = await client.get(url)
             logger.info(response.json())
             return response.json()
