@@ -13,7 +13,7 @@ try:
 except ImportError:
     #旧版本兼容问题，整合包更新后删除此部分代码
     pass
-logger=get_logger()
+logger=get_logger("Link_parsing")
 
 
 
@@ -33,16 +33,22 @@ async def link_prising(url,filepath=None,proxy=None,type=None):
     try:
         match url:
             case url if 'bili' in url or 'b23' in url:
+                logger.info(f"解析bilibili链接:{url}")
                 link_prising_json = await bilibili(url, filepath=filepath)
             case url if 'douyin' in url:
+                logger.info(f"解析抖音链接:{url}")
                 link_prising_json = await dy(url, filepath=filepath)
             case url if 'weibo' in url:
+                logger.info(f"解析微博链接:{url}")
                 link_prising_json = await wb(url, filepath=filepath)
             case url if 'xhslink' in url or 'xiaohongshu' in url:
+                logger.info(f"解析小红书链接:{url}")
                 link_prising_json = await xiaohongshu(url, filepath=filepath)
             case url if 'x.com' in url:
+                logger.info(f"解析x链接:{url}")
                 link_prising_json = await twitter(url, filepath=filepath, proxy=proxy)
             case url if 'gal.manshuo.ink/archives/' in url or 'www.hikarinagi.com' in url :
+                logger.info(f"解析Galgame链接:{url}")
                 link_prising_json = await Galgame_manshuo(url, filepath=filepath)
             case url if 'www.mysqil.com' in url:
                 #link_prising_json = await youxi_pil(url, filepath=filepath)

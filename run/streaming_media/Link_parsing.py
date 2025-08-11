@@ -5,7 +5,7 @@ import shutil
 import os
 import json as json_handle
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
-from developTools.message.message_components import Image, File, Video, Node, Text, Image, Music
+from developTools.message.message_components import Image, File, Video, Node, Text, Image, Music, Json
 from run.streaming_media.service.Link_parsing.core.login_core import ini_login_Link_Prising
 from run.streaming_media.service.Link_parsing.Link_parsing import download_video_link_prising
 from run.streaming_media.service.Link_parsing.music_link_parsing import netease_music_link_parse
@@ -87,18 +87,23 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)
     async def Link_Prising_search(event: GroupMessageEvent):
-        url = event.pure_text
-
-        # 处理小程序消息
-        if not url and event.processed_message and 'json' in event.processed_message[0]:
-            try:
-                url = event.processed_message[0]['json']['data']
-                event_context = json_handle.loads(event.message_chain[0].data)
-                if 'meta' in event_context:
+        if event.message_chain.has(Json):
+            url=event.message_chain.get(Json)[0].data
+            event_context = json_handle.loads(url)
+            if 'meta' in event_context:
+                try:
                     url = "QQ小程序" + event_context['meta']['detail_1']['qqdocurl']
-            except:
-                pass
+                except:
+                    pass
 
+        elif event.message_chain.has(Text):
+            url=""
+            for i in event.message_chain.get(Text):
+                url+=i.text
+                #url = "".join([i for i in event.message_chain.get(Text) if i.text.strip()])
+            #url="".join([i for i in event.message_chain.get(Text) if i.text.strip()])
+        else:
+            return
         #print(url)
         if event.group_id in teamlist:
             json = teamlist[event.group_id]['data']

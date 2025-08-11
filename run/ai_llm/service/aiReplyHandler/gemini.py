@@ -11,7 +11,7 @@ from developTools.utils.logger import get_logger
 from framework_common.database_util.llmDB import get_user_history, update_user_history
 from framework_common.utils.random_str import random_str
 
-logger=get_logger()
+logger=get_logger("Gemini Prompt Construct and Request")
 async def geminiRequest(ask_prompt,base_url: str,apikey: str,model: str,proxy=None,tools=None,system_instruction=None,temperature=0.7,maxOutputTokens=2048):
     if proxy is not None and proxy !="":
         proxies={"http://": proxy, "https://": proxy}
@@ -121,16 +121,19 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                 img_base64 = base64_match.group(2)
                 prompt_elements.append({"inline_data": {"mime_type": "audio/mp3", "data": img_base64}})
                 continue
-            r=await bot.get_record(origin_voice_url)
-
-            mp3_filepath=r["data"]["file"]
+            mp3_data=None
             try:
+                r = await bot.get_record(origin_voice_url)
+                logger.info(f"下载语音成功:{r}")
+                mp3_filepath = r["data"]["file"]
                 with open(mp3_filepath, "rb") as mp3_file:
                     mp3_data = mp3_file.read()
                     base64_encoded_data = base64.b64encode(mp3_data)
                     base64_message = base64_encoded_data.decode('utf-8')
                     prompt_elements.append({"inline_data": {"mime_type": "audio/mp3", "data": base64_message}})
                 #prompt_elements.append({"type":"voice","voice":i["voice"]})
+            except Exception as e:
+                logger.warning(f"下载语音失败:{origin_voice_url} 原因:{e}")
             finally:
                 if mp3_data is not None:
                     del mp3_data
@@ -168,9 +171,11 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
         elif "reply" in i:
             try:
                 event_obj=await bot.get_msg(int(event.get("reply")[0]["id"]))
+                print(event_obj)
                 message = await gemini_prompt_elements_construct(event_obj.processed_message) #
                 prompt_elements.extend(message["parts"])
             except Exception as e:
+                traceback.print_exc()
                 logger.warning(f"引用消息解析失败:{e}")
         else:
             prompt_elements.append({"text": str(i)})   #不知道还有什么类型，都需要做对应处理的，唉，任务还多着呢。

@@ -1,8 +1,12 @@
+import asyncio
+
 from developTools.event.events import GroupMessageEvent
 from framework_common.database_util.Group import add_to_group
 
 
 def main(bot,config):
+    message = {"user_name": "test", "user_id": 000000, "message": [{"text": "test"}]}
+    asyncio.run(add_to_group(000000, message))
     @bot.on(GroupMessageEvent)
     async def add_message_to_db(event: GroupMessageEvent):
         if not config.ai_llm.config["llm"]["读取群聊上下文"]:

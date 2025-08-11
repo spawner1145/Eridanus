@@ -32,14 +32,18 @@ async def _check_single_gemini_key_status(
             else:
                 return api_key, True, f"响应200但内容异常: {response.text[:100]}..."
         elif response.status_code in [401, 403]:
+            logger.error(f"API Key: {api_key} 无效。原因: {response.text}")
             return api_key, False, f"HTTP {response.status_code}: {response.text}"
         else:
+            logger.info(f"API Key: {api_key} 状态码: {response.status_code}。无法访问但暂时保留")
             return api_key, True, f"HTTP {response.status_code}: {response.text[:100]}..."
 
     except httpx.RequestError as exc:
+        logger.error(f"API Key: {api_key} 请求错误: {exc} 但暂时保留")
         return api_key, True, f"网络或请求错误: {exc}"
     except Exception as exc:
-        return api_key, True, f"未知错误: {exc}"
+        logger.error(f"API Key: {api_key} 未知错误: {exc} 但暂时保留")
+        return api_key, True, f"未知错误: {exc} 但暂时保留"
 
 
 class GeminiKeyManager:

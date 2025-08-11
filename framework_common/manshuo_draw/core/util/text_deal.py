@@ -24,7 +24,7 @@ async def deal_text_with_tag(input_string):
         content = match.group(2)
         content_tag=list(re.finditer(pattern, content, flags=re.DOTALL))
         if content_tag:
-            result=add_append_img(result,deal_text_with_tag(content),'last_tag',tag,'common')
+            result=add_append_img(result,await deal_text_with_tag(content),'last_tag',tag,'common')
         else:
             result.append({'content': content, 'tag': tag})
 
@@ -149,7 +149,8 @@ async def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_s
         if 'number_count' in params and params["number_count"] < len(params_check):params_check[params["number_count"]] = []
         return {'canvas': canvas, 'canvas_bottom': y}
     if isinstance(content, list):content_list=content
-    else:content_list = await deal_text_with_tag(content)
+    else:
+        content_list = await deal_text_with_tag(content)
 
     #将所有的emoji转换成pillow对象
     content_list_convert,emoji_list=[],[]

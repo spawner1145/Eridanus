@@ -168,6 +168,7 @@ SM3.prototype._compress = _compress
 SM3.prototype._fill = _fill
 
 function result_encrypt(long_str, num = null) {
+    let temp_int;
     let s_obj = {
         s0: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=',
         s1: 'Dkdpgh4ZKsQB80/Mfvw36XI1R25+WUAlEi7NLboqYTOPuzmFjJnryx9HVGcaStCe=',
