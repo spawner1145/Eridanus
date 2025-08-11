@@ -12,7 +12,7 @@ from io import BytesIO
 
 from PIL import Image
 
-from developTools.message.message_components import Reply, Mface, Image
+from developTools.message.message_components import Reply, Mface
 from developTools.message.message_components import Image as Bot_Image
 
 async def delay_recall(bot, msg, interval=20):
