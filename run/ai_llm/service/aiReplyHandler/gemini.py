@@ -121,7 +121,7 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                 img_base64 = base64_match.group(2)
                 prompt_elements.append({"inline_data": {"mime_type": "audio/mp3", "data": img_base64}})
                 continue
-
+            mp3_data=None
             try:
                 r = await bot.get_record(origin_voice_url)
                 logger.info(f"下载语音成功:{r}")
