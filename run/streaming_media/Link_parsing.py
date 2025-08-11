@@ -87,13 +87,9 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)
     async def Link_Prising_search(event: GroupMessageEvent):
-        if event.user_id!=1840094972:
-            return
-        #url = event.raw_message
         if event.message_chain.has(Json):
             url=event.message_chain.get(Json)[0].data
             event_context = json_handle.loads(url)
-            print(event_context)
             if 'meta' in event_context:
                 try:
                     url = "QQ小程序" + event_context['meta']['detail_1']['qqdocurl']
