@@ -87,7 +87,7 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)
     async def Link_Prising_search(event: GroupMessageEvent):
-        url = event.pure_text
+        url = event.raw_message
 
         # 处理小程序消息
         if not url and event.processed_message and 'json' in event.processed_message[0]:
