@@ -95,14 +95,15 @@ def main(bot, config):
                     url = "QQ小程序" + event_context['meta']['detail_1']['qqdocurl']
                 except:
                     pass
-        else:
-            if event.message_chain.has(Text):
-                url=""
-                for i in event.message_chain.get(Text):
-                    url+=i.text
+
+        elif event.message_chain.has(Text):
+            url=""
+            for i in event.message_chain.get(Text):
+                url+=i.text
                 #url = "".join([i for i in event.message_chain.get(Text) if i.text.strip()])
             #url="".join([i for i in event.message_chain.get(Text) if i.text.strip()])
-
+        else:
+            return
         #print(url)
         if event.group_id in teamlist:
             json = teamlist[event.group_id]['data']
@@ -118,7 +119,6 @@ def main(bot, config):
                 await call_bili_download_video(bot, event, config,'img')
         #if not re.search(r'https?://', url or '') and not url.startswith("QQ小程序"):
            # return
-        print(url)
         link_prising_json = await link_prising(url, filepath='data/pictures/cache/', proxy=proxy)
         send_context = f'{botname}识别结果：'
         #print(link_prising_json)
