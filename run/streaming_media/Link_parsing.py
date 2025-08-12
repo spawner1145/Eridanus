@@ -10,7 +10,7 @@ from run.streaming_media.service.Link_parsing.core.login_core import ini_login_L
 from run.streaming_media.service.Link_parsing.Link_parsing import download_video_link_prising
 from run.streaming_media.service.Link_parsing.music_link_parsing import netease_music_link_parse
 from run.streaming_media.service.Link_parsing import *
-
+import traceback
 from collections import defaultdict
 from time import time
 teamlist = defaultdict(lambda: {'data': None, 'expire_at': 0})
@@ -43,7 +43,8 @@ async def call_bili_download_video(bot, event, config,type_download='video'):
             elif video_json['type'] == 'too_big':
                 await bot.send(event, f'太大了，罢工！')
         except Exception as e:
-            await bot.send(event, f'下载失败\n{e} 请安装ffmpeg')
+            traceback.print_exc()
+            await bot.send(event, f'下载失败，如已排除其他问题\n{e} 请尝试安装ffmpeg')
     elif type_download == 'img' and json_linking['pic_url_list'] != []:
         node_list = [Node(
             content=[Text("小的找的图片如下，请君过目喵")])]
