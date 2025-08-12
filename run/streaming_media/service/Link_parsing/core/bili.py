@@ -14,7 +14,7 @@ from run.streaming_media.service.Link_parsing.core.login_core import ini_login_L
 from run.streaming_media.service.bilibili.BiliCooikeManager import get_bili_cookies
 import random
 import pprint
-
+import traceback
 async def bili_init():
     BILIBILI_HEADER = {
         'User-Agent':
@@ -276,7 +276,7 @@ async def download_b(video_url,audio_url,video_id,filepath=None):
         await merge_file_to_mp4(f"{path}-video.m4s", f"{path}-audio.m4s", f"{path}-res.mp4")
         return f"{path}-res.mp4"
     except Exception as e:
-        pass
+        traceback.print_exc()
 
 async def download_img(url: str, path: str = '', proxy: str = None, session=None, headers=None,len=None) -> str:
     """
