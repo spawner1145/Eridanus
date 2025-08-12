@@ -23,6 +23,7 @@ from run.acg_infromation.service.majsoul.majsoul_info.processData import convert
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from developTools.utils.logger import get_logger
 from framework_common.utils.install_and_import import install_and_import
+from framework_common.database_util.User import get_user, update_user   # 更新用户数据用
 from userdb_query import get_users_range, get_users_count, search_users_by_id, get_user_signed_days
 from chatdb_manage import get_msg, update_msg, delete_specified_msg, delete_all_msg, get_file_storage, update_file_storage
 
@@ -31,13 +32,15 @@ from flask_sock import Sock
 
 psutil = install_and_import("psutil")
 httpx = install_and_import("httpx")
-
+zipfile = install_and_import("zipfile")
 # 全局变量，用于存储 logger 实例和屏蔽的日志类别
 _logger = None
 _blocked_loggers = []
 
 app = Flask(__name__, static_folder="dist", static_url_path="")
 app.json.sort_keys = False  # 不要对json排序
+
+
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)  # 只显示 ERROR 级别及以上的日志（隐藏 INFO 和 DEBUG）
@@ -65,7 +68,9 @@ user_info = {
 }
 
 # ip白名单，白名单不需要登录，便于不看文档的用户和远程开发调试使用
-ip_whitelist = ["127.0.0.1","192.168.195.128","192.168.195.137"]
+# 出于安全考虑，release不再使用,仅用于调试
+ip_whitelist = []
+# ip_whitelist = ["127.0.0.1","192.168.195.128","192.168.195.137","::1"]
 
 # 合法的消息事件，其余不储存进数据库。
 valid_message_actions = ['send_group_forward_msg','send_group_msg','upload_group_file']
@@ -76,7 +81,7 @@ user_file = "./user_info.yaml"
 # 会话信息字典（token跟expires）
 auth_info = {}
 
-# 会话有效时长，秒数为单位（暂时只对webui生效）
+# 会话有效时长，秒数为单位
 auth_duration = 720000
 # 可用的git源
 REPO_SOURCES = [
@@ -109,6 +114,9 @@ def build_yaml_file_map(run_dir):
     for root, _, files in os.walk(run_dir):
         for file in files:
             if not file.endswith('.yaml'):
+                continue
+            # 如果文件名包含"基础配置.menu"则跳过
+            if "menu.yaml" in file:
                 continue
             abs_path = os.path.join(root, file)
             rel_path = os.path.relpath(abs_path, run_dir).replace("\\", "/")
@@ -169,11 +177,11 @@ def merge_dicts(old, new):
                 new[k] = v
         # 如果键在新的yaml文件中且类型一致，则更新值
         elif k in new:
-            logger.server(f"更新 key: {k}, old value: {v}, new value: {new[k]}")
+            # logger.server(f"更新 key: {k}, old value: {v}, new value: {new[k]}")
             new[k] = v
         # 如果键不在新的yaml中，直接添加
-        else:
-            logger.server(f"移除键 key: {k}, value: {v}")
+        # else:
+        #     logger.server(f"移除键 key: {k}, value: {v}")
 
 
 def conflict_file_dealer(old_data: dict, file_new='new_aiReply.yaml'):
@@ -275,6 +283,7 @@ def auth(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         #白名单直接放行
+        # print(request.remote_addr)
         if request.remote_addr in ip_whitelist:
             return func(*args, **kwargs)
         global auth_info
@@ -287,6 +296,13 @@ def auth(func):
         return func(*args, **kwargs)
     return wrapper
 
+# 静态文件缓存控制，加快响应
+@app.after_request
+def after_request(response):
+    # 为静态文件添加缓存控制头
+    if request.endpoint == 'static':
+        response.headers['Cache-Control'] = 'public, max-age=2592000'  # 缓存一月
+    return response
 
 @app.route("/api/load/<filename>", methods=["GET"])
 @auth
@@ -341,6 +357,81 @@ def list_files():
     return jsonify({"files": list(YAML_FILES.keys())})
 
 
+def search_yaml_content(search_key):
+    """在所有YAML文件中搜索指定的键名"""
+    # 构建索引字典
+    index_dict = {}
+    for filename, file_path in YAML_FILES.items():
+        try:
+            # 加载YAML文件
+            with open(file_path, 'r', encoding='utf-8') as f:
+                yaml_data = yaml.load(f)
+            
+            # 递归搜索键名
+            def search_in_dict(d, path=""):
+                results = []
+                for key, value in d.items():
+                    current_path = f"{path}.{key}" if path else key
+                    
+                    # 如果键是字符串且匹配搜索词
+                    if isinstance(key, str) and search_key.lower() in key.lower():
+                        results.append({
+                            "file": filename,
+                            "path": current_path,
+                            "value": value
+                        })
+                    
+                    # 如果值是字典，递归搜索
+                    if isinstance(value, dict):
+                        results.extend(search_in_dict(value, current_path))
+                    
+                return results
+            
+            # 在当前文件中搜索
+            if isinstance(yaml_data, dict):
+                matches = search_in_dict(yaml_data)
+                if matches:
+                    index_dict[filename] = matches
+                    
+        except Exception as e:
+            logger.error(f"处理文件 {filename} 时出错: {str(e)}")
+            continue
+    
+    # 构建结果列表
+    result_list = []
+    for filename, matches in index_dict.items():
+        for match in matches:
+            result_list.append({
+                "file": filename,
+                "path": match["path"],
+                "value": match["value"]
+            })
+    
+    return result_list
+
+
+@app.route("/api/search_yaml", methods=["POST"])
+@auth
+def search_yaml_keys():
+    """根据键名搜索YAML文件内容"""
+    try:
+        # 获取请求数据
+        data = request.get_json()
+        search_key = data.get("search")
+        
+        if not search_key:
+            return jsonify({"error": "搜索键名不能为空"})
+        
+        # 搜索YAML内容
+        result_list = search_yaml_content(search_key)
+        
+        return jsonify({"results": result_list})
+        
+    except Exception as e:
+        logger.error(f"搜索YAML键名时出错: {str(e)}")
+        return jsonify({"error": f"搜索时出错: {str(e)}"})
+
+
 @app.route("/api/pull", methods=["POST"])
 @auth
 def pull_eridanus():
@@ -374,7 +465,7 @@ def login():
     # 不能给用户看
     # logger.server(data)
     if data["account"] == user_info["account"] and data["password"] == user_info["password"]:
-        logger.server("webUI登录成功")
+        logger.server(f"WebUI登录 - {request.remote_addr}")
         auth_token = Fernet.generate_key().decode()  # 生成token
         auth_expires = int(time.time() + auth_duration)  # 生成过期时间
         auth_info[auth_token] = auth_expires  # 加入字典
@@ -383,7 +474,7 @@ def login():
         resp.set_cookie("auth_expires", str(auth_expires))
         return resp
     else:
-        logger.error("webUI登录失败")
+        logger.error(f"WebUI登录失败 - {request.remote_addr}")
         return jsonify({"error": "Failed"})
 
 
@@ -394,7 +485,7 @@ def logout():
     recv_token = request.cookies.get('auth_token')
     try:
         del auth_info[recv_token]
-        logger.server("用户登出")
+        # logger.server("用户登出")
         return jsonify({"message": "退出登录成功"})
     except:
         return jsonify({"error": "登录信息无效"})
@@ -458,7 +549,61 @@ def get_users():
             "current": current,
         })
     except Exception as e:
-        return jsonify({"error": f"获取用户信息失败: {e}"}), 500
+        return jsonify({"error": f"获取用户信息失败: {e}"})
+
+# 修改用户信息
+@app.route("/api/usermgr/modUser", methods=["POST"])
+@auth
+def mod_user():
+    try:
+        data = request.get_json()
+        result = asyncio.run(
+            update_user(
+                user_id = int(data.get("user_id")),
+                nickname = data.get("nickname"),
+                card = data.get("card"),
+                sex = data.get("sex"),
+                age = int(data.get("age")),
+                city = data.get("city"),
+                permission = int(data.get("permission")),
+                ai_token_record = int(data.get("ai_token_record")),
+                user_portrait = data.get("user_portrait"),
+            )
+        )
+        return jsonify({"message": result })
+    except Exception as e:
+        return jsonify({"error": f"更新用户信息失败: {e}"})
+
+
+@app.route("/api/diagnosis", methods=["GET","POST"])
+@auth
+def diagnosis():
+    """日志"""
+    try:
+        if request.method == "GET":
+            # 返回 ../log 目录下的文件列表
+            logs_dir = os.path.join(BASE_DIR, "..", "log")
+            files = [f for f in os.listdir(logs_dir) if os.path.isfile(os.path.join(logs_dir, f))]
+            return jsonify({"files": files})
+        elif request.method == "POST":
+            # 获取json字段中{"file":"filename.log"}的文件名称，并返回文件
+            data = request.get_json()
+            filename = data.get("file")
+            logs_dir = os.path.join(BASE_DIR, "..", "log")
+            file_path = os.path.join(logs_dir, filename)
+            # 确保文件在 log 目录下，防止路径遍历攻击
+            if not os.path.abspath(file_path).startswith(os.path.abspath(logs_dir)):
+                return jsonify({"error": "Invalid file path"})
+            if not os.path.exists(file_path):
+                return jsonify({"error": "File not found"})
+            # 检查文件大小，如果大于特定值返回错误
+            file_size = os.path.getsize(file_path)
+            if file_size > 30 * 1024 * 1024:  # 30MB
+                return jsonify({"error": f"日志文件过大: {file_size / 1024 / 1024:.2f} MB"})
+            return send_file(file_path)
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 
 
 # 机器人的基本信息
@@ -518,18 +663,11 @@ def basic_info():
     except Exception as e:
         return jsonify({"error": f"获取基本信息失败: {e}"})
 
-
-# API外的路由（404）完全交给React前端处理,根路由都不用了
-@app.errorhandler(404)
-def index(e):
-    return send_from_directory(app.static_folder, 'index.html')
-
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # 普通运行环境
 
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "chat_files")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # 确保目录存在
-ALLOWED_EXTENSIONS = {'gif', 'png', 'jpg', 'jpeg', 'bmp', 'webp', 'tif', 'tiff' , 'heif', 'ico' , 'heic' , 'svg' , 'avif' , 'jfif'}
+ALLOWED_EXTENSIONS = {'gif', 'png', 'jpg', 'jpeg', 'bmp', 'webp', 'tif', 'tiff' , 'heif', 'ico' , 'heic' , 'svg' , 'avif' , 'jfif', 'zip'}
 def allowed_file(filename):
     return '.' in filename and \
         filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -539,32 +677,31 @@ def gen_file_name(filename):
     如果文件存在，加后缀重命名。
     """
     i = 1
-    print(filename)
+    # print(filename)
     while os.path.exists(os.path.join(UPLOAD_FOLDER, filename)):
         name, extension = os.path.splitext(filename)
         name = str(name).rstrip(f"_{i-1}")
         filename = '%s_%s%s' % (name, str(i), extension)
         i += 1
-    print(filename)
+    # print(filename)
     return filename
 
 #上传文件
 @app.route("/api/chat/uploadFile", methods=["POST"])
 @auth
 def upload_file():
-    if request.method == 'POST':
+    try:
         files = request.files['file']
-
         if files:
             filename = gen_file_name(files.filename)
             mime_type = files.content_type
 
-            if not allowed_file(files.filename):
-                return jsonify({"files": [{"error": "不支持的文件格式"}]})
-            else:
+            # if not allowed_file(files.filename):
+            #     return jsonify({"files": [{"error": "不支持的文件格式"}]})
+            # else:
                 # save file to disk
-                uploaded_file_path = os.path.join(UPLOAD_FOLDER, filename)
-                files.save(uploaded_file_path)
+            uploaded_file_path = os.path.join(UPLOAD_FOLDER, filename)
+            files.save(uploaded_file_path)
 
                 # size = os.path.getsize(uploaded_file_path)
 
@@ -573,15 +710,16 @@ def upload_file():
                         "type": mime_type,
                         # "size": size,
                         "path": "file://"+uploaded_file_path}]})
-
-
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 # webui对话需要保存聊天记录，从缓存文件夹移动文件到聊天文件文件夹(done)；聊天文件可以通过webUI的文件管理器管理(todo)
 @app.route("/api/chat/file", methods=["GET"])
 @auth
 def get_file():
     try:
-        origin_file_path = request.args.get("path")
+        origin_file_path = request.args.get("path", "")
+        file_name = request.args.get("name", "")
         if origin_file_path.startswith("file://"):
             # 查询数据库有没有存入文件
             file_name = asyncio.run(get_file_storage(origin_file_path))
@@ -600,7 +738,7 @@ def get_file():
             # 储存文件信息到键值对
                 asyncio.run(update_file_storage(origin_file_path,file_name))
             # 返回文件
-                return send_file(os.path.join(UPLOAD_FOLDER, file_name))
+        return send_file(os.path.join(UPLOAD_FOLDER, file_name))
     except Exception as e:
         return jsonify({"error":str(e)})
 
@@ -610,7 +748,7 @@ def get_file():
 def get_music():
     try:
         response = httpx.post(
-            "https://ss.xingzhige.com/music_card/card",
+            "https://ss.xingzhige.com/music_card/card", #赞美源神
             json = request.json
         )
         # 解析返回的JSON数据
@@ -647,6 +785,95 @@ def del_history():
     except Exception as e:
         return jsonify({"error":e})
 
+# 重启服务器
+@app.route("/api/tools/restart", methods=["GET"])
+@auth
+def restart_server():
+    try:
+        return jsonify({"message": "功能开发中，敬请期待"})
+    except Exception as e:
+        return jsonify({"error":e})
+
+@app.route("/api/tools/export_yaml", methods=["GET"])
+@auth
+def export_yaml():
+    try:
+        # 导入tool.py中的export_yaml函数
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from tool import export_yaml as export_yaml_func
+        
+        # 调用导出函数
+        export_yaml_func()
+        
+        # 创建zip文件名
+        timestamp = int(time.time())
+        zip_filename = f"yaml_backups_{timestamp}.zip"
+        zip_filepath = os.path.join(UPLOAD_FOLDER, zip_filename)
+        # 压缩old_yamls文件夹
+        with zipfile.ZipFile(zip_filepath, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk("old_yamls"):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.join("old_yamls", os.path.relpath(file_path, "old_yamls"))
+                    zipf.write(file_path, arcname)
+        # 删除old_yamls文件夹
+        shutil.rmtree("old_yamls")
+        
+        # 储存文件信息到数据库
+        asyncio.run(update_file_storage(zip_filename,zip_filename))
+        
+        return jsonify({"message": "导出成功", "file": zip_filename})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route("/api/tools/import_yaml", methods=["POST"])
+@auth
+def import_yaml():
+    try:
+        # 获取传入的文件名
+        data = request.get_json()
+        zip_filename = data.get("file")
+        
+        if not zip_filename:
+            return jsonify({"error": "文件名不能为空"})
+        
+        # 检查文件是否存在
+        zip_filepath = os.path.join(UPLOAD_FOLDER, zip_filename)
+        if not os.path.exists(zip_filepath):
+            return jsonify({"error": "文件不存在"})
+        
+        # 解压文件到上一级目录
+        extract_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with zipfile.ZipFile(zip_filepath, 'r') as zip_ref:
+            # 获取压缩包内所有文件和文件夹的路径
+            namelist = zip_ref.namelist()
+            logger.server(f"压缩包内文件和文件夹路径: {namelist}")
+            # 检查根目录是否只有一个文件夹，且仅为 old_yamls
+            root_items = {item.split('/')[0] for item in namelist if item.split('/')[0]}
+            if len(root_items) == 1 and 'old_yamls' in root_items:
+                zip_ref.extractall(extract_path)
+            else:
+                raise ValueError("压缩包目录有误")
+        
+        # 导入tool.py中的import_yaml函数
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from tool import import_yaml as import_yaml_func
+        
+        # 调用导入函数
+        import_yaml_func()
+        
+        # 删除解压后的文件夹
+        shutil.rmtree("old_yamls")
+        
+        return jsonify({"message": "导入成功"})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+# API和静态文件外的路由（404）完全交给React前端处理,根路由都不用了
+@app.errorhandler(404)
+def index(e):
+    return send_from_directory(app.static_folder, 'index.html')
+
 clients = set()
 
 # WebSocket路由
@@ -658,16 +885,17 @@ def handle_websocket(ws):
     try:
         # 对非本地的访问鉴权
         try:
-            if request.remote_addr not in ip_whitelist:
+            # if request.remote_addr not in ip_whitelist:
+            if request.remote_addr not in ['127.0.0.1']:
                 recv_token = request.args.get('auth_token')
                 if auth_info[recv_token] > int(time.time()):
-                    logger.server("WebSocket 客户端鉴权成功")
+                    logger.server(f"WebSocket客户端登录 - {request.remote_addr}")
         except:
-            raise ValueError("WebSocket 客户端鉴权失败")
+            raise ValueError(f"WebSocket 客户端登录失败 - {request.remote_addr}")
         while True:
             # 接收来自前端的消息
             message = ws.receive()
-            logger.server(f"收到前端消息: {message} {type(message)}")
+            # logger.server(f"收到前端消息: {message} {type(message)}")
             message = json.loads(message)
             if "echo" in message:
                 for client in list(clients):
@@ -741,14 +969,14 @@ def handle_websocket(ws):
                     except Exception:
                         clients.discard(client)
 
-                logger.server(f"已发送 OneBot v11 事件: {event_json}")
+                # logger.server(f"已发送 OneBot v11 事件: {event_json}")
             send_mes(onebot_event)
     except Exception as e:
         logger.server(f"WebSocket事件: {str(e)}")
         # traceback.print_exc()
     finally:
-        # 总有人看见红色就害怕
-        logger.server("WebSocket 客户端断开连接")
+        # 总有人看见红色就害怕，干脆不要了，不搞这么多提示
+        # logger.server("WebSocket 客户端断开连接")
         clients.discard(ws)
 
 
@@ -762,7 +990,7 @@ def start_webui():
             user_info['password'] = yaml_file['password']
             user_info['friends'] = yaml_file['friends']
             user_info['groups'] = yaml_file['groups']
-        logger.server(f"登录信息读取成功。初始用户名和密码均为 {user_info['account']} ")
+        logger.server("登录信息读取成功。初始用户名和密码均为 eridanus ")
         logger.server("请访问 http://localhost:5007 登录")
         logger.server("请访问 http://localhost:5007 登录")
         logger.server("请访问 http://localhost:5007 登录")
@@ -771,7 +999,7 @@ def start_webui():
         with open(user_file, 'w', encoding="utf-8") as file:
             yaml.dump(user_info, file)
 
-    app.run(host="0.0.0.0", port=5007)
+    app.run(host="0.0.0.0", port=5007,threaded=True)
 # 启动Eridanus并捕获输出，反馈到前端。
 # 不会写，不写！
 

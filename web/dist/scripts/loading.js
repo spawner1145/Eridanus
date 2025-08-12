@@ -9,6 +9,9 @@
       <style>
         html,
         body,
+        body {
+          overscroll-behavior: none;
+        }
         #root {
           height: 100%;
           margin: 0;
