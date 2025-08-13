@@ -10,7 +10,7 @@ import colorlog
 _logger = None
 _blocked_loggers = ["INFO_MSG", "DEBUG"]  # 默认禁用DEBUG
 _lock = threading.Lock()  # 添加线程锁
-
+_current_log_date = None
 
 class CategoryHandler(logging.StreamHandler):
     """自定义Handler，根据消息类型使用不同的formatter"""
@@ -97,8 +97,8 @@ def createLogger(blocked_loggers=None):
     file_formatter = logging.Formatter(file_format)
 
     # 获取当前日期
-    current_date = datetime.now().strftime("%Y-%m-%d")
-    log_file_path = os.path.join(log_folder, f"{current_date}.log")
+    _current_log_date = datetime.now().strftime("%Y-%m-%d")
+    log_file_path = os.path.join(log_folder, f"{_current_log_date}.log")
 
     # 创建文件处理器
     file_handler = logging.FileHandler(log_file_path, mode='a', encoding='utf-8')
@@ -108,19 +108,30 @@ def createLogger(blocked_loggers=None):
 
     # 定义一个函数来更新日志文件（按日期切换）
     def update_log_file():
-        nonlocal log_file_path, file_handler
+        nonlocal log_file_path, file_handler,_current_log_date
         new_date = datetime.now().strftime("%Y-%m-%d")
-        new_log_file_path = os.path.join(log_folder, f"{new_date}.log")
-        if new_log_file_path != log_file_path:
+        if new_date != _current_log_date:
+            new_log_file_path = os.path.join(log_folder, f"{new_date}.log")
+
+            # 移除旧的文件处理器
             logger.removeHandler(file_handler)
             file_handler.close()
-            log_file_path = new_log_file_path
-            file_handler = logging.FileHandler(log_file_path, mode='a', encoding='utf-8')
+
+            # 创建新的文件处理器
+            file_handler = logging.FileHandler(new_log_file_path, mode='a', encoding='utf-8')
             file_handler.setFormatter(file_formatter)
             file_handler.addFilter(BlockLoggerFilter())
             logger.addHandler(file_handler)
 
+            # 更新当前日期
+            _current_log_date = new_date
+            print(f"日志文件已切换到: {new_log_file_path}")
+
+    def check_date_change():
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        return current_date != _current_log_date
     # 在 logger 上绑定更新日志文件的函数
+    logger.check_date_change = check_date_change
     logger.update_log_file = update_log_file
     _logger = logger
 
@@ -132,8 +143,16 @@ class LoggerWrapper:
         self._logger = logger
         self._custom_name = custom_name or "Eridanus"
 
+    def _check_and_update_log_file(self):
+        """检查并更新日志文件（如果日期发生变化）"""
+        if hasattr(self._logger, 'check_date_change') and self._logger.check_date_change():
+            with _lock:  # 使用锁确保线程安全
+                # 再次检查（双重检查锁定模式）
+                if self._logger.check_date_change():
+                    self._logger.update_log_file()
     def _log_with_category(self, level, message, category=None, *args, **kwargs):
         """带类别的日志记录方法"""
+        self._check_and_update_log_file()
         # 创建LogRecord
         record = self._logger.makeRecord(
             self._custom_name,  # 使用自定义名称
@@ -185,9 +204,10 @@ class LoggerWrapper:
             self._log_with_category(logging.INFO, message, 'server', *args, **kwargs)
 
     def update_log_file(self):
-        """更新日志文件"""
+        """手动更新日志文件"""
         if hasattr(self._logger, 'update_log_file'):
-            self._logger.update_log_file()
+            with _lock:
+                self._logger.update_log_file()
 
 
 def get_logger(name=None, blocked_loggers=None) -> LoggerWrapper:
