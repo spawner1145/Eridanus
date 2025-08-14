@@ -3,9 +3,11 @@ from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager        
 import asyncio
 import random
+import base64
 import os
 from developTools.message.message_components import File, Image, Video, Node, Text
 from framework_common.utils.utils import delay_recall # 撤回提示防刷屏
+from run.ai_generated_art.service.setu_moderate import pic_audit_standalone # 审核
 
 from .comfy_api.client import ComfyUIClient
 from .comfy_api.workflow import ComfyWorkflow
@@ -59,14 +61,34 @@ async def run_workflow(prompt, config, output_dir: str = "data/pictures/cache"):
         #print(json.dumps(all_results, indent=2, ensure_ascii=False))
         #print("输出完毕")
         return all_results
+
+async def call_simple_draw(bot, event, config, prompt): # 主调用逻辑和@bot.on分开，方便函数调用
+    msg = await bot.send(event, "已发送cui绘图请求...")
+    await delay_recall(bot, msg, 10)
+    results = await run_workflow(prompt=prompt, config=config)
+    path = results.get("9", {}).get("DEFAULT_DOWNLOAD", "")
+    with open(path, "rb") as image_file:
+        image_data = image_file.read()
+    if event.group_id not in config.ai_generated_art.config['ai绘画']['allow_nsfw_groups']: # 审核逻辑开始
+        try:
+            check = await pic_audit_standalone(
+                base64.b64encode(image_data).decode('utf-8'),
+                return_none=True,
+                url=config.ai_generated_art.config['ai绘画']['sd审核和反推api']
+            )
+        except:
+            msg = await bot.send(event, "未配置审核api或api故障，为保证安全已禁止发送", True)
+            await delay_recall(bot, msg, 10)
+            return
+        if check:
+            msg = await bot.send(event, "杂鱼，色图不给你！", True)
+            await delay_recall(bot, msg, 10)
+            return # 审核逻辑结束，如果不想要审核可以把开始到结束的一段都删了
+    await bot.send(event, [Text("cui结果:"), Image(file=path)], True)
     
 def main(bot: ExtendBot,config: YAMLManager):
     @bot.on(GroupMessageEvent)
     async def handle_group_message(event: GroupMessageEvent):
-        if event.pure_text.startswith("cui "):
-            msg = await bot.send(event, "已发送生成图片请求...")
-            await delay_recall(bot, msg, 10)
-            prompt = event.pure_text.replace("cui ","").strip()
-            results = await run_workflow(prompt=prompt, config=config)
-            path = results.get("9", {}).get("DEFAULT_DOWNLOAD", "")
-            await bot.send(event, Image(file=path))
+        if event.pure_text.startswith("#cui "): # 触发指令前缀
+            prompt = event.pure_text.replace("#cui ","")
+            await call_simple_draw(bot, event, config, prompt)
