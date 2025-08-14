@@ -29,5 +29,6 @@ JMComic:                  #禁漫相关功能设置
   gif_compress: false     #gif模式下是否压缩
   previewPages: 6         #验车预览页数
   autoClearPDF: True      #下载后自动清除pdf
+  autoEncrypt: True       #下载后自动加密pdf
   savePath: "data/pictures/benzi"  #下载为pdf的默认保存路径
 

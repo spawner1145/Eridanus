@@ -33,3 +33,4 @@ psutil
 pyzipper
 pycairo
 watchdog
+pypdf

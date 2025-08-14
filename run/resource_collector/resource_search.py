@@ -1,6 +1,7 @@
 import asyncio
 import random
 import shutil
+import traceback
 from concurrent.futures.thread import ThreadPoolExecutor
 
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
@@ -8,6 +9,7 @@ from developTools.message.message_components import Image, Node, Text, File, Car
 from developTools.utils.logger import get_logger
 from framework_common.database_util.User import get_user
 from framework_common.framework_util.yamlLoader import YAMLManager
+from framework_common.utils.PDFEncrypt import AsyncPDFEncryptor
 from run.resource_collector.service.asmr.asmr100 import random_asmr_100, latest_asmr_100, choose_from_latest_asmr_100, \
     choose_from_hotest_asmr_100
 from run.resource_collector.service.jmComic.jmComic import JM_search, JM_search_week, JM_search_comic_id, downloadComic, \
@@ -262,15 +264,31 @@ async def call_jm(bot,event,config,mode="preview",comic_id=607279,serach_topic=N
             finally:
                 try:
                     shutil.rmtree(f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}")
+                    if config.resource_collector.config['JMComic']["autoEncrypt"]:
+                        encryptor = AsyncPDFEncryptor()
+
+                        try:
+                            await encryptor.encrypt_pdf_file(f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}.pdf", f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}_encrypted.pdf", f"{comic_id}")
+                            pdf_path=f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}_encrypted.pdf"
+                        except Exception as e:
+                            bot.logger.error(f"encrypt_pdf_file error:{e}")
+                            traceback.print_exc()
+                            pdf_path=f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}.pdf"
+                    else:
+                        pdf_path=f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}.pdf"
                     for group_id in operating[comic_id]:
                         event.group_id = group_id  # 修改数据实现切换群聊，懒狗实现
-                        await bot.send(event, File(file=f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}.pdf"))
-                        await bot.send(event, "下载完成了( >ρ< ”)。请等待上传完成。", True)
+                        await bot.send(event, File(file=pdf_path))
+                        if config.resource_collector.config["JMComic"]["autoEncrypt"]:
+                            await bot.send(event, f"加密成功，请注意查收。\n密码为：{comic_id}")
+                        await bot.send(event, "下载完成了( >ρ< ”)。请等待上传完成。")
 
                     bot.logger.info("移除预览缓存")
                     operating.pop(comic_id)
                     if config.resource_collector.config['JMComic']["autoClearPDF"]:
                         await wait_and_delete_file(bot,file_path=f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}.pdf")
+                        if config.resource_collector.config['JMComic']["autoEncrypt"]:
+                            await wait_and_delete_file(bot,file_path=f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}_encrypted.pdf")
                 except Exception as e:
                     bot.logger.error(e)
                 finally:
