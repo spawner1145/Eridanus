@@ -367,6 +367,7 @@ def main(bot, config):
                                 user_info.portrait_update_time)).total_seconds() > config.ai_llm.config["llm"][
                             "记忆更新间隔"]:
                             bot.logger.info(f"更新用户 {event.user_id} 设定")
+                            await update_user(event.user_id, portrait_update_time=datetime.datetime.now().isoformat())
                             reply_message = await aiReplyCore(
                                 [{
                                      'text': 'system: 对以上聊天内容做出总结，描绘出当前对话的用户画像，总结出当前用户的人物性格特征以及偏好。不要回复，直接给出结果'}],
@@ -377,7 +378,6 @@ def main(bot, config):
                                 event=current_event,
                             )
                             await update_user(event.user_id, user_portrait=reply_message.strip())
-                            await update_user(event.user_id, portrait_update_time=datetime.datetime.now().isoformat())
                             await delete_latest2_history(event.user_id)
                     if not user_state[uid]["queue"].empty():
                         asyncio.create_task(process_user_queue(uid))
