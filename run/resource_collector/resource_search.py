@@ -17,7 +17,7 @@ from run.resource_collector.service.jmComic.jmComic import JM_search, JM_search_
 from run.resource_collector.service.zLibrary.zLib import search_book, download_book
 from run.resource_collector.service.zLibrary.zLibrary import Zlibrary
 from framework_common.utils.random_str import random_str
-from framework_common.utils.utils import download_file, merge_audio_files, download_img
+from framework_common.utils.utils import download_file, merge_audio_files, download_img, delay_recall
 
 logger=get_logger()
 module_config=YAMLManager.get_instance()
@@ -213,7 +213,8 @@ async def call_jm(bot,event,config,mode="preview",comic_id=607279,serach_topic=N
             event.group_id = temp_id
             operating[comic_id] = [event.group_id]
             bot.logger.info(f"JM验车 {comic_id}")
-            await bot.send(event, "下载中...稍等喵", True)
+            msg=await bot.send(event, "下载中...稍等喵", True)
+            await delay_recall(bot, msg)
             try:
                 loop = asyncio.get_running_loop()
                 # 使用线程池执行器
@@ -252,7 +253,8 @@ async def call_jm(bot,event,config,mode="preview",comic_id=607279,serach_topic=N
                 return
             operating[comic_id] = [temp_id]
             try:
-                await bot.send(event, "已启用线程,请等待下载完成", True)
+                msg=await bot.send(event, "已启用线程,请等待下载完成", True)
+                await delay_recall(bot, msg)
                 loop = asyncio.get_running_loop()
                 with ThreadPoolExecutor() as executor:
                     r = await loop.run_in_executor(executor, downloadALLAndToPdf, comic_id,
@@ -281,8 +283,8 @@ async def call_jm(bot,event,config,mode="preview",comic_id=607279,serach_topic=N
                         await bot.send(event, File(file=pdf_path))
                         if config.resource_collector.config["JMComic"]["autoEncrypt"]:
                             await bot.send(event, f"加密成功，请注意查收。\n密码为：{comic_id}")
-                        await bot.send(event, "下载完成了( >ρ< ”)。请等待上传完成。")
-
+                        msg=await bot.send(event, "下载完成了( >ρ< ”)。请等待上传完成。")
+                        await delay_recall(bot, msg)
                     bot.logger.info("移除预览缓存")
                     operating.pop(comic_id)
                     if config.resource_collector.config['JMComic']["autoClearPDF"]:

@@ -3,6 +3,7 @@ from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Text, Node, File, Image
 from framework_common.database_util.User import get_user
 from framework_common.framework_util.websocket_fix import ExtendBot
+from framework_common.utils.utils import delay_recall
 from framework_common.utils.zip import compress_files, sanitize_filename
 from framework_common.utils.zip_2_pwd_version import compress_files_with_pwd
 from run.resource_collector.service.iwara.iwara1 import search_videos, download_specific_video, fetch_video_info
@@ -15,7 +16,8 @@ async def iwara_search(bot:ExtendBot,event:GroupMessageEvent,config,aim:str,oper
         if not user_info.permission >= config.resource_collector.config["iwara"]["iwara_search_level"]:
             await bot.send(event, "无权限")
             return
-        await bot.send(event, Text(f"正在iwara搜索{aim}"))
+        msg=await bot.send(event, Text(f"正在iwara搜索{aim}"))
+        await delay_recall(bot, msg)
         count_num=0
         while count_num<4:
             try:
@@ -40,7 +42,8 @@ async def iwara_search(bot:ExtendBot,event:GroupMessageEvent,config,aim:str,oper
             await bot.send(event, "无权限")
             return
         videoid = aim
-        await bot.send(event, Text(f"正在下载iwara视频{videoid}"))
+        msg=await bot.send(event, Text(f"正在下载iwara视频{videoid}"))
+        await delay_recall(bot, msg)
         try:
             list = await download_specific_video(videoid, config)
             if config.resource_collector.config["iwara"]["zip_file"]:
