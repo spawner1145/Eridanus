@@ -90,7 +90,7 @@ async def self_info_core(bot=None,event=None,status=None):
         {'type': 'basic_set', 'img_width': 1000,'img_height':3000},
         {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={bot_id}&s=640"],'upshift_extra': 20,
                              'content': [f"[name]{botname}的状态信息[/name]\n[time]{datetime.now().strftime('%Y年%m月%d日 %H:%M')}[/time]" ], },
-        f'{botname} 当前共有群聊： {group_num},   好友： {friend_num}',
+        f'{botname} 当前共有群聊： {group_num} 组,   好友： {friend_num} 位',
         f'当前进程 内存 占用：{info['memory_rss_MB']:.2f} MB (占比 {info['memory_percent']:.2f} %)',
         {'type': 'math', 'subtype': 'bar_chart', 'content': [info['memory_percent'] / 100]},
         f'当前 内存 占用：{info['total_memory_rss_MB']}  (占比 {info['total_memory_percent']:.2f} %)',
