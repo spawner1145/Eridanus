@@ -36,6 +36,9 @@ async def ideo_gram(prompt,proxy=None):
 
     url=f"https://apiserver.alcex.cn/ideogram/generate-image?prompt={prompt}"
     return await get_results(url,proxy)
+async def doubao(prompt,proxy=None):
+    url=f"https://api.xingzhige.com/API/DrawOne?prompt={prompt}"
+    return await get_results(url,proxy)
 
 async def bing_dalle3(prompt,proxy=None):
 
