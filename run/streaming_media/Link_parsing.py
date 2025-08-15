@@ -4,6 +4,8 @@ import re
 import shutil
 import os
 import json as json_handle
+from functools import partial
+
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Image, File, Video, Node, Text, Image, Music, Json
 from run.streaming_media.service.Link_parsing.core.login_core import ini_login_Link_Prising
@@ -90,7 +92,16 @@ def main(bot, config):
     async def Link_Prising_search(event: GroupMessageEvent):
         if event.message_chain.has(Json):
             url=event.message_chain.get(Json)[0].data
-            event_context = json_handle.loads(url)
+            loop = asyncio.get_event_loop()
+            try:
+                event_context = await loop.run_in_executor(
+                    None,
+                    json_handle.loads,
+                    url
+                )
+            except Exception as e:
+                bot.logger.error(f"JSON解析失败: {e}")
+                return
             if 'meta' in event_context:
                 try:
                     url = "QQ小程序" + event_context['meta']['detail_1']['qqdocurl']
@@ -120,7 +131,15 @@ def main(bot, config):
                 await call_bili_download_video(bot, event, config,'img')
         #if not re.search(r'https?://', url or '') and not url.startswith("QQ小程序"):
            # return
-        link_prising_json = await link_prising(url, filepath='data/pictures/cache/', proxy=proxy)
+        link_prising_json = await loop.run_in_executor(
+            None,
+            partial(
+                link_prising,
+                url,
+                filepath='data/pictures/cache/',
+                proxy=proxy
+            )
+        )
         send_context = f'{botname}识别结果：'
         #print(link_prising_json)
         if link_prising_json['status']:
