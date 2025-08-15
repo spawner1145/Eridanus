@@ -66,7 +66,7 @@ def main(bot, config):
             if not user_info.permission >= config.ai_llm.config["core"]["ai_reply_group"]:
                 await bot.send(event, "你没有足够的权限使用该功能~")
                 return
-            if event.group_id == 913122269 and not user_info.permission >= 66:
+            if event.group_id in [913122269,1050663831] and not user_info.permission >= 66:
                 #await bot.send(event,"你没有足够的权限使用该功能哦~")
                 return
             if not user_info.permission >= config.ai_llm.config["core"]["ai_token_limt"]:
@@ -159,7 +159,7 @@ def main(bot, config):
                             bot.logger.debug(f"用户 {event.user_id} 权限不足，跳过回复")
                             return
 
-                        if event.group_id == 913122269 and not user_info.permission >= 66:
+                        if event.group_id in [913122269,1050663831] and not user_info.permission >= 66:
                             bot.logger.debug(f"特定群组 {event.group_id} 权限不足，跳过回复")
                             return
 
