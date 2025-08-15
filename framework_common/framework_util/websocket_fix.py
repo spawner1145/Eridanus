@@ -149,3 +149,19 @@ class ExtendBot(WebSocketBot):
         else:
             return await super().send(event, components, Quote)
 
+    async def delay_recall(self,msg, interval=20):
+        """
+        延迟撤回消息的非阻塞封装函数，撤回机器人自身消息可以先msg = await bot.send(event, 'xxx')然后调用await delay_recall(bot, msg, 20)这样来不阻塞的撤回，默认20秒后撤回
+
+        参数:
+            bot
+            msg: 消息
+            interval: 延迟时间（秒）
+        """
+
+        async def recall_task():
+            await asyncio.sleep(interval)
+            await super().recall(msg['data']['message_id'])
+
+        asyncio.create_task(recall_task())
+
