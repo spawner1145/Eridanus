@@ -6,14 +6,11 @@ import asyncio
 import threading
 import traceback
 import logging
-
-from run.basic_plugin.service.self_condition import self_info_core
-
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
+from run.basic_plugin.service.self_condition import self_info_core
 from framework_common.utils.system_logger import get_logger
 from framework_common.framework_util.PluginAwareExtendBot import PluginManager, PluginLoadConfig, LoadStrategy
 from framework_common.framework_util.yamlLoader import YAMLManager
@@ -115,8 +112,7 @@ async def handler(bot, event: GroupMessageEvent | PrivateMessageEvent):
         await bot.send(event, "插件重载完成")
     elif event.pure_text == "/status":
         status = await get_plugin_status()
-        print(status)
-        await self_info_core(bot, event,status)
+        await self_info_core(bot, event, status)
     elif event.pure_text == "/test":
         plugin_memory = plugin_manager.get_plugin_memory_usage("插件名")
 
@@ -125,7 +121,6 @@ async def handler(bot, event: GroupMessageEvent | PrivateMessageEvent):
         # 手动输出内存报告
         r=plugin_manager.log_memory_report()
         await bot.send(event, r)
-
 """"@bot1.on(LifecycleMetaEvent)
 async def handle_lifecycle(event: LifecycleMetaEvent):
     while True:
