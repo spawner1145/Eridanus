@@ -4,6 +4,10 @@ import platform
 from .download_img import process_img_download
 from .common import add_append_img
 import copy
+import traceback
+import os
+import httpx
+import aiofiles
 
 async def deal_text_with_tag(input_string):
     pattern = r'\[(\w+)\](.*?)\[/\1\]'
@@ -75,57 +79,53 @@ async def can_render_character(font, character,params):
         # 如果抛出异常，说明字体不支持该字符
         return False
 
-async def color_emoji_maker(text,color,size=40):
-    try:
-        #此绘图方式win暂不可用，仅限于mac与linux使用
-        import gi
-        gi.require_version("Pango", "1.0")
-        gi.require_version("PangoCairo", "1.0")
-        from gi.repository import Pango, PangoCairo
-        import cairo
-        width, height = 50, 50
-        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
-        context = cairo.Context(surface)
-        context.set_source_rgba(0, 0, 0, 0)
-        context.paint()
-        layout = PangoCairo.create_layout(context)
-        font_description = Pango.FontDescription("Sans 30")  # 使用系统默认 Sans 字体
-        layout.set_font_description(font_description)
-        layout.set_text(text, -1)
-        context.set_source_rgb(0, 0, 0)  # 黑色文本
-        context.move_to(0, 0)
-        PangoCairo.show_layout(context, layout)
-        buf = surface.get_data()
-        # 创建 Pillow 图像对象
-        image = Image.frombuffer(
-            "RGBA",  # Pillow 使用 "RGBA" 模式
-            (surface.get_width(), surface.get_height()),
-            buf,  # 数据缓冲区
-            "raw",  # 原始数据格式
-            "BGRA",  # cairo 使用的是 BGRA 排列，需要转换
-            0, 1  # 像素顺序和步长
-        )
-        return image
-    except Exception as e:
+async def color_emoji_maker(text,color,size=40,color_path=None):
+    #print(text,color_path)
+    color_path_emoji = os.path.join(color_path, f'{text}.png')
+    if color_path is not None and not os.path.exists(color_path_emoji):
+        await color_emoji_url_download(text, color_path_emoji)
+    if os.path.exists(color_path_emoji):
+        image = Image.open(color_path_emoji)
+    else:
         system = platform.system()
         image_size, x_offest = 40, 0
         if system == "Darwin":  # macOS 系统标识
             font_path = "/System/Library/Fonts/Apple Color Emoji.ttc"
         elif system == "Windows":
             font_path = r"C:\Windows\Fonts\seguiemj.ttf"
-            x_offest=8
+            x_offest = 8
         elif system == "Linux":
-            font_path = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
+            font_path = "/usr/share/fonts/truetype/noto/NotoSansSymbols-Regular.ttf"
+            size = 32
         else:
             raise OSError("暂不支持")
-        # 图像大小（宽高相等）
         image = Image.new('RGBA', (image_size, image_size), (255, 255, 255, 0))  # 背景透明
         draw = ImageDraw.Draw(image)
+        #print(os.path.exists(font_path))
         font = ImageFont.truetype(font_path, size)
-        draw.text((0-x_offest, 0), text, font=font, fill=color)
-    #image.show()
+        draw.text((0 - x_offest, 0), text, font=font, fill=color)
     return image
 
+async def color_emoji_url_download(text,color_path, proxy="http://127.0.0.1:7890"):
+    codepoints = []
+    # emoji 可能是多个 Unicode 码点组成，需要用unicode转码处理
+    for char in text:codepoints.append(f"{ord(char):x}")
+    codepoints_content='-'.join(codepoints)
+    url = f"https://twemoji.maxcdn.com/v/latest/72x72/{codepoints_content}.png"
+
+    if proxy is not None and proxy != '':
+        proxies = {"http://": proxy, "https://": proxy}
+    else:
+        proxies = None
+    async with httpx.AsyncClient(proxies=proxies) as client:
+        try:
+            response = await client.get(url)
+            if response.status_code == 200:
+                content = response.content
+                async with aiofiles.open(color_path, 'wb') as f:
+                    await f.write(content)
+        except Exception as e:
+            pass
 
 
 async def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_shadow=False,ellipsis=True):
@@ -254,10 +254,13 @@ async def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_s
                 draw.text((x, y - upshift_font), text[i], font=font, fill=eval(str(params[f'font_{last_tag}_color'])))
             else:
                 try:
-                    emoji_img = await color_emoji_maker(text[i], eval(str(params[f'font_{last_tag}_color'])))
+                    emoji_img = await color_emoji_maker(text[i], eval(str(params[f'font_{last_tag}_color'])),color_path=params[f'color_emoji_path'])
+                    if emoji_img.mode != 'RGBA':emoji_img = emoji_img.convert('RGBA')
                     emoji_img = emoji_img.resize((char_width, int(char_width * emoji_img.height / emoji_img.width)))
                     canvas.paste(emoji_img, (int(x), int(y + 3 - upshift_font)), mask=emoji_img)
                 except Exception as e:
+                    #print(e)
+                    #traceback.print_exc()
                     i += 1
                     continue
 

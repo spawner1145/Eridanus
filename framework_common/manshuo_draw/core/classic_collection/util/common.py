@@ -46,7 +46,7 @@ def get_abs_path(path,is_ignore_judge=False):
         if not os.path.isabs(path):
             # 如果是相对路径，将其转换为绝对路径
             upper_dir = os.path.abspath(__file__)
-            for _ in range(5):  # 寻找上五级的目录，即为Eridanus
+            for _ in range(6):  # 寻找上五级的目录，即为Eridanus
                 upper_dir = os.path.dirname(upper_dir)
             absolute_path = os.path.join(upper_dir, path)
             return absolute_path
@@ -66,7 +66,7 @@ def get_abs_path(path,is_ignore_judge=False):
     if not os.path.isabs(path):
         # 如果是相对路径，将其转换为绝对路径
         upper_dir = os.path.abspath(__file__)
-        for _ in range(5):#寻找上五级的目录，即为Eridanus
+        for _ in range(6):#寻找上五级的目录，即为Eridanus
             upper_dir = os.path.dirname(upper_dir)
         absolute_path = os.path.join(upper_dir, path)
         return absolute_path
