@@ -142,7 +142,7 @@ def main(bot, config):
         """
         戳一戳的功能实现，之所以这么复杂，是因为要获取戳一戳的具体内容。
         """
-        if event.group_id and event.group_id not in [913122269,1050663831]:
+        if event.group_id and event.group_id in [913122269,1050663831]:
             return
         if event.target_id == bot.id:
             if event.group_id:
