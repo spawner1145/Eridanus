@@ -110,7 +110,8 @@ async def color_emoji_url_download(text,color_path, proxy="http://127.0.0.1:7890
     codepoints = []
     # emoji 可能是多个 Unicode 码点组成，需要用unicode转码处理
     for char in text:codepoints.append(f"{ord(char):x}")
-    url = f"https://twemoji.maxcdn.com/v/latest/72x72/{"-".join(codepoints)}.png"
+    codepoints_content='-'.join(codepoints)
+    url = f"https://twemoji.maxcdn.com/v/latest/72x72/{codepoints_content}.png"
 
     if proxy is not None and proxy != '':
         proxies = {"http://": proxy, "https://": proxy}

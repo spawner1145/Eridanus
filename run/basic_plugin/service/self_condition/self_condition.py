@@ -82,8 +82,8 @@ async def self_info_core(bot=None,event=None,status=None):
             if '__pycache__' == info_name: continue
             elif status['main_bot'][info_name]['loaded'] is True:
                 status_info += (f' {cunt}. 模块 {info_name} 已加载，'
-                                f'函数入口：{status['main_bot'][info_name]["entrance_func_count"]} 个，'
-                                f'加载功能：{status['main_bot'][info_name]["event_handlers_count"]} 个\n')
+                                f'函数入口：{status["main_bot"][info_name]["entrance_func_count"]} 个，'
+                                f'加载功能：{status["main_bot"][info_name]["event_handlers_count"]} 个\n')
                 cunt+=1
         status_info = f'[title]\n插件管理器[/title]\n  当前共有 {len(status["main_bot"])-1} 个插件, 其中 {cunt-1} 个插件成功加載\n' + status_info
     draw_info=[
