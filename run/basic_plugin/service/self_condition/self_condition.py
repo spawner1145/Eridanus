@@ -76,7 +76,7 @@ async def self_info_core(bot=None,event=None,status=None):
                   'max':max_cpu,'x_des':[info_check['time'].replace('_',':') for info_check in info_list],'y_des':[f'{max_cpu}']}
     status_info = ''
     if status is not None:
-        pprint.pprint(status)
+        #pprint.pprint(status)
         status_info,cunt = f'',1
         for info_name in status['main_bot']:
             if '__pycache__' == info_name: continue
