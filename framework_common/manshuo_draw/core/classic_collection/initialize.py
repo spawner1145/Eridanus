@@ -1,5 +1,5 @@
 import os
-from framework_common.manshuo_draw.core.util import *
+from .util import *
 global initialize_yaml_set
 version_check=True
 from ruamel.yaml import YAML

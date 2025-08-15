@@ -1,6 +1,5 @@
-from PIL import Image, ImageDraw, ImageFont, ImageOps,ImageFilter
 from .initialize import initialize_yaml_must_require
-from framework_common.manshuo_draw.core.util import *
+from .util import *
 
 class TextModule:
     def __init__(self,layer_img_set,params):

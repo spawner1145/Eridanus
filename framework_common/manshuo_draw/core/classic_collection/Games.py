@@ -1,8 +1,9 @@
-from PIL import Image, ImageDraw, ImageFont, ImageOps,ImageFilter
+from PIL import Image
 from .initialize import initialize_yaml_must_require
-from framework_common.manshuo_draw.core.util import *
+from .util import *
 from datetime import datetime
 import calendar
+import weakref
 
 class GamesModule:
     def __init__(self,layer_img_set,params):
