@@ -131,6 +131,7 @@ def main(bot, config):
                 await call_bili_download_video(bot, event, config,'img')
         #if not re.search(r'https?://', url or '') and not url.startswith("QQ小程序"):
            # return
+        loop = asyncio.get_event_loop()
         link_prising_json = await loop.run_in_executor(
             None,
             partial(
