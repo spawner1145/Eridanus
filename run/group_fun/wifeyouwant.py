@@ -452,8 +452,7 @@ def main(bot, config):
 
             try:
                 target_name = (await bot.get_group_member_info(target_group, target_id))['data']['nickname']
-                today_wife_api, header = config.group_fun.config["today_wife"]["api"], \
-                config.group_fun.config["today_wife"]["header"]
+                today_wife_api, header = config.group_fun.config["today_wife"]["api"], config.group_fun.config["today_wife"]["header"]
                 response = today_check_api(today_wife_api, header)
                 img_path = f'data/pictures/wife_you_want_img/today_wife.jpg'
 
