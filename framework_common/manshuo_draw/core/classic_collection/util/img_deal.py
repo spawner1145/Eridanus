@@ -5,7 +5,8 @@ from .common import crop_to_square
 import math
 import gc
 import weakref
-
+from collections.abc import Iterable
+import pprint
 
 def _cleanup_temp_images(temp_images):
     """清理临时图像对象"""
@@ -20,7 +21,7 @@ def _cleanup_temp_images(temp_images):
     temp_images.clear()  # 清空列表
     gc.collect()  # 强制垃圾回收
 
-
+#图像处理
 async def img_process(params, pure_backdrop, img, x_offset, current_y, upshift=0, type='img'):
     temp_images = []  # 用于跟踪需要清理的临时图像
     original_img = img
@@ -123,7 +124,7 @@ async def img_process(params, pure_backdrop, img, x_offset, current_y, upshift=0
             except:
                 pass
 
-
+#背景处理
 async def backdrop_process(params, canves, limit=(0, 0)):
     limit_x, limit_y = limit
     if params['background'] is None or params['background'] == []:
@@ -237,7 +238,7 @@ async def backdrop_process(params, canves, limit=(0, 0)):
                     pass
         raise e
 
-
+#图标i绘制处理
 async def icon_process(params, canves, box_right=(0, 0)):
     x, y = box_right
     if params['right_icon'] is None or params['right_icon'] == []:
@@ -287,7 +288,6 @@ async def icon_process(params, canves, box_right=(0, 0)):
             except:
                 pass
 
-
 # 头像右侧标签以及背景处理
 async def icon_backdrop_check(params):
     if not (params['type_software'] is None and params['background'] is None and params['right_icon'] is None):
@@ -316,14 +316,13 @@ async def icon_backdrop_check(params):
     elif params['judge_flag'] == 'common':
         params['is_shadow_img'], params['is_rounded_corners_img'], params['is_stroke_img'] = False, False, False
 
-
 # 标签绘制
 async def label_process(params, img, number_count, new_width):
     if number_count >= len(params['label']) or params['label'][number_count] == '':
         return img
 
     font_label = ImageFont.truetype(params['font_label'], params['font_label_size'])
-    label_width, label_height, upshift = params['padding'] * 4, params['padding'] + params['font_label_size'], 0
+    label_width, label_height, upshift = params['padding'] * 4, params['padding'] + params['font_label_size'], params['upshift_label']
     label_content = params['label'][number_count]
 
     # 计算标签的实际长度
@@ -359,37 +358,32 @@ async def label_process(params, img, number_count, new_width):
 async def init(params):  # 对模块的参数进行初始化
     # 接下来是对图片进行处理，将其全部转化为pillow的img对象，方便后续处理
     if 'img' in params:
-        params['processed_img'] = await process_img_download(params['img'], params['is_abs_path_convert'],
-                                                             proxy=params['proxy'])
+        params['processed_img'] = await process_img_download(params['img'], params['is_abs_path_convert'],proxy=params['proxy'])
         # 判断图片的排版方式
         if params['number_per_row'] == 'default':
-            if len(params['processed_img']) == 1:
-                params['number_per_row'] = 1
-                params['is_crop'] = False
-            elif len(params['processed_img']) in [2, 4]:
-                params['number_per_row'] = 2
-            else:
-                params['number_per_row'] = 3
+            if len(params['processed_img']) == 1:params['number_per_row'],params['is_crop'] = 1,False
+            elif len(params['processed_img']) in [2, 4]:params['number_per_row'] = 2
+            else:params['number_per_row'] = 3
         # 接下来处理是否裁剪部分
-        if params['type'] == 'avatar':
-            params['is_crop'] = True
-        if params['type'] == 'games' and 'is_crop' not in params:
-            params['is_crop'] = False
+        if params['type'] == 'avatar':params['is_crop'] = True
+        if params['type'] == 'games' and 'is_crop' not in params:params['is_crop'] = False
         if 'is_crop' in params and params['is_crop'] == 'default':
-            if params['number_per_row'] == 1:
-                params['is_crop'] = False
-            else:
-                params['is_crop'] = True
-        if params['is_crop'] is True:
-            params['processed_img'] = await crop_to_square(params['processed_img'])
+            if params['number_per_row'] == 1:params['is_crop'] = False
+            else:params['is_crop'] = True
+        if params['is_crop'] is True:params['processed_img'] = await crop_to_square(params['processed_img'])
+    if params['type'] == 'math':#单独处理
+        if params['number_per_row'] == 'default':
+            if len(params['content']) == 1:params['number_per_row'] = 1
+            elif len(params['content']) in [2, 4]:params['number_per_row'] = 2
+            else:params['number_per_row'] = 3
+        if params['y_des'] is not None:
+            label_list,params['label'] = params['y_des'],[]
+            for item in label_list: params['label'].append(f"-Y:{item}")
 
-    if 'number_per_row' in params:
-        params['new_width'] = (((params['img_width'] - params['padding'] * 2) - (params['number_per_row'] - 1) * params[
-            'padding_with']) // params['number_per_row'])
-    if 'draw_limited_height' in params:
-        params['draw_limited_height_remain'] = params['draw_limited_height']
-    else:
-        params['draw_limited_height_remain'] = 0
+
+    if 'number_per_row' in params:params['new_width'] = (((params['img_width'] - params['padding'] * 2) - (params['number_per_row'] - 1) * params['padding_with']) // params['number_per_row'])
+    if 'draw_limited_height' in params:params['draw_limited_height_remain'] = params['draw_limited_height']
+    else:params['draw_limited_height_remain'] = 0
 
     params['per_number_count'], params['number_count'], params['upshift'], params['downshift'], params['current_y'], \
     params['x_offset'], params['max_height'], params['avatar_upshift'] = 0, 0, 0, 0, 0, params['padding'], 0, 0
@@ -397,63 +391,41 @@ async def init(params):  # 对模块的参数进行初始化
         'draw_limited_height_check'], params['json_img_left_module_flag'] = params[
         'img_height_limit'], [], False, None, False
     # 若有描边，则将初始粘贴位置增加一个描边宽度
-    if params['is_stroke_front'] and params['is_stroke_img']:
-        params['upshift'] += params['stroke_img_width'] / 2
-    if params['is_shadow_front'] and params['is_shadow_img']:
-        params['upshift'] += params['shadow_offset_img'] * 3
+    if params['is_stroke_front'] and params['is_stroke_img']:params['upshift'] += params['stroke_img_width'] / 2
+    if params['is_shadow_front'] and params['is_shadow_img']:params['upshift'] += params['shadow_offset_img'] * 3
     if 'is_shadow_avatar' in params and 'shadow_offset_avatar' in params:
-        if params['is_shadow_front'] and params['is_shadow_avatar']:
-            params['avatar_upshift'] += params['shadow_offset_avatar'] * 2
+        if params['is_shadow_front'] and params['is_shadow_avatar']:params['avatar_upshift'] += params['shadow_offset_avatar'] * 2
     params['pure_backdrop'] = Image.new("RGBA", (
-    params['img_width'], int(params['img_height_limit'] + params['upshift'] + params['padding_up_common'] * 2)),
-                                        (0, 0, 0, 0))
+    params['img_width'], int(params['img_height_limit'] + params['upshift'] + params['padding_up_common'] * 2)),(0, 0, 0, 0))
 
 
 async def per_img_limit_deal(params, img, type='img'):  # 处理每个模块之间图像的限高关系
-    original_img = img
-    try:
-        if 'magnification_img' in params:
-            if params['magnification_img'] == 'default':
-                if img.height / img.width < 9 / 16:
-                    params['magnification_img'] = 2
-                else:
-                    params['magnification_img'] = 2.5
-        else:
-            params['magnification_img'] = 1
+    if 'magnification_img' in params:
+        if params['magnification_img'] == 'default':
+            if img.height / img.width < 9 / 16:params['magnification_img'] = 2
+            else:params['magnification_img'] = 2.5
+    else:
+        params['magnification_img'] = 1
+    img_height = int((params['new_width'] / params['magnification_img']) * img.height / img.width)
+    img_width = int(params['new_width'] / params['magnification_img'])
+    img = img.resize((img_width, img_height))#这里的不用回收，最后会统一处理
+    if params['number_count'] + 1 <= params['number_per_row'] and 'draw_limited_height' in params:
+        cropped_img = img.crop((0, params['draw_limited_height'], img_width, img_height))
+        img.close()
+        img = cropped_img
+    if img.height > params['img_height_limit_module']:
+        final_cropped = img.crop((0, 0, img_width, params['img_height_limit_module']))
+        img.close()
+        img = final_cropped
+        if type not in ['avatar','math']:params['draw_limited_height_check'] = params['img_height_limit_module']
+        params['json_img_left_module_flag'] = True
+    #单独处理math模块内chart个数问题
+    if params['type'] == 'math' and isinstance(params['content'][params['number_count']], (set, list)):#单独处理math模块中chart的长宽
+        number_per_row_list=len(params['content'][params['number_count']])
+        if params['chart_width'] == 'default':
+            params['chart_width'] = (((params['new_width'] - params['padding'] * 2) - (number_per_row_list - 1) * params['padding_with']) // number_per_row_list)
+    return img
 
-        img_height = int((params['new_width'] / params['magnification_img']) * img.height / img.width)
-        img_width = int(params['new_width'] / params['magnification_img'])
-
-        resized_img = img.resize((img_width, img_height))
-        if resized_img is not img and img is not original_img:
-            img.close()
-        img = resized_img
-
-        if params['number_count'] + 1 <= params['number_per_row'] and 'draw_limited_height' in params:
-            cropped_img = img.crop((0, params['draw_limited_height'], img_width, img_height))
-            if cropped_img is not img:
-                img.close()
-            img = cropped_img
-
-        if img.height > params['img_height_limit_module']:
-            final_cropped = img.crop((0, 0, img_width, params['img_height_limit_module']))
-            if final_cropped is not img:
-                img.close()
-            img = final_cropped
-            if type != 'avatar':
-                params['draw_limited_height_check'] = params['img_height_limit_module']
-            params['json_img_left_module_flag'] = True
-
-        return img
-
-    except Exception as e:
-        # 出错时清理可能创建的图像
-        if img is not original_img and img and hasattr(img, 'close'):
-            try:
-                img.close()
-            except:
-                pass
-        raise e
 
 
 async def per_img_deal(params, img, type='img'):  # 绘制完该模块后处理下一个模块的关系
@@ -480,7 +452,7 @@ async def per_img_deal(params, img, type='img'):  # 绘制完该模块后处理�
 
 
 
-
+#每个模块绘制完成后的处理函数，用于处理最后的模块长度以及其他部分例如垃圾回收、继承判断
 async def final_img_deal(params, type='img'):#判断是否需要增减
     if type == 'text':
         if params['content'][0] != []:
@@ -488,27 +460,30 @@ async def final_img_deal(params, type='img'):#判断是否需要增减
             params['json_img_left_module'] = params['params']
             params['json_img_left_module_flag']=True
         return
-    if params['per_number_count'] != 0:
-        params['current_y'] += params['max_height']
-    else:
-        params['current_y'] -= params['padding_with']
+    if params['per_number_count'] != 0:params['current_y'] += params['max_height']
+    else:params['current_y'] -= params['padding_with']
     #处理限制高度
     if params['current_y'] >= params['img_height_limit']:
-        if params['img_height_limit_flag'] :
-            params['current_y'] = params['img_height_limit'] - params['padding_up_common']
-        elif params['img_height_limit_flag'] is False:
-            params['current_y'] = params['img_height_limit']
+        if params['img_height_limit_flag'] :params['current_y'] = params['img_height_limit'] - params['padding_up_common']
+        elif params['img_height_limit_flag'] is False:params['current_y'] = params['img_height_limit']
     #处理能够返回的剩余待处理图片
     for item in ['img','content','label','right_icon','background']:
         if item in params['params']:
-            if type == 'avatar':number_check=params["number_count"]
-            else:number_check=int(params["number_count"])
-            if number_check < 0: number_check = 0
+            number_check = int(params["number_count"])
+            if params['json_img_left_module_flag']:     # 若触底flag置True，则减去本层图像个数
+                number_check -= int(params["number_per_row"])
+            if number_check < 0: number_check = 0       # 以免出错
             params['params'][item] = params['params'][item][number_check:]
-    if params['draw_limited_height_check']:
+    #处理对应的返回值
+    if params['draw_limited_height_check']:#处理超长图像的裁切问题，实现过一层裁剪对应长度
         params['params']['draw_limited_height'] = params['draw_limited_height_check'] + params['draw_limited_height_remain']
-    if params['json_img_left_module_flag']:
+    if params['json_img_left_module_flag']:#若触底flag置True，则继承
         params['json_img_left_module'] = params['params']
-
-
-    #print(params['img_height_limit'],params['current_y'])
+    #在模块绘制完成的时候同一回收刚开始创建的图片对象
+    for img_type in ['img','processed_img']:
+        if img_type not in params:continue
+        if not isinstance(params[img_type], bool) and isinstance(params[img_type], Iterable)  :
+            for obj in params[img_type]:
+                if isinstance(obj, Image.Image) and getattr(obj, 'fp', None) is not None:
+                    try:obj.close()
+                    except Exception as e:pass

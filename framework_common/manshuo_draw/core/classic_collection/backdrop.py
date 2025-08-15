@@ -1,6 +1,6 @@
-from PIL import Image, ImageDraw
+from PIL import Image
 from .initialize import initialize_yaml_must_require
-from framework_common.manshuo_draw.core.util import *
+from .util import *
 class Backdrop:
     def __init__(self,basic_img_set,params):
         for key, value in vars(basic_img_set).items():#继承父类属性，主要是图片基本设置类

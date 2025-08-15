@@ -1,6 +1,6 @@
-from PIL import Image, ImageDraw, ImageFilter, ImageOps,ImageFont
+from PIL import Image
 from .initialize import initialize_yaml_must_require
-from framework_common.manshuo_draw.core.util import *
+from .util import *
 
 class basicimgset:
     def __init__(self, params):

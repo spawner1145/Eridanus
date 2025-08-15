@@ -233,9 +233,7 @@ def ini_login_Link_Prising(type=None):
         return bili_login_check,douyin_login_check,xhs_login_check
     data_file.save()
 
-def main():
-    ck_string = asyncio.run(get_douyin_cookies())
-    print("抖音CK:", ck_string)
+
 
 async def login_core_select():
     mode = int(input(

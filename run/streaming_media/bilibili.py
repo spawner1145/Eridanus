@@ -180,5 +180,5 @@ def main(bot, config):
     async def _(event):
         if event.pure_text == "/bili login":
             async with BiliCookieManager() as manager:
-                await manager.get_cookies(auto_login=True,bot=bot,group_id=event.group_id)
+                await manager.get_cookies(auto_login=True,bot=bot,group_id=event.group_id,login=True)
                 await manager._cleanup()

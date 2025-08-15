@@ -7,7 +7,6 @@ from io import BytesIO
 from datetime import datetime, timedelta
 from PIL import Image as PImage
 import base64
-import pprint
 from framework_common.utils.install_and_import import install_and_import
 dateutil=install_and_import('qrcode', 'qrcode')
 import qrcode
@@ -15,7 +14,9 @@ import pprint
 from developTools.message.message_components import Text, Image, At
 from framework_common.manshuo_draw import *
 from framework_common.framework_util.yamlLoader import YAMLManager
-db_json=YAMLManager("run").common_config.basic_config['redis']
+try:config = YAMLManager.get_instance()
+except Exception as e:config = YAMLManager("run")
+db_json=config.common_config.basic_config['redis']
 db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
 
 

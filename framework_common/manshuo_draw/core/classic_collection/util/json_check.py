@@ -10,7 +10,7 @@ def json_check(json_img: List[Any]) -> List[Dict[str, Any]]:
 
     # 预定义常量，避免重复字符串比较
     img_extensions = frozenset([".jpg", ".png", ".jpeg", ".webp"])  # 使用frozenset减少内存
-    valid_types = frozenset(['avatar', 'img', 'text', 'games'])
+    valid_types = frozenset(['avatar', 'img', 'text', 'games','math'])
     special_types = frozenset(['basic_set', 'backdrop'])
 
     for per_json_check in json_img:
@@ -89,7 +89,6 @@ def json_check(json_img: List[Any]) -> List[Dict[str, Any]]:
     yaml_manager = None
     try:
         is_lightweight = False
-
         for item in json_check_reload:
             if item.get('type') == 'basic_set':
                 if is_lightweight:

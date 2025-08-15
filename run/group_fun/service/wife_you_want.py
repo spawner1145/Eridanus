@@ -2,7 +2,7 @@ import asyncio
 import calendar
 import time
 import gc
-
+import traceback
 from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 
 from datetime import datetime
@@ -169,6 +169,7 @@ async def PIL_lu_maker(today, target_id, target_name, type='lu', contents=None):
     except Exception as e:
         print(f"PIL_lu_maker error: {e}")
         # 确保在异常情况下也能清理内存
+        #traceback.print_exc()
         gc.collect()
         raise
     finally:
@@ -229,12 +230,6 @@ def today_check_api(today_wife_api, header, num_check=None):
 
 
 if __name__ == '__main__':
-    DATABASE = "wifeyouwant.db"  # 修改路径为小写
     target_id = 1270858640
     current_date = datetime.today()
-
-    try:
-        asyncio.run(PIL_lu_maker(current_date, target_id, 'manshuo'))
-    finally:
-        # 程序结束时强制垃圾回收
-        gc.collect()
+    asyncio.run(PIL_lu_maker(current_date, target_id, 'manshuo'))

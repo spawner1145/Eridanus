@@ -1,6 +1,5 @@
-from PIL import Image,ImageDraw, ImageFilter, ImageOps
-from .initialize import initialize_yaml_must_require
-from framework_common.manshuo_draw.core.util import *
+from PIL import Image
+from .util import *
 
 class LayerSet:
     def __init__(self,basic_img_set,layer_set=1):
