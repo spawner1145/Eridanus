@@ -106,28 +106,26 @@ def createLogger(blocked_loggers=None):
     file_handler.addFilter(BlockLoggerFilter())
     logger.addHandler(file_handler)
 
-    # 定义一个函数来更新日志文件（按日期切换）
     def update_log_file():
-        nonlocal log_file_path, file_handler,_current_log_date
+        nonlocal file_handler 
         new_date = datetime.now().strftime("%Y-%m-%d")
         if new_date != _current_log_date:
+            global _current_log_date  # 添加这一行
             new_log_file_path = os.path.join(log_folder, f"{new_date}.log")
-
-            # 移除旧的文件处理器
+    
             logger.removeHandler(file_handler)
             file_handler.close()
-
-            # 创建新的文件处理器
+    
             file_handler = logging.FileHandler(new_log_file_path, mode='a', encoding='utf-8')
             file_handler.setFormatter(file_formatter)
             file_handler.addFilter(BlockLoggerFilter())
             logger.addHandler(file_handler)
-
-            # 更新当前日期
+    
             _current_log_date = new_date
             print(f"日志文件已切换到: {new_log_file_path}")
 
     def check_date_change():
+        global _current_log_date
         current_date = datetime.now().strftime("%Y-%m-%d")
         return current_date != _current_log_date
     # 在 logger 上绑定更新日志文件的函数
