@@ -110,7 +110,7 @@ def createLogger(blocked_loggers=None):
         nonlocal file_handler 
         new_date = datetime.now().strftime("%Y-%m-%d")
         if new_date != _current_log_date:
-            global _current_log_date  # 添加这一行
+            nonlocal _current_log_date
             new_log_file_path = os.path.join(log_folder, f"{new_date}.log")
     
             logger.removeHandler(file_handler)
