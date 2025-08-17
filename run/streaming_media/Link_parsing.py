@@ -91,7 +91,7 @@ def main(bot, config):
     async def Link_Prising_search(event: GroupMessageEvent):
         global Cachecleaner
         if not Cachecleaner:
-            asyncio.create_task(cleanup_teamlist(bot))
+            asyncio.create_task(cleanup_teamlist(None))
             
         if event.message_chain.has(Json):
             url=event.message_chain.get(Json)[0].data
@@ -150,7 +150,7 @@ def main(bot, config):
                 #print(link_prising_json)
                 bot.logger.error(str('bili_link_error ') + link_prising_json['reason'])
 
-async def cleanup_teamlist(event):
+async def cleanup_teamlist(bot):
     global Cachecleaner
     if Cachecleaner:
         #bot.logger.info("不再重复启动清理程序。")
