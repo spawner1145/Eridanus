@@ -91,7 +91,7 @@ def main(bot, config):
     async def Link_Prising_search(event: GroupMessageEvent):
         global Cachecleaner
         if not Cachecleaner:
-            cleanup_teamlist(bot)
+            asyncio.create_task(cleanup_teamlist(bot))
             
         if event.message_chain.has(Json):
             url=event.message_chain.get(Json)[0].data
