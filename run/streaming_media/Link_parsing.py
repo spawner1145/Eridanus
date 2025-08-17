@@ -85,7 +85,7 @@ def main(bot, config):
     global Cachecleaner
     Cachecleaner=False
     proxy = config.common_config.basic_config["proxy"]["http_proxy"]
-    asyncio.create_task(cleanup_teamlist(None))
+
 
     @bot.on(GroupMessageEvent)
     async def Link_Prising_search(event: GroupMessageEvent):
@@ -177,3 +177,4 @@ def main(bot, config):
             collected = gc.collect()
             bot.logger.info_func(f"回收了 {collected} 个对象")
             await asyncio.sleep(1000)
+    asyncio.create_task(cleanup_teamlist(None))
