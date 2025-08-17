@@ -149,7 +149,7 @@ def main(bot, config):
     async def cleanup_teamlist(event):
         global Cachecleaner
         if Cachecleaner:
-            bot.logger.info("不再重复启动清理程序。")
+            #bot.logger.info("不再重复启动清理程序。")
             return
         while True:
             bot.logger.info('清理链接解析过期缓存')
@@ -177,4 +177,3 @@ def main(bot, config):
             collected = gc.collect()
             bot.logger.info_func(f"回收了 {collected} 个对象")
             await asyncio.sleep(1000)
-    asyncio.create_task(cleanup_teamlist(None))
