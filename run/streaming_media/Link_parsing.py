@@ -85,6 +85,7 @@ def main(bot, config):
     global Cachecleaner
     Cachecleaner=False
     proxy = config.common_config.basic_config["proxy"]["http_proxy"]
+    asyncio.create_task(cleanup_teamlist(None))
 
     @bot.on(GroupMessageEvent)
     async def Link_Prising_search(event: GroupMessageEvent):
@@ -145,9 +146,10 @@ def main(bot, config):
                 #print(link_prising_json)
                 bot.logger.error(str('bili_link_error ') + link_prising_json['reason'])
     @bot.on(LifecycleMetaEvent)
-    async def cleanup_teamlist(event: LifecycleMetaEvent):
+    async def cleanup_teamlist(event):
         global Cachecleaner
         if Cachecleaner:
+            bot.logger.info("不再重复启动清理程序。")
             return
         while True:
             bot.logger.info('清理链接解析过期缓存')
