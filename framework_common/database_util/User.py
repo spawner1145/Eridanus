@@ -10,7 +10,8 @@ from developTools.utils.logger import get_logger
 from functools import wraps
 import time
 from typing import Optional
-
+from asyncio import sleep
+        
 from framework_common.database_util.RedisCacheManager import create_user_cache_manager
 
 dbpath = "data/dataBase/user_management.db"
@@ -292,7 +293,7 @@ async def get_user(user_id, nickname="") -> User:
         logger.error(traceback.format_exc())
 
         # 出错时清理可能损坏的数据
-        try:
+        """try:
             async with aiosqlite.connect(dbpath) as db:
                 async with db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,)) as cursor:
                     if await cursor.fetchone():
@@ -300,11 +301,11 @@ async def get_user(user_id, nickname="") -> User:
                         await db.commit()
                         logger.info(f"已删除损坏的用户数据: {user_id}")
         except Exception as cleanup_error:
-            logger.error(f"清理损坏数据失败: {cleanup_error}")
-
-        # 使用新的缓存管理器清除缓存
+            logger.error(f"清理损坏数据失败: {cleanup_error}")"""
+        
+        # 清除缓存
         redis_cache_manager.delete(f"user:{user_id}")
-
+        await sleep(2)
         # 递归重试
         return await get_user(user_id, nickname)
 
