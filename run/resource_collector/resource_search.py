@@ -430,19 +430,18 @@ def main(bot,config):
 
     @bot.on(GroupMessageEvent)
     async def downloadAndToPdf(event: GroupMessageEvent):
-        if event.pure_text.startswith("JM下载"):
-
+        if event.pure_text.lower().startswith("jm下载"):
             user_info = await get_user(event.user_id)
             if user_info.permission < config.resource_collector.config["jmcomic"]["jm_comic_download_level"]:
                 await bot.send(event, "你没有权限使用该功能")
                 return
             try:
-                comic_id = int(event.pure_text.replace("JM下载", ""))
+                comic_id = int(event.pure_text.lower().replace("jm下载", ""))
                 logger.info(f"JM下载启动 aim: {comic_id}")
             except:
                 await bot.send(event, "非法参数，指令示例 JM下载601279")
                 return
-            await call_jm(bot,event,config,mode="download",comic_id=comic_id)
+            await call_jm(bot, event, config, mode="download", comic_id=comic_id)
 
 
 
