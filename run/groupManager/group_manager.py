@@ -62,7 +62,7 @@ def main(bot: ExtendBot,config):
 
     @bot.on(GroupMessageEvent)
     async def _(event: GroupMessageEvent):
-        if event.group_id in checked_group:
+        if 1:
             return
         r = await bot.get_group_info(event.group_id)
         try:
