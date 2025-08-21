@@ -29,13 +29,12 @@ from run.group_fun.service.wife_you_want import manage_group_status, manage_grou
 def main(bot, config):
     global last_messages, membercheck, filepath
 
-    # 使用有限大小的双端队列替代无限增长的字典
+    # 使用有限大小的双端队列
     last_messages = {}
     filepath = 'data/pictures/cache'
     if not os.path.exists(filepath):
         os.makedirs(filepath)
 
-    # 使用有时间限制的成员检查字典
     membercheck = {}
 
     # 启动定时清理任务
@@ -80,9 +79,8 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)
     async def today_wife(event: GroupMessageEvent):
-        # 使用上下文管理器确保HTTP客户端正确关闭
         async with httpx.AsyncClient(timeout=30.0) as client:
-            if not event.pure_text.startswith("今"):
+            if not event.pure_text.startswith("今") or not config.group_fun.config["today_wife"]["今日老婆"]:
                 return
 
             if ('今日' in str(event.pure_text) or '今天' in str(event.pure_text)) and '老婆' in str(event.pure_text):
@@ -142,7 +140,7 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def today_husband(event: GroupMessageEvent):
         async with httpx.AsyncClient(timeout=30.0) as client:
-            if str(event.pure_text).startswith("今"):
+            if str(event.pure_text).startswith("今") and config.group_fun.config["today_wife"]["今日老公"]:
                 if ('今日' in str(event.pure_text) or '今天' in str(event.pure_text)) and '老公' in str(
                         event.pure_text):
                     bot.logger.info("今日老公开启！")
@@ -166,7 +164,7 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def today_luoli(event: GroupMessageEvent):
         async with httpx.AsyncClient(timeout=30.0) as client:
-            if str(event.pure_text).startswith("今"):
+            if str(event.pure_text).startswith("今") and config.group_fun.config["today_wife"]["今日萝莉"]:
                 if ('今日' in str(event.pure_text) or '今天' in str(event.pure_text)) and '萝莉' in str(
                         event.pure_text):
                     bot.logger.info("今日萝莉开启！")

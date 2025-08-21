@@ -12,6 +12,7 @@ _blocked_loggers = ["INFO_MSG", "DEBUG"]  # 默认禁用DEBUG
 _lock = threading.Lock()  # 添加线程锁
 _current_log_date = None
 
+
 class CategoryHandler(logging.StreamHandler):
     """自定义Handler，根据消息类型使用不同的formatter"""
 
@@ -58,7 +59,7 @@ class CategoryHandler(logging.StreamHandler):
 
 
 def createLogger(blocked_loggers=None):
-    global _logger, _blocked_loggers
+    global _logger, _blocked_loggers, _current_log_date
     if blocked_loggers is not None:
         _blocked_loggers = blocked_loggers
 
@@ -106,30 +107,39 @@ def createLogger(blocked_loggers=None):
     file_handler.addFilter(BlockLoggerFilter())
     logger.addHandler(file_handler)
 
+    # 将文件处理器存储到logger对象上，方便后续访问
+    logger._file_handler = file_handler
+    logger._log_folder = log_folder
+    logger._file_formatter = file_formatter
+    logger._block_filter = BlockLoggerFilter()
+
     # 定义一个函数来更新日志文件（按日期切换）
     def update_log_file():
-        nonlocal log_file_path, file_handler,_current_log_date
+        global _current_log_date
         new_date = datetime.now().strftime("%Y-%m-%d")
         if new_date != _current_log_date:
-            new_log_file_path = os.path.join(log_folder, f"{new_date}.log")
+            old_date = _current_log_date
+            new_log_file_path = os.path.join(logger._log_folder, f"{new_date}.log")
 
             # 移除旧的文件处理器
-            logger.removeHandler(file_handler)
-            file_handler.close()
+            logger.removeHandler(logger._file_handler)
+            logger._file_handler.close()
 
             # 创建新的文件处理器
-            file_handler = logging.FileHandler(new_log_file_path, mode='a', encoding='utf-8')
-            file_handler.setFormatter(file_formatter)
-            file_handler.addFilter(BlockLoggerFilter())
-            logger.addHandler(file_handler)
+            logger._file_handler = logging.FileHandler(new_log_file_path, mode='a', encoding='utf-8')
+            logger._file_handler.setFormatter(logger._file_formatter)
+            logger._file_handler.addFilter(logger._block_filter)
+            logger.addHandler(logger._file_handler)
 
             # 更新当前日期
             _current_log_date = new_date
-            print(f"日志文件已切换到: {new_log_file_path}")
+            print(f"日志文件已从 {old_date}.log 切换到: {new_log_file_path}")
 
     def check_date_change():
+        global _current_log_date
         current_date = datetime.now().strftime("%Y-%m-%d")
         return current_date != _current_log_date
+
     # 在 logger 上绑定更新日志文件的函数
     logger.check_date_change = check_date_change
     logger.update_log_file = update_log_file
@@ -150,6 +160,7 @@ class LoggerWrapper:
                 # 再次检查（双重检查锁定模式）
                 if self._logger.check_date_change():
                     self._logger.update_log_file()
+
     def _log_with_category(self, level, message, category=None, *args, **kwargs):
         """带类别的日志记录方法"""
         self._check_and_update_log_file()
@@ -225,8 +236,40 @@ def get_logger(name=None, blocked_loggers=None) -> LoggerWrapper:
     with _lock:  # 使用锁确保线程安全
         if _logger is None:
             createLogger(blocked_loggers)
-        _logger.update_log_file()
     return LoggerWrapper(_logger, name)
+
+
+# 添加一个用于测试的辅助函数
+def _set_current_log_date_for_test(date_str):
+    """
+    仅用于测试的函数，用于设置当前日志日期
+    这个函数会同时切换日志文件到指定日期
+    """
+    global _current_log_date, _logger
+
+    if _logger is not None:
+        # 移除旧的文件处理器
+        _logger.removeHandler(_logger._file_handler)
+        _logger._file_handler.close()
+
+        # 创建对应日期的文件处理器
+        new_log_file_path = os.path.join(_logger._log_folder, f"{date_str}.log")
+        _logger._file_handler = logging.FileHandler(new_log_file_path, mode='a', encoding='utf-8')
+        _logger._file_handler.setFormatter(_logger._file_formatter)
+        _logger._file_handler.addFilter(_logger._block_filter)
+        _logger.addHandler(_logger._file_handler)
+
+        print(f"测试: 切换到日期 {date_str} 的日志文件: {new_log_file_path}")
+
+    _current_log_date = date_str
+
+
+def _get_current_log_date():
+    """
+    获取当前日志日期，用于测试验证
+    """
+    global _current_log_date
+    return _current_log_date
 
 
 # 使用示例
