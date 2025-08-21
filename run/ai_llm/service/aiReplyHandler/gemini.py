@@ -3,6 +3,7 @@ import io
 import os
 import re
 import traceback
+from datetime import datetime
 
 import httpx
 from PIL import Image
@@ -58,6 +59,9 @@ BASE64_PATTERN = re.compile(r"^data:([a-zA-Z0-9]+/[a-zA-Z0-9-.+]+);base64,([A-Za
 async def gemini_prompt_elements_construct(precessed_message,bot=None,func_result=False,event=None):
     prompt_elements=[]
 
+    current_datetime = datetime.now()
+    formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+    prompt_elements.append({"text": f"(系统提示，当前时间为{formatted_datetime})"})
     #{"role": "assistant","content":[{"type":"text","text":i["text"]}]}
     for i in precessed_message:
         if "text" in i:
