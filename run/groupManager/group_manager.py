@@ -7,6 +7,8 @@ from run.groupManager.func_collection import quit_group
 
 
 def main(bot: ExtendBot,config):
+    checked_group=[]
+    
     @bot.on(GroupMessageEvent)
     async def group_message(event: GroupMessageEvent):
         if event.get("text"):
@@ -60,6 +62,8 @@ def main(bot: ExtendBot,config):
 
     @bot.on(GroupMessageEvent)
     async def _(event: GroupMessageEvent):
+        if event.group_id in checked_group:
+            return
         r = await bot.get_group_info(event.group_id)
         try:
             num=r["data"]["member_count"]
@@ -72,6 +76,8 @@ def main(bot: ExtendBot,config):
             await bot.quit(event.group_id)
             bot.logger.info_func(f"群{event.group_id}人数{r['data']['member_count']}，自动退出")
             await bot.send_friend_message(config.common_config.basic_config["master"]["id"], f"群{event.group_id}人数{r['data']['member_count']}，自动退出")
+        else:
+            checked_group.append(event.group_id)
     @bot.on(PrivateMessageEvent)
     async def private_message(event: PrivateMessageEvent):
         await quitgroup(event)
