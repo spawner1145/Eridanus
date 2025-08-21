@@ -9,6 +9,7 @@ from apscheduler.triggers.cron import CronTrigger
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Image, Text, Card
 from framework_common.database_util.User import get_users_with_permission_above, get_user
+from framework_common.framework_util.func_map_loader import openai_func_map, gemini_func_map
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.manshuo_draw import RedisDatabase, manshuo_draw
 from framework_common.utils.random_str import random_str
@@ -31,6 +32,36 @@ def main(bot: ExtendBot, config):
 
     enabled = False
 
+    if config.ai_llm.config["llm"]["func_calling"]:
+        if config.ai_llm.config["llm"]["model"] == "gemini":
+            tools = gemini_func_map()
+        else:
+            tools = openai_func_map()
+
+    else:
+        tools = None
+
+    if config.ai_llm.config["llm"]["联网搜索"]:
+        if config.ai_llm.config["llm"]["model"] == "gemini":
+            if tools is None:
+                tools = [
+
+                    {"googleSearch": {}},
+                ]
+            else:
+                tools = [
+                    {"googleSearch": {}},
+                    tools
+                ]
+        else:
+            if tools is None:
+                tools = [{"type": "function", "function": {"name": "googleSearch"}}]
+            else:
+                tools = [
+                    {"type": "function", "function": {"name": "googleSearch"}},
+                    tools
+                ]
+
     @bot.on(LifecycleMetaEvent)
     async def start_scheduler(_):
         nonlocal enabled
@@ -51,8 +82,8 @@ def main(bot: ExtendBot, config):
                 filtered_users = friend_list
             for user in filtered_users:
                 try:
-                    r = await aiReplyCore([{"text": f"道晚安，直接发送结果，不要发送多余内容"}], int(user["user_id"]),
-                                          config, bot=bot, tools=None)
+                    r = await aiReplyCore([{"text": f"道晚安，直接发送结果，无需对此条提示做出应答。"}], int(user["user_id"]),
+                                          config, bot=bot, tools=tools)
                     await bot.send_friend_message(int(user["user_id"]), r)
                     await sleep(6)
                 except Exception as e:
@@ -75,7 +106,7 @@ def main(bot: ExtendBot, config):
                     r = await aiReplyCore([{
                         "text": f"播报今天的天气，保持你的角色，根据天气给出建议，直接发送结果，不要发送'好的'之类的命令应答提示。今天的天气信息如下{weather}"}],
                         int(user["user_id"]),
-                        config, bot=bot, tools=None)
+                        config, bot=bot, tools=tools)
                     await bot.send_friend_message(int(user["user_id"]), r)
                     await sleep(6)
                 except Exception as e:
@@ -195,7 +226,7 @@ def main(bot: ExtendBot, config):
                 try:
                     r = await aiReplyCore(
                         [{"text": f"你现在是一个群机器人，向群内所有人道{task_name}，直接发送结果，不要发送多余内容"}],
-                        random.randint(1000000, 99999999), config, bot=bot, tools=None)
+                        random.randint(1000000, 99999999), config, bot=bot, tools=tools)
                     await bot.send_group_message(group_id, r)
                     await sleep(6)
                 except Exception as e:
