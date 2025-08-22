@@ -2,11 +2,6 @@ from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Text, Image, At
 from framework_common.manshuo_draw import *
 from run.anime_game_service.service.epicfree import *
-import threading
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-import time
-from datetime import datetime
 
 
 def main(bot, config):

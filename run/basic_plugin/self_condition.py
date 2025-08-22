@@ -6,22 +6,19 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import time
 from datetime import datetime
-from run.basic_plugin.service.self_condition import *
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.executors.pool import ThreadPoolExecutor
-from apscheduler.triggers.cron import CronTrigger
-import time
-import gc
+
+
 
 
 self_task = None
 self_task_lock = asyncio.Lock()
 async def self_condition_loop(bot, config):
     """自身状态检查的主循环"""
+
     bot.logger.info_func("自身状态监控循环启动")
     while True:
         try:
+            from run.basic_plugin.service.self_condition import self_info_record
             await self_info_record()
         except Exception as e:
             bot.logger.error(f"自身状态检查出错：{e}")
@@ -29,7 +26,8 @@ async def self_condition_loop(bot, config):
         interval = 1800
         await asyncio.sleep(interval)
 
-def main(bot, config):
+def main_canceled(bot, config):
+
     #查询bot自身状态
     @bot.on(GroupMessageEvent)
     async def self_info(event: GroupMessageEvent):
