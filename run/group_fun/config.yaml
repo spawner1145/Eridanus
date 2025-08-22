@@ -4,6 +4,9 @@ today_wife:
   - 'https://api.iw233.cn/api.php?sort=top'
   header: 'https://weibo.com/'          #知道的自己改，不知道的不要动
   wifePrefix: '/'                       #透群友的指令前缀
+  今日萝莉: True
+  今日老公: True
+  今日老婆: True
   复读开关: True
   签🦌撤回: True
   透群友撤回: True
