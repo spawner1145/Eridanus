@@ -413,6 +413,10 @@ def main(bot,config):
     @bot.on(GroupMessageEvent)
     async def download(event: GroupMessageEvent):
         if event.pure_text.startswith("验车") or event.pure_text == "随机本子":
+            user_info = await get_user(event.user_id)
+            if user_info.permission < config.resource_collector.config["jmcomic"]["jm_comic_random_level"]:
+                await bot.send(event, "你没有权限使用该功能")
+                return
             try:
                 if event.pure_text.startswith("验车"):
                     comic_id = int(event.pure_text.replace("验车", ""))

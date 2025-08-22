@@ -18,6 +18,7 @@ asmr:
 jmcomic:
   jm_comic_search_level: 0  #jm搜索功能所需权限等级
   jm_comic_download_level: 0          #jm下载功能所需权限等级
+  jm_comic_random_level: 0  #jm随机本子功能所需权限等级
 iwara:
   iwara_search_level: 0  #iwara搜索功能所需权限等级
   iwara_download_level: 9  #iwara下载功能所需权限等级
