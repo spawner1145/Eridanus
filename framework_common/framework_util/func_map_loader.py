@@ -69,6 +69,7 @@ for root, dirs, files in os.walk(PLUGIN_DIR):
         except Exception as e:
             logger.error(f"❌ 无法导入 {module_name}: {e}")
             traceback.print_exc()
+            continue
 
 def openai_func_map():
     return convert_gemini_to_openai(function_declarations)
