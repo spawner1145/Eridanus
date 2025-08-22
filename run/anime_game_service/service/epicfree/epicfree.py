@@ -20,7 +20,10 @@ async def epic_free_game_get(bot=None,event=None,proxy_for_draw='http://127.0.0.
         if bot and event:await bot.send(event, result['msg'])
         else:print(result['msg'])
         return
-    if bot and event:self_id=event.self_id
+    if bot:
+        self_id=bot.id
+    elif event:
+        self_id=event.self_id
     else:self_id=2319804644
     formatted_date = datetime.now().strftime("%Y年%m月%d日")
     draw_json = [
