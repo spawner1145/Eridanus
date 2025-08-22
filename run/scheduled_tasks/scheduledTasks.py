@@ -15,6 +15,7 @@ from framework_common.manshuo_draw import RedisDatabase, manshuo_draw
 from framework_common.utils.random_str import random_str
 from framework_common.utils.utils import download_img
 from run.ai_llm.service.aiReplyCore import aiReplyCore
+from run.anime_game_service.service.epicfree import epic_free_game_get
 from run.basic_plugin.service.life_service import bingEveryDay, danxianglii
 from run.basic_plugin.service.nasa_api import get_nasa_apod
 from run.basic_plugin.service.weather_query import free_weather_query
@@ -319,6 +320,20 @@ def main(bot: ExtendBot, config):
                 except Exception as e:
                     logger.error(f"向群{group_id}推送{task_name}失败，原因：{e}")
                     continue
+        elif task_name=="epic喜加一":
+            proxy = config.common_config.basic_config['proxy']['http_proxy'] if \
+            config.common_config.basic_config['proxy'][
+                'http_proxy'] else None
+            path=await epic_free_game_get(proxy_for_draw=proxy)
+            logger.info_func("推送epic喜加一")
+            for group_id in config.scheduled_tasks.sheduled_tasks_push_groups_ordinary[task_name]["groups"]:
+                if group_id == 0: continue
+                try:
+                    await bot.send_group_message(group_id, Image(file=path))
+                    await sleep(6)
+                except Exception as e:
+                    logger.error(f"向群{group_id}推送{task_name}失败，原因：{e}")
+                    continue
 
     def create_dynamic_jobs():
         for task_name, task_info in scheduledTasks.items():
@@ -347,7 +362,7 @@ def main(bot: ExtendBot, config):
         scheduler.start()
 
     allow_args = ["忍术大学习", "每日天文", "bing每日图像", "单向历", "bangumi", "nightASMR", "摸鱼人日历", "新闻",
-                  "免费游戏喜加一", "早安", "晚安", "午安","每日壁画王"]
+                  "免费游戏喜加一", "早安", "晚安", "午安","每日壁画王","epic喜加一"]
 
     @bot.on(GroupMessageEvent)
     async def _(event: GroupMessageEvent):

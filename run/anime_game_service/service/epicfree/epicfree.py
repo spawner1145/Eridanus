@@ -40,7 +40,8 @@ async def epic_free_game_get(bot=None,event=None,proxy_for_draw='http://127.0.0.
     if bot and event:
         await bot.send(event, [f"{result['msg']}",Image(file=img_path)])
     else:
-        print(f"{result['msg']}")
+        return img_path
+        #print(f"{result['msg']}")
 
 
 
