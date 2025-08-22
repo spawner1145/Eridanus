@@ -25,7 +25,8 @@ def main(bot, config):
     async def batch_update_speeches():
         while True:
             try:
-                await asyncio.sleep(60)
+                bot.logger.info("Start batch update speeches")
+                await asyncio.sleep(100)
                 for from_id, groups in speech_cache.items():
                     for group_id, days in groups.items():
                         for current_day, count in days.items():
@@ -41,8 +42,7 @@ def main(bot, config):
             except Exception as e:
                 print(f"Batch update error: {e}")
 
-    async def start_batch_update():
-        bot.loop.create_task()
+
 
     @bot.on(GroupMessageEvent)
     async def on_start(event: GroupMessageEvent):
