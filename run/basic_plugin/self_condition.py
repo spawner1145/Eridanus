@@ -27,7 +27,10 @@ async def self_condition_loop(bot, config):
         await asyncio.sleep(interval)
 
 def main_canceled(bot, config):
+    """
 
+    排查问题，控制变量，暂时停用
+    """
     #查询bot自身状态
     @bot.on(GroupMessageEvent)
     async def self_info(event: GroupMessageEvent):

@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from developTools.event.events import GroupMessageEvent
 from framework_common.framework_util.yamlLoader import YAMLManager
 from developTools.event.events import GroupMessageEvent,LifecycleMetaEvent
@@ -16,20 +18,50 @@ def main(bot, config):
     db_json=config.common_config.basic_config['redis']
     db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
 
+    speech_cache = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+    global batch_update_task
+    batch_update_task = False
+    # 定时批量更新数据库
+    async def batch_update_speeches():
+        while True:
+            try:
+                await asyncio.sleep(60)
+                for from_id, groups in speech_cache.items():
+                    for group_id, days in groups.items():
+                        for current_day, count in days.items():
+                            user_data = db.read_user(f'{from_id}')
+                            if user_data == {} or 'number_speeches' not in user_data or f'{group_id}' not in user_data[
+                                'number_speeches'] or current_day not in user_data['number_speeches'][f'{group_id}']:
+                                db.write_user(f'{from_id}', {'number_speeches': {f'{group_id}': {current_day: count}}})
+                            else:
+                                db.update_user_field(f'{from_id}', f"number_speeches.{group_id}.{current_day}",
+                                                     int(user_data['number_speeches'][f'{group_id}'][
+                                                             current_day]) + count)
+                speech_cache.clear()
+            except Exception as e:
+                print(f"Batch update error: {e}")
+
+    async def start_batch_update():
+        bot.loop.create_task()
+
+    @bot.on(GroupMessageEvent)
+    async def on_start(event: GroupMessageEvent):
+        global batch_update_task
+        if not batch_update_task:
+            asyncio.create_task(batch_update_speeches())
+            batch_update_task = True
+
     @bot.on(GroupMessageEvent)
     async def number_speeches_count(event: GroupMessageEvent):
-
-        context=event.pure_text
+        context = event.pure_text
         target_group = int(event.group_id)
         from_id = int(event.sender.user_id)
-        user_data = db.read_user(f'{from_id}')
         today = datetime.now()
         year, month, day = today.year, today.month, today.day
-        current_day= f'{year}_{month}_{day}'
-        if user_data == {} or 'number_speeches' not in user_data or f'{target_group}' not in user_data['number_speeches'] or current_day not in user_data['number_speeches'][f'{target_group}']:
-            db.write_user(f'{from_id}', {'number_speeches': {f'{target_group}': {current_day: 1}}})
-        elif current_day in user_data['number_speeches'][f'{target_group}']:
-            db.update_user_field(f'{from_id}', f"number_speeches.{target_group}.{current_day}", int(user_data['number_speeches'][f'{target_group}'][current_day])+1)
+        current_day = f'{year}_{month}_{day}'
+
+        # 将计数记录到内存缓存
+        speech_cache[from_id][target_group][current_day] += 1
 
     @bot.on(GroupMessageEvent)
     async def number_speeches_check(event: GroupMessageEvent):
