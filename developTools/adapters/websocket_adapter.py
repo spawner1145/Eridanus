@@ -23,8 +23,9 @@ from developTools.utils.logger import get_logger
 
 # 引入 EventBus
 class EventBus:
-    def __init__(self) -> None:
-        self.handlers: dict[Type[EventBase], set] = {}
+    def __init__(self, max_workers: int = 100) -> None:
+        self.handlers: dict[type, set] = {}
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
 
     def subscribe(self, event: Type[EventBase], handler):
         if event not in self.handlers:
@@ -37,13 +38,22 @@ class EventBus:
             return func
         return decorator
 
-    async def emit(self, event_instance: EventBase) -> None:
+    async def emit(self, event_instance) -> None:
+        loop = asyncio.get_running_loop()
         event_type = type(event_instance)
+
         if handlers := self.handlers.get(event_type):
             for handler in handlers:
-                asyncio.create_task(handler(event_instance))
-        else:
-            pass
+                async def run_handler(h=handler):
+                    try:
+                        await loop.run_in_executor(
+                            self.executor,
+                            lambda: asyncio.run(h(event_instance))
+                        )
+                    except Exception as e:
+                        print(f"Handler {h} failed: {e}")
+
+                asyncio.create_task(run_handler())
 
 
 
