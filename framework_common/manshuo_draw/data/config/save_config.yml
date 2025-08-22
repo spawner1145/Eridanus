@@ -206,6 +206,9 @@ games:
     background: framework_common/manshuo_draw/data/img/games/lu/background_LU.jpg
     img: false
     is_shadow_img: false
+    is_rounded_corners_img: true      #是否对模块进行圆角处理
+    is_stroke_img: false               #是否对模块进行描边处理
+
 
 
 math:

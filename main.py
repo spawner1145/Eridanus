@@ -110,7 +110,7 @@ async def handler(bot, event: GroupMessageEvent | PrivateMessageEvent):
     if event.pure_text == "/reload all":
         await reload_all_plugins()
         await bot.send(event, "插件重载完成")
-    elif event.pure_text == "/status":
+    elif event.pure_text in ["/status",'/info']:
         status = await get_plugin_status()
         await self_info_core(bot, event, status)
     elif event.pure_text == "/test":

@@ -22,9 +22,6 @@ async def self_condition_loop(bot, config):
     bot.logger.info_func("自身状态监控循环启动")
     while True:
         try:
-            if not config.streaming_media.config["bili_dynamic"]["enable"]:
-                bot.logger.info_func("自身状态监控已被禁用，退出循环")
-                break
             await self_info_record()
         except Exception as e:
             bot.logger.error(f"自身状态检查出错：{e}")
@@ -44,9 +41,6 @@ def main(bot, config):
     @bot.on(LifecycleMetaEvent)
     async def start_self_condition_monitor(event):
         """生命周期事件处理"""
-        if not config.streaming_media.config["bili_dynamic"]["enable"]:
-            return
-
         global self_task, self_task_lock
 
         async with self_task_lock:
