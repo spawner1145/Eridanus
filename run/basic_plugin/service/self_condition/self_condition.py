@@ -57,7 +57,7 @@ async def self_info_core(bot=None,event=None,status=None):
     today = datetime.now()
     current_day = f'{today.year}_{today.month}_{today.day}'
     yesterday = f'{today.year}_{today.month}_{today.day-1}'
-    memory_info,cpu_info,max_memory,max_cpu={},{},False,False
+    memory_info,cpu_info,max_memory,max_cpu='未成功记录喵','未成功记录喵',False,False
     if current_day in info_data:
         today_info_data=info_data[current_day]
         info_list = sorted(today_info_data, key=lambda d: (int(d['time'].split('_')[0]), int(d['time'].split('_')[1])))
@@ -113,6 +113,7 @@ async def self_info_core(bot=None,event=None,status=None):
 
 async def self_info_record():
     gc.collect()
+    #print('自身状态记录一次')
     info = await get_process_info()
     today = datetime.now()
     current_day = f'{today.year}_{today.month}_{today.day}'
