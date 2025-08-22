@@ -21,7 +21,7 @@ async def epic_free_game_get(bot=None,event=None,proxy_for_draw='http://127.0.0.
         else:print(result['msg'])
         return
     if bot:
-        self_id=bot.id
+        self_id=bot.id if bot.id else 2319804644
     elif event:
         self_id=event.self_id
     else:self_id=2319804644

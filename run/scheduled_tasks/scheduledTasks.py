@@ -324,7 +324,7 @@ def main(bot: ExtendBot, config):
             proxy = config.common_config.basic_config['proxy']['http_proxy'] if \
             config.common_config.basic_config['proxy'][
                 'http_proxy'] else None
-            path=await epic_free_game_get(proxy_for_draw=proxy)
+            path=await epic_free_game_get(bot=bot,proxy_for_draw=proxy)
             logger.info_func("推送epic喜加一")
             for group_id in config.scheduled_tasks.sheduled_tasks_push_groups_ordinary[task_name]["groups"]:
                 if group_id == 0: continue
