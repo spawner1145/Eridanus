@@ -32,7 +32,7 @@ class RedisDatabase:
         try:self.pool = redis.ConnectionPool(host=host, port=port, db=db, decode_responses=True)
         except redis.exceptions.ConnectionError:self.pool = redis.ConnectionPool(host=host, port=port, db=db, decode_responses=True)
         self.redis = redis.StrictRedis(connection_pool=self.pool)
-
+        self.redis.config_set('save', '600 1')
     def write_user(self, user_id: str, user_data: Dict[str, Any]):
         """
         将用户数据以嵌套字典的形式存储到 Redis 中（通过 JSON 序列化）。

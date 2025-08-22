@@ -163,8 +163,12 @@ async def update_user(user_id, **kwargs):
     return f"✅ 用户 {user_id} 的信息已更新：{kwargs}"
 
 
-async def get_user(user_id, nickname="") -> User:
+async def get_user(user_id, nickname="",times=1) -> User:
     """获取用户信息，如果不存在则创建默认用户"""
+    if times > 5 :
+        logger.error(f"清理损坏数据失败, 递归次数过多")
+        return  None
+    
     try:
         # 确保数据库已初始化
         await ensure_db_initialized()
@@ -305,9 +309,11 @@ async def get_user(user_id, nickname="") -> User:
         
         # 清除缓存
         redis_cache_manager.delete(f"user:{user_id}")
-        await sleep(2)
-        # 递归重试
-        return await get_user(user_id, nickname)
+
+        await asyncio.sleep(2)
+        times +=1
+
+        return await get_user(user_id, nickname,times)
 
 
 async def get_signed_days(user_id):

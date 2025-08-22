@@ -28,15 +28,19 @@ async def download_img(url, gray_layer=False, proxy="http://127.0.0.1:7890"):
     async with httpx.AsyncClient(proxies=proxies) as client:
         try:
             response = await client.get(url)
+            if response.status_code == 302:
+                new_url = response.headers['Location']
+                response = await client.get(new_url)
         except Exception as e:
+            print(f'绘图框架无法获取图片{url}：{e}')
             try:
                 response = await client.get('https://gal.manshuo.ink/usr/uploads/galgame/zatan.png')
             except Exception:
                 response = await client.get(
                     'https://gal.manshuo.ink/usr/uploads/galgame/img/%E4%B8%96%E4%BC%8AGalgame.png')
         if response.status_code != 200:
-            response = await client.get('https://gal.manshuo.ink/usr/uploads/galgame/img/%E4%B8%96%E4%BC%8AGalgame.png')
-
+            try:response = await client.get('https://gal.manshuo.ink/usr/uploads/galgame/img/%E4%B8%96%E4%BC%8AGalgame.png')
+            except Exception as e: return None
         if gray_layer:
             try:
                 with BytesIO(response.content) as img_buffer:
@@ -71,7 +75,8 @@ async def process_img_download(img_list,is_abs_path_convert=True,gray_layer=Fals
             if is_abs_path_convert is True: content = get_abs_path(content)
             processed_img.append(Image.open(content))
         elif isinstance(content, str) and content.startswith("http"):
-            processed_img.append(Image.open(BytesIO(base64.b64decode(await download_img(content,proxy=proxy)))))
+            try:processed_img.append(Image.open(BytesIO(base64.b64decode(await download_img(content,proxy=proxy)))))
+            except Exception as e: print(e)
         elif isinstance(content, Image.Image):
             processed_img.append(content)
         else:  # 最后判断是否为base64，若不是，则不添加本次图像
