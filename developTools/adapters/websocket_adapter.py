@@ -23,9 +23,8 @@ from developTools.utils.logger import get_logger
 
 # 引入 EventBus
 class EventBus:
-    def __init__(self, max_workers: int = 100) -> None:
-        self.handlers: dict[type, set] = {}
-        self.executor = ThreadPoolExecutor(max_workers=max_workers)
+    def __init__(self) -> None:
+        self.handlers: dict[Type[EventBase], set] = {}
 
     def subscribe(self, event: Type[EventBase], handler):
         if event not in self.handlers:
@@ -38,22 +37,13 @@ class EventBus:
             return func
         return decorator
 
-    async def emit(self, event_instance) -> None:
-        loop = asyncio.get_running_loop()
+    async def emit(self, event_instance: EventBase) -> None:
         event_type = type(event_instance)
-
         if handlers := self.handlers.get(event_type):
             for handler in handlers:
-                async def run_handler(h=handler):
-                    try:
-                        await loop.run_in_executor(
-                            self.executor,
-                            lambda: asyncio.run(h(event_instance))
-                        )
-                    except Exception as e:
-                        print(f"Handler {h} failed: {e}")
-
-                asyncio.create_task(run_handler())
+                asyncio.create_task(handler(event_instance))
+        else:
+            pass
 
 
 
@@ -66,38 +56,17 @@ class WebSocketBot:
         self.response_callbacks: Dict[str, asyncio.Future] = {}
         self.receive_task: Optional[asyncio.Task] = None
 
+        self._message_queue = asyncio.Queue()  # 添加消息队列
+        self._processing_task: Optional[asyncio.Task] = None  # 添加处理任务
 
     async def _receive(self):
         """
-        接收服务端消息并分发处理。
+        接收服务端消息并放入队列。
         """
         try:
             async for response in self.websocket:
-                data = json.loads(response)
-                self.logger.info_msg(f"收到服务端响应: {data}")
-
-                # 如果是响应消息
-                if "status" in data and "echo" in data:
-                    echo = data["echo"]
-                    future = self.response_callbacks.pop(echo, None)
-                    if future and not future.done():
-                        future.set_result(data)
-                elif "post_type" in data:
-                    event_obj = EventFactory.create_event(data)
-                    try:
-                        if event_obj.post_type=="meta_event":
-
-                            if event_obj.meta_event_type=="lifecycle":
-                                self.id = int(event_obj.self_id)
-                                self.logger.info_msg(f"Bot ID: {self.id}")
-                    except:
-                        pass
-                    if event_obj:
-                        asyncio.create_task(self.event_bus.emit(event_obj))  #不能await，否则会阻塞
-                    else:
-                        self.logger.warning("无法匹配事件类型，跳过处理。")
-                else:
-                    self.logger.warning("收到未知消息格式，已忽略。")
+                # 将消息放入队列而不是直接处理
+                await self._message_queue.put(response)
         except websockets.exceptions.ConnectionClosedError as e:
             self.logger.warning(f"WebSocket 连接关闭: {e}")
             self.logger.warning("5秒后尝试重连")
@@ -112,6 +81,54 @@ class WebSocketBot:
                     future.cancel()
             self.response_callbacks.clear()
             self.receive_task = None
+
+    async def _process_messages(self):
+        """
+        从队列中处理消息。
+        """
+        try:
+            while True:
+                try:
+                    # 从队列中获取消息
+                    response = await self._message_queue.get()
+                    data = json.loads(response)
+                    self.logger.info_msg(f"收到服务端响应: {data}")
+
+                    # 如果是响应消息
+                    if "status" in data and "echo" in data:
+                        echo = data["echo"]
+                        future = self.response_callbacks.pop(echo, None)
+                        if future and not future.done():
+                            future.set_result(data)
+                    elif "post_type" in data:
+                        event_obj = EventFactory.create_event(data)
+                        try:
+                            if event_obj.post_type == "meta_event":
+                                if event_obj.meta_event_type == "lifecycle":
+                                    self.id = int(event_obj.self_id)
+                                    self.logger.info_msg(f"Bot ID: {self.id}")
+                        except:
+                            pass
+                        if event_obj:
+                            # 创建独立任务处理事件，避免阻塞消息处理
+                            asyncio.create_task(self.event_bus.emit(event_obj))
+                        else:
+                            self.logger.warning("无法匹配事件类型，跳过处理。")
+                    else:
+                        self.logger.warning("收到未知消息格式，已忽略。")
+
+                    # 标记任务完成
+                    self._message_queue.task_done()
+
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    self.logger.error(f"处理消息时发生错误: {e}", exc_info=True)
+
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self._processing_task = None
 
     async def _connect_and_run(self):
         """
