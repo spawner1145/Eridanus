@@ -62,6 +62,8 @@ def main(bot: ExtendBot,config):
 
     @bot.on(GroupMessageEvent)
     async def _(event: GroupMessageEvent):
+        if not config.groupManager.config["自动退群"]:
+            return
         if event.group_id in checked_group:
             return
         r = await bot.get_group_info(event.group_id)
@@ -69,10 +71,8 @@ def main(bot: ExtendBot,config):
             num=r["data"]["member_count"]
         except:
             return #管你这那的
-        if r["data"]["member_count"] != 0 and (
-                r["data"]["member_count"] <= config.common_config.basic_config["自动退出少于此人数的群"]
-                or r["data"]["member_count"] >= config.common_config.basic_config["自动退出多于此人数的群"])\
-                and event.group_id not in config.common_config.censor_group["whitelist"]:
+        if r["data"]["member_count"] != 0 and (r["data"]["member_count"] <= config.groupManager.config["自动退出少于此人数的群"]
+                or r["data"]["member_count"] >= config.groupManager.config["自动退出多于此人数的群"]) and event.group_id not in config.common_config.censor_group["whitelist"]:
             await bot.quit(event.group_id)
             bot.logger.info_func(f"群{event.group_id}人数{r['data']['member_count']}，自动退出")
             await bot.send_friend_message(config.common_config.basic_config["master"]["id"], f"群{event.group_id}人数{r['data']['member_count']}，自动退出")

@@ -54,6 +54,7 @@ def main(bot, config):
     global user_state, recent_interactions
     user_state = {}
     recent_interactions = {}  # 记录最近交互的用户 {user_id: group_id}
+    portrait_updating = set()  # 正在更新画像的用户集合
 
     @bot.on(GroupMessageEvent)
     async def aiReply(event: GroupMessageEvent):
@@ -274,111 +275,48 @@ def main(bot, config):
                         if event.user_id in recent_interactions:
                             del recent_interactions[event.user_id]
                             bot.logger.info(f"清理用户 {event.user_id} 的延时交互记录")
-                        # 清理完成后移除任务记录
                         if event.user_id in cleanup_tasks:
                             del cleanup_tasks[event.user_id]
 
-                    # 启动延时清理任务前先取消之前的任务
                     if event.user_id in cleanup_tasks:
                         cleanup_tasks[event.user_id].cancel()
 
                     cleanup_tasks[event.user_id] = asyncio.create_task(delayed_cleanup())
-                    """
-                    判断用户是否有继续对话的意图
-                    """
-                    if config.ai_llm.config["llm"]["自主继续对话"]:
-                        schema = {
-                            "type": "object",
-                            "properties": {
-                                "continue_intent": {
-                                    "type": "boolean",
-                                    "description": "用户是否表现出想要继续交流的意愿（如：提出问题、分享想法、表达情感、寻求建议等）"
-                                },
-                                "conversation_energy": {
-                                    "type": "string",
-                                    "enum": ["high", "medium", "low"],
-                                    "description": "当前对话的活跃度：high-热烈讨论中，medium-正常交流，low-话题将结束"
-                                },
-                                "topic_openness": {
-                                    "type": "boolean",
-                                    "description": "当前话题是否还有延展空间"
-                                }
-                            },
-                            "required": ["continue_intent", "conversation_energy", "topic_openness"]
-                        }
-                        if hasattr(event,"group_id"):
-                            group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id,
-                                                                                        config.ai_llm.config["llm"][
-                                                                                            "可获取的群聊上下文长度"],
-                                                                                        "gemini", bot)
-                        else:
-                            group_messages_bg = []
-
-                        result = await schemaReplyCore(
-                            config,
-                            schema,
-                            "分析用户的对话意图和当前聊天氛围，判断是否适合继续交流",
-                            keep_history=False,
-                            user_id=event.user_id,
-                            group_messages_bg=group_messages_bg,
-                        )
-                        if result["continue_intent"] and result["topic_openness"]:
-                            # 根据对话活跃度选择不同的回应风格
-                            if result["conversation_energy"] == "high":
-                                prompt = """继续参与这个热烈的话题讨论。你可以：
-                                    - 分享相关的个人看法或经历
-                                    - 提出有趣的相关问题
-                                    - 对刚才的观点表达认同或不同意见
-                                    - 补充新的信息或角度
-                                    保持自然随意的语调，就像朋友间的聊天。"""
-
-                            elif result["conversation_energy"] == "medium":
-                                prompt = """以轻松自然的方式延续对话。你可以：
-                                - 对刚才的话题表达看法
-                                - 分享类似经历或想法
-                                - 适当提问了解对方更多想法
-                                - 引入相关但新鲜的话题角度
-                                避免过于正式，保持聊天的随意感。"""
-
-                            else:
-                                prompt = """话题似乎要结束了，你可以：
-                                - 简单表达对刚才内容的感受
-                                - 温和地转向相关的新话题
-                                - 分享一个轻松的相关想法
-                                - 或者让对话自然结束
-                                不要强行延续，保持自然。"""
-
-                            reply_message = await aiReplyCore(
-                                [{'text': f'system: {prompt}'}],
-                                current_event.user_id,
-                                config,
-                                system_instruction="你是群聊/私聊中的一员，以自然、真实的方式参与对话。有自己的观点和情感，不要显得过于完美或机械。可以表达疑惑、好奇、认同或不同意见，就像真正的朋友一样交流。",
-                                bot=bot,
-                                event=current_event,
-                            )
-                            await send_text(bot, event, config, reply_message.strip())
                     #print(user_state[uid]["queue"])
                     """
                     总结用户特征，伪长期记忆人格
                     """
-                    if config.ai_llm.config["llm"]["长期记忆"]:
-                        if user_info.portrait_update_time == "" or (
-                                datetime.datetime.now() - datetime.datetime.fromisoformat(
-                                user_info.portrait_update_time)).total_seconds() > config.ai_llm.config["llm"][
-                            "记忆更新间隔"]:
-                            bot.logger.info(f"更新用户 {event.user_id} 设定")
-                            await update_user(event.user_id, portrait_update_time=datetime.datetime.now().isoformat())
-                            reply_message = await aiReplyCore(
-                                [{
-                                     'text': 'system: 对以上聊天内容做出总结，描绘出当前对话的用户画像，总结出当前用户的人物性格特征以及偏好。不要回复，直接给出结果'}],
-                                current_event.user_id,
-                                config,
-                                system_instruction="请总结上下文",
-                                bot=bot,
-                                event=current_event,
-                            )
-                            await update_user(event.user_id, user_portrait=reply_message.strip())
-                            await delete_latest2_history(event.user_id)
+                    if config.ai_llm.config["llm"]["长期记忆"] and event.user_id not in portrait_updating:
+                        should_update = False
+                        if user_info.portrait_update_time == "":
+                            should_update = True
+                        else:
+                            try:
+                                time_diff = (datetime.datetime.now() - datetime.datetime.fromisoformat(
+                                    user_info.portrait_update_time)).total_seconds()
+                                should_update = time_diff > config.ai_llm.config["llm"]["记忆更新间隔"]
+                            except:
+                                should_update = True
+
+                        if should_update:
+                            portrait_updating.add(event.user_id)
+                            try:
+                                bot.logger.info(f"更新用户 {event.user_id} 设定")
+                                await update_user(event.user_id,
+                                                  portrait_update_time=datetime.datetime.now().isoformat())
+                                reply_message = await aiReplyCore(
+                                    [{
+                                        'text': 'system: 对以上聊天内容做出总结，描绘出当前对话的用户画像，总结出当前用户的人物性格特征以及偏好。不要回复，直接给出结果'}],
+                                    current_event.user_id,
+                                    config,
+                                    system_instruction="请总结上下文",
+                                    bot=bot,
+                                    event=current_event,
+                                )
+                                await update_user(event.user_id, user_portrait=reply_message.strip())
+                                await delete_latest2_history(event.user_id)
+                            finally:
+                                portrait_updating.discard(event.user_id)
                     if not user_state[uid]["queue"].empty():
                         asyncio.create_task(process_user_queue(uid))
             finally:
