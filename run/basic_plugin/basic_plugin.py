@@ -152,6 +152,8 @@ async def call_pick_music(bot, event, config, aim):
 def main(bot, config):
     global avatar
     avatar = False
+    if not os.path.exists('data/pictures/cache'):
+        os.makedirs('data/pictures/cache')
 
     @bot.on(GroupMessageEvent)
     async def weather_query(event: GroupMessageEvent):
