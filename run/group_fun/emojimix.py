@@ -16,17 +16,28 @@ local_path = BASE_DIR / 'data/pictures/emojimix'
 os.makedirs(local_path, exist_ok=True)
 
 MAX_CACHE = 20
-
+supported_emojis = set()
+async def init_emoji_cache():
+    """启动时加载所有支持的emoji到内存中"""
+    global supported_emojis
+    async with aiosqlite.connect(db_path) as db:
+        cursor = await db.execute('SELECT code FROM emoji')
+        rows = await cursor.fetchall()
+        await cursor.close()
+        supported_emojis = {row[0] for row in rows}
 def emoji_to_codepoint_string(char: str) -> str:
     return '-'.join(f"{ord(c):x}" for c in char)
 
+
 async def is_supported_emoji(char: str) -> bool:
+    return char in supported_emojis
+"""
     async with aiosqlite.connect(db_path) as db:
         cursor = await db.execute('SELECT 1 FROM emoji WHERE code = ?', (char,))
         res = await cursor.fetchone()
         await cursor.close()
         return res is not None
-
+"""
 async def get_combinations(base_code: str, left_code: str, right_code: str):
     async with aiosqlite.connect(db_path) as db:
         cursor = await db.execute('''
@@ -103,6 +114,7 @@ async def emojimix_handle(a: str, b: str) -> str | None:
     return await try_mix(b_code, a_code, reverse=True)
 
 def main(bot: ExtendBot, config: YAMLManager):
+    asyncio.create_task(init_emoji_cache())
     @bot.on(GroupMessageEvent)
     async def handle_group_message(event: GroupMessageEvent):
         if len(event.pure_text) == 2:

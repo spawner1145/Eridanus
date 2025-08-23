@@ -1,15 +1,17 @@
+from concurrent.futures.thread import ThreadPoolExecutor
+
 from framework_common.manshuo_draw.core.deal_img import *
 import asyncio
 
 
 async def manshuo_draw(json_img):
-    #json_img = json.loads(json.dumps(json_img))
     json_img = json_check(json_img)
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as executor:
+        img_path = await loop.run_in_executor(executor, lambda: asyncio.run(deal_img(json_img)))
 
-    #analyze_objects("0")
-    img_path=await deal_img(json_img)
     del json_img
-    #analyze_objects("1")
+    # analyze_objects("1")
     return img_path
 
 if __name__ == '__main__':
