@@ -114,9 +114,13 @@ async def emojimix_handle(a: str, b: str) -> str | None:
     return await try_mix(b_code, a_code, reverse=True)
 
 def main(bot: ExtendBot, config: YAMLManager):
-    asyncio.create_task(init_emoji_cache())
+    activated=False
     @bot.on(GroupMessageEvent)
     async def handle_group_message(event: GroupMessageEvent):
+        nonlocal activated
+        if not activated:
+            asyncio.create_task(init_emoji_cache())
+            activated=True
         if len(event.pure_text) == 2:
             emoji1, emoji2 = event.pure_text[0], event.pure_text[1]
             result = await emojimix_handle(emoji1, emoji2)
