@@ -113,7 +113,7 @@ def main(bot, config):
         #print(url)
         if event.group_id in teamlist:
             json = teamlist[event.group_id]['data']
-            if event.get("text") is not None and event.get("text")[0] == "下载视频":
+            if event.message_chain.has(Text) and event.message_chain.get(Text)[0].text == "下载视频":
                 if json['soft_type'] not in {'bilibili', 'dy', 'wb', 'xhs', 'x'}:
                     await bot.send(event, '该类型视频暂未提供下载支持，敬请期待')
                     teamlist.pop(event.group_id)
@@ -132,7 +132,7 @@ def main(bot, config):
             bot.logger.info('链接解析成功，开始推送~~')
             if link_prising_json['video_url']:
                 teamlist[event.group_id] = {'data': link_prising_json, 'expire_at': time() + 300}
-                if event.pure_text.startswith('下载视频'):
+                if event.message_chain.has(Text) and event.message_chain.get(Text)[0].text == "下载视频":
                     bot.logger.info('视频下载ing')
                     await call_bili_download_video(bot, event, config)
                     return
