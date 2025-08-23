@@ -180,8 +180,7 @@ def main(bot,config):
         elif event.pure_text =="我的信息":
             await call_user_data_query(bot,event,config)
         elif event.pure_text == "签到":
-            pass
-            #await call_user_data_sign(bot,event,config)
+            await call_user_data_sign(bot,event,config)
         elif event.pure_text.startswith("修改城市"):
             city=event.pure_text.split("修改城市")[1]
             await call_change_city(bot,event,config,city)
