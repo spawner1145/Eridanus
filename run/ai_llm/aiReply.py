@@ -74,7 +74,7 @@ def main(bot, config):
                 if user_info.ai_token_record >= config.ai_llm.config["core"]["ai_token_limt_token"]:
                     await bot.send(event, "您的ai对话token已用完，请耐心等待下一次刷新～～")
                     return
-            await handle_message(event)
+            await handle_message(event,user_info)
         elif config.ai_llm.config["llm"]["仁济模式"]["延时相关性"]["enable"]:
             global recent_interactions
             if event.user_id in recent_interactions and recent_interactions[event.user_id] == event.group_id:
@@ -169,7 +169,7 @@ def main(bot, config):
                                 bot.logger.debug(f"用户 {event.user_id} token限制，跳过回复")
                                 return
 
-                        await handle_message(event)
+                        await handle_message(event,user_info)
                     else:
                         bot.logger.debug(
                             f"延时相关性判断未触发 - 消息: '{event.processed_message}' | bot_related: {result['bot_related']} | 置信度: {result.get('confidence', 0)} | 理由: {result.get('reason', 'N/A')}")
@@ -190,7 +190,7 @@ def main(bot, config):
                 if not user_info.permission >= config.ai_llm.config["core"]["ai_token_limt"]:
                     if user_info.ai_token_record >= config.ai_llm.config["core"]["ai_token_limt_token"]:
                         return
-                await handle_message(event)
+                await handle_message(event,user_info)
 
         elif config.ai_llm.config["llm"]["仁济模式"]["算法回复"]["enable"]:  # 仁济模式第二层(算法判断)
             sentences = await get_group_messages(event.group_id, config.ai_llm.config["llm"]["可获取的群聊上下文长度"])
@@ -216,11 +216,12 @@ def main(bot, config):
                         return
                 await handle_message(event)
 
-    async def handle_message(event):
+    async def handle_message(event,user_info=None):
         global user_state,recent_interactions
         # 锁机制
         uid = event.user_id
-        user_info = await get_user(event.user_id)
+        if user_info is None:
+            user_info = await get_user(event.user_id, event.sender.nickname)
 
         if hasattr(event, 'group_id'):
             recent_interactions[event.user_id] = event.group_id
@@ -397,7 +398,7 @@ def main(bot, config):
                 await bot.send(event, "你没有足够的权限使用该功能哦~")
                 return
             # 锁机制
-            await handle_message(event)
+            await handle_message(event,user_info)
     @bot.on(LifecycleMetaEvent)
     async def _(event: LifecycleMetaEvent):
         nonlocal apikey_check,removed_keys
