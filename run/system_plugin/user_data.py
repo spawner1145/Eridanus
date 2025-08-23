@@ -59,6 +59,10 @@ async def call_user_data_sign(bot,event,config):
     try:
         response = await today_check_api(today_wife_api, header)
         img = PlImage.open(BytesIO(response.content))
+        if config.system_plugin.config["user_data"]["签到附带原图"]:
+            img.save(f"data/pictures/cache/wife_{userid}.jpg")
+            img = f"data/pictures/cache/wife_{userid}.jpg"
+            await bot.send(event, Image(file=img))
     except Exception as e:
         traceback.print_exc()
         bot.logger.error("获取图片失败，使用预设图片: data/system/bot.png")
