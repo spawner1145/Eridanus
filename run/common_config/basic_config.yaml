@@ -30,7 +30,9 @@ PluginLoadConfig: #插件加载配置，根据配置情况调整。会影响插�
   retry_delay: 1  # 重试延迟（秒）
   memory_threshold_mb: 200  # 内存阈值（MB）
   enable_gc_between_batches: True  # 批次间是否强制垃圾回收
-
+HandlerMonitor:   #消息处理器超时检测
+  enable: false
+  handler_timeout_warning: 10  # 处理超时警告（秒）
 redis: #redis数据库相关设置，如果您不清楚请不要乱动
   redis_ip: default       #默认即为本机ip，若您使用docker安装，请填您的docker网桥
   redis_port: default

@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 import threading
+import time
 import uuid
 
 from asyncio import sleep
@@ -23,8 +24,12 @@ from developTools.utils.logger import get_logger
 
 # 引入 EventBus
 class EventBus:
-    def __init__(self) -> None:
+    def __init__(self, handler_timeout_warning: float = 10.0, enable_monitoring: bool = True) -> None:
         self.handlers: dict[Type[EventBase], set] = {}
+        self.handler_timeout_warning = handler_timeout_warning
+        self.enable_monitoring = enable_monitoring  # 可以完全关闭监控
+        self.logger = get_logger() if enable_monitoring else None
+        self._handler_info_cache: Dict[callable, str] = {}  # 缓存handler信息
 
     def subscribe(self, event: Type[EventBase], handler):
         if event not in self.handlers:
@@ -35,24 +40,105 @@ class EventBus:
         def decorator(func):
             self.subscribe(event, func)
             return func
+
         return decorator
+
+    def set_handler_timeout_warning(self, timeout: float):
+        """设置handler超时警告阈值"""
+        self.handler_timeout_warning = timeout
+        if self.logger:
+            self.logger.info_msg(f"Handler超时警告阈值已设置为: {timeout}秒")
+
+    def toggle_monitoring(self, enabled: bool):
+        """动态开启/关闭监控"""
+        self.enable_monitoring = enabled
+        if enabled and self.logger is None:
+            self.logger = get_logger()
+
+    async def _execute_handler_with_monitoring(self, handler, event_instance: EventBase):
+        """执行handler并监控其执行时间"""
+        start_time = time.perf_counter()  # 使用更精确的计时器
+
+        try:
+            # 执行handler
+            if asyncio.iscoroutinefunction(handler):
+                await handler(event_instance)
+            else:
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, handler, event_instance)
+        except Exception as e:
+            handler_info = self._get_handler_info_cached(handler)
+            self.logger.error(f"Handler执行出错 {handler_info}: {e}", exc_info=True)
+        finally:
+            execution_time = time.perf_counter() - start_time
+
+            # 只有超时时才获取handler信息和记录日志
+            if execution_time > self.handler_timeout_warning:
+                handler_info = self._get_handler_info_cached(handler)
+                self.logger.warning(
+                    f"⚠️ Handler执行时间过长: {execution_time:.3f}s (阈值: {self.handler_timeout_warning}s)\n"
+                    f"   Handler信息: {handler_info}\n"
+                    f"   事件类型: {type(event_instance).__name__}\n"
+                    f"   建议检查是否包含阻塞代码"
+                )
+
+    def _get_handler_info_cached(self, handler) -> str:
+        """获取handler信息（带缓存）"""
+        if handler in self._handler_info_cache:
+            return self._handler_info_cache[handler]
+
+        try:
+            if hasattr(handler, '__name__'):
+                func_name = handler.__name__
+            else:
+                func_name = str(handler)
+
+            # 获取源码文件信息
+            if hasattr(handler, '__code__'):
+                code = handler.__code__
+                filename = code.co_filename
+                lineno = code.co_firstlineno
+                info = f"{func_name} at {filename}:{lineno}"
+            elif hasattr(handler, '__call__') and hasattr(handler.__call__, '__code__'):
+                code = handler.__call__.__code__
+                filename = code.co_filename
+                lineno = code.co_firstlineno
+                info = f"{func_name} at {filename}:{lineno}"
+            else:
+                info = f"{func_name} (位置信息不可用)"
+
+        except Exception as e:
+            info = f"Unknown handler (获取信息失败: {e})"
+
+        # 缓存结果
+        self._handler_info_cache[handler] = info
+        return info
 
     async def emit(self, event_instance: EventBase) -> None:
         event_type = type(event_instance)
         if handlers := self.handlers.get(event_type):
-            for handler in handlers:
-                asyncio.create_task(handler(event_instance))
+            if self.enable_monitoring:
+                # 监控模式
+                for handler in handlers:
+                    asyncio.create_task(
+                        self._execute_handler_with_monitoring(handler, event_instance),
+                        name=f"handler-{handler.__name__ if hasattr(handler, '__name__') else 'unknown'}"
+                    )
+            else:
+                # 原版模式（零开销）
+                for handler in handlers:
+                    asyncio.create_task(handler(event_instance))
         else:
             pass
 
 
 
 class WebSocketBot:
-    def __init__(self, uri: str,blocked_loggers=None):
+    def __init__(self, uri: str,blocked_loggers=None,enable_monitoring=True,handler_timeout_warning=10.0):
         self.uri = uri
         self.websocket: Optional[websockets.WebSocketClientProtocol] = None
         self.logger = get_logger(blocked_loggers=blocked_loggers)
-        self.event_bus = EventBus()
+        self.event_bus = EventBus(handler_timeout_warning=handler_timeout_warning, enable_monitoring=enable_monitoring)
         self.response_callbacks: Dict[str, asyncio.Future] = {}
         self.receive_task: Optional[asyncio.Task] = None
 

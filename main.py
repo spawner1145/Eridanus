@@ -25,8 +25,10 @@ bot2 = None
 dual_manager = None
 
 config = YAMLManager("run")  # 这玩意用来动态加载和修改配置文件
+enable_monitoring = config.common_config.basic_config["HandlerMonitor"]["enable"]
+handler_timeout_warning=float(config.common_config.basic_config["HandlerMonitor"]["handler_timeout_warning"])
 bot1 = ExtendBot(config.common_config.basic_config["adapter"]["ws_client"]["ws_link"], config,
-                 blocked_loggers=["DEBUG", "INFO_MSG"])
+                 blocked_loggers=["DEBUG", "INFO_MSG"],handler_timeout_warning=handler_timeout_warning, enable_monitoring=enable_monitoring)
 
 bot1.logger.info("正在初始化....")
 
