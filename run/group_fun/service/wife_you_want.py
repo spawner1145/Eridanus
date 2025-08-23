@@ -215,21 +215,40 @@ def run_async_task():
 
 
 async def today_check_api(today_wife_api, header, num_check=None):
-    if num_check is None:
-        num_check = 0
-    if num_check > 5:   return None
     headers = {'Referer': header}
-    response = None
+
+    async def try_single_api(api_url):
+        try:
+            async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+                response = await client.get(api_url, headers=headers)
+                content_type = response.headers.get('Content-Type', '').lower()
+                print(f"API: {api_url}, Final URL: {response.url}, Status: {response.status_code}, "
+                      f"Content-Type: {content_type}, Content-Length: {len(response.content)}, "
+                      f"First-Bytes: {response.content[:10]}")
+                if (response.status_code == 200 and
+                        len(response.content) > 0 and
+                        ('image' in content_type or
+                         response.content.startswith(b'\xff\xd8') or  # JPEG
+                         response.content.startswith(b'\x89PNG'))):  # PNG
+                    return response
+                return None
+        except Exception as e:
+            print(f"Request error for {api_url}: {e}")
+            return None
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.get(today_wife_api[num_check], headers=headers)
-            return response
-    except Exception as e:
-        #print(f"Request error: {e}")
-        return await today_check_api(today_wife_api, header, num_check=num_check + 1)
+        tasks = [asyncio.create_task(try_single_api(api)) for api in today_wife_api]
+
+        for task in asyncio.as_completed(tasks):
+            result = await task
+            if result is not None:
+                for t in tasks:
+                    if not t.done():
+                        t.cancel()
+                return result
+        return None
+
     finally:
-        # 强制垃圾回收
         gc.collect()
 
 
