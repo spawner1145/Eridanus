@@ -7,12 +7,15 @@ import asyncio
 async def manshuo_draw(json_img):
     json_img = json_check(json_img)
     loop = asyncio.get_event_loop()
-    with ThreadPoolExecutor() as executor:
-        img_path = await loop.run_in_executor(executor, lambda: asyncio.run(deal_img(json_img)))
+    img_path = await loop.run_in_executor(
+        None,
+        lambda: asyncio.run(deal_img(json_img))
+    )
 
     del json_img
     # analyze_objects("1")
     return img_path
+
 
 if __name__ == '__main__':
 
