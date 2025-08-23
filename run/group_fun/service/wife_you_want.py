@@ -11,6 +11,8 @@ import aiosqlite
 import requests
 from PIL import Image, ImageDraw, ImageFont
 from framework_common.framework_util.yamlLoader import YAMLManager
+import httpx
+import asyncio
 
 db_json = YAMLManager("run").common_config.basic_config['redis']
 db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
@@ -212,18 +214,20 @@ def run_async_task():
         gc.collect()
 
 
-def today_check_api(today_wife_api, header, num_check=None):
+async def today_check_api(today_wife_api, header, num_check=None):
     if num_check is None:
         num_check = 0
+    if num_check > 5:   return None
     headers = {'Referer': header}
     response = None
 
     try:
-        response = requests.get(today_wife_api[num_check], headers=headers, timeout=30)
-        return response
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(today_wife_api[num_check], headers=headers)
+            return response
     except Exception as e:
-        print(f"Request error: {e}")
-        return None
+        #print(f"Request error: {e}")
+        return await today_check_api(today_wife_api, header, num_check=num_check + 1)
     finally:
         # 强制垃圾回收
         gc.collect()

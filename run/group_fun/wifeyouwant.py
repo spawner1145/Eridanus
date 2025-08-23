@@ -99,7 +99,7 @@ def main(bot, config):
                     # 批量处理图片，避免多次创建临时文件
                     for i in range(number):
                         try:
-                            response = today_check_api(today_wife_api, header)
+                            response = await today_check_api(today_wife_api, header)
                             temp_path = f'{filepath}/today_wife_{i}.jpg'
                             with open(temp_path, 'wb') as file:
                                 file.write(response.content)
@@ -122,7 +122,7 @@ def main(bot, config):
                             pass
                 else:
                     try:
-                        response = today_check_api(today_wife_api, header)
+                        response = await today_check_api(today_wife_api, header)
                         img_path = f'{filepath}/today_wife.jpg'
                         with open(img_path, 'wb') as file:
                             file.write(response.content)
@@ -451,7 +451,7 @@ def main(bot, config):
             try:
                 target_name = (await bot.get_group_member_info(target_group, target_id))['data']['nickname']
                 today_wife_api, header = config.group_fun.config["today_wife"]["api"], config.group_fun.config["today_wife"]["header"]
-                response = today_check_api(today_wife_api, header)
+                response = await today_check_api(today_wife_api, header)
                 img_path = f'data/pictures/wife_you_want_img/today_wife.jpg'
 
                 with open(img_path, 'wb') as file:
@@ -700,7 +700,7 @@ def main(bot, config):
                     elif flag_persona == 5:
                         today_wife_api, header = (config.group_fun.config["today_wife"]["api"],
                                                   config.group_fun.config["today_wife"]["header"])
-                        response = today_check_api(today_wife_api, header)
+                        response = await today_check_api(today_wife_api, header)
                         img_path = f'data/pictures/wife_you_want_img/today_wife.jpg'
                         with open(img_path, 'wb') as file:
                             file.write(response.content)
