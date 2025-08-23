@@ -52,11 +52,13 @@ class basicimgset:
                 basic_img.paste(layer_img_canvas, (0, -int(self.padding_up_common), width, height - int(self.padding_up_common)),mask=layer_img_canvas)
                 basic_img = basic_img.crop((0, 0, width, height - int(self.padding_up_common) ))
         else:
+            height_max = 0
             for layer_img_canvas in img_list:
                 width, height = layer_img_canvas.size
+                if height > height_max: height_max = height
                 basic_img.paste(layer_img_canvas,(x_offest, -int(self.padding_up_common), width + x_offest, height - int(self.padding_up_common)),mask=layer_img_canvas)
                 x_offest += (width - self.padding_left_common)
-
+            basic_img = basic_img.crop((0, 0, basic_img.width, height_max - int(self.padding_up_common)))
 
 
         #basic_img=basic_img.crop((0, 0, self.img_width, height))

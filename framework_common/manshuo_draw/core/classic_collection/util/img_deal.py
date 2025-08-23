@@ -454,6 +454,7 @@ async def per_img_deal(params, img, type='img'):  # 绘制完该模块后处理�
 
 #每个模块绘制完成后的处理函数，用于处理最后的模块长度以及其他部分例如垃圾回收、继承判断
 async def final_img_deal(params, type='img'):#判断是否需要增减
+    if params['jump_next_page']: params['without_draw_and_jump'] = True
     if type == 'text':
         if params['content'][0] != []:
             params['params']['content'] = [params['content'][0]]
