@@ -1,3 +1,4 @@
+import traceback
 from asyncio import sleep
 
 import asyncio
@@ -48,15 +49,20 @@ async def call_user_data_query(bot,event,config):
 async def call_user_data_sign(bot,event,config):
     context, userid, nickname = event.pure_text, event.sender.user_id, event.sender.nickname
     sign_str = await record_sign_in(event.user_id)
-    if '今天已经签到过了' in sign_str:
+    if '今天已经签到过了' in sign_str and event.sender.user_id!=config.common_config.basic_config["master"]["id"]:
         await bot.send(event, sign_str)
         return
     user_data = await get_user(event.user_id, event.sender.nickname)
     uer_sign_days = len(user_data.signed_days)
     formatted_date = datetime.now().strftime("%Y年%m月%d日")
     today_wife_api, header = config.group_fun.config["today_wife"]["api"], config.group_fun.config["today_wife"]["header"]
-    response = await today_check_api(today_wife_api, header)
-    img = PlImage.open(BytesIO(response.content))
+    try:
+        response = await today_check_api(today_wife_api, header)
+        img = PlImage.open(BytesIO(response.content))
+    except Exception as e:
+        traceback.print_exc()
+        bot.logger.error("获取图片失败，使用预设图片: data/system/bot.png")
+        img="data/system/bot.png"
     tarottxt, tarotimg = tarotChoice(config.basic_plugin.config["tarot"]["mode"])
     r = random.randint(1, 100)
     if r <= 10:
