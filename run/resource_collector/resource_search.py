@@ -357,7 +357,9 @@ def main(bot,config):
 
     @bot.on(LifecycleMetaEvent)
     async def _(event):
+        nonlocal asmr_task_activated
         if not asmr_task_activated:
+            asmr_task_activated = True
             asyncio.create_task(asmr_monitor_loop(bot, event, config))
 
     async def asmr_monitor_loop(bot, event, config):
