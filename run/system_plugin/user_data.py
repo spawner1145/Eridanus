@@ -3,9 +3,17 @@ from asyncio import sleep
 import asyncio
 import re
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
-from developTools.message.message_components import Node, Text
+from developTools.message.message_components import Node, Text, Image, At
 from framework_common.database_util.llmDB import delete_user_history, clear_all_history
 from framework_common.database_util.User import add_user, get_user, record_sign_in, update_user
+from datetime import datetime
+from run.group_fun.service.wife_you_want import today_check_api
+from io import BytesIO
+from PIL import Image as PlImage
+from run.basic_plugin.service.divination import tarotChoice
+import random
+from framework_common.manshuo_draw import *
+
 async def call_user_data_register(bot,event,config):
     data = await bot.get_group_member_info(group_id=event.group_id, user_id=event.user_id)
     r = await add_user(
@@ -21,8 +29,53 @@ async def call_user_data_query(bot,event,config):
     await bot.send(event, Node(content=[Text(str(r))]))
     #await bot.send(event, str(r))
 async def call_user_data_sign(bot,event,config):
-    r = await record_sign_in(event.user_id)
-    await bot.send(event, r)
+    context, userid, nickname = event.pure_text, event.sender.user_id, event.sender.nickname
+    sign_str = await record_sign_in(event.user_id)
+    if '今天已经签到过了' in sign_str:
+        await bot.send(event, sign_str)
+        return
+    user_data = await get_user(event.user_id, event.sender.nickname)
+    uer_sign_days = len(user_data.signed_days)
+    formatted_date = datetime.now().strftime("%Y年%m月%d日")
+    today_wife_api, header = config.group_fun.config["today_wife"]["api"], config.group_fun.config["today_wife"]["header"]
+    response = today_check_api(today_wife_api, header)
+    img = PlImage.open(BytesIO(response.content))
+    tarottxt, tarotimg = tarotChoice(config.basic_plugin.config["tarot"]["mode"])
+    r = random.randint(1, 100)
+    if r <= 10:
+        card_ = "data/pictures/Amamiya/谕吉.jpg"
+        card_txt = '[title]谕吉[/title]\n通常表示吉祥的预兆，但带有提醒或警示的意味，\n暗示虽然吉利，但仍需谨慎行事。\n吉中带谕，有幸运但不宜过于冒进。'
+    elif 10 < r <= 30:
+        card_ = "data/pictures/Amamiya/大吉.jpg"
+        card_txt = '[title]大吉[/title]\n事情非常顺利，成功几率高，\n适合开始重要的计划或行动。\n吉中之王，代表极佳的运势和极大好运。'
+    elif 30 < r <= 60:
+        card_ = "data/pictures/Amamiya/中吉.jpg"
+        card_txt = '[title]中吉[/title]\n运势较好，事情有望顺利，\n但可能会遇到一些小困难或需要付出努力。\n介于大吉和小吉之间，吉利但不完美。'
+    elif 60 < r <= 90:
+        card_ = "data/pictures/Amamiya/小吉.jpg"
+        card_txt = '[title]小吉[/title]\n总体有利，但吉祥程度较轻微，\n可能会有一些阻碍或限制。\n吉祥但平缓，适合稳妥行事。'
+    else:
+        card_ = "data/pictures/Amamiya/大兄.jpg"
+        card_txt = '[title]凶[/title]\n事情可能不顺，\n容易遇到困难、损失或不幸。\n提醒谨慎，小心防范，避免冒险。'
+
+    draw_list = [
+        {'type': 'basic_set', 'img_width': 750, 'img_height': 3000, 'is_stroke_layer': True,
+         'backdrop_mode': 'one_color', 'backdrop_color': {'color1': (235, 239, 253, 225)}},
+        {'type': 'backdrop', 'subtype': 'img', 'background': [img]},
+        {'type': 'avatar', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640"], 'upshift_extra': 15,
+         'avatar_backdrop_color': (235, 239, 253, 0),
+         'content': [f"[name]{nickname} 今天签到啦～[/name]\n[time]当前时间：{formatted_date}[/time]"]},
+        f'[title]今天 {nickname} 签到了哦[/title]（签到天数：{uer_sign_days}）',
+        {'type': 'img', 'subtype': 'common', 'img': [img], 'jump_next_page': True},
+        '[title]您今天的塔罗牌和运势为：[/title]',
+        {'type': 'img', 'subtype': 'common_with_des_right', 'img': [tarotimg, card_], 'content': [tarottxt, card_txt],
+         'is_crop': False, 'number_per_row': 1}
+    ]
+    bot.logger.info('开始制作用户签到图片')
+    await bot.send(event, Image(file=(await manshuo_draw(draw_list))))
+
+
+
 async def call_change_city(bot,event,config,city):
     user_info = await get_user(event.user_id, event.sender.nickname)
     if user_info.permission>=config.system_plugin.config["user_data"]["change_info_operate_level"]:
