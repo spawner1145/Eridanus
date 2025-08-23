@@ -130,11 +130,11 @@ async def steamsnoopall(bot, config, db,steam_api_key):
                     await bot.send_group_message(group_id, [f"{config.common_config.basic_config['bot']} 发现了群友的Steam动态了哦",Image(file=await manshuo_draw(draw_json))])
 
                 #await bot.send_group_message(group_id, [replay_content])
-            await asyncio.sleep(120)
+
         except Exception as e:
             bot.logger.error(f"Steam视奸检测出错：{e}\n{traceback.format_exc()}")
             continue
-
+        await asyncio.sleep(120)
 
 
 
