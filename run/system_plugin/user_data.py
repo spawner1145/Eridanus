@@ -25,9 +25,26 @@ async def call_user_data_register(bot,event,config):
         data["data"]["area"])
     await bot.send(event, r)
 async def call_user_data_query(bot,event,config):
-    r = await get_user(event.user_id, event.sender.nickname)
-    await bot.send(event, Node(content=[Text(str(r))]))
+    user_data = await get_user(event.user_id, event.sender.nickname)
+    uer_sign_days = len(user_data.signed_days)
     #await bot.send(event, str(r))
+    context, userid, nickname = event.pure_text, event.sender.user_id, event.sender.nickname
+    formatted_date = datetime.now().strftime("%Y年%m月%d日")
+
+    draw_list = [
+        {'type': 'basic_set', 'img_width': 1000,},
+        {'type': 'avatar', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640"], 'upshift_extra': 15,
+         'avatar_backdrop_color': (235, 239, 253, 0),
+         'content': [f"[name]{nickname} 的个人信息[/name]\n[time]当前时间：{formatted_date}[/time]"]},
+        f'用户：{user_data.user_id}， 昵称：{user_data.nickname}， 卡片名称：{user_data.card}',
+        f'性别：{user_data.sex}， 年龄：{user_data.age}， 所在城市：{user_data.city}',
+        f' {nickname} 签到天数：{uer_sign_days}）， 注册时间：{user_data.registration_date}',
+        f'权限等级：{user_data.permission}， ai对话token：{user_data.ai_token_record}',
+        f'用户画像更新时间：{user_data.portrait_update_time}， 用户画像：{user_data.user_portrait}',
+    ]
+    bot.logger.info('开始制作用户信息图片')
+    await bot.send(event, Image(file=(await manshuo_draw(draw_list))))
+
 async def call_user_data_sign(bot,event,config):
     context, userid, nickname = event.pure_text, event.sender.user_id, event.sender.nickname
     sign_str = await record_sign_in(event.user_id)
@@ -38,7 +55,7 @@ async def call_user_data_sign(bot,event,config):
     uer_sign_days = len(user_data.signed_days)
     formatted_date = datetime.now().strftime("%Y年%m月%d日")
     today_wife_api, header = config.group_fun.config["today_wife"]["api"], config.group_fun.config["today_wife"]["header"]
-    response = today_check_api(today_wife_api, header)
+    response = await today_check_api(today_wife_api, header)
     img = PlImage.open(BytesIO(response.content))
     tarottxt, tarotimg = tarotChoice(config.basic_plugin.config["tarot"]["mode"])
     r = random.randint(1, 100)
@@ -163,7 +180,8 @@ def main(bot,config):
         elif event.pure_text =="我的信息":
             await call_user_data_query(bot,event,config)
         elif event.pure_text == "签到":
-            await call_user_data_sign(bot,event,config)
+            pass
+            #await call_user_data_sign(bot,event,config)
         elif event.pure_text.startswith("修改城市"):
             city=event.pure_text.split("修改城市")[1]
             await call_change_city(bot,event,config,city)
