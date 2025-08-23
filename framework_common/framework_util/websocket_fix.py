@@ -17,86 +17,13 @@ class ExtendBot(WebSocketBot):
         super().__init__(uri, **kwargs)
         self.config = config
         self.id = 1000000
-
     async def _receive(self):
         """
-        接收服务端消息并分发处理。
+        接收服务端消息并放入队列。
         """
         try:
             async for response in self.websocket:
-                data = json.loads(response)
-                #self.logger.info(f"收到服务端响应: {data},{type(data)}")
-                if 'heartbeat' not in str(data):
-                    self.logger.info_msg(f"收到服务端响应: {data}")
-                # 如果是响应消息
-                if "status" in data and "echo" in data:
-                    echo = data["echo"]
-                    future = self.response_callbacks.pop(echo, None)
-                    if future and not future.done():
-                        future.set_result(data)
-                elif "post_type" in data:
-                    event_obj = EventFactory.create_event(data)
-                    try:
-                        if event_obj.post_type == "meta_event":
-
-                            if event_obj.meta_event_type == "lifecycle":
-
-                                self.id = int(event_obj.self_id)
-                                self.logger.info(f"Bot ID: {self.id},{type(self.id)}")
-                    except:
-                        pass
-                    if hasattr(event_obj, "group_id") and event_obj.group_id is not None:
-                        if self.config.common_config.basic_config["group_handle_logic"] == "blacklist":
-                            if event_obj.group_id not in self.config.common_config.censor_group["blacklist"]:
-                                if hasattr(event_obj, "user_id"):
-                                    if self.config.common_config.basic_config["user_handle_logic"] == "blacklist":
-                                        if event_obj.user_id not in convert_list_to_type(self.config.common_config.censor_user["blacklist"]):
-                                            asyncio.create_task(self.event_bus.emit(event_obj))
-                                        else:
-                                            self.logger.info(f"用户{event_obj.user_id}在黑名单中，跳过处理。")
-                                    elif self.config.common_config.basic_config["user_handle_logic"] == "whitelist":
-                                        if event_obj.user_id in convert_list_to_type(self.config.common_config.censor_user["whitelist"]):
-                                            asyncio.create_task(self.event_bus.emit(event_obj))
-                                        else:
-                                            self.logger.info(f"用户{event_obj.user_id}不在白名单中，跳过处理。")
-                                else:
-                                    asyncio.create_task(self.event_bus.emit(event_obj))
-                            else:
-                                self.logger.info(f"群{event_obj.group_id}在黑名单中，跳过处理。")
-                        elif self.config.common_config.basic_config["group_handle_logic"] == "whitelist":
-                            if event_obj.group_id in convert_list_to_type(self.config.common_config.censor_group["whitelist"]):
-                                if hasattr(event_obj, "user_id"):
-                                    if self.config.common_config.basic_config["user_handle_logic"] == "blacklist":
-                                        if event_obj.user_id not in convert_list_to_type(self.config.common_config.censor_user["blacklist"]):
-                                            asyncio.create_task(self.event_bus.emit(event_obj))
-                                        else:
-                                            self.logger.info(f"用户{event_obj.user_id}在黑名单中，跳过处理。")
-                                    elif self.config.common_config.basic_config["user_handle_logic"] == "whitelist":
-                                        if event_obj.user_id in convert_list_to_type(self.config.common_config.censor_user["whitelist"]):
-                                            asyncio.create_task(self.event_bus.emit(event_obj))
-                                        else:
-                                            self.logger.info(f"用户{event_obj.user_id}不在白名单中，跳过处理。")
-                                else:
-                                    asyncio.create_task(self.event_bus.emit(event_obj))
-                            else:
-                                self.logger.info(f"群{event_obj.group_id}不在白名单中，跳过处理。")
-                    elif hasattr(event_obj, "user_id"):
-                        if self.config.common_config.basic_config["user_handle_logic"] == "blacklist":
-                            if event_obj.user_id not in convert_list_to_type(self.config.common_config.censor_user["blacklist"]):
-                                asyncio.create_task(self.event_bus.emit(event_obj))
-                            else:
-                                self.logger.info(f"用户{event_obj.user_id}在黑名单中，跳过处理。")
-                        elif self.config.common_config.basic_config["user_handle_logic"] == "whitelist":
-                            if event_obj.user_id in convert_list_to_type(self.config.common_config.censor_user["whitelist"]):
-                                asyncio.create_task(self.event_bus.emit(event_obj))
-                            else:
-                                self.logger.info(f"用户{event_obj.user_id}不在白名单中，跳过处理。")
-                    elif event_obj:
-                        asyncio.create_task(self.event_bus.emit(event_obj))  #不能await，
-                    else:
-                        self.logger.warning(f"无法匹配的事件类型，请向开发群913122269反馈。源数据：{data}。")
-                else:
-                    self.logger.warning(f"收到未知消息格式，请向开发群913122269反馈。源数据：{data}。")
+                await self._message_queue.put(response)
         except websockets.exceptions.ConnectionClosedError as e:
             self.logger.warning(f"WebSocket 连接关闭: {e}")
             self.logger.warning("5秒后尝试重连")
@@ -111,6 +38,108 @@ class ExtendBot(WebSocketBot):
                     future.cancel()
             self.response_callbacks.clear()
             self.receive_task = None
+
+    async def _process_messages(self):
+        """
+        从队列中处理消息。
+        """
+        try:
+            while True:
+                try:
+                    # 从队列中获取消息
+                    response = await self._message_queue.get()
+                    data = json.loads(response)
+                    self.logger.info(f"收到服务端响应: {data}")
+
+                    # 如果是响应消息
+                    if "status" in data and "echo" in data:
+                        echo = data["echo"]
+                        future = self.response_callbacks.pop(echo, None)
+                        if future and not future.done():
+                            future.set_result(data)
+                    elif "post_type" in data:
+                        event_obj = EventFactory.create_event(data)
+                        try:
+                            if event_obj.post_type == "meta_event":
+                                if event_obj.meta_event_type == "lifecycle":
+                                    self.id = int(event_obj.self_id)
+                                    self.logger.info_msg(f"Bot ID: {self.id}")
+                        except:
+                            pass
+                        if hasattr(event_obj, "group_id") and event_obj.group_id is not None:
+                            if self.config.common_config.basic_config["group_handle_logic"] == "blacklist":
+                                if event_obj.group_id not in self.config.common_config.censor_group["blacklist"]:
+                                    if hasattr(event_obj, "user_id"):
+                                        if self.config.common_config.basic_config["user_handle_logic"] == "blacklist":
+                                            if event_obj.user_id not in convert_list_to_type(
+                                                    self.config.common_config.censor_user["blacklist"]):
+                                                asyncio.create_task(self.event_bus.emit(event_obj))
+                                            else:
+                                                self.logger.info(f"用户{event_obj.user_id}在黑名单中，跳过处理。")
+                                        elif self.config.common_config.basic_config["user_handle_logic"] == "whitelist":
+                                            if event_obj.user_id in convert_list_to_type(
+                                                    self.config.common_config.censor_user["whitelist"]):
+                                                asyncio.create_task(self.event_bus.emit(event_obj))
+                                            else:
+                                                self.logger.info(f"用户{event_obj.user_id}不在白名单中，跳过处理。")
+                                    else:
+                                        asyncio.create_task(self.event_bus.emit(event_obj))
+                                else:
+                                    self.logger.info(f"群{event_obj.group_id}在黑名单中，跳过处理。")
+                            elif self.config.common_config.basic_config["group_handle_logic"] == "whitelist":
+                                if event_obj.group_id in convert_list_to_type(
+                                        self.config.common_config.censor_group["whitelist"]):
+                                    if hasattr(event_obj, "user_id"):
+                                        if self.config.common_config.basic_config["user_handle_logic"] == "blacklist":
+                                            if event_obj.user_id not in convert_list_to_type(
+                                                    self.config.common_config.censor_user["blacklist"]):
+                                                asyncio.create_task(self.event_bus.emit(event_obj))
+                                            else:
+                                                self.logger.info(f"用户{event_obj.user_id}在黑名单中，跳过处理。")
+                                        elif self.config.common_config.basic_config["user_handle_logic"] == "whitelist":
+                                            if event_obj.user_id in convert_list_to_type(
+                                                    self.config.common_config.censor_user["whitelist"]):
+                                                asyncio.create_task(self.event_bus.emit(event_obj))
+                                            else:
+                                                self.logger.info(f"用户{event_obj.user_id}不在白名单中，跳过处理。")
+                                    else:
+                                        asyncio.create_task(self.event_bus.emit(event_obj))
+                                else:
+                                    self.logger.info(f"群{event_obj.group_id}不在白名单中，跳过处理。")
+                        elif hasattr(event_obj, "user_id"):
+                            if self.config.common_config.basic_config["user_handle_logic"] == "blacklist":
+                                if event_obj.user_id not in convert_list_to_type(
+                                        self.config.common_config.censor_user["blacklist"]):
+                                    asyncio.create_task(self.event_bus.emit(event_obj))
+                                else:
+                                    self.logger.info(f"用户{event_obj.user_id}在黑名单中，跳过处理。")
+                            elif self.config.common_config.basic_config["user_handle_logic"] == "whitelist":
+                                if event_obj.user_id in convert_list_to_type(
+                                        self.config.common_config.censor_user["whitelist"]):
+                                    asyncio.create_task(self.event_bus.emit(event_obj))
+                                else:
+                                    self.logger.info(f"用户{event_obj.user_id}不在白名单中，跳过处理。")
+                        elif event_obj:
+                            asyncio.create_task(self.event_bus.emit(event_obj))  # 不能await，
+                        else:
+                            self.logger.warning(f"无法匹配的事件类型，请向开发群913122269反馈。源数据：{data}。")
+                    else:
+                        self.logger.warning("收到未知消息格式，已忽略。")
+
+                    # 标记任务完成
+                    self._message_queue.task_done()
+
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    self.logger.error(f"处理消息时发生错误: {e}", exc_info=True)
+
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self._processing_task = None
+
+
 
     async def send(self, event: EventBase, components: list[Union[MessageComponent, str]], Quote: bool = False):
         """

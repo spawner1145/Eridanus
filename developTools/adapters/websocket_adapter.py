@@ -151,7 +151,6 @@ class WebSocketBot:
         """
         try:
             async for response in self.websocket:
-                # 将消息放入队列而不是直接处理
                 await self._message_queue.put(response)
         except websockets.exceptions.ConnectionClosedError as e:
             self.logger.warning(f"WebSocket 连接关闭: {e}")
@@ -223,8 +222,16 @@ class WebSocketBot:
         await self._connect()
         if self.websocket:
             self.receive_task = asyncio.create_task(self._receive())
-            while True:
-                await asyncio.sleep(1)
+            self._processing_task = asyncio.create_task(self._process_messages())
+
+            # 等待接收任务完成（通常是连接断开时）
+            try:
+                await self.receive_task
+            except Exception as e:
+                self.logger.error(f"接收任务出错: {e}")
+            finally:
+                if self._processing_task and not self._processing_task.done():
+                    self._processing_task.cancel()
 
     async def _connect(self):
         try:
