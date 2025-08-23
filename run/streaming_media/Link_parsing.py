@@ -120,7 +120,7 @@ def main(bot, config):
                 else:
                     bot.logger.info('视频下载ing')
                     await call_bili_download_video(bot, event, config)
-            elif event.get("text") is not None and event.get("text")[0] == "下载图片":
+            elif event.message_chain.has(Text) and event.message_chain.get(Text)[0].text == "下载图片":
                 bot.logger.info('图片下载ing')
                 await call_bili_download_video(bot, event, config,'img')
         #if not re.search(r'https?://', url or '') and not url.startswith("QQ小程序"):
