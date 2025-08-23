@@ -329,7 +329,7 @@ def main(bot, config):
             t = event.message_chain.get(Text)[0].text.strip()
         else:
             t = ""
-        user_info = await get_user(event.user_id)
+
 
         if event.pure_text == "/clear" or t == "/clear":
             await delete_user_history(event.user_id)
@@ -348,14 +348,15 @@ def main(bot, config):
             "id"] and event.get("at"):
             await delete_user_history(event.get("at")[0]["qq"])
             await bot.send(event, [Text("已清理与目标用户的对话记录")])
-        elif event.pure_text.startswith("/切人设 ") and user_info.permission >= config.ai_llm.config["core"][
-            "ai_change_character"]:
-            chara_file = str(event.pure_text).replace("/切人设 ", "")
-            if chara_file == "0":
-                reply = await change_folder_chara(config.ai_llm.config["llm"]["chara_file_name"], event.user_id)
-            else:
-                reply = await change_folder_chara(chara_file, event.user_id)
-            await bot.send(event, reply, True)
+        elif event.pure_text.startswith("/切人设 "):
+            user_info = await get_user(event.user_id)
+            if user_info.permission >= config.ai_llm.config["core"]["ai_change_character"]:
+                chara_file = str(event.pure_text).replace("/切人设 ", "")
+                if chara_file == "0":
+                    reply = await change_folder_chara(config.ai_llm.config["llm"]["chara_file_name"], event.user_id)
+                else:
+                    reply = await change_folder_chara(chara_file, event.user_id)
+                await bot.send(event, reply, True)
         elif event.pure_text.startswith("/全切人设 ") and event.user_id == config.common_config.basic_config["master"][
             "id"]:
             chara_file = str(event.pure_text).replace("/全切人设 ", "")
