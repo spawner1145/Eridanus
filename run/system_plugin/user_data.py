@@ -104,12 +104,6 @@ def main(bot,config):
         await update_user(111111111, permission=9999, nickname="主人")
     @bot.on(GroupMessageEvent)
     async def handle_group_message(event):
-        await sleep(1) #让auto_register指令优先执行
-        try:
-            user_info=await get_user(event.user_id,event.sender.nickname)
-        except Exception as e:
-            bot.logger.error(f"Error in creating users!: {e}")
-            return
         #print(user_info)
         if event.pure_text == "注册":
             await call_user_data_register(bot,event,config)
@@ -120,9 +114,11 @@ def main(bot,config):
         elif event.pure_text.startswith("修改城市"):
             city=event.pure_text.split("修改城市")[1]
             await call_change_city(bot,event,config,city)
-        elif event.pure_text.startswith("叫我") and user_info.permission>=config.system_plugin.config["user_data"]["change_info_operate_level"]:
-            nickname=event.pure_text.split("叫我")[1]
-            await call_change_name(bot,event,config,nickname)
+        elif event.pure_text.startswith("叫我"):
+            user_info=await get_user(event.user_id, event.sender.nickname)
+            if user_info.permission>=config.system_plugin.config["user_data"]["change_info_operate_level"]:
+                nickname=event.pure_text.split("叫我")[1]
+                await call_change_name(bot,event,config,nickname)
 
         if event.pure_text.startswith("授权#"):
             try:
