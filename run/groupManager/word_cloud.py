@@ -20,6 +20,7 @@ def main(bot,config):
             """
             增加一个日期提示
             """
+            await asyncio.sleep(3)
             current_datetime = datetime.now()
             formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
             event.processed_message.insert(0, {"text": f"(系统提示，当前时间为{formatted_datetime})"})
