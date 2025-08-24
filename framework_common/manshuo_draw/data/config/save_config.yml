@@ -157,7 +157,8 @@ avatar:
   stroke_avatar_radius: 55
   stroke_avatar_color: (255, 255, 255, 80) #描边的圆角颜色
 
-  is_shadow_avatar: false             #是否对头像进行阴影处理
+  is_shadow_avatar: false
+  #是否对头像进行阴影处理
   shadow_offset_avatar: 10                 #阴影的偏移量
   shadow_opacity_avatar: 50                #阴影的透明度
   blur_radius_avatar: 8                   #阴影模糊半径
@@ -197,6 +198,10 @@ avatar:
 
 games:
   LuRecordMake:
+    img_height: 1500
+    is_stroke_layer: False
+    is_shadow_layer: False
+    is_rounded_corners_layer: False
     font_lu: framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf
     font_lu_size: 24
     font_lu_color: (255,0,0)

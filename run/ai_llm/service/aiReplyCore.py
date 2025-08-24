@@ -63,7 +63,8 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
         tools = await add_send_mface(tools, config)
     if not system_instruction:
         if config.ai_llm.config["llm"]["system"]:
-            system_instruction = config.ai_llm.config["llm"]["system"]
+            system_instruction = await read_chara(user_id, config.ai_llm.config["llm"]["system"])
+            #system_instruction = config.ai_llm.config["llm"]["system"]
         else:
             system_instruction = await read_chara(user_id, await use_folder_chara(
                 config.ai_llm.config["llm"]["chara_file_name"]))
