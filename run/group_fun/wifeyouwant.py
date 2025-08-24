@@ -484,7 +484,7 @@ def main(bot, config):
             return
 
         # 热门群友统计
-        if config.group_fun.config["today_wife"]["透热门群友"] is True:
+        if config.group_fun.config["today_wife"]["透热门群友"]:
             target_group, from_id = int(event.group_id), int(event.sender.user_id)
             try:
                 count_check = await manage_group_status(from_id, target_group, 'group_owner_record')
@@ -803,48 +803,5 @@ def main(bot, config):
                 bot.logger.error(f"生成色色记录失败: {e}")
                 await bot.send(event, '生成记录时出现错误，请稍后重试')
 
-    '''@bot.on(GroupMessageEvent)
-    async def fudu(event: GroupMessageEvent):
-        global last_messages
-
-        if not config.group_fun.config["today_wife"]["复读开关"]:
-            return
-
-        read_check = ['[', '@', '来点', '随机', '#', '今日', 'gal', '查询', '搜索', '/', '瓶子', '什么',
-                      'minfo', 'id', '管理', 'mai', '更新', '今', '日记', '看', '赞我', '随机', '本周',
-                      'b50', '分数列表', '完成表', '🦌']
-
-        message = str(event.pure_text)
-        if not message:
-            return
-
-        # 检查是否包含过滤关键词
-        if any(keyword in message for keyword in read_check):
-            return
-
-        group_id = event.group_id
-
-        # 初始化群消息记录（使用有限大小的deque）
-        if group_id not in last_messages:
-            last_messages[group_id] = deque(maxlen=4)  # 只保留最近3条消息
-
-        group_messages = last_messages[group_id]
-
-        # 添加当前消息
-        group_messages.append(message)
-
-        # 检查复读条件（至少需要3条消息）
-        if len(group_messages) >= 3:
-            recent_messages = list(group_messages)
-            # 如果最新的两条消息相同，且与第三条不同
-            if (recent_messages[-1] == recent_messages[-2] and
-                    recent_messages[-1] != recent_messages[-3]):
-
-                # 30%概率触发复读
-                if random.randint(1, 100) < 30:
-                    bot.logger.info(f"复读触发群：{group_id}，复读内容：{message}")
-                    await bot.send(event, message)
-                    # 将复读的消息也加入队列，避免无限复读
-                    group_messages.append(message)'''
 
 

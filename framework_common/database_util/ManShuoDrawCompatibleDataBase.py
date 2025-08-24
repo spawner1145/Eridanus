@@ -129,7 +129,7 @@ class AsyncSQLiteDatabase:
 
     async def read_user(self, user_id: str) -> Dict[str, Any]:
         """
-        读取用户数据，并将 JSON 字符串反序列化为嵌套字典。
+        读取用户数据，并将 JSON 字符串反序列化为嵌套字典。草
         """
         logger.info(f"Reading user {user_id} from {self.db_path}")
         conn = await self._get_connection()
