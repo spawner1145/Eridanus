@@ -134,7 +134,7 @@ async def steamsnoopall(bot, config, db,steam_api_key):
         except Exception as e:
             bot.logger.error(f"Steam视奸检测出错：{e}\n{traceback.format_exc()}")
             continue
-        await asyncio.sleep(120)
+        await asyncio.sleep(300)
 
 
 

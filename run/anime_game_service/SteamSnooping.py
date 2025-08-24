@@ -24,7 +24,7 @@ def main(bot, config):
                 bot.logger.info(f"bot开始视奸群友的Steam啦！")
                 monitor_activated = True
                 loop = asyncio.get_event_loop()
-                await loop.run_in_executor(
+                loop.run_in_executor(
                     None,
                     lambda: asyncio.run(steamsnoopall(bot, config, db, steam_api_key))
                 )
