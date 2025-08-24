@@ -85,34 +85,30 @@ async def delete_group(category_name, group_name):
 async def manage_group_status(user_id, group_id, type, status=None):  # 顺序为：个人，组别和状态
     if status is None:
         context = await query_user_data(f'{type}', f'{group_id}', f"{user_id}")
-        if context is None:
-            await add_or_update_user(f'{type}', f'{group_id}', f"{user_id}", 0)
-        return await query_user_data(f'{type}', f'{group_id}', f"{user_id}")
+        return context if context is not None else 0  # 直接返回0，不写入数据库
     else:
         await add_or_update_user(f'{type}', f'{group_id}', f"{user_id}", status)
-        return await query_user_data(f'{type}', f'{group_id}', f"{user_id}")
+        return status
 
 
 async def manage_group_add(from_id, target_id, target_group):
-    times_from = await manage_group_status(from_id, target_group, 'wife_from_Year')
-    times_target = await manage_group_status(target_id, target_group, 'wife_target_Year')
-    await manage_group_status(from_id, target_group, 'wife_from_Year', times_from + 1)
-    await manage_group_status(target_id, target_group, 'wife_target_Year', times_target + 1)
+    types = ['wife_from_Year', 'wife_target_Year', 'wife_from_month', 'wife_target_month',
+             'wife_from_week', 'wife_target_week', 'wife_from_day', 'wife_target_day']
 
-    times_from = await manage_group_status(from_id, target_group, 'wife_from_month')
-    times_target = await manage_group_status(target_id, target_group, 'wife_target_month')
-    await manage_group_status(from_id, target_group, 'wife_from_month', times_from + 1)
-    await manage_group_status(target_id, target_group, 'wife_target_month', times_target + 1)
+    tasks = []
+    for i in range(0, len(types), 2):
+        tasks.append(manage_group_status(from_id, target_group, types[i]))
+        tasks.append(manage_group_status(target_id, target_group, types[i + 1]))
 
-    times_from = await manage_group_status(from_id, target_group, 'wife_from_week')
-    times_target = await manage_group_status(target_id, target_group, 'wife_target_week')
-    await manage_group_status(from_id, target_group, 'wife_from_week', times_from + 1)
-    await manage_group_status(target_id, target_group, 'wife_target_week', times_target + 1)
+    results = await asyncio.gather(*tasks)
 
-    times_from = await manage_group_status(from_id, target_group, 'wife_from_day')
-    times_target = await manage_group_status(target_id, target_group, 'wife_target_day')
-    await manage_group_status(from_id, target_group, 'wife_from_day', times_from + 1)
-    await manage_group_status(target_id, target_group, 'wife_target_day', times_target + 1)
+    update_tasks = []
+    for i, result in enumerate(results):
+        user_id = from_id if i % 2 == 0 else target_id
+        type_name = types[i]
+        update_tasks.append(manage_group_status(user_id, target_group, type_name, result + 1))
+
+    await asyncio.gather(*update_tasks)
 
 
 async def manage_group_check(target_group, type):
