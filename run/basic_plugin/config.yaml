@@ -1,5 +1,6 @@
 心知天气:
   api_key: ""     #https://www.seniverse.com/ 申请后，填私钥
+自我状态监测: false
 image_search:
   sauceno_api_key: ""          #sauceno搜图api，你可以从https://saucenao.com/user.php注册并获取
 nasa_api:
