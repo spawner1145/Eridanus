@@ -71,7 +71,6 @@ async def can_render_character(font, character,params):
         replacement_image = Image.new("RGB", (100, 100), "white")
         replacement_draw = ImageDraw.Draw(replacement_image)
         replacement_draw.text((10, 10), '\uFFFD', font=font, fill="black")
-
         # 比较两幅图像的像素数据
         return not (list(dummy_image.getdata()) == list(replacement_image.getdata()))
 

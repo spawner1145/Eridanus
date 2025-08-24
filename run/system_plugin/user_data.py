@@ -14,6 +14,7 @@ from PIL import Image as PlImage
 from run.basic_plugin.service.divination import tarotChoice
 import random
 from framework_common.manshuo_draw import *
+import json
 
 async def call_user_data_register(bot,event,config):
     data = await bot.get_group_member_info(group_id=event.group_id, user_id=event.user_id)
@@ -53,6 +54,7 @@ async def call_user_data_sign(bot,event,config):
         await bot.send(event, sign_str)
         return
     user_data = await get_user(event.user_id, event.sender.nickname)
+    user_data.signed_days = json.loads(user_data.signed_days)
     uer_sign_days = len(user_data.signed_days)
     formatted_date = datetime.now().strftime("%Y年%m月%d日")
     today_wife_api, header = config.group_fun.config["today_wife"]["api"], config.group_fun.config["today_wife"]["header"]
