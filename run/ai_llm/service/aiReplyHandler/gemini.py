@@ -140,7 +140,10 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
         elif "video" in i and bot is not None:
             mp4_data=None
             base64_encoded_data=None
-            video_url=i["video"]["url"]
+            try:
+                video_url=i["video"]["url"]
+            except:
+                video_url=i["video"]["file"]
             base64_match = BASE64_PATTERN.match(video_url)
             if base64_match:
                 mime_type = base64_match.group(1)
