@@ -26,7 +26,7 @@ def main(bot, config):
         while True:
             try:
                 bot.logger.info("Start batch update speeches")
-                await asyncio.sleep(100)
+                await asyncio.sleep(300)
                 for from_id, groups in speech_cache.items():
                     for group_id, days in groups.items():
                         for current_day, count in days.items():
