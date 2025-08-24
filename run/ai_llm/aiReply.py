@@ -64,6 +64,7 @@ def main(bot, config):
 
             ## 权限判断
             user_info = await get_user(event.user_id, event.sender.nickname)
+            bot.logger.info(f"用户：{event.user_id} 群： {event.group_id} 权限：{user_info.permission}")
             if not user_info.permission >= config.ai_llm.config["core"]["ai_reply_group"]:
                 await bot.send(event, "你没有足够的权限使用该功能~")
                 return
