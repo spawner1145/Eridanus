@@ -484,7 +484,7 @@ def main(bot, config):
             return
 
         # 热门群友统计
-        if config.group_fun.config["today_wife"]["透热门群友"]:
+        if config.group_fun.config["today_wife"]["仅热门群友"]:
             target_group, from_id = int(event.group_id), int(event.sender.user_id)
             try:
                 count_check = await manage_group_status(from_id, target_group, 'group_owner_record')
@@ -613,8 +613,7 @@ def main(bot, config):
 
                         # 尝试获取热门群友列表
                         try:
-                            if (config.group_fun.config["today_wife"]["透热门群友"] is True and
-                                    flag_persona not in [2, 1]):
+                            if (config.group_fun.config["today_wife"]["仅热门群友"] and flag_persona not in [2, 1]):
                                 friendlist_check = await query_group_users('group_owner_record', target_group)
                                 friendlist = [member[0] for member in friendlist_check[:50]]  # 限制50个
                         except Exception:
