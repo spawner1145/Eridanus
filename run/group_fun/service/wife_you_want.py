@@ -141,23 +141,22 @@ async def PIL_lu_maker(today, target_id, target_name, type='lu', contents=None):
             length_total = await manage_group_status('lu_length_total', f'basic_info', target_id)
             times_total = await manage_group_status('lu_times_total', f'basic_info', target_id)
             today_times = lu_content.get(f'{day - 1}', {}).get('times', 0)
-            content = f"[title]{today.strftime('%Y年%m月')}的开🦌计划[/title]\n今天🦌了{today_times}次，牛牛可开心了.今天牛牛一共变长了{length_today}cm\n您一共🦌了{times_total}次，现在牛牛一共{length_total}cm!!!"
+            content = f"[title]{target_name} 的{today.strftime('%Y年%m月')}的开🦌计划[/title]\n今天🦌了{today_times}次，牛牛可开心了.今天牛牛一共变长了{length_today}cm\n您一共🦌了{times_total}次，现在牛牛一共{length_total}cm!!!"
         elif type == 'supple_lu':
             length_today = await manage_group_status('lu_length', f'{year}_{month}_{day}', target_id)
             length_total = await manage_group_status('lu_length_total', f'basic_info', target_id)
             times_total = await manage_group_status('lu_times_total', f'basic_info', target_id)
-            content = f"[title]{today.strftime('%Y年%m月')}的开🦌计划[/title]\n您补🦌了！！！！！，今天牛牛一共变长了{length_today}cm\n您一共🦌了{times_total}次，现在牛牛一共{length_total}cm!!!"
+            content = f"[title]{target_name} 的{today.strftime('%Y年%m月')}的开🦌计划[/title]\n您补🦌了！！！！！，今天牛牛一共变长了{length_today}cm\n您一共🦌了{times_total}次，现在牛牛一共{length_total}cm!!!"
         elif type == 'nolu':
-            content = f"[title]{today.strftime('%Y年%m月')}的开🦌计划[/title]\n您今天戒鹿了，非常棒！"
+            content = f"[title]{target_name} 的{today.strftime('%Y年%m月')}的开🦌计划[/title]\n您今天戒鹿了，非常棒！"
 
         formatted_time = datetime.now().strftime("%Y年%m月%d日 %H:%M")
-        draw_content = [
-            {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={target_id}&s=640"],
-             'upshift_extra': 25,
-             'content': [f"[name]{target_name}[/name]\n[time]{formatted_time}[/time]"], 'type_software': 'lu', },
+        draw_content = [{'type': 'backdrop', 'subtype': 'one_color'},
+                        {'type': 'basic_set', 'img_height': 1100,'backdrop_mode':'one_color','is_stroke_layer':True,'is_shadow_layer':False,'is_rounded_corners_layer':True},
             str(content),
             {'type': 'games', 'subtype': 'LuRecordMake', 'content_list': lu_content},
         ]
+
 
         img_path = await manshuo_draw(draw_content)
 
@@ -177,6 +176,7 @@ async def PIL_lu_maker(today, target_id, target_name, type='lu', contents=None):
     finally:
         # 图片生成后强制垃圾回收
         gc.collect()
+
 
 
 async def daily_task():
@@ -255,4 +255,15 @@ async def today_check_api(today_wife_api, header, num_check=None):
 if __name__ == '__main__':
     target_id = 1270858640
     current_date = datetime.today()
+    start_time = time.perf_counter()
     asyncio.run(PIL_lu_maker(current_date, target_id, 'manshuo'))
+    end_time = time.perf_counter()
+
+    elapsed_time = end_time - start_time  # 秒数（浮点数）
+
+    # 转换为小时、分钟、秒
+    hours = int(elapsed_time // 3600)
+    minutes = int((elapsed_time % 3600) // 60)
+    seconds = elapsed_time % 60
+
+    print(f"{hours}时 {minutes}分 {seconds:.2f}秒")
