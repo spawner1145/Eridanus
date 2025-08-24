@@ -113,7 +113,7 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                     img_byte_arr.close()
                 del res
 
-        elif "record" in i:
+        elif "record" in i and bot is not None:
             origin_voice_url=i["record"]["file"]
             base64_match = BASE64_PATTERN.match(origin_voice_url)
             if base64_match:
@@ -137,7 +137,7 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
             finally:
                 if mp3_data is not None:
                     del mp3_data
-        elif "video" in i:
+        elif "video" in i and bot is not None:
             mp4_data=None
             base64_encoded_data=None
             video_url=i["video"]["url"]
@@ -168,7 +168,7 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                     del mp4_data
                 if base64_encoded_data is not None:
                     del base64_encoded_data
-        elif "reply" in i:
+        elif "reply" in i and event is not None and bot is not None:
             try:
                 event_obj=await bot.get_msg(int(event.get("reply")[0]["id"]))
                 message = await gemini_prompt_elements_construct(event_obj.processed_message) #
