@@ -3,6 +3,8 @@ import calendar
 import time
 import gc
 import traceback
+
+from framework_common.database_util.ManShuoDrawCompatibleDataBase import AsyncSQLiteDatabase
 from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 
 from datetime import datetime
@@ -14,14 +16,13 @@ from framework_common.framework_util.yamlLoader import YAMLManager
 import httpx
 import asyncio
 
-db_json = YAMLManager("run").common_config.basic_config['redis']
-db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
+db=asyncio.run(AsyncSQLiteDatabase.get_instance())
 
 
 # 添加或更新用户数据
 async def add_or_update_user(category_name, group_name, username, times):
     global db
-    db.write_user("WifeYouWant", {category_name: {group_name: {username: times}}})
+    await db.write_user("WifeYouWant", {category_name: {group_name: {username: times}}})
 
 
 # 添加或更新整组用户数据
@@ -37,7 +38,7 @@ async def add_or_update_user_collect(queue_check_make):
 # 查询某个小组的用户数据，按照次数排序
 async def query_group_users(category_name, group_name):
     global db
-    content = db.read_user("WifeYouWant")
+    content =await db.read_user("WifeYouWant")
     if content and f'{category_name}' in content and f'{group_name}' in content[f'{category_name}']:
         content_dict = content[f'{category_name}'][f'{group_name}']
         sorted_data = sorted(content_dict.items(), key=lambda item: item[1], reverse=True)
@@ -55,7 +56,7 @@ async def query_group_users(category_name, group_name):
 # 查询某个小组下特定用户的数据
 async def query_user_data(category_name, group_name, username):
     global db
-    content = db.read_user("WifeYouWant")
+    content =await db.read_user("WifeYouWant")
     if content and f'{category_name}' in content and f'{group_name}' in content[f'{category_name}'] and f'{username}' in \
             content[f'{category_name}'][f'{group_name}']:
         user_data = content[f'{category_name}'][f'{group_name}'][f'{username}']
@@ -72,13 +73,13 @@ async def query_user_data(category_name, group_name, username):
 # 删除类别及其关联数据
 async def delete_category(category_name):
     global db
-    db.delete_user_field("WifeYouWant", f'{category_name}')
+    await db.delete_user_field("WifeYouWant", f'{category_name}')
 
 
 # 删除组别及其关联用户
 async def delete_group(category_name, group_name):
     global db
-    db.delete_user_field("WifeYouWant", "category_name.group_name")
+    await db.delete_user_field("WifeYouWant", "category_name.group_name")
 
 
 async def manage_group_status(user_id, group_id, type, status=None):  # 顺序为：个人，组别和状态

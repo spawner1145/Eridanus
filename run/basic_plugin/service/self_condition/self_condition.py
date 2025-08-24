@@ -1,5 +1,7 @@
 import pprint
 import psutil
+
+from framework_common.database_util.ManShuoDrawCompatibleDataBase import AsyncSQLiteDatabase
 from run.basic_plugin.service.self_condition.core import *
 import asyncio
 from datetime import datetime, timedelta
@@ -10,8 +12,7 @@ from PIL import Image as PImage
 from framework_common.framework_util.yamlLoader import YAMLManager
 try:config = YAMLManager.get_instance()
 except Exception as e:config = YAMLManager("run")
-db_json=config.common_config.basic_config['redis']
-db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
+db=asyncio.run(AsyncSQLiteDatabase.get_instance())
 botname = config.common_config.basic_config["bot"]
 import gc
 
@@ -53,7 +54,7 @@ async def self_info_core(bot=None,event=None,status=None):
     else:bot_id,group_num,friend_num=2319804644, 0, 0
     gc.collect()
     info = await get_process_info()
-    info_data = db.read_user(f'self_info')
+    info_data =await db.read_user(f'self_info')
     today = datetime.now()
     current_day = f'{today.year}_{today.month}_{today.day}'
     yesterday = f'{today.year}_{today.month}_{today.day-1}'
@@ -119,12 +120,12 @@ async def self_info_record():
     current_day = f'{today.year}_{today.month}_{today.day}'
     now = datetime.now()  # 获取当前时间
     current_time=f'{now.hour}_{now.minute}'
-    info_data = db.read_user(f'self_info')
+    info_data =await db.read_user(f'self_info')
     if info_data == {} or current_day not in info_data or info_data[current_day] is None:
-        db.write_user(f'self_info', { current_day : [{f'self_info': info, 'time': current_time}]})
+        await db.write_user(f'self_info', { current_day : [{f'self_info': info, 'time': current_time}]})
     else:
         info_data[current_day].append({f'self_info': info, 'time': current_time})
-        db.write_user(f'self_info', {current_day: info_data[current_day]})
+        await db.write_user(f'self_info', {current_day: info_data[current_day]})
 
 def self_info_record_sync():
     asyncio.run(self_info_record())

@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 from developTools.event.events import GroupMessageEvent
+from framework_common.database_util.ManShuoDrawCompatibleDataBase import AsyncSQLiteDatabase
 from framework_common.framework_util.yamlLoader import YAMLManager
 from developTools.event.events import GroupMessageEvent,LifecycleMetaEvent
 from developTools.message.message_components import Record, Node, Text, Image, At
@@ -14,9 +15,9 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 def main(bot, config):
-    # 初始化 Redis 数据库实例。
-    db_json=config.common_config.basic_config['redis']
-    db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
+
+
+    db=asyncio.run(AsyncSQLiteDatabase.get_instance())
 
     speech_cache = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
     global batch_update_task
@@ -30,12 +31,12 @@ def main(bot, config):
                 for from_id, groups in speech_cache.items():
                     for group_id, days in groups.items():
                         for current_day, count in days.items():
-                            user_data = db.read_user(f'{from_id}')
+                            user_data =await db.read_user(f'{from_id}')
                             if user_data == {} or 'number_speeches' not in user_data or f'{group_id}' not in user_data[
                                 'number_speeches'] or current_day not in user_data['number_speeches'][f'{group_id}']:
-                                db.write_user(f'{from_id}', {'number_speeches': {f'{group_id}': {current_day: count}}})
+                                await db.write_user(f'{from_id}', {'number_speeches': {f'{group_id}': {current_day: count}}})
                             else:
-                                db.update_user_field(f'{from_id}', f"number_speeches.{group_id}.{current_day}",
+                                await db.update_user_field(f'{from_id}', f"number_speeches.{group_id}.{current_day}",
                                                      int(user_data['number_speeches'][f'{group_id}'][
                                                              current_day]) + count)
                 speech_cache.clear()
@@ -82,7 +83,7 @@ def main(bot, config):
         recall_id = await bot.send(event, f'收到查询指令，请耐心等待喵')
         year, month, day = today.year, today.month, today.day
         current_day = f'{year}_{month}_{day}'
-        all_users = db.read_all_users()
+        all_users =await db.read_all_users()
         target_group = int(event.group_id)
         number_speeches_check_list = []
         #处理得出本群的人员信息表
@@ -134,7 +135,7 @@ def main(bot, config):
         recall_id = await bot.send(event, f'收到查询指令，请耐心等待喵')
         year, month, day = today.year, today.month, today.day
         current_month = f'{year}_{month}'
-        all_users = db.read_all_users()
+        all_users =await db.read_all_users()
         target_group = int(event.group_id)
         number_speeches_check_list = []
         #处理得出本群的人员信息表

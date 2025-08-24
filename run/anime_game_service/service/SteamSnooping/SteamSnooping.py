@@ -40,7 +40,7 @@ async def steamsnoopall(bot, config, db,steam_api_key):
     while True:
         try:
             all_snoop_ids, all_snoop_ids_send, all_snoop_ids_steamid, replay_content, user_times=[],{},{},'',None
-            ids_list=db.read_user('SteamSnoopingList')
+            ids_list=await db.read_user('SteamSnoopingList')
             if not ids_list:return
             for targetgruop in ids_list:
                 if not targetgruop.isdigit():continue
@@ -65,7 +65,7 @@ async def steamsnoopall(bot, config, db,steam_api_key):
                     else:
                         item['game_start_time'] = int(time.time())
                 new_players_dict[item["steamid"]]=item
-            db.write_user('SteamSnoopingList', {'old_players_dict': new_players_dict})
+            await db.write_user('SteamSnoopingList', {'old_players_dict': new_players_dict})
 
             #将查询到的数据与旧数据比对,构建一个基于steamid的更新表
             if 'old_players_dict' in ids_list: old_players_dict = ids_list['old_players_dict']
@@ -75,7 +75,7 @@ async def steamsnoopall(bot, config, db,steam_api_key):
             current_day = f'{year}_{month}_{day}'
             for userid in all_snoop_ids_send:
                 steamid = str(all_snoop_ids_steamid[f'{userid}'])
-                user_info = db.read_user(userid)
+                user_info =await db.read_user(userid)
                 if 'times' in user_info["SteamSnooping"] and current_day in user_info["SteamSnooping"]['times']:
                     user_times=int(user_info["SteamSnooping"]['times'][current_day])
                 if steamid not in new_players_dict or steamid not in old_players_dict:continue
@@ -94,7 +94,7 @@ async def steamsnoopall(bot, config, db,steam_api_key):
                         user_times=int(user_info["SteamSnooping"]['times'][current_day]) + int(time.time() - int(old_players_dict[steamid]["game_start_time"]))
                     else:
                         user_times= int(time.time()) - int(old_players_dict[steamid]["game_start_time"])
-                    db.write_user(f'{userid}', {'SteamSnooping': {f'times': {current_day: user_times}}})
+                    await db.write_user(f'{userid}', {'SteamSnooping': {f'times': {current_day: user_times}}})
                     replay_content += f"([title]{new_players_dict[steamid]['personaname']}[/title]) 玩了 [title]{time_str} {old_players_dict[steamid]['gameextrainfo']}[/title] 后不玩了"
                 else:continue
                 if replay_content == '':continue
