@@ -23,7 +23,7 @@ def main(bot, config):
             if config.anime_game_service.config['steamsnooping']['is_snooping']:
                 bot.logger.info(f"bot开始视奸群友的Steam啦！")
                 monitor_activated = True
-                asyncio.to_thread(
+                await asyncio.to_thread(
                     lambda: asyncio.run(steamsnoopall(bot, config, db, steam_api_key))
                 )
 
