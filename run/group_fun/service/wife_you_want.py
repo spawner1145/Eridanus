@@ -2,7 +2,9 @@ import asyncio
 import calendar
 import time
 import gc
+import traceback
 
+from framework_common.database_util.ManShuoDrawCompatibleDataBase import AsyncSQLiteDatabase
 from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 
 from datetime import datetime
@@ -11,15 +13,16 @@ import aiosqlite
 import requests
 from PIL import Image, ImageDraw, ImageFont
 from framework_common.framework_util.yamlLoader import YAMLManager
+import httpx
+import asyncio
 
-db_json = YAMLManager("run").common_config.basic_config['redis']
-db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
+db=asyncio.run(AsyncSQLiteDatabase.get_instance())
 
 
 # 添加或更新用户数据
 async def add_or_update_user(category_name, group_name, username, times):
     global db
-    db.write_user("WifeYouWant", {category_name: {group_name: {username: times}}})
+    await db.write_user("WifeYouWant", {category_name: {group_name: {username: times}}})
 
 
 # 添加或更新整组用户数据
@@ -35,7 +38,7 @@ async def add_or_update_user_collect(queue_check_make):
 # 查询某个小组的用户数据，按照次数排序
 async def query_group_users(category_name, group_name):
     global db
-    content = db.read_user("WifeYouWant")
+    content =await db.read_user("WifeYouWant")
     if content and f'{category_name}' in content and f'{group_name}' in content[f'{category_name}']:
         content_dict = content[f'{category_name}'][f'{group_name}']
         sorted_data = sorted(content_dict.items(), key=lambda item: item[1], reverse=True)
@@ -53,7 +56,7 @@ async def query_group_users(category_name, group_name):
 # 查询某个小组下特定用户的数据
 async def query_user_data(category_name, group_name, username):
     global db
-    content = db.read_user("WifeYouWant")
+    content =await db.read_user("WifeYouWant")
     if content and f'{category_name}' in content and f'{group_name}' in content[f'{category_name}'] and f'{username}' in \
             content[f'{category_name}'][f'{group_name}']:
         user_data = content[f'{category_name}'][f'{group_name}'][f'{username}']
@@ -70,46 +73,42 @@ async def query_user_data(category_name, group_name, username):
 # 删除类别及其关联数据
 async def delete_category(category_name):
     global db
-    db.delete_user_field("WifeYouWant", f'{category_name}')
+    await db.delete_user_field("WifeYouWant", f'{category_name}')
 
 
 # 删除组别及其关联用户
 async def delete_group(category_name, group_name):
     global db
-    db.delete_user_field("WifeYouWant", "category_name.group_name")
+    await db.delete_user_field("WifeYouWant", "category_name.group_name")
 
 
 async def manage_group_status(user_id, group_id, type, status=None):  # 顺序为：个人，组别和状态
     if status is None:
         context = await query_user_data(f'{type}', f'{group_id}', f"{user_id}")
-        if context is None:
-            await add_or_update_user(f'{type}', f'{group_id}', f"{user_id}", 0)
-        return await query_user_data(f'{type}', f'{group_id}', f"{user_id}")
+        return context if context is not None else 0  # 直接返回0，不写入数据库
     else:
         await add_or_update_user(f'{type}', f'{group_id}', f"{user_id}", status)
-        return await query_user_data(f'{type}', f'{group_id}', f"{user_id}")
+        return status
 
 
 async def manage_group_add(from_id, target_id, target_group):
-    times_from = await manage_group_status(from_id, target_group, 'wife_from_Year')
-    times_target = await manage_group_status(target_id, target_group, 'wife_target_Year')
-    await manage_group_status(from_id, target_group, 'wife_from_Year', times_from + 1)
-    await manage_group_status(target_id, target_group, 'wife_target_Year', times_target + 1)
+    types = ['wife_from_Year', 'wife_target_Year', 'wife_from_month', 'wife_target_month',
+             'wife_from_week', 'wife_target_week', 'wife_from_day', 'wife_target_day']
 
-    times_from = await manage_group_status(from_id, target_group, 'wife_from_month')
-    times_target = await manage_group_status(target_id, target_group, 'wife_target_month')
-    await manage_group_status(from_id, target_group, 'wife_from_month', times_from + 1)
-    await manage_group_status(target_id, target_group, 'wife_target_month', times_target + 1)
+    tasks = []
+    for i in range(0, len(types), 2):
+        tasks.append(manage_group_status(from_id, target_group, types[i]))
+        tasks.append(manage_group_status(target_id, target_group, types[i + 1]))
 
-    times_from = await manage_group_status(from_id, target_group, 'wife_from_week')
-    times_target = await manage_group_status(target_id, target_group, 'wife_target_week')
-    await manage_group_status(from_id, target_group, 'wife_from_week', times_from + 1)
-    await manage_group_status(target_id, target_group, 'wife_target_week', times_target + 1)
+    results = await asyncio.gather(*tasks)
 
-    times_from = await manage_group_status(from_id, target_group, 'wife_from_day')
-    times_target = await manage_group_status(target_id, target_group, 'wife_target_day')
-    await manage_group_status(from_id, target_group, 'wife_from_day', times_from + 1)
-    await manage_group_status(target_id, target_group, 'wife_target_day', times_target + 1)
+    update_tasks = []
+    for i, result in enumerate(results):
+        user_id = from_id if i % 2 == 0 else target_id
+        type_name = types[i]
+        update_tasks.append(manage_group_status(user_id, target_group, type_name, result + 1))
+
+    await asyncio.gather(*update_tasks)
 
 
 async def manage_group_check(target_group, type):
@@ -139,23 +138,22 @@ async def PIL_lu_maker(today, target_id, target_name, type='lu', contents=None):
             length_total = await manage_group_status('lu_length_total', f'basic_info', target_id)
             times_total = await manage_group_status('lu_times_total', f'basic_info', target_id)
             today_times = lu_content.get(f'{day - 1}', {}).get('times', 0)
-            content = f"[title]{today.strftime('%Y年%m月')}的开🦌计划[/title]\n今天🦌了{today_times}次，牛牛可开心了.今天牛牛一共变长了{length_today}cm\n您一共🦌了{times_total}次，现在牛牛一共{length_total}cm!!!"
+            content = f"[title]{target_name} 的{today.strftime('%Y年%m月')}的开🦌计划[/title]\n今天🦌了{today_times}次，牛牛可开心了.今天牛牛一共变长了{length_today}cm\n您一共🦌了{times_total}次，现在牛牛一共{length_total}cm!!!"
         elif type == 'supple_lu':
             length_today = await manage_group_status('lu_length', f'{year}_{month}_{day}', target_id)
             length_total = await manage_group_status('lu_length_total', f'basic_info', target_id)
             times_total = await manage_group_status('lu_times_total', f'basic_info', target_id)
-            content = f"[title]{today.strftime('%Y年%m月')}的开🦌计划[/title]\n您补🦌了！！！！！，今天牛牛一共变长了{length_today}cm\n您一共🦌了{times_total}次，现在牛牛一共{length_total}cm!!!"
+            content = f"[title]{target_name} 的{today.strftime('%Y年%m月')}的开🦌计划[/title]\n您补🦌了！！！！！，今天牛牛一共变长了{length_today}cm\n您一共🦌了{times_total}次，现在牛牛一共{length_total}cm!!!"
         elif type == 'nolu':
-            content = f"[title]{today.strftime('%Y年%m月')}的开🦌计划[/title]\n您今天戒鹿了，非常棒！"
+            content = f"[title]{target_name} 的{today.strftime('%Y年%m月')}的开🦌计划[/title]\n您今天戒鹿了，非常棒！"
 
         formatted_time = datetime.now().strftime("%Y年%m月%d日 %H:%M")
-        draw_content = [
-            {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={target_id}&s=640"],
-             'upshift_extra': 25,
-             'content': [f"[name]{target_name}[/name]\n[time]{formatted_time}[/time]"], 'type_software': 'lu', },
+        draw_content = [{'type': 'backdrop', 'subtype': 'one_color'},
+                        {'type': 'basic_set', 'img_height': 1100,'backdrop_mode':'one_color','is_stroke_layer':True,'is_shadow_layer':False,'is_rounded_corners_layer':True},
             str(content),
             {'type': 'games', 'subtype': 'LuRecordMake', 'content_list': lu_content},
         ]
+
 
         img_path = await manshuo_draw(draw_content)
 
@@ -169,11 +167,13 @@ async def PIL_lu_maker(today, target_id, target_name, type='lu', contents=None):
     except Exception as e:
         print(f"PIL_lu_maker error: {e}")
         # 确保在异常情况下也能清理内存
+        #traceback.print_exc()
         gc.collect()
         raise
     finally:
         # 图片生成后强制垃圾回收
         gc.collect()
+
 
 
 async def daily_task():
@@ -211,30 +211,56 @@ def run_async_task():
         gc.collect()
 
 
-def today_check_api(today_wife_api, header, num_check=None):
-    if num_check is None:
-        num_check = 0
+async def today_check_api(today_wife_api, header, num_check=None):
     headers = {'Referer': header}
-    response = None
+
+    async def try_single_api(api_url):
+        try:
+            async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+                response = await client.get(api_url, headers=headers)
+                content_type = response.headers.get('Content-Type', '').lower()
+                print(f"API: {api_url}, Final URL: {response.url}, Status: {response.status_code}, "
+                      f"Content-Type: {content_type}, Content-Length: {len(response.content)}, "
+                      f"First-Bytes: {response.content[:10]}")
+                if (response.status_code == 200 and
+                        len(response.content) > 0 and
+                        ('image' in content_type or
+                         response.content.startswith(b'\xff\xd8') or  # JPEG
+                         response.content.startswith(b'\x89PNG'))):  # PNG
+                    return response
+                return None
+        except Exception as e:
+            print(f"Request error for {api_url}: {e}")
+            return None
 
     try:
-        response = requests.get(today_wife_api[num_check], headers=headers, timeout=30)
-        return response
-    except Exception as e:
-        print(f"Request error: {e}")
+        tasks = [asyncio.create_task(try_single_api(api)) for api in today_wife_api]
+
+        for task in asyncio.as_completed(tasks):
+            result = await task
+            if result is not None:
+                for t in tasks:
+                    if not t.done():
+                        t.cancel()
+                return result
         return None
+
     finally:
-        # 强制垃圾回收
         gc.collect()
 
 
 if __name__ == '__main__':
-    DATABASE = "wifeyouwant.db"  # 修改路径为小写
     target_id = 1270858640
     current_date = datetime.today()
+    start_time = time.perf_counter()
+    asyncio.run(PIL_lu_maker(current_date, target_id, 'manshuo'))
+    end_time = time.perf_counter()
 
-    try:
-        asyncio.run(PIL_lu_maker(current_date, target_id, 'manshuo'))
-    finally:
-        # 程序结束时强制垃圾回收
-        gc.collect()
+    elapsed_time = end_time - start_time  # 秒数（浮点数）
+
+    # 转换为小时、分钟、秒
+    hours = int(elapsed_time // 3600)
+    minutes = int((elapsed_time % 3600) // 60)
+    seconds = elapsed_time % 60
+
+    print(f"{hours}时 {minutes}分 {seconds:.2f}秒")

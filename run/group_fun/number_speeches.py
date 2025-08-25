@@ -1,4 +1,7 @@
+from collections import defaultdict
+
 from developTools.event.events import GroupMessageEvent
+from framework_common.database_util.ManShuoDrawCompatibleDataBase import AsyncSQLiteDatabase
 from framework_common.framework_util.yamlLoader import YAMLManager
 from developTools.event.events import GroupMessageEvent,LifecycleMetaEvent
 from developTools.message.message_components import Record, Node, Text, Image, At
@@ -12,24 +15,54 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 def main(bot, config):
-    # 初始化 Redis 数据库实例
-    db_json=config.common_config.basic_config['redis']
-    db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
+
+
+    db=asyncio.run(AsyncSQLiteDatabase.get_instance())
+
+    speech_cache = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+    global batch_update_task
+    batch_update_task = False
+    # 定时批量更新数据库
+    async def batch_update_speeches():
+        while True:
+            try:
+                bot.logger.info("Start batch update speeches")
+                await asyncio.sleep(300)
+                for from_id, groups in speech_cache.items():
+                    for group_id, days in groups.items():
+                        for current_day, count in days.items():
+                            user_data =await db.read_user(f'{from_id}')
+                            if user_data == {} or 'number_speeches' not in user_data or f'{group_id}' not in user_data[
+                                'number_speeches'] or current_day not in user_data['number_speeches'][f'{group_id}']:
+                                await db.write_user(f'{from_id}', {'number_speeches': {f'{group_id}': {current_day: count}}})
+                            else:
+                                await db.update_user_field(f'{from_id}', f"number_speeches.{group_id}.{current_day}",
+                                                     int(user_data['number_speeches'][f'{group_id}'][
+                                                             current_day]) + count)
+                speech_cache.clear()
+            except Exception as e:
+                print(f"Batch update error: {e}")
+
+
+
+    @bot.on(GroupMessageEvent)
+    async def on_start(event: GroupMessageEvent):
+        global batch_update_task
+        if not batch_update_task:
+            asyncio.create_task(batch_update_speeches())
+            batch_update_task = True
 
     @bot.on(GroupMessageEvent)
     async def number_speeches_count(event: GroupMessageEvent):
-
-        context=event.pure_text
+        context = event.pure_text
         target_group = int(event.group_id)
         from_id = int(event.sender.user_id)
-        user_data = db.read_user(f'{from_id}')
         today = datetime.now()
         year, month, day = today.year, today.month, today.day
-        current_day= f'{year}_{month}_{day}'
-        if user_data == {} or 'number_speeches' not in user_data or f'{target_group}' not in user_data['number_speeches'] or current_day not in user_data['number_speeches'][f'{target_group}']:
-            db.write_user(f'{from_id}', {'number_speeches': {f'{target_group}': {current_day: 1}}})
-        elif current_day in user_data['number_speeches'][f'{target_group}']:
-            db.update_user_field(f'{from_id}', f"number_speeches.{target_group}.{current_day}", int(user_data['number_speeches'][f'{target_group}'][current_day])+1)
+        current_day = f'{year}_{month}_{day}'
+
+        # 将计数记录到内存缓存
+        speech_cache[from_id][target_group][current_day] += 1
 
     @bot.on(GroupMessageEvent)
     async def number_speeches_check(event: GroupMessageEvent):
@@ -50,7 +83,7 @@ def main(bot, config):
         recall_id = await bot.send(event, f'收到查询指令，请耐心等待喵')
         year, month, day = today.year, today.month, today.day
         current_day = f'{year}_{month}_{day}'
-        all_users = db.read_all_users()
+        all_users =await db.read_all_users()
         target_group = int(event.group_id)
         number_speeches_check_list = []
         #处理得出本群的人员信息表
@@ -102,7 +135,7 @@ def main(bot, config):
         recall_id = await bot.send(event, f'收到查询指令，请耐心等待喵')
         year, month, day = today.year, today.month, today.day
         current_month = f'{year}_{month}'
-        all_users = db.read_all_users()
+        all_users =await db.read_all_users()
         target_group = int(event.group_id)
         number_speeches_check_list = []
         #处理得出本群的人员信息表

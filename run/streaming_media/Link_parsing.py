@@ -14,7 +14,8 @@ import traceback
 from collections import defaultdict
 from time import time
 teamlist = defaultdict(lambda: {'data': None, 'expire_at': 0})
-
+global Cachecleaner
+Cachecleaner=False
 
 async def call_bili_download_video(bot, event, config,type_download='video'):
     if event.group_id in teamlist:
@@ -82,12 +83,16 @@ def main(bot, config):
             bot.logger.info('✅ 系统已正确读取到node.js')
     except:
         pass
-    global Cachecleaner
-    Cachecleaner=False
+
     proxy = config.common_config.basic_config["proxy"]["http_proxy"]
+
 
     @bot.on(GroupMessageEvent)
     async def Link_Prising_search(event: GroupMessageEvent):
+        global Cachecleaner
+        if not Cachecleaner:
+            asyncio.create_task(cleanup_teamlist(bot))
+            
         if event.message_chain.has(Json):
             url=event.message_chain.get(Json)[0].data
             event_context = json_handle.loads(url)
@@ -107,15 +112,16 @@ def main(bot, config):
             return
         #print(url)
         if event.group_id in teamlist:
+            bot.logger.info('链接解析缓存中，开始推送~~')
             json = teamlist[event.group_id]['data']
-            if event.get("text") is not None and event.get("text")[0] == "下载视频":
+            if event.message_chain.has(Text) and event.message_chain.get(Text)[0].text == "下载视频":
                 if json['soft_type'] not in {'bilibili', 'dy', 'wb', 'xhs', 'x'}:
                     await bot.send(event, '该类型视频暂未提供下载支持，敬请期待')
                     teamlist.pop(event.group_id)
                 else:
                     bot.logger.info('视频下载ing')
                     await call_bili_download_video(bot, event, config)
-            elif event.get("text") is not None and event.get("text")[0] == "下载图片":
+            elif event.message_chain.has(Text) and event.message_chain.get(Text)[0].text == "下载图片":
                 bot.logger.info('图片下载ing')
                 await call_bili_download_video(bot, event, config,'img')
         #if not re.search(r'https?://', url or '') and not url.startswith("QQ小程序"):
@@ -126,8 +132,8 @@ def main(bot, config):
         if link_prising_json['status']:
             bot.logger.info('链接解析成功，开始推送~~')
             if link_prising_json['video_url']:
-                teamlist[event.group_id] = {'data': link_prising_json, 'expire_at': time() + 300}
-                if event.pure_text.startswith('下载视频'):
+                teamlist[event.group_id] = {'data': link_prising_json, 'expire_at': time() + 600}
+                if event.message_chain.has(Text) and event.message_chain.get(Text)[0].text == "下载视频":
                     bot.logger.info('视频下载ing')
                     await call_bili_download_video(bot, event, config)
                     return
@@ -144,34 +150,35 @@ def main(bot, config):
             if link_prising_json['reason']:
                 #print(link_prising_json)
                 bot.logger.error(str('bili_link_error ') + link_prising_json['reason'])
-    @bot.on(LifecycleMetaEvent)
-    async def cleanup_teamlist(event: LifecycleMetaEvent):
-        global Cachecleaner
-        if Cachecleaner:
-            return
-        while True:
-            bot.logger.info('清理链接解析过期缓存')
-            Cachecleaner=True
-            current_time = time()
-            expired_keys = []
-            for k, v in teamlist.items():
-                if isinstance(k,str) and k.endswith('_recall'):
-                    continue
-                if isinstance(v, dict) and 'expire_at' in v:
-                    if v['expire_at'] < current_time:
-                        expired_keys.append(k)
-                else:
+
+async def cleanup_teamlist(bot):
+    global Cachecleaner
+    if Cachecleaner:
+        #bot.logger.info("不再重复启动清理程序。")
+        return
+    while True:
+        bot.logger.info('清理链接解析过期缓存')
+        Cachecleaner=True
+        current_time = time()
+        expired_keys = []
+        for k, v in teamlist.items():
+            if isinstance(k,str) and k.endswith('_recall'):
+                continue
+            if isinstance(v, dict) and 'expire_at' in v:
+                if v['expire_at'] < current_time:
                     expired_keys.append(k)
-                    bot.logger.warning(f"teamlist[{k}] 格式错误，强制清理: {type(v)}")
+            else:
+                expired_keys.append(k)
+                bot.logger.warning(f"teamlist[{k}] 格式错误，强制清理: {type(v)}")
 
-            for key in expired_keys:
-                # 同时清理对应的 _recall 键（如果存在）
-                recall_key = f'{key}_recall'
-                teamlist.pop(key, None)
-                teamlist.pop(recall_key, None)
-                bot.logger.debug(f"清理 teamlist 键: {key} 和 {recall_key}")
+        for key in expired_keys:
+            # 同时清理对应的 _recall 键（如果存在）
+            recall_key = f'{key}_recall'
+            teamlist.pop(key, None)
+            teamlist.pop(recall_key, None)
+            bot.logger.debug(f"清理 teamlist 键: {key} 和 {recall_key}")
 
-            bot.logger.debug(f"teamlist 当前键数: {len(teamlist)}")
-            collected = gc.collect()
-            bot.logger.info_func(f"回收了 {collected} 个对象")
-            await asyncio.sleep(1000)
+        bot.logger.debug(f"teamlist 当前键数: {len(teamlist)}")
+        collected = gc.collect()
+        bot.logger.info_func(f"回收了 {collected} 个对象")
+        await asyncio.sleep(1000)

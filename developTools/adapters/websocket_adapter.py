@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 import threading
+import time
 import uuid
 
 from asyncio import sleep
@@ -23,8 +24,12 @@ from developTools.utils.logger import get_logger
 
 # 引入 EventBus
 class EventBus:
-    def __init__(self) -> None:
+    def __init__(self, handler_timeout_warning: float = 10.0, enable_monitoring: bool = True) -> None:
         self.handlers: dict[Type[EventBase], set] = {}
+        self.handler_timeout_warning = handler_timeout_warning
+        self.enable_monitoring = enable_monitoring  # 可以完全关闭监控
+        self.logger = get_logger() if enable_monitoring else None
+        self._handler_info_cache: Dict[callable, str] = {}  # 缓存handler信息
 
     def subscribe(self, event: Type[EventBase], handler):
         if event not in self.handlers:
@@ -35,60 +40,118 @@ class EventBus:
         def decorator(func):
             self.subscribe(event, func)
             return func
+
         return decorator
+
+    def set_handler_timeout_warning(self, timeout: float):
+        """设置handler超时警告阈值"""
+        self.handler_timeout_warning = timeout
+        if self.logger:
+            self.logger.info_msg(f"Handler超时警告阈值已设置为: {timeout}秒")
+
+    def toggle_monitoring(self, enabled: bool):
+        """动态开启/关闭监控"""
+        self.enable_monitoring = enabled
+        if enabled and self.logger is None:
+            self.logger = get_logger()
+
+    async def _execute_handler_with_monitoring(self, handler, event_instance: EventBase):
+        """执行handler并监控其执行时间"""
+        start_time = time.perf_counter()  # 使用更精确的计时器
+
+        try:
+            # 执行handler
+            if asyncio.iscoroutinefunction(handler):
+                await handler(event_instance)
+            else:
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, handler, event_instance)
+        except Exception as e:
+            handler_info = self._get_handler_info_cached(handler)
+            self.logger.error(f"Handler执行出错 {handler_info}: {e}", exc_info=True)
+        finally:
+            execution_time = time.perf_counter() - start_time
+
+            # 只有超时时才获取handler信息和记录日志
+            if execution_time > self.handler_timeout_warning:
+                handler_info = self._get_handler_info_cached(handler)
+                self.logger.warning(
+                    f"⚠️ Handler执行时间过长: {execution_time:.3f}s (阈值: {self.handler_timeout_warning}s)\n"
+                    f"   Handler信息: {handler_info}\n"
+                    f"   事件类型: {type(event_instance).__name__}\n"
+                    f"   建议检查是否包含阻塞代码"
+                )
+
+    def _get_handler_info_cached(self, handler) -> str:
+        """获取handler信息（带缓存）"""
+        if handler in self._handler_info_cache:
+            return self._handler_info_cache[handler]
+
+        try:
+            if hasattr(handler, '__name__'):
+                func_name = handler.__name__
+            else:
+                func_name = str(handler)
+
+            # 获取源码文件信息
+            if hasattr(handler, '__code__'):
+                code = handler.__code__
+                filename = code.co_filename
+                lineno = code.co_firstlineno
+                info = f"{func_name} at {filename}:{lineno}"
+            elif hasattr(handler, '__call__') and hasattr(handler.__call__, '__code__'):
+                code = handler.__call__.__code__
+                filename = code.co_filename
+                lineno = code.co_firstlineno
+                info = f"{func_name} at {filename}:{lineno}"
+            else:
+                info = f"{func_name} (位置信息不可用)"
+
+        except Exception as e:
+            info = f"Unknown handler (获取信息失败: {e})"
+
+        # 缓存结果
+        self._handler_info_cache[handler] = info
+        return info
 
     async def emit(self, event_instance: EventBase) -> None:
         event_type = type(event_instance)
         if handlers := self.handlers.get(event_type):
-            tasks = [asyncio.create_task(handler(event_instance)) for handler in handlers]
-            await asyncio.gather(*tasks)
+            if self.enable_monitoring:
+                # 监控模式
+                for handler in handlers:
+                    asyncio.create_task(
+                        self._execute_handler_with_monitoring(handler, event_instance),
+                        name=f"handler-{handler.__name__ if hasattr(handler, '__name__') else 'unknown'}"
+                    )
+            else:
+                # 原版模式（零开销）
+                for handler in handlers:
+                    asyncio.create_task(handler(event_instance))
         else:
             pass
-            #print(f"未找到处理 {event_type} 的监听器")
 
 
 
 class WebSocketBot:
-    def __init__(self, uri: str,blocked_loggers=None):
+    def __init__(self, uri: str,blocked_loggers=None,enable_monitoring=True,handler_timeout_warning=10.0):
         self.uri = uri
         self.websocket: Optional[websockets.WebSocketClientProtocol] = None
         self.logger = get_logger(blocked_loggers=blocked_loggers)
-        self.event_bus = EventBus()
+        self.event_bus = EventBus(handler_timeout_warning=handler_timeout_warning, enable_monitoring=enable_monitoring)
         self.response_callbacks: Dict[str, asyncio.Future] = {}
         self.receive_task: Optional[asyncio.Task] = None
 
+        self._message_queue = asyncio.Queue()  # 添加消息队列
+        self._processing_task: Optional[asyncio.Task] = None  # 添加处理任务
 
     async def _receive(self):
         """
-        接收服务端消息并分发处理。
+        接收服务端消息并放入队列。
         """
         try:
             async for response in self.websocket:
-                data = json.loads(response)
-                self.logger.info_msg(f"收到服务端响应: {data}")
-
-                # 如果是响应消息
-                if "status" in data and "echo" in data:
-                    echo = data["echo"]
-                    future = self.response_callbacks.pop(echo, None)
-                    if future and not future.done():
-                        future.set_result(data)
-                elif "post_type" in data:
-                    event_obj = EventFactory.create_event(data)
-                    try:
-                        if event_obj.post_type=="meta_event":
-
-                            if event_obj.meta_event_type=="lifecycle":
-                                self.id = int(event_obj.self_id)
-                                self.logger.info_msg(f"Bot ID: {self.id}")
-                    except:
-                        pass
-                    if event_obj:
-                        asyncio.create_task(self.event_bus.emit(event_obj))  #不能await，否则会阻塞
-                    else:
-                        self.logger.warning("无法匹配事件类型，跳过处理。")
-                else:
-                    self.logger.warning("收到未知消息格式，已忽略。")
+                await self._message_queue.put(response)
         except websockets.exceptions.ConnectionClosedError as e:
             self.logger.warning(f"WebSocket 连接关闭: {e}")
             self.logger.warning("5秒后尝试重连")
@@ -104,6 +167,54 @@ class WebSocketBot:
             self.response_callbacks.clear()
             self.receive_task = None
 
+    async def _process_messages(self):
+        """
+        从队列中处理消息。
+        """
+        try:
+            while True:
+                try:
+                    # 从队列中获取消息
+                    response = await self._message_queue.get()
+                    data = json.loads(response)
+                    self.logger.info_msg(f"收到服务端响应: {data}")
+
+                    # 如果是响应消息
+                    if "status" in data and "echo" in data:
+                        echo = data["echo"]
+                        future = self.response_callbacks.pop(echo, None)
+                        if future and not future.done():
+                            future.set_result(data)
+                    elif "post_type" in data:
+                        event_obj = EventFactory.create_event(data)
+                        try:
+                            if event_obj.post_type == "meta_event":
+                                if event_obj.meta_event_type == "lifecycle":
+                                    self.id = int(event_obj.self_id)
+                                    self.logger.info_msg(f"Bot ID: {self.id}")
+                        except:
+                            pass
+                        if event_obj:
+                            # 创建独立任务处理事件，避免阻塞消息处理
+                            asyncio.create_task(self.event_bus.emit(event_obj))
+                        else:
+                            self.logger.warning("无法匹配事件类型，跳过处理。")
+                    else:
+                        self.logger.warning("收到未知消息格式，已忽略。")
+
+                    # 标记任务完成
+                    self._message_queue.task_done()
+
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    self.logger.error(f"处理消息时发生错误: {e}", exc_info=True)
+
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self._processing_task = None
+
     async def _connect_and_run(self):
         """
         建立 WebSocket 连接并开始接收消息。
@@ -111,8 +222,16 @@ class WebSocketBot:
         await self._connect()
         if self.websocket:
             self.receive_task = asyncio.create_task(self._receive())
-            while True:
-                await asyncio.sleep(1)
+            self._processing_task = asyncio.create_task(self._process_messages())
+
+            # 等待接收任务完成（通常是连接断开时）
+            try:
+                await self.receive_task
+            except Exception as e:
+                self.logger.error(f"接收任务出错: {e}")
+            finally:
+                if self._processing_task and not self._processing_task.done():
+                    self._processing_task.cancel()
 
     async def _connect(self):
         try:
@@ -124,10 +243,7 @@ class WebSocketBot:
             await asyncio.sleep(5)
             await self._connect_and_run()
 
-    async def _call_api(self, action: str, params: dict, timeout: int = 20) -> dict:
-        """
-        发送请求并异步等待响应，确保 bot 不被阻塞，同时 api调用 仍然能 await 拿到结果。
-        """
+    async def _call_api(self, action: str, params: dict, timeout: int = 5) -> dict:
         if self.websocket is None:
             self.logger.warning("WebSocket 未连接，无法调用 API。")
             return {"status": "failed", "retcode": -1, "data": None, "echo": str(uuid.uuid4())}
@@ -140,17 +256,13 @@ class WebSocketBot:
         self.response_callbacks[echo] = future
         await self.websocket.send(json.dumps(message))
 
-        async def wait_for_response():
-            try:
-                return await asyncio.wait_for(future, timeout=timeout)
-            except asyncio.TimeoutError:
-                self.logger.error(f"调用 API 超时: {action}")
-                if echo in self.response_callbacks:
-                    del self.response_callbacks[echo]
-                return {"status": "failed", "retcode": 98, "data": None, "msg": "API call timeout", "echo": echo}
-
-        return await asyncio.create_task(wait_for_response())
-
+        try:
+            return await asyncio.wait_for(future, timeout=timeout)
+        except asyncio.TimeoutError:
+            self.logger.error(f"调用 API 超时: {action}")
+            if echo in self.response_callbacks:
+                del self.response_callbacks[echo]
+            return {"status": "failed", "retcode": 98, "data": None, "msg": "API call timeout", "echo": echo}
 
 
 

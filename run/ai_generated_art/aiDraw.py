@@ -10,7 +10,7 @@ from developTools.message.message_components import Image, Node, Text
 from run.ai_generated_art.service.modelscope_text2img import modelscope_drawer
 from run.ai_generated_art.service.hf_t2i import hf_drawer
 from run.ai_generated_art.service.setu_moderate import pic_audit_standalone
-from run.basic_plugin.service.ai_text2img import bing_dalle3, flux_ultra
+from run.basic_plugin.service.ai_text2img import bing_dalle3, flux_ultra, doubao
 from framework_common.database_util.User import get_user, User
 from framework_common.utils.random_str import random_str
 from run.ai_generated_art.service.aiDraw import n4, n3, SdDraw0, getloras, getcheckpoints, ckpt2, n4re0, n3re0, \
@@ -108,6 +108,7 @@ async def call_text2img2(bot, event, config, tag):
         functions = [
             bing_dalle3(prompt, proxy),
             flux_ultra(prompt, proxy),
+            doubao(prompt, proxy),
             # ideo_gram(prompt, proxy),
             # flux_speed(prompt, proxy), #也不要这个
             # recraft_v3(prompt, proxy), #不要这个

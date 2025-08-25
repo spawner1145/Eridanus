@@ -55,7 +55,7 @@ class GeminiKeyManager:
             cls._instance = super(GeminiKeyManager, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, initial_api_keys: List[str], check_interval_seconds: int = 1000,
+    def __init__(self, initial_api_keys: List[str], check_interval_seconds: int = 3000,
                  timeout_per_key: float = 10.0, max_concurrent_checks: int = 20):
         if self._initialized:
             return

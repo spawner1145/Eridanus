@@ -1,23 +1,32 @@
+import asyncio
+
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Text, Image, At
+from framework_common.database_util.ManShuoDrawCompatibleDataBase import AsyncSQLiteDatabase
 from framework_common.manshuo_draw import *
 from run.anime_game_service.service.SteamSnooping import *
 import threading
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-import time
-from datetime import datetime
+
 
 
 def main(bot, config):
     # 初始化 Redis 数据库实例
-    db_json=config.common_config.basic_config['redis']
-    db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
+    db=asyncio.run(AsyncSQLiteDatabase.get_instance())
     steam_api_key=config.anime_game_service.config['steamsnooping']['steam_api_key']
     #print(steam_api_key)
-    if config.anime_game_service.config['steamsnooping']['is_snooping']:
-        bot.logger.info(f"bot开始视奸群友的Steam啦！")
-        threading.Thread(target=url_main(bot, config, db,steam_api_key), daemon=True).start()
+
+    monitor_activated = False
+    @bot.on(GroupMessageEvent)
+    async def _(event: GroupMessageEvent):
+        nonlocal monitor_activated
+        if not monitor_activated:
+            if config.anime_game_service.config['steamsnooping']['is_snooping']:
+                bot.logger.info(f"bot开始视奸群友的Steam啦！")
+                monitor_activated = True
+                await asyncio.to_thread(
+                    lambda: asyncio.run(steamsnoopall(bot, config, db, steam_api_key))
+                )
+
 
     #绑定一个steamid
     @bot.on(GroupMessageEvent)
@@ -30,10 +39,10 @@ def main(bot, config):
             if not steamid:
                 await bot.send(event, '请输入正确的 Steam ID 或 Steam好友代码，格式: steambind [Steam ID 或 Steam好友代码]')
                 return
-            db.write_user(userid, {'SteamSnooping':{'steamid':steamid}})
+            await db.write_user(userid, {'SteamSnooping':{'steamid':steamid}})
             await bot.send(event, ['成功绑定 ',At(qq=userid), f' 的steamid ({steamid}) 喵'])
         elif context.lower()=='steamunbind':
-            db.write_user(userid, {'SteamSnooping': {'steamid': None}})
+            await db.write_user(userid, {'SteamSnooping': {'steamid': None}})
             await bot.send(event, ['成功解除 ', At(qq=userid), f' 的steamid绑定'])
 
 
@@ -54,7 +63,7 @@ def main(bot, config):
         else:return
 
         if not (steamid and steam_friend_code):
-            steaminfodata = db.read_user(userid)
+            steaminfodata =await db.read_user(userid)
             if steaminfodata and  'SteamSnooping' in steaminfodata:
                 #await bot.send(event, Image(file=(await manshuo_draw())))
                 steamid = steaminfodata["SteamSnooping"]["steamid"]
@@ -114,19 +123,19 @@ def main(bot, config):
     async def add_steamid_snoop(event: GroupMessageEvent):
         context, userid = event.pure_text, str(event.sender.user_id)
         target_group = str(event.group_id)
-        if event.message_chain.has(At):
+        if event.message_chain.has(At) and event.message_chain.has(Text):
             userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
         if context.lower().startswith('steamadd'):
-            steaminfodata = db.read_user(userid)
+            steaminfodata =await db.read_user(userid)
             if not (steaminfodata and  'SteamSnooping' in steaminfodata):
                 await bot.send(event, '此用户好像还未绑定，发送"steamhelp"来查看帮助哦')
                 return
-            db.write_user('SteamSnoopingList', {target_group:{userid:True,
+            await db.write_user('SteamSnoopingList', {target_group:{userid:True,
                                                               f'{userid}_steamid':steaminfodata["SteamSnooping"]["steamid"],
                                                               }})
             await bot.send(event, [At(qq=userid), f' 已被加入视歼列表'])
         elif context.lower()=='steamremove':
-            db.write_user('SteamSnoopingList', {target_group:{userid:False}})
+            await db.write_user('SteamSnoopingList', {target_group:{userid:False}})
             await bot.send(event, [At(qq=userid), f' 已被移除视歼列表'])
 
     #查看当前群的视奸列表

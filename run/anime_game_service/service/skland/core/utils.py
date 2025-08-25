@@ -27,7 +27,7 @@ async def get_characters_and_bind(user, userid, db):
             #pprint.pprint(character_dict)
             if len(app["bindingList"]) == 1:character_dict['isdefault'] = True
             if character_dict['isdefault'] is True:
-                db.write_user(userid, {'skland': {'character_info': character_dict}})
+                await db.write_user(userid, {'skland': {'character_info': character_dict}})
                 return character_dict
 
 

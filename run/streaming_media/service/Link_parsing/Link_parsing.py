@@ -120,7 +120,7 @@ if __name__ == "__main__":#测试用，不用管
     url='https://live.bilibili.com/1947172143'
     url='https://t.bilibili.com/1082791822623768624?share_source=pc_native'
     url='https://t.bilibili.com/1091661166310064137'
-    #url='https://t.bilibili.com/1079052679915765778'
+    url='https://t.bilibili.com/1099886612828913666?share_source=pc_native'
 
     asyncio.run(link_prising(url))
     #asyncio.run(youxi_pil_new_text())

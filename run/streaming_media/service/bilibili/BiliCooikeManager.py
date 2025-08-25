@@ -11,11 +11,11 @@ import os
 import threading
 from developTools.utils.logger import get_logger
 from framework_common.utils.PlayWrightAutoInstaller import check_and_install_playwright
-
+from bilibili_api import hot, sync,Credential,dynamic
 check_and_install_playwright()
 
 logger = get_logger("bili_cookie_manager")
-
+is_login_check = False
 
 class BiliCookieManager:
     """
@@ -113,7 +113,7 @@ class BiliCookieManager:
             finally:
                 self._playwright = None
 
-    async def get_cookies(self, auto_login: bool = True,bot=None,group_id=None,check_cookie=True) -> List[Dict[str, Any]]:
+    async def get_cookies(self, auto_login: bool = True,bot=None,group_id=None,check_cookie=True,login=False) -> List[Dict[str, Any]]:
         """
         获取Cookie
 
@@ -124,9 +124,19 @@ class BiliCookieManager:
             Cookie列表
         """
         async with self._lock:
+
+            global is_login_check
+            if login is True:
+                is_login_check = False
+                cookies = await self._login_and_get_cookies(bot,group_id)
+                if cookies:
+                    self.cookies = cookies
+                    await self._save_cookies()
+                    return self.cookies.copy()
+
             # 先尝试加载本地Cookie
             await self._load_cookies()
-            if check_cookie is False:return self.cookies.copy()
+            if not check_cookie:return self.cookies.copy()
 
             # 验证Cookie有效性
             if self.cookies and await self._validate_cookies() and group_id is None:
@@ -171,43 +181,28 @@ class BiliCookieManager:
         if not self.cookies:
             return False
 
-        page = None
-        try:
-            await self._initialize()
-            page = await self.browser.new_page(
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            )
-
-            # 设置Cookie
-            await page.context.add_cookies(self.cookies)
-
-            # 访问B站检查登录状态
-            await page.goto('https://www.bilibili.com', wait_until='networkidle', timeout=30000)
-
-            # 检查是否有用户头像
-            user_info = await page.query_selector('.header-avatar-wrap')
-            is_valid = user_info is not None
-
-            if is_valid:
-                #logger.info("Cookie验证成功")
-                pass
-            else:
-                logger.warning("Cookie验证失败")
-
-            return is_valid
-
-        except Exception as e:
-            logger.error(f"Cookie验证过程出错: {e}")
+        BILI_SESSDATA, bili_jct, buvid3, DedeUserID = '', '', '', ''
+        for cookie in self.cookies:
+            if cookie['name'] == 'SESSDATA':
+                BILI_SESSDATA = cookie['value']
+            elif cookie['name'] == 'bili_jct':
+                bili_jct = cookie['value']
+            elif cookie['name'] == 'buvid3':
+                buvid3 = cookie['value']
+            elif cookie['name'] == 'DedeUserID':
+                DedeUserID = cookie['value']
+        credential = Credential(sessdata=BILI_SESSDATA, bili_jct=bili_jct, buvid3=buvid3, dedeuserid=DedeUserID)
+        if sync(credential.check_refresh()):
             return False
-        finally:
-            if page:
-                try:
-                    await page.close()
-                except Exception as e:
-                    logger.warning(f"关闭验证页面时出错: {e}")
+        else:
+            return True
+
 
     async def _login_and_get_cookies(self,bot=None,group_id=None) -> Optional[List[Dict[str, Any]]]:
         """登录并获取Cookie"""
+        global is_login_check
+        if is_login_check:return None
+        is_login_check = True
         page = None
         try:
             await self._initialize()
@@ -259,13 +254,13 @@ class BiliCookieManager:
                 elif group_id is None:
                     await bot.send_friend_message(bot.master,Image(file=str(self.qr_file.absolute())))
                     await bot.send_friend_message(bot.master,"请使用bilibili扫描二维码登录...")
+                is_login_check = False
             except:
                 traceback.print_exc()
             logger.info("请扫描二维码登录...")
 
             # 等待登录成功
             login_success = await self._wait_for_login_success(page)
-
             if login_success:
                 logger.info("登录成功！正在获取cookies...")
                 if bot is not None:

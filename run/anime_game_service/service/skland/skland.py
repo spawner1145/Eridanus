@@ -1,5 +1,6 @@
 from requests import RequestException
 
+from framework_common.database_util.ManShuoDrawCompatibleDataBase import AsyncSQLiteDatabase
 from run.anime_game_service.service.skland.core import *
 import json
 import asyncio
@@ -7,7 +8,6 @@ from io import BytesIO
 from datetime import datetime, timedelta
 from PIL import Image as PImage
 import base64
-import pprint
 from framework_common.utils.install_and_import import install_and_import
 dateutil=install_and_import('qrcode', 'qrcode')
 import qrcode
@@ -15,8 +15,10 @@ import pprint
 from developTools.message.message_components import Text, Image, At
 from framework_common.manshuo_draw import *
 from framework_common.framework_util.yamlLoader import YAMLManager
-db_json=YAMLManager("run").common_config.basic_config['redis']
-db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
+try:config = YAMLManager.get_instance()
+except Exception as e:config = YAMLManager("run")
+
+db=asyncio.run(AsyncSQLiteDatabase.get_instance())
 
 
 
@@ -59,7 +61,7 @@ async def qrcode_get(userid,bot=None,event=None):
             'user_id' : cred.userId,
         }
         #pprint.pprint(user_dict)
-        db.write_user(userid, {'skland':{'user_info':user_dict}})
+        await db.write_user(userid, {'skland':{'user_info':user_dict}})
         character_dict=await get_characters_and_bind(user_dict, userid, db)
         if bot and event:await bot.send(event, f'绑定成功，欢迎 {character_dict["nickname"]}')
         else:
@@ -72,7 +74,7 @@ async def qrcode_get(userid,bot=None,event=None):
 
 
 async def self_info(userid,bot=None,event=None):
-    user_info = db.read_user(userid)
+    user_info =await db.read_user(userid)
     if not (user_info and 'skland' in user_info and 'user_info' in user_info['skland'] and 'character_info' in user_info['skland']):
         await bot.send(event, '此用户还未绑定，请发送 ‘森空岛帮助’ 查看菜单')
         return
@@ -96,7 +98,7 @@ async def skland_signin(userid,bot=None,event=None):
         cred = CRED(cred=user_info['cred'], token=user_info['cred_token'])
         return await SklandAPI.ark_sign(cred, uid, channel_master_id=channel_master_id)
 
-    user_info = db.read_user(userid)
+    user_info =await db.read_user(userid)
     if not (user_info and 'skland' in user_info and 'user_info' in user_info['skland'] and 'character_info' in user_info['skland']):
         if bot and event:await bot.send(event, '此用户还未绑定，请发送 ‘森空岛帮助’ 查看菜单')
         else:print('此用户还未绑定，请发送 ‘森空岛帮助’ 查看菜单')
@@ -121,7 +123,7 @@ async def skland_info(userid,bot=None,event=None):
     async def get_character_info(user_info, uid: str):
         return await SklandAPI.ark_card(CRED(cred=user_info['cred'], token=user_info['cred_token']), uid)
 
-    user_info = db.read_user(userid)
+    user_info =await db.read_user(userid)
     if not (user_info and 'skland' in user_info and 'user_info' in user_info['skland'] and 'character_info' in user_info['skland']):
         if bot and event:await bot.send(event, '此用户还未绑定，请发送 ‘森空岛帮助’ 查看菜单')
         else:print('此用户还未绑定，请发送 ‘森空岛帮助’ 查看菜单')
@@ -147,7 +149,7 @@ async def rouge_info(userid,rg_type,bot=None,event=None):
         return await SklandAPI.get_rogue(
             CRED(cred=user_info['cred'], token=user_info['cred_token'], userId=str(user_info['user_id'])),
             uid,topic_id,)
-    user_info = db.read_user(userid)
+    user_info =await db.read_user(userid)
     if not (user_info and 'skland' in user_info and 'user_info' in user_info['skland'] and 'character_info' in user_info['skland']):
         if bot and event:await bot.send(event, '此用户还未绑定，请发送 ‘森空岛帮助’ 查看菜单')
         else:print('此用户还未绑定，请发送 ‘森空岛帮助’ 查看菜单')
@@ -171,7 +173,7 @@ async def rouge_detailed_info(userid,rg_type,game_count=None,favored=False,bot=N
         return await SklandAPI.get_rogue(
             CRED(cred=user_info['cred'], token=user_info['cred_token'], userId=str(user_info['user_id'])),
             uid,topic_id,)
-    user_info = db.read_user(userid)
+    user_info =await db.read_user(userid)
     if not (user_info and 'skland' in user_info and 'user_info' in user_info['skland'] and 'character_info' in user_info['skland']):
         if bot and event:await bot.send(event, '此用户还未绑定，请发送 ‘森空岛帮助’ 查看菜单')
         else:print('此用户还未绑定，请发送 ‘森空岛帮助’ 查看菜单')

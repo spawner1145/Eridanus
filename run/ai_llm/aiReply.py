@@ -54,6 +54,7 @@ def main(bot, config):
     global user_state, recent_interactions
     user_state = {}
     recent_interactions = {}  # 记录最近交互的用户 {user_id: group_id}
+    portrait_updating = set()  # 正在更新画像的用户集合
 
     @bot.on(GroupMessageEvent)
     async def aiReply(event: GroupMessageEvent):
@@ -63,17 +64,18 @@ def main(bot, config):
 
             ## 权限判断
             user_info = await get_user(event.user_id, event.sender.nickname)
+            bot.logger.info(f"用户：{event.user_id} 群： {event.group_id} 权限：{user_info.permission}")
             if not user_info.permission >= config.ai_llm.config["core"]["ai_reply_group"]:
                 await bot.send(event, "你没有足够的权限使用该功能~")
                 return
-            if event.group_id == 913122269 and not user_info.permission >= 66:
+            if event.group_id in [913122269,1050663831] and not user_info.permission >= 66:
                 #await bot.send(event,"你没有足够的权限使用该功能哦~")
                 return
             if not user_info.permission >= config.ai_llm.config["core"]["ai_token_limt"]:
                 if user_info.ai_token_record >= config.ai_llm.config["core"]["ai_token_limt_token"]:
                     await bot.send(event, "您的ai对话token已用完，请耐心等待下一次刷新～～")
                     return
-            await handle_message(event)
+            await handle_message(event,user_info)
         elif config.ai_llm.config["llm"]["仁济模式"]["延时相关性"]["enable"]:
             global recent_interactions
             if event.user_id in recent_interactions and recent_interactions[event.user_id] == event.group_id:
@@ -159,7 +161,7 @@ def main(bot, config):
                             bot.logger.debug(f"用户 {event.user_id} 权限不足，跳过回复")
                             return
 
-                        if event.group_id == 913122269 and not user_info.permission >= 66:
+                        if event.group_id in [913122269,1050663831] and not user_info.permission >= 66:
                             bot.logger.debug(f"特定群组 {event.group_id} 权限不足，跳过回复")
                             return
 
@@ -168,7 +170,7 @@ def main(bot, config):
                                 bot.logger.debug(f"用户 {event.user_id} token限制，跳过回复")
                                 return
 
-                        await handle_message(event)
+                        await handle_message(event,user_info)
                     else:
                         bot.logger.debug(
                             f"延时相关性判断未触发 - 消息: '{event.processed_message}' | bot_related: {result['bot_related']} | 置信度: {result.get('confidence', 0)} | 理由: {result.get('reason', 'N/A')}")
@@ -189,7 +191,7 @@ def main(bot, config):
                 if not user_info.permission >= config.ai_llm.config["core"]["ai_token_limt"]:
                     if user_info.ai_token_record >= config.ai_llm.config["core"]["ai_token_limt_token"]:
                         return
-                await handle_message(event)
+                await handle_message(event,user_info)
 
         elif config.ai_llm.config["llm"]["仁济模式"]["算法回复"]["enable"]:  # 仁济模式第二层(算法判断)
             sentences = await get_group_messages(event.group_id, config.ai_llm.config["llm"]["可获取的群聊上下文长度"])
@@ -215,11 +217,12 @@ def main(bot, config):
                         return
                 await handle_message(event)
 
-    async def handle_message(event):
+    async def handle_message(event,user_info=None):
         global user_state,recent_interactions
         # 锁机制
         uid = event.user_id
-        user_info = await get_user(event.user_id)
+        if user_info is None:
+            user_info = await get_user(event.user_id, event.sender.nickname)
 
         if hasattr(event, 'group_id'):
             recent_interactions[event.user_id] = event.group_id
@@ -274,111 +277,48 @@ def main(bot, config):
                         if event.user_id in recent_interactions:
                             del recent_interactions[event.user_id]
                             bot.logger.info(f"清理用户 {event.user_id} 的延时交互记录")
-                        # 清理完成后移除任务记录
                         if event.user_id in cleanup_tasks:
                             del cleanup_tasks[event.user_id]
 
-                    # 启动延时清理任务前先取消之前的任务
                     if event.user_id in cleanup_tasks:
                         cleanup_tasks[event.user_id].cancel()
 
                     cleanup_tasks[event.user_id] = asyncio.create_task(delayed_cleanup())
-                    """
-                    判断用户是否有继续对话的意图
-                    """
-                    if config.ai_llm.config["llm"]["自主继续对话"]:
-                        schema = {
-                            "type": "object",
-                            "properties": {
-                                "continue_intent": {
-                                    "type": "boolean",
-                                    "description": "用户是否表现出想要继续交流的意愿（如：提出问题、分享想法、表达情感、寻求建议等）"
-                                },
-                                "conversation_energy": {
-                                    "type": "string",
-                                    "enum": ["high", "medium", "low"],
-                                    "description": "当前对话的活跃度：high-热烈讨论中，medium-正常交流，low-话题将结束"
-                                },
-                                "topic_openness": {
-                                    "type": "boolean",
-                                    "description": "当前话题是否还有延展空间"
-                                }
-                            },
-                            "required": ["continue_intent", "conversation_energy", "topic_openness"]
-                        }
-                        if hasattr(event,"group_id"):
-                            group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id,
-                                                                                        config.ai_llm.config["llm"][
-                                                                                            "可获取的群聊上下文长度"],
-                                                                                        "gemini", bot)
-                        else:
-                            group_messages_bg = []
-
-                        result = await schemaReplyCore(
-                            config,
-                            schema,
-                            "分析用户的对话意图和当前聊天氛围，判断是否适合继续交流",
-                            keep_history=False,
-                            user_id=event.user_id,
-                            group_messages_bg=group_messages_bg,
-                        )
-                        if result["continue_intent"] and result["topic_openness"]:
-                            # 根据对话活跃度选择不同的回应风格
-                            if result["conversation_energy"] == "high":
-                                prompt = """继续参与这个热烈的话题讨论。你可以：
-                                    - 分享相关的个人看法或经历
-                                    - 提出有趣的相关问题
-                                    - 对刚才的观点表达认同或不同意见
-                                    - 补充新的信息或角度
-                                    保持自然随意的语调，就像朋友间的聊天。"""
-
-                            elif result["conversation_energy"] == "medium":
-                                prompt = """以轻松自然的方式延续对话。你可以：
-                                - 对刚才的话题表达看法
-                                - 分享类似经历或想法
-                                - 适当提问了解对方更多想法
-                                - 引入相关但新鲜的话题角度
-                                避免过于正式，保持聊天的随意感。"""
-
-                            else:
-                                prompt = """话题似乎要结束了，你可以：
-                                - 简单表达对刚才内容的感受
-                                - 温和地转向相关的新话题
-                                - 分享一个轻松的相关想法
-                                - 或者让对话自然结束
-                                不要强行延续，保持自然。"""
-
-                            reply_message = await aiReplyCore(
-                                [{'text': f'system: {prompt}'}],
-                                current_event.user_id,
-                                config,
-                                system_instruction="你是群聊/私聊中的一员，以自然、真实的方式参与对话。有自己的观点和情感，不要显得过于完美或机械。可以表达疑惑、好奇、认同或不同意见，就像真正的朋友一样交流。",
-                                bot=bot,
-                                event=current_event,
-                            )
-                            await send_text(bot, event, config, reply_message.strip())
                     #print(user_state[uid]["queue"])
                     """
                     总结用户特征，伪长期记忆人格
                     """
-                    if config.ai_llm.config["llm"]["长期记忆"]:
-                        if user_info.portrait_update_time == "" or (
-                                datetime.datetime.now() - datetime.datetime.fromisoformat(
-                                user_info.portrait_update_time)).total_seconds() > config.ai_llm.config["llm"][
-                            "记忆更新间隔"]:
-                            bot.logger.info(f"更新用户 {event.user_id} 设定")
-                            reply_message = await aiReplyCore(
-                                [{
-                                     'text': 'system: 对以上聊天内容做出总结，描绘出当前对话的用户画像，总结出当前用户的人物性格特征以及偏好。不要回复，直接给出结果'}],
-                                current_event.user_id,
-                                config,
-                                system_instruction="请总结上下文",
-                                bot=bot,
-                                event=current_event,
-                            )
-                            await update_user(event.user_id, user_portrait=reply_message.strip())
-                            await update_user(event.user_id, portrait_update_time=datetime.datetime.now().isoformat())
-                            await delete_latest2_history(event.user_id)
+                    if config.ai_llm.config["llm"]["长期记忆"] and event.user_id not in portrait_updating:
+                        should_update = False
+                        if user_info.portrait_update_time == "":
+                            should_update = True
+                        else:
+                            try:
+                                time_diff = (datetime.datetime.now() - datetime.datetime.fromisoformat(
+                                    user_info.portrait_update_time)).total_seconds()
+                                should_update = time_diff > config.ai_llm.config["llm"]["记忆更新间隔"]
+                            except:
+                                should_update = True
+
+                        if should_update:
+                            portrait_updating.add(event.user_id)
+                            try:
+                                bot.logger.info(f"更新用户 {event.user_id} 设定")
+                                await update_user(event.user_id,
+                                                  portrait_update_time=datetime.datetime.now().isoformat())
+                                reply_message = await aiReplyCore(
+                                    [{
+                                        'text': 'system: 对以上聊天内容做出总结，描绘出当前对话的用户画像，总结出当前用户的人物性格特征以及偏好。不要回复，直接给出结果'}],
+                                    current_event.user_id,
+                                    config,
+                                    system_instruction="请总结上下文",
+                                    bot=bot,
+                                    event=current_event,
+                                )
+                                await update_user(event.user_id, user_portrait=reply_message.strip())
+                                await delete_latest2_history(event.user_id)
+                            finally:
+                                portrait_updating.discard(event.user_id)
                     if not user_state[uid]["queue"].empty():
                         asyncio.create_task(process_user_queue(uid))
             finally:
@@ -391,7 +331,7 @@ def main(bot, config):
             t = event.message_chain.get(Text)[0].text.strip()
         else:
             t = ""
-        user_info = await get_user(event.user_id)
+
 
         if event.pure_text == "/clear" or t == "/clear":
             await delete_user_history(event.user_id)
@@ -410,14 +350,15 @@ def main(bot, config):
             "id"] and event.get("at"):
             await delete_user_history(event.get("at")[0]["qq"])
             await bot.send(event, [Text("已清理与目标用户的对话记录")])
-        elif event.pure_text.startswith("/切人设 ") and user_info.permission >= config.ai_llm.config["core"][
-            "ai_change_character"]:
-            chara_file = str(event.pure_text).replace("/切人设 ", "")
-            if chara_file == "0":
-                reply = await change_folder_chara(config.ai_llm.config["llm"]["chara_file_name"], event.user_id)
-            else:
-                reply = await change_folder_chara(chara_file, event.user_id)
-            await bot.send(event, reply, True)
+        elif event.pure_text.startswith("/切人设 "):
+            user_info = await get_user(event.user_id)
+            if user_info.permission >= config.ai_llm.config["core"]["ai_change_character"]:
+                chara_file = str(event.pure_text).replace("/切人设 ", "")
+                if chara_file == "0":
+                    reply = await change_folder_chara(config.ai_llm.config["llm"]["chara_file_name"], event.user_id)
+                else:
+                    reply = await change_folder_chara(chara_file, event.user_id)
+                await bot.send(event, reply, True)
         elif event.pure_text.startswith("/全切人设 ") and event.user_id == config.common_config.basic_config["master"][
             "id"]:
             chara_file = str(event.pure_text).replace("/全切人设 ", "")
@@ -458,7 +399,7 @@ def main(bot, config):
                 await bot.send(event, "你没有足够的权限使用该功能哦~")
                 return
             # 锁机制
-            await handle_message(event)
+            await handle_message(event,user_info)
     @bot.on(LifecycleMetaEvent)
     async def _(event: LifecycleMetaEvent):
         nonlocal apikey_check,removed_keys

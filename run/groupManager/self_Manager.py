@@ -9,7 +9,7 @@ from pathlib import Path
 
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, FriendRequestEvent, GroupRequestEvent, \
     LifecycleMetaEvent
-from developTools.message.message_components import Record, Text, Image, File, Node
+from developTools.message.message_components import Record, Text, Image, File, Node, Mface
 from framework_common.database_util.User import get_user
 
 from developTools.utils.logger import get_logger
@@ -317,6 +317,14 @@ def main(bot:ExtendBot, config):
                     mes_chain.append(Text(i.text))
                 elif isinstance(i,Image):
                     mes_chain.append(Image(file=i.file or i.url))
+                elif isinstance(i,Record):
+                    mes_chain.append(Record(file=i.file or i.url))
+                elif isinstance(i,File):
+                    mes_chain.append(File(file=i.file or i.url))
+                elif isinstance(i,Mface):
+                    mes_chain.append(Mface(file=i.file or i.url))
+                else:
+                    mes_chain.append(i)
             await bot.send(event,f"正在转发消息至所有群，请稍后...\n任务群数量：{len(groups['data'])}")
             for group in groups["data"]:
                 try:

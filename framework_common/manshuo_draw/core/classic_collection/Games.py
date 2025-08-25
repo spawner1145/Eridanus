@@ -1,8 +1,10 @@
-from PIL import Image, ImageDraw, ImageFont, ImageOps,ImageFilter
+from PIL import Image
 from .initialize import initialize_yaml_must_require
-from framework_common.manshuo_draw.core.util import *
+from .util import *
 from datetime import datetime
 import calendar
+import weakref
+import time
 
 class GamesModule:
     def __init__(self,layer_img_set,params):
@@ -50,8 +52,7 @@ class GamesModule:
         for i in range(int(self.number_per_row)):
             week_img_canves = Image.new("RGBA", background_make.size, (255, 255, 255, 255)).resize(
                 (self.new_width, int(self.new_width * background_make.height / background_make.width)))
-            img_week = (await basic_img_draw_text(week_img_canves, f"[title]{weeky[i]}[/title]", self.__dict__,
-                                      box=(int(self.padding*1.2), week_img_canves.height//2 - self.font_title_size//2 - 3), ))['canvas']
+            img_week = (await basic_img_draw_text(week_img_canves, f"[title]{weeky[i]}[/title]", self.__dict__,box=(int(self.padding*1.2), week_img_canves.height//2 - self.font_title_size//2 - 3), ))['canvas']
             self.pure_backdrop = await img_process(self.__dict__, self.pure_backdrop, img_week, x_offset_week, self.current_y, self.upshift)
             x_offset_week += self.new_width + self.padding_with
         self.current_y += img_week.height + self.padding_with
@@ -60,6 +61,7 @@ class GamesModule:
         for i in range(first_day_of_week):
             week_list.append(Image.new("RGBA", background_make.size, (0, 0, 0, 0)))
         self.processed_img=add_append_img(week_list,self.processed_img)
+
         for img in self.processed_img:
             if self.img_height_limit_module <= 0:break
             img = await per_img_limit_deal(self.__dict__,img)#处理每个图片,您的每张图片绘制自定义区域

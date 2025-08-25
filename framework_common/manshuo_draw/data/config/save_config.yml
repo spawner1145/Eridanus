@@ -11,11 +11,13 @@ basic_set:
   is_stroke_front: true             #是否对模块进行描边处理（此处为前置条件，必要不充分）
   is_shadow_front: true             #是否对模块进行阴影处理（此处为前置条件，必要不充分）
   img_path_save: data/pictures/cache  #若有图片保存需求，则会将文件保存在此处，基于‘Eridanus’文件夹
+  color_emoji_path: framework_common/manshuo_draw/data/cache
   img_name_save: None
   debug: false                      #是否开启debug，开启后控制台会输出相应处理过程
   config_path: framework_common/manshuo_draw/data/config/save_config.yml  #默认配置文件地址
   is_abs_path_convert: true        #将文件路径转换为绝对路径（默认关闭，可能会有bug，但建议开发者打开以便于测试）
                                     #注意：此处同时对传入的img路径进行转换，绝对路径初始值为‘Eridanus’，即bot所在文件夹
+  jump_next_page: False             #再本模块绘制完成后呕是否强制在下一页绘制
 
   #以下为层级的部分处理
   layer: 1
@@ -42,7 +44,7 @@ basic_set:
   #以下为模块的的前置设置
   padding: 20                       #模块内间距
   padding_with: 15                  #模块内元素之间的间距
-  padding_up: 20                    #模块内元素的上间距
+  padding_up: 20                    #模块内元素的上间距，目前只有文字模块用到，其他模块暂无使用，一般使用 padding_with
   spacing: 1                        #文字绘制时候每个字之间的间距
   auto_line_change: true            #是否实现自动换行，关掉就是不由程序判断文本直接粘贴
 
@@ -81,6 +83,7 @@ basic_set:
   font_label_color: (255,255,255)
   label: []                             #默认的label内容
   label_color: (251,114,153,255)      #默认label颜色
+  upshift_label: 0
 
 
   is_rounded_corners_label: true      #是否对标签进行圆角处理
@@ -154,7 +157,8 @@ avatar:
   stroke_avatar_radius: 55
   stroke_avatar_color: (255, 255, 255, 80) #描边的圆角颜色
 
-  is_shadow_avatar: false             #是否对头像进行阴影处理
+  is_shadow_avatar: false
+  #是否对头像进行阴影处理
   shadow_offset_avatar: 10                 #阴影的偏移量
   shadow_opacity_avatar: 50                #阴影的透明度
   blur_radius_avatar: 8                   #阴影模糊半径
@@ -194,6 +198,10 @@ avatar:
 
 games:
   LuRecordMake:
+    img_height: 1500
+    is_stroke_layer: False
+    is_shadow_layer: False
+    is_rounded_corners_layer: False
     font_lu: framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf
     font_lu_size: 24
     font_lu_color: (255,0,0)
@@ -204,3 +212,63 @@ games:
     background: framework_common/manshuo_draw/data/img/games/lu/background_LU.jpg
     img: false
     is_shadow_img: false
+    is_rounded_corners_img: true      #是否对模块进行圆角处理
+    is_stroke_img: false               #是否对模块进行描边处理
+
+
+
+math:
+  number_per_row: default           #每行图片个数，默认即为九宫格，可自定义
+  backdrop_color: (255,255,255,255)
+  chart_color: (194, 228, 255)
+  chart_width: default
+  x_des: None
+  y_des: None
+
+  #下面为本模块的处理定义
+  is_rounded_corners_img: true      #是否对模块进行圆角处理
+  rounded_img_radius: 20            #圆角处理半径
+
+  is_stroke_img: true               #是否对模块进行描边处理
+  stroke_img_radius: 23             #描边的圆角弧度
+  stroke_img_width: 10              #描边的圆角宽度
+  stroke_img_color: (255, 255, 255, 80) #描边的圆角颜色
+
+  is_shadow_img: true               #是否对模块进行阴影处理
+  shadow_offset_img: 10                 #阴影的偏移量
+  shadow_opacity_img: 50                #阴影的透明度
+  blur_radius_img: 10                   #阴影模糊半径
+
+  #下面为本模块的内部图像处理定义
+  is_rounded_corners_math: true      #是否对模块进行圆角处理
+  rounded_math_radius: 20            #圆角处理半径
+
+  is_stroke_math: false               #是否对模块进行描边处理
+  stroke_math_radius: 23             #描边的圆角弧度
+  stroke_math_width: 10              #描边的圆角宽度
+  stroke_math_color: (255, 255, 255, 80) #描边的圆角颜色
+
+  is_shadow_math: false               #是否对模块进行阴影处理
+  shadow_offset_math: 10                 #阴影的偏移量
+  shadow_opacity_math: 50                #阴影的透明度
+  blur_radius_math: 10                   #阴影模糊半径
+
+  is_stroke_label: false               #是否对标签进行描边处理
+  label_color: (194, 228, 255, 0)      #默认label颜色
+  font_label_size: 19
+  font_label_color: (148,148,148)
+  is_shadow_label: false               #是否对标签进行阴影处理
+  upshift_label: -15
+
+  bar_chart:
+    must_required_keys: { 'content': null}
+    max: false
+    chart_height: 25
+
+  bar_chart_vertical:
+    must_required_keys: { 'content': null}
+    max: false
+    chart_height: 200
+    padding_up: 30
+    padding: 25
+    num_interline_draw: 5

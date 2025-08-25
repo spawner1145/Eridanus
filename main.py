@@ -6,7 +6,6 @@ import asyncio
 import threading
 import traceback
 import logging
-
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 if sys.platform == 'win32':
@@ -26,8 +25,10 @@ bot2 = None
 dual_manager = None
 
 config = YAMLManager("run")  # 这玩意用来动态加载和修改配置文件
+enable_monitoring = config.common_config.basic_config["HandlerMonitor"]["enable"]
+handler_timeout_warning=float(config.common_config.basic_config["HandlerMonitor"]["handler_timeout_warning"])
 bot1 = ExtendBot(config.common_config.basic_config["adapter"]["ws_client"]["ws_link"], config,
-                 blocked_loggers=["DEBUG", "INFO_MSG"])
+                 blocked_loggers=["DEBUG", "INFO_MSG"],handler_timeout_warning=handler_timeout_warning, enable_monitoring=enable_monitoring)
 
 bot1.logger.info("正在初始化....")
 
@@ -111,9 +112,10 @@ async def handler(bot, event: GroupMessageEvent | PrivateMessageEvent):
     if event.pure_text == "/reload all":
         await reload_all_plugins()
         await bot.send(event, "插件重载完成")
-    elif event.pure_text == "/status":
+    elif event.pure_text in ["/status",'/info']:
         status = await get_plugin_status()
-        print(status)
+        from run.basic_plugin.service.self_condition import self_info_core
+        await self_info_core(bot, event, status)
     elif event.pure_text == "/test":
         plugin_memory = plugin_manager.get_plugin_memory_usage("插件名")
 

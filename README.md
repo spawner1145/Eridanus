@@ -40,7 +40,7 @@ _🎊 基于 [OneBot](https://github.com/howmanybots/onebot/blob/master/README.m
 
 如使用快捷部署部署失败，请参照文档部署。
 # 交流
-QQ群：913122269
+QQ群：1050663831
 # 更新计划
 - [x] galgame查询，同步请求部分修改为异步
 - [x] ai对话功能，群聊上下文读取方式优化，人设读取方式优化，提高兼容性

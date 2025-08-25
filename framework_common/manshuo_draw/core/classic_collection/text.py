@@ -1,6 +1,5 @@
-from PIL import Image, ImageDraw, ImageFont, ImageOps,ImageFilter
 from .initialize import initialize_yaml_must_require
-from framework_common.manshuo_draw.core.util import *
+from .util import *
 
 class TextModule:
     def __init__(self,layer_img_set,params):
@@ -35,7 +34,9 @@ class TextModule:
                                                   limit_box=(self.pure_backdrop.width, self.img_height_limit_module))
         canvas_bottom=int(img_des_canvas_info['canvas_bottom'] )
         await final_img_deal(self.__dict__,'text')  # 处理最后的位置关系
-        if self.json_img_left_module_flag:canvas_bottom=self.img_height_limit_module
+        if self.json_img_left_module_flag:
+            #canvas_bottom=self.img_height_limit_module
+            self.without_draw_and_jump = True
         return {'canvas':self.pure_backdrop,'canvas_bottom':canvas_bottom,'upshift':0,'downshift':0,
                 'json_img_left_module':self.json_img_left_module,'without_draw':self.without_draw_and_jump}
 

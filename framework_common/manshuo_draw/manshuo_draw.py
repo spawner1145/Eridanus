@@ -1,19 +1,19 @@
-import json
+from concurrent.futures.thread import ThreadPoolExecutor
 
 from framework_common.manshuo_draw.core.deal_img import *
 import asyncio
-import copy
-from framework_common.manshuo_draw.core.util.test import *
+
 
 async def manshuo_draw(json_img):
-    #json_img = json.loads(json.dumps(json_img))
     json_img = json_check(json_img)
+    img_path = await asyncio.to_thread(
+        lambda: asyncio.run(deal_img(json_img))
+    )
 
-    #analyze_objects("0")
-    img_path=await deal_img(json_img)
     del json_img
-    #analyze_objects("1")
+    # analyze_objects("1")
     return img_path
+
 
 if __name__ == '__main__':
 
@@ -22,14 +22,13 @@ if __name__ == '__main__':
 
         {'type': 'backdrop', 'subtype': 'gradient'},
 
-        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift_extra':25,'layer':2,
-         'content':[ {'name': '漫朔_manshuo', 'time': '2025年 05月27日 20:32'}] },
-
-        {'type': 'img', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg','framework_common/manshuo_draw/data/cache/manshuo.jpg'],
-         'label': ['BiliBili', 'dy', 'manshuo'],'layer':3,},
-
+        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift_extra':25,
+         'content':[ f"[name]今日发言排行榜[/name]\n[time]2025年 05月27日 20:32[/time]"] },
+        '1234341fdsgsdfvbs',
         {'type': 'img', 'subtype': 'common_with_des_right', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],
          'content': ['这里是manshuo[title]！这部分是测manshuo！[/title]这manshuo！[des]这里是介绍[/des]'],'layer':4, },
+        {'type': 'math', 'subtype': 'bar_chart', 'content': [0.2, 0.6, 0.3, 0.8], },
+        {'type': 'math', 'subtype': 'bar_chart_vertical','content': [[0.2,0.6,0.3,0.8,0.2,0.6,0.3,0.8,0.2,0.6,0.3,0.8,]], 'x_des':[[1,2,3,4,5,1,2,3,4,5,1,2,3,4,5,]]},
     ]
 
     contents2=[
@@ -99,5 +98,5 @@ if __name__ == '__main__':
         '[des]这里是介绍[/des]']
 
 
-    asyncio.run(manshuo_draw(text_content))
+    asyncio.run(manshuo_draw(contents))
 

@@ -1,8 +1,8 @@
 import os
 import gc
 from .classic_collection import *
-from .util import *
-import pprint
+from .classic_collection.util import *
+
 
 async def layer_deal(basic_img_info,json_img,json_img_left,layer=1):
     layer_img_info = LayerSet(basic_img_info)
@@ -37,13 +37,16 @@ async def layer_deal(basic_img_info,json_img,json_img_left,layer=1):
             if per_json_img['type'] not in ['layer_processed', 'backdrop']:
                 printf(per_json_img)
             #print(layer_img_info.img_height_limit)
+            #对每个模块进行判断，分别执行对应的模块
             match per_json_img['type']:
                 case 'text':    json_check = await getattr(TextModule(layer_img_info, per_json_img), per_json_img['subtype'])()
                 case 'img':     json_check = await getattr(ImageModule(layer_img_info, per_json_img), per_json_img['subtype'])()
                 case 'avatar':  json_check = await getattr(AvatarModule(layer_img_info, per_json_img), per_json_img['subtype'])()
                 case 'games':   json_check = await getattr(GamesModule(layer_img_info, per_json_img), per_json_img['subtype'])()
+                case 'math':   json_check = await getattr(MathModule(layer_img_info, per_json_img), per_json_img['subtype'])()
                 case 'layer_processed':json_check = per_json_img['content']
                 case _:         json_check=None
+
             if json_check:
                 canvas_dict[count_number]=json_check
                 layer_img_info.img_height_limit -= (json_check['canvas_bottom'] + layer_img_info.padding_up_layer)
@@ -59,7 +62,7 @@ async def layer_deal(basic_img_info,json_img,json_img_left,layer=1):
             json_img=add_append_img([{'type':'layer_processed','content':json_check['content'],'layer':layer}],json_img)
         elif layer_check < layer:
             break
-
+    #对生成的模块进行拼接
     layer_img_canvas=await layer_img_info.paste_img(canvas_dict)
     #layer_img_canvas.show()
     upshift,downshift=0,0
@@ -84,6 +87,7 @@ async def deal_img(json_img): #此函数将逐个解析json文件中的每个字
 
     if basic_img_info.is_abs_path_convert is True:
         basic_img_info.img_path_save = get_abs_path(basic_img_info.img_path_save,is_ignore_judge=True)
+        basic_img_info.color_emoji_path = get_abs_path(basic_img_info.color_emoji_path, is_ignore_judge=True)
     if basic_img_info.img_name_save is not None :
         img_path = basic_img_info.img_path_save
         if os.path.isfile(img_path):return img_path

@@ -10,7 +10,8 @@ from developTools.utils.logger import get_logger
 from functools import wraps
 import time
 from typing import Optional
-
+from asyncio import sleep
+        
 from framework_common.database_util.RedisCacheManager import create_user_cache_manager
 
 dbpath = "data/dataBase/user_management.db"
@@ -36,13 +37,11 @@ async def ensure_db_initialized():
 async def initialize_db():
     """初始化数据库表结构"""
     try:
-        # 确保数据库目录存在
         db_dir = os.path.dirname(dbpath)
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir)
 
         async with aiosqlite.connect(dbpath) as db:
-            # 优化数据库设置
             await db.execute("PRAGMA journal_mode=WAL;")
             await db.execute("PRAGMA synchronous=NORMAL;")
             await db.execute("PRAGMA cache_size=10000;")
@@ -66,20 +65,29 @@ async def initialize_db():
             )
             """)
 
-            # 检查并添加缺失的列
+            required_columns = {
+                'nickname': 'TEXT',
+                'card': 'TEXT',
+                'sex': 'TEXT DEFAULT "0"',
+                'age': 'INTEGER DEFAULT 0',
+                'city': 'TEXT DEFAULT "通辽"',
+                'permission': 'INTEGER DEFAULT 0',
+                'signed_days': 'TEXT',
+                'registration_date': 'TEXT',
+                'ai_token_record': 'INTEGER DEFAULT 0',
+                'user_portrait': 'TEXT DEFAULT ""',
+                'portrait_update_time': 'TEXT DEFAULT ""'
+            }
+
             async with db.execute("PRAGMA table_info(users);") as cursor:
                 columns = await cursor.fetchall()
-                column_names = [col[1] for col in columns]
+                existing_columns = [col[1] for col in columns]
 
-                if 'user_portrait' not in column_names:
-                    await db.execute("ALTER TABLE users ADD COLUMN user_portrait TEXT DEFAULT '';")
-                    logger.info("✅ 添加了 user_portrait 列")
+            for column_name, column_def in required_columns.items():
+                if column_name not in existing_columns:
+                    await db.execute(f"ALTER TABLE users ADD COLUMN {column_name} {column_def};")
+                    logger.info(f"✅ 添加了 {column_name} 列")
 
-                if 'portrait_update_time' not in column_names:
-                    await db.execute("ALTER TABLE users ADD COLUMN portrait_update_time TEXT DEFAULT '';")
-                    logger.info("✅ 添加了 portrait_update_time 列")
-
-            # 创建索引优化查询
             await db.execute("CREATE INDEX IF NOT EXISTS idx_user_id ON users(user_id);")
             await db.execute("CREATE INDEX IF NOT EXISTS idx_permission ON users(permission);")
 
@@ -162,8 +170,12 @@ async def update_user(user_id, **kwargs):
     return f"✅ 用户 {user_id} 的信息已更新：{kwargs}"
 
 
-async def get_user(user_id, nickname="") -> User:
+async def get_user(user_id, nickname="", times=1) -> User:
     """获取用户信息，如果不存在则创建默认用户"""
+    if times > 5:
+        logger.error(f"清理损坏数据失败, 递归次数过多")
+        return None
+
     try:
         # 确保数据库已初始化
         await ensure_db_initialized()
@@ -193,19 +205,7 @@ async def get_user(user_id, nickname="") -> User:
         }
 
         async with aiosqlite.connect(dbpath) as db:
-            # 检查表结构并添加缺失列
-            async with db.execute("PRAGMA table_info(users);") as cursor:
-                columns = await cursor.fetchall()
-                column_names = [col[1] for col in columns]
-
-                for key in default_user.keys():
-                    if key not in column_names:
-                        default_value = "''" if isinstance(default_user[key], str) else "0"
-                        await db.execute(f"ALTER TABLE users ADD COLUMN {key} TEXT DEFAULT {default_value};")
-                        await db.commit()
-                        logger.info(f"列 {key} 已成功添加至 'users' 表中。")
-
-            # 查询用户
+            # 查询用户（不再检查表结构）
             async with db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cursor:
                 result = await cursor.fetchone()
 
@@ -213,16 +213,6 @@ async def get_user(user_id, nickname="") -> User:
                     # 用户存在，构建用户对象
                     column_names = [description[0] for description in cursor.description]
                     existing_user = dict(zip(column_names, result))
-
-                    # 检查是否有缺失的字段
-                    missing_keys = [key for key in default_user if key not in existing_user]
-                    if missing_keys:
-                        for key in missing_keys:
-                            existing_user[key] = default_user[key]
-                        update_query = f"UPDATE users SET {', '.join(f'{key} = ?' for key in missing_keys)} WHERE user_id = ?"
-                        update_values = [existing_user[key] for key in missing_keys] + [user_id]
-                        await db.execute(update_query, update_values)
-                        await db.commit()
 
                     user_obj = User(
                         existing_user['user_id'],
@@ -291,22 +281,13 @@ async def get_user(user_id, nickname="") -> User:
         logger.error(f"获取用户 {user_id} 时出错：{e}")
         logger.error(traceback.format_exc())
 
-        # 出错时清理可能损坏的数据
-        try:
-            async with aiosqlite.connect(dbpath) as db:
-                async with db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,)) as cursor:
-                    if await cursor.fetchone():
-                        await db.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
-                        await db.commit()
-                        logger.info(f"已删除损坏的用户数据: {user_id}")
-        except Exception as cleanup_error:
-            logger.error(f"清理损坏数据失败: {cleanup_error}")
-
-        # 使用新的缓存管理器清除缓存
+        # 清除缓存
         redis_cache_manager.delete(f"user:{user_id}")
 
-        # 递归重试
-        return await get_user(user_id, nickname)
+        await asyncio.sleep(2)
+        times += 1
+
+        return await get_user(user_id, nickname, times)
 
 
 async def get_signed_days(user_id):

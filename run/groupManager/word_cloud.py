@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 
 from developTools.event.events import GroupMessageEvent
 from framework_common.database_util.Group import add_to_group
@@ -16,7 +17,9 @@ def main(bot,config):
         except:
             user_name=event.user_id
         try:
+
             message={"user_name":user_name,"user_id":event.user_id,"message":event.processed_message}
+
             await add_to_group(event.group_id,message)
         except Exception as e:
             bot.logger.error(f"group_mes database error {e}")

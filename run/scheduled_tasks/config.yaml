@@ -56,3 +56,6 @@ scheduledTasks:    #其他定时任务模块的内容会陆续转到这里
   每日壁画王:
     enable: true
     time: 17/12
+  epic喜加一:
+    enable: true
+    time: 16/40

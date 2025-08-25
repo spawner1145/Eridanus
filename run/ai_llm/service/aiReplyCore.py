@@ -58,22 +58,29 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
     reply_message = ""
     original_history = []
     mface_files = None
+    user_info = None
     if tools is not None and config.ai_llm.config["llm"]["表情包发送"]:
         tools = await add_send_mface(tools, config)
     if not system_instruction:
         if config.ai_llm.config["llm"]["system"]:
             system_instruction = await read_chara(user_id, config.ai_llm.config["llm"]["system"])
+            #system_instruction = config.ai_llm.config["llm"]["system"]
         else:
             system_instruction = await read_chara(user_id, await use_folder_chara(
                 config.ai_llm.config["llm"]["chara_file_name"]))
         user_info = await get_user(user_id)
-        system_instruction = system_instruction.replace("{用户}", user_info.nickname).replace("{bot_name}",
+        current_datetime = datetime.datetime.now()
+        formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+        system_instruction = (f"{formatted_datetime} {system_instruction}").replace("{用户}", user_info.nickname).replace("{bot_name}",
                                                                                               config.common_config.basic_config["bot"])
     """
     用户设定读取
     """
     if config.ai_llm.config["llm"]["长期记忆"]:
-        temp_user=await get_user(user_id)
+        if not user_info:
+            temp_user = await get_user(user_id)
+        else:
+            temp_user=user_info
         system_instruction+=f"\n以下为当前用户的用户画像：{temp_user.user_portrait}"
 
     try:
