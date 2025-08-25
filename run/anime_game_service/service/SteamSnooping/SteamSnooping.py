@@ -17,7 +17,8 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import traceback
 from datetime import datetime
-
+from developTools.utils.logger import get_logger
+logger=get_logger("SteamSnooping")
 
 def url_main(bot, config, db,steam_api_key):
     global url_activate
@@ -38,6 +39,7 @@ def url_main(bot, config, db,steam_api_key):
 
 async def steamsnoopall(bot, config, db,steam_api_key):
     while True:
+        logger.info("开始检查steam用户活动情况")
         try:
             all_snoop_ids, all_snoop_ids_send, all_snoop_ids_steamid, replay_content, user_times=[],{},{},'',None
             ids_list=await db.read_user('SteamSnoopingList')
@@ -130,10 +132,10 @@ async def steamsnoopall(bot, config, db,steam_api_key):
                     await bot.send_group_message(group_id, [f"{config.common_config.basic_config['bot']} 发现了群友的Steam动态了哦",Image(file=await manshuo_draw(draw_json))])
 
                 #await bot.send_group_message(group_id, [replay_content])
-
         except Exception as e:
             bot.logger.error(f"Steam视奸检测出错：{e}\n{traceback.format_exc()}")
             continue
+        logger.info("steam用户活动检查完成")
         await asyncio.sleep(300)
 
 
