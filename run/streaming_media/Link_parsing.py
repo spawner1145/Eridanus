@@ -126,7 +126,9 @@ def main(bot, config):
                 await call_bili_download_video(bot, event, config,'img')
         #if not re.search(r'https?://', url or '') and not url.startswith("QQ小程序"):
            # return
-        link_prising_json = await link_prising(url, filepath='data/pictures/cache/', proxy=proxy)
+        link_prising_json=await asyncio.to_thread(
+            lambda: asyncio.run(link_prising(url, filepath='data/pictures/cache/', proxy=proxy))
+        )
         send_context = f'{botname}识别结果：'
         #print(link_prising_json)
         if link_prising_json['status']:
