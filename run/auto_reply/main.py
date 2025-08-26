@@ -4,7 +4,7 @@ import re
 import uuid
 
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
-from developTools.message.message_components import Text, Image
+from developTools.message.message_components import Text, Image,Mface
 from framework_common.database_util.Group import add_to_group
 from framework_common.database_util.User import get_user
 from framework_common.framework_util.websocket_fix import ExtendBot
@@ -18,9 +18,10 @@ keyword_manager = None
 cache_manager = None
 
 bot_name=None
+ymconfig=None
 def main(bot: ExtendBot, config: YAMLManager):
-    global keyword_manager, cache_manager,bot_name
-
+    global keyword_manager, cache_manager,bot_name,ymconfig
+    ymconfig=config
     # 初始化管理器
     keyword_manager = KeywordManager()
     cache_manager = CacheManager(max_size=1000)  # 可配置缓存大小
@@ -108,7 +109,7 @@ async def handle_adding_mode(bot, event, user_adding_state, text, timeout_tasks)
         # 记录回复内容 - 保持原始message_chain格式
         temp_meschain = []
         for i in event.message_chain:
-            if isinstance(i, Image):
+            if isinstance(i, Image) or isinstance(i,Mface):
                 path = f"data/pictures/auto_reply/{uuid.uuid4()}.png"
                 await download_img(i.file or i.url, path)
                 temp_meschain.append(Image(file=path))
@@ -161,7 +162,7 @@ async def finish_adding(bot, event, user_adding_state, user_id, timeout_tasks, t
 
             if success:
                 mode_text = "全局词库" if state["is_global"] else f"群词库"
-                timeout_text = " (10秒超时自动结束)" if timeout else ""
+                timeout_text = " (超时自动结束)" if timeout else ""
                 await bot.send(event,
                                f"✅ 成功添加到{mode_text}:\n关键词: {state['current_key']}\n回复数量: {len(state['values'])}条{timeout_text}")
             else:
@@ -234,6 +235,7 @@ async def timeout_checker(bot, event, user_adding_state, user_id, timeout_tasks)
 
     try:
         # 等待10秒
+        slep_time=config.auto_reply.config["词库添加自动超时"]
         await asyncio.sleep(10)
 
         print(f"超时时间到，检查用户 {user_id} 状态")
