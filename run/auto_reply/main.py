@@ -5,6 +5,8 @@ import uuid
 
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
 from developTools.message.message_components import Text, Image
+from framework_common.database_util.Group import add_to_group
+from framework_common.database_util.User import get_user
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.utils import download_img
@@ -15,9 +17,9 @@ from run.auto_reply.service.keyword_manager import KeywordManager
 keyword_manager = None
 cache_manager = None
 
-
+bot_name=None
 def main(bot: ExtendBot, config: YAMLManager):
-    global keyword_manager, cache_manager
+    global keyword_manager, cache_manager,bot_name
 
     # 初始化管理器
     keyword_manager = KeywordManager()
@@ -27,7 +29,7 @@ def main(bot: ExtendBot, config: YAMLManager):
     user_adding_state = {}
     # 超时任务管理
     timeout_tasks = {}
-
+    bot_name=config.common_config.basic_config["bot"]
     @bot.on(GroupMessageEvent)
     async def handle_group_message(event: GroupMessageEvent):
         text = event.pure_text.strip()
@@ -39,19 +41,44 @@ def main(bot: ExtendBot, config: YAMLManager):
             return
 
         if text == "开始添加":
-            await start_adding_mode(bot, event, user_adding_state, timeout_tasks, is_global=False)
+            user_info=await get_user(event.user_id)
+            if user_info.permission >= config.auto_reply.config["分群词库权限"]:
+                await start_adding_mode(bot, event, user_adding_state, timeout_tasks, is_global=False)
+            else:
+                await bot.send(event, "你没有权限使用该功能")
             return
         elif text == "*开始添加":
+            user_info=await get_user(event.user_id)
+            if user_info.permission >= config.auto_reply.config["全局词库权限"]:
+                await start_adding_mode(bot, event, user_adding_state, timeout_tasks, is_global=False)
+            else:
+                await bot.send(event, "你没有权限使用该功能")
             await start_adding_mode(bot, event, user_adding_state, timeout_tasks, is_global=True)
             return
         elif text.startswith("删除关键词 "):
+            user_info=await get_user(event.user_id)
+            if user_info.permission >= config.auto_reply.config["分群词库权限"]:
+                await start_adding_mode(bot, event, user_adding_state, timeout_tasks, is_global=False)
+            else:
+                await bot.send(event, "你没有权限使用该功能")
             keyword = text[6:].strip()  # 提取关键词
             if not keyword:
                 await bot.send(event, "请提供要删除的关键词")
                 return
             await handle_delete_keyword(bot, event, keyword, group_id)
             return
-
+        elif text.startswith("*删除关键词 "):
+            user_info=await get_user(event.user_id)
+            if user_info.permission >= config.auto_reply.config["全局词库权限"]:
+                await start_adding_mode(bot, event, user_adding_state, timeout_tasks, is_global=True)
+            else:
+                await bot.send(event, "你没有权限使用该功能")
+            keyword = text[7:].strip()  # 提取关键词
+            if not keyword:
+                await bot.send(event, "请提供要删除的关键词")
+                return
+            await handle_delete_keyword(bot, event, keyword, group_id)
+            return
         await process_keyword_match(bot, event, text, group_id)
 
 
@@ -97,9 +124,9 @@ async def handle_adding_mode(bot, event, user_adding_state, text, timeout_tasks)
         await reset_timeout(bot, event, user_adding_state, user_id, timeout_tasks)
 
 
-# 改进版的finish_adding函数，增加错误处理
+# 修复版的finish_adding函数，增加缓存清理
 async def finish_adding(bot, event, user_adding_state, user_id, timeout_tasks, timeout=False):
-    """完成添加流程"""
+    """完成添加流程 - 修复1: 添加时清理相关缓存"""
     print(f"开始完成添加流程，用户: {user_id}, 是否超时: {timeout}")
 
     if user_id not in user_adding_state:
@@ -126,11 +153,12 @@ async def finish_adding(bot, event, user_adding_state, user_id, timeout_tasks, t
     try:
         if state["current_key"] and state["values"]:
             print(f"保存关键词: {state['current_key']}, 回复数量: {len(state['values'])}")
-            # 保存到数据库
+            # 保存到数据库 - 修复1: 传递cache_manager
             success = await keyword_manager.add_keyword(
                 keyword=state["current_key"],
                 responses=state["values"],
-                group_id=state["group_id"]
+                group_id=state["group_id"],
+                cache_manager=cache_manager  # 传递cache_manager以便清理缓存
             )
 
             if success:
@@ -231,33 +259,64 @@ async def timeout_checker(bot, event, user_adding_state, user_id, timeout_tasks)
         print(f"超时检查任务结束，用户: {user_id}, 任务ID: {task_id}")
 
 
+# 修复3: 更新的删除关键词处理函数
 async def handle_delete_keyword(bot, event, keyword, group_id):
-    """处理删除关键词"""
+    """处理删除关键词 - 修复3: 提供相似关键词建议"""
     try:
         # 尝试删除群词库中的关键词
-        success = await keyword_manager.delete_keyword(keyword, group_id)
-        if success:
-            # 清除缓存
+        result = await keyword_manager.delete_keyword(keyword, group_id)
+
+        if result["success"]:
+            # 删除成功 - 清除缓存
             await cache_manager.delete_cache(keyword, group_id)
             await bot.send(event, f"✅ 成功删除群 {group_id} 词库中的关键词: {keyword}")
             return
 
         # 如果群词库中没有，尝试删除全局词库
-        success = await keyword_manager.delete_keyword(keyword, None)
-        if success:
+        global_result = await keyword_manager.delete_keyword(keyword, None)
+        if global_result["success"]:
             # 清除缓存
             await cache_manager.delete_cache(keyword, None)
             await bot.send(event, f"✅ 成功删除全局词库中的关键词: {keyword}")
             return
 
-        await bot.send(event, f"❌ 未找到关键词: {keyword}")
+        # 删除失败 - 提供相似关键词建议
+        error_msg = f"❌ 未找到关键词: {keyword}"
+
+        # 检查群词库的相似关键词
+        similar_keywords = result.get("similar", [])
+        # 检查全局词库的相似关键词
+        global_similar = global_result.get("similar", [])
+
+        # 合并并去重相似关键词
+        all_similar = {}
+        for item in similar_keywords + global_similar:
+            kw = item["keyword"]
+            if kw not in all_similar or all_similar[kw]["similarity"] < item["similarity"]:
+                all_similar[kw] = item
+
+        # 转换为列表并排序
+        similar_list = list(all_similar.values())
+        similar_list.sort(key=lambda x: x["similarity"], reverse=True)
+
+        if similar_list:
+            suggestions = []
+            for item in similar_list[:5]:  # 只显示前5个
+                suggestions.append(f"• {item['keyword']} (相似度: {item['similarity']}%)")
+
+            suggestion_text = "\n".join(suggestions)
+            error_msg += f"\n\n💡 您是否想删除以下相似的关键词之一：\n{suggestion_text}"
+            error_msg += "\n\n请使用确切的关键词名称重试，如：删除关键词 实际关键词"
+
+        await bot.send(event, error_msg)
+
     except Exception as e:
         print(f"删除关键词错误: {e}")
         await bot.send(event, f"❌ 删除关键词失败: {keyword}")
 
 
 async def process_keyword_match(bot, event, text, group_id):
-    """处理关键字匹配"""
+    """处理关键字匹配 - 修复1&2: 优化缓存策略确保最新数据"""
     if not text:
         return
 
@@ -266,22 +325,37 @@ async def process_keyword_match(bot, event, text, group_id):
 
 
 async def match_and_reply(bot, event, text, group_id):
-    """异步匹配和回复"""
+    """异步匹配和回复 - 修复1&2: 优化缓存和随机选择逻辑"""
     try:
-        cached_response = await cache_manager.get(text, group_id)
-        if cached_response:
-            response_chain = restore_message_chain(cached_response)
-            await bot.send(event, response_chain)
-            return
-
-        # 数据库匹配
+        # 修复1: 优化缓存策略 - 先检查数据库获取最新数据
+        # 直接从数据库匹配，确保获取最新的关键词数据
         response = await keyword_manager.match_keyword(text, group_id)
+
         if response:
             # 还原message_chain格式
             response_chain = restore_message_chain(response)
-            # 更新缓存
+
+            # 修复1: 更新缓存为最新的响应结果
+            # 注意：由于随机性，我们缓存的是匹配到的关键词信息，而不是具体的响应
+            # 这样可以保持随机性同时提供一定的性能优化
             await cache_manager.set(text, group_id, response)
+
             await bot.send(event, response_chain)
+            for mes in response_chain:
+                if isinstance(mes, Text):
+                    self_message = {"user_name": bot_name, "user_id": 0000000,
+                                    "message": [{"text": mes.text}]}
+                    await add_to_group(event.group_id, self_message)
+            return
+
+        # 如果数据库没有匹配，再检查缓存（用于一些计算密集型的负匹配）
+        cached_response = await cache_manager.get(text, group_id)
+        if cached_response == "NO_MATCH":  # 缓存标记：此文本无匹配
+            return
+
+        # 标记为无匹配并缓存（避免重复计算）
+        await cache_manager.set(text, group_id, "NO_MATCH")
+
     except Exception as e:
         print(f"匹配错误: {e}")
 

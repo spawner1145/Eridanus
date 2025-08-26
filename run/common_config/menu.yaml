@@ -254,3 +254,10 @@ help_menu: #不要在webui修改本文件！不要在webui修改本文件！
       \n  style  [des]可引用图片[/des]
       \n  style {风格}   [des]可选"像素风格","抽象风格","韩系淡彩风格","清新日漫风格","纯真动漫风格"[/des]
       \n  示例：style 像素风格    [des]随后发送图片[/des]'],'layer':2}
+      - '   '
+      - {'type': 'text','content': ['[title]词库功能[/title]
+      \n  半成品，不保证可用性
+      \n  开始添加   [des]默认只在本群生效[/des]
+      \n  *开始添加   [des]在所有群生效[/des]
+      \n  删除关键词 关键字    [des]删除关键字所有回复[/des]
+      \n  *删除关键词 关键字    [des]全局词库删除关键字所有回复[/des]'],'layer':2}
