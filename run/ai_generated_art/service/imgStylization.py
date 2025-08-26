@@ -19,4 +19,4 @@ async def imgStylization(input_url, style_set, output_image_path):
             async with aiofiles.open(output_image_path, "wb") as f:
                 await f.write(response.content)
             return output_image_path
-asyncio.run(imgStylization("https://multimedia.nt.qq.com.cn/download?appid=1407&fileid=EhTKAzpqLZd-FM5VkBOua7zbk8S_JRiEnAwg_woo3q63jcynjwMyBHByb2RQgL2jAVoQvm6yt8sCn2Niw92dDdA_NHoCAlE&rkey=CAMSOLgthq-6lGU_tSgj3OkfqsgzUFGTbNVBBI8rTjXFzkQsTPCK-kOxhEx4s67wDpt2ngGcmu7BQouR", "像素风格", "output.jpg"))
+#asyncio.run(imgStylization("https://multimedia.nt.qq.com.cn/download?appid=1407&fileid=EhTKAzpqLZd-FM5VkBOua7zbk8S_JRiEnAwg_woo3q63jcynjwMyBHByb2RQgL2jAVoQvm6yt8sCn2Niw92dDdA_NHoCAlE&rkey=CAMSOLgthq-6lGU_tSgj3OkfqsgzUFGTbNVBBI8rTjXFzkQsTPCK-kOxhEx4s67wDpt2ngGcmu7BQouR", "像素风格", "output.jpg"))
