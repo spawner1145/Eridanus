@@ -2,6 +2,8 @@ import httpx
 from xpinyin import Pinyin
 p = Pinyin()
 async def weather_query(proxy,api_key,location):
+    if not api_key:
+        return await free_weather_query(location)
     location = location.replace('市','')
     location = p.get_pinyin(location, '')
 

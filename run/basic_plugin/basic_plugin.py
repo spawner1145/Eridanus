@@ -199,6 +199,7 @@ def main(bot, config):
             for file_name in file_lists:
                 if os.path.exists(os.path.join('data/pictures/cache', file_name)):
                     shutil.copy(os.path.join('data/pictures/cache', file_name), 'data/pictures/doc')
+                    os.remove(os.path.join('data/pictures/cache', file_name))
             await bot.send(event, reply_list)
 
 

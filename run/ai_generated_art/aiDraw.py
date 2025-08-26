@@ -521,8 +521,8 @@ def main(bot, config):
                     await bot.send(event, Image(file=path), True)
                 except Exception as e:
                     traceback.print_exc()
-                    bot.logger.error(f"反推失败: {e}")
-                    msg = await bot.send(event, f"反推失败: {e}", True)
+                    bot.logger.error(f"风格化失败: {e}")
+                    msg = await bot.send(event, f"风格化失败: {e}", True)
                     await delay_recall(bot, msg)
     @bot.on(GroupMessageEvent)
     async def tagger(event):
