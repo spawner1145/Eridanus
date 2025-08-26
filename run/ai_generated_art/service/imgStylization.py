@@ -31,6 +31,7 @@ async def retry_async(func, *args, retries=5, delay=1, **kwargs):
     raise last_exc
 
 async def imgStylization(input_url, style_set, output_image_path):
+    style_set=style_set.strip()
     # 下载图片
     await retry_async(download_img, input_url, output_image_path)
 
