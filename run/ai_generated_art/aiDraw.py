@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import traceback
 from io import BytesIO
 
 import httpx
@@ -7,6 +8,7 @@ from bs4 import BeautifulSoup
 
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Image, Node, Text
+from run.ai_generated_art.service.imgStylization import imgStylization
 from run.ai_generated_art.service.modelscope_text2img import modelscope_drawer
 from run.ai_generated_art.service.hf_t2i import hf_drawer
 from run.ai_generated_art.service.setu_moderate import pic_audit_standalone
@@ -22,6 +24,7 @@ from run.basic_plugin.service.imgae_search.anime_trace import anime_trace
 turn = 0
 UserGet = {}
 tag_user = {}
+style_transfer_user = {}
 info_user = {}
 sd_user_args = {}
 sd_re_args = {}
@@ -473,7 +476,54 @@ def main(bot, config):
                 msg = await bot.send(event, f"发送失败{e}")
                 await delay_recall(bot, msg)
                 bot.logger.error(f"Failed to send the compiled message to the group. Error: {e}")
+    @bot.on(GroupMessageEvent)
+    async def style_transfer(event: GroupMessageEvent):
+        global style_transfer_user
+        if event.pure_text == "style" or "style " in event.pure_text:
+            if not await get_img(event, bot):
+                if event.pure_text.replace("style", "") in ["像素风格","抽象风格","韩系淡彩风格","清新日漫风格","纯真动漫风格"]:
+                    style_set = event.pure_text.replace("style", "")
+                else:
+                    style_set = "像素风格"
+                style_transfer_user[event.sender.user_id] = style_set
+                style_transfer_user[event.sender.user_id] = []
+                msg = await bot.send(event, "请发送要识别的图片")
+                await delay_recall(bot, msg)
+                return
 
+        # 处理图片和重绘命令
+        if "style" in event.pure_text or event.sender.user_id in style_transfer_user:
+            # print(event.processed_message)
+            if await get_img(event, bot):
+                if event.sender.user_id in style_transfer_user:
+                    style_set = style_transfer_user[event.sender.user_id]
+                    style_transfer_user.pop(event.sender.user_id)
+                else:
+                    if event.pure_text.replace("style", "") in ["像素风格","抽象风格","韩系淡彩风格","清新日漫风格","纯真动漫风格"]:
+                        style_set = event.pure_text.replace("style", "")
+                    else:
+                        style_set = "像素风格"
+
+
+                # 日志记录
+                bot.logger.info(f"接收来自群：{event.group_id} 用户：{event.sender.user_id} 的风格化反推指令")
+
+                # 获取图片路径
+                img_url = await get_img(event, bot)
+                bot.logger.info(f"发起反推风格化请求，img:{img_url}")
+
+                path = f"data/pictures/cache/{random_str()}.png"
+                msg=await bot.send(event, "风格化中。其他可选风格：像素风格、抽象风格、韩系淡彩风格、清新日漫风格、纯真动漫风格\n使用方式：发送“style 风格名”即可切换风格", True)
+                await delay_recall(bot, msg)
+                try:
+                    path = await imgStylization(img_url, style_set, path)
+
+                    await bot.send(event, Image(file=path), True)
+                except Exception as e:
+                    traceback.print_exc()
+                    bot.logger.error(f"反推失败: {e}")
+                    msg = await bot.send(event, f"反推失败: {e}", True)
+                    await delay_recall(bot, msg)
     @bot.on(GroupMessageEvent)
     async def tagger(event):
         global tag_user
