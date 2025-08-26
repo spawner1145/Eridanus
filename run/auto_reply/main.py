@@ -61,7 +61,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                 if not keyword:
                     await bot.send(event, "请提供要删除的关键词")
                     return
-                await handle_delete_keyword(bot, event, keyword, group_id)
+                await handle_delete_keyword(bot, event, keyword, group_id,isglobal=False)
             else:
                 await bot.send(event, "你没有权限使用该功能")
             return
@@ -72,7 +72,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                 if not keyword:
                     await bot.send(event, "请提供要删除的关键词")
                     return
-                await handle_delete_keyword(bot, event, keyword, group_id)
+                await handle_delete_keyword(bot, event, keyword, group_id,isglobal=True)
             else:
                 await bot.send(event, "你没有权限使用该功能")
 
@@ -258,25 +258,26 @@ async def timeout_checker(bot, event, user_adding_state, user_id, timeout_tasks)
 
 
 # 修复3: 更新的删除关键词处理函数
-async def handle_delete_keyword(bot, event, keyword, group_id):
+async def handle_delete_keyword(bot, event, keyword, group_id,isglobal=False):
     """处理删除关键词 - 修复3: 提供相似关键词建议"""
     try:
+        if not isglobal:
         # 尝试删除群词库中的关键词
-        result = await keyword_manager.delete_keyword(keyword, group_id)
-
-        if result["success"]:
-            # 删除成功 - 清除缓存
-            await cache_manager.delete_cache(keyword, group_id)
-            await bot.send(event, f"✅ 成功删除群 {group_id} 词库中的关键词: {keyword}")
-            return
-
-        # 如果群词库中没有，尝试删除全局词库
-        global_result = await keyword_manager.delete_keyword(keyword, None)
-        if global_result["success"]:
-            # 清除缓存
-            await cache_manager.delete_cache(keyword, None)
-            await bot.send(event, f"✅ 成功删除全局词库中的关键词: {keyword}")
-            return
+            result = await keyword_manager.delete_keyword(keyword, group_id)
+    
+            if result["success"]:
+                # 删除成功 - 清除缓存
+                await cache_manager.delete_cache(keyword, group_id)
+                await bot.send(event, f"✅ 成功删除群 {group_id} 词库中的关键词: {keyword}")
+                return
+        else:
+            # 如果群词库中没有，尝试删除全局词库
+            global_result = await keyword_manager.delete_keyword(keyword, None)
+            if global_result["success"]:
+                # 清除缓存
+                await cache_manager.delete_cache(keyword, None)
+                await bot.send(event, f"✅ 成功删除全局词库中的关键词: {keyword}")
+                return
 
         # 删除失败 - 提供相似关键词建议
         error_msg = f"❌ 未找到关键词: {keyword}"
