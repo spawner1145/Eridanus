@@ -481,8 +481,8 @@ def main(bot, config):
         global style_transfer_user
         if event.pure_text == "style" or "style " in event.pure_text:
             if not await get_img(event, bot):
-                if event.pure_text.replace("style", "") in ["像素风格","抽象风格","韩系淡彩风格","清新日漫风格","纯真动漫风格"]:
-                    style_set = event.pure_text.replace("style", "")
+                if event.pure_text.replace("style ", "") in ["像素风格","抽象风格","韩系淡彩风格","清新日漫风格","纯真动漫风格"]:
+                    style_set = event.pure_text.replace("style ", "")
                 else:
                     style_set = "像素风格"
                 style_transfer_user[event.sender.user_id] = style_set
@@ -499,7 +499,7 @@ def main(bot, config):
                     style_set = style_transfer_user[event.sender.user_id]
                     style_transfer_user.pop(event.sender.user_id)
                 else:
-                    if event.pure_text.replace("style", "") in ["像素风格","抽象风格","韩系淡彩风格","清新日漫风格","纯真动漫风格"]:
+                    if event.pure_text.replace(" ","").replace("style", "") in ["像素风格","抽象风格","韩系淡彩风格","清新日漫风格","纯真动漫风格"]:
                         style_set = event.pure_text.replace("style", "")
                     else:
                         style_set = "像素风格"

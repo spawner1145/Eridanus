@@ -13,7 +13,12 @@ async def imgStylization(input_url, style_set, output_image_path):
     async with httpx.AsyncClient() as client:
         url=f"https://api.xingzhige.com/API/AiStyle/?model={style_set}&url={url}"
         response = await client.get(url,timeout=60)
-        new_url = response.json()["data"]["imageUrl"]
+        try:
+            print(response.json())
+            new_url = response.json()["data"]["imageUrl"]
+        except Exception as e:
+            response=await client.get(url,timeout=60)
+            print(response.json())
         response = await client.get(new_url)
         if response.status_code == 200:
             async with aiofiles.open(output_image_path, "wb") as f:
