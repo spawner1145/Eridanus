@@ -50,34 +50,32 @@ def main(bot: ExtendBot, config: YAMLManager):
         elif text == "*开始添加":
             user_info=await get_user(event.user_id)
             if user_info.permission >= config.auto_reply.config["全局词库权限"]:
-                await start_adding_mode(bot, event, user_adding_state, timeout_tasks, is_global=False)
+                await start_adding_mode(bot, event, user_adding_state, timeout_tasks, is_global=True)
             else:
                 await bot.send(event, "你没有权限使用该功能")
-            await start_adding_mode(bot, event, user_adding_state, timeout_tasks, is_global=True)
             return
         elif text.startswith("删除关键词 "):
             user_info=await get_user(event.user_id)
             if user_info.permission >= config.auto_reply.config["分群词库权限"]:
-                await start_adding_mode(bot, event, user_adding_state, timeout_tasks, is_global=False)
+                keyword = text[6:].strip()  # 提取关键词
+                if not keyword:
+                    await bot.send(event, "请提供要删除的关键词")
+                    return
+                await handle_delete_keyword(bot, event, keyword, group_id)
             else:
                 await bot.send(event, "你没有权限使用该功能")
-            keyword = text[6:].strip()  # 提取关键词
-            if not keyword:
-                await bot.send(event, "请提供要删除的关键词")
-                return
-            await handle_delete_keyword(bot, event, keyword, group_id)
             return
         elif text.startswith("*删除关键词 "):
             user_info=await get_user(event.user_id)
             if user_info.permission >= config.auto_reply.config["全局词库权限"]:
-                await start_adding_mode(bot, event, user_adding_state, timeout_tasks, is_global=True)
+                keyword = text[7:].strip()  # 提取关键词
+                if not keyword:
+                    await bot.send(event, "请提供要删除的关键词")
+                    return
+                await handle_delete_keyword(bot, event, keyword, group_id)
             else:
                 await bot.send(event, "你没有权限使用该功能")
-            keyword = text[7:].strip()  # 提取关键词
-            if not keyword:
-                await bot.send(event, "请提供要删除的关键词")
-                return
-            await handle_delete_keyword(bot, event, keyword, group_id)
+
             return
         await process_keyword_match(bot, event, text, group_id)
 
