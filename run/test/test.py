@@ -6,5 +6,5 @@ from framework_common.framework_util.yamlLoader import YAMLManager
 def main(bot: ExtendBot,config: YAMLManager):
     @bot.on(GroupMessageEvent)
     async def handle_group_message(event: GroupMessageEvent):
-        if event.pure_text=="测试":
+        if event.pure_text=="测试244":
             await bot.send(event,"Hello World!")
