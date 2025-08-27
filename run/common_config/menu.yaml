@@ -248,3 +248,16 @@ help_menu: #不要在webui修改本文件！不要在webui修改本文件！
       - { 'type': 'basic_set', 'img_width': 1000,'img_name_save': 'help_menu_page5.png','img_height': 1500,'max_num_of_columns': 3 ,'font_common_size': 34,'font_des_size': 25, 'font_title_size': 46,'spacing': 3,'padding_up': 30}
       - {'type': 'text','content': ['[title]ai写插件[/title]
       \n  /写插件{具体需求}  [des]实验性功能，不保证稳定性和可用性[/des]'],'layer':2}
+      - '   '
+      - {'type': 'text','content': ['[title]图片风格化[/title]
+      \n  将图片转化为指定风格，默认像素风
+      \n  style  [des]可引用图片[/des]
+      \n  style {风格}   [des]可选"像素风格","抽象风格","韩系淡彩风格","清新日漫风格","纯真动漫风格"[/des]
+      \n  示例：style 像素风格    [des]随后发送图片[/des]'],'layer':2}
+      - '   '
+      - {'type': 'text','content': ['[title]词库功能[/title]
+      \n  半成品，不保证可用性
+      \n  开始添加   [des]默认只在本群生效[/des]
+      \n  *开始添加   [des]在所有群生效[/des]
+      \n  删除关键词 关键字    [des]删除关键字所有回复[/des]
+      \n  *删除关键词 关键字    [des]全局词库删除关键字所有回复[/des]'],'layer':2}

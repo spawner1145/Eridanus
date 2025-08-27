@@ -22,38 +22,42 @@ def main(bot, config):
     speech_cache = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
     global batch_update_task
     batch_update_task = False
-    # 定时批量更新数据库
+
+
     async def batch_update_speeches():
+        """优化后的批量更新函数 - 大幅减少数据库操作次数"""
         while True:
             try:
-                bot.logger.info("Start batch update speeches")
                 await asyncio.sleep(300)
-                for from_id, groups in speech_cache.items():
-                    for group_id, days in groups.items():
-                        for current_day, count in days.items():
-                            user_data =await db.read_user(f'{from_id}')
-                            if user_data == {} or 'number_speeches' not in user_data or f'{group_id}' not in user_data[
-                                'number_speeches'] or current_day not in user_data['number_speeches'][f'{group_id}']:
-                                await db.write_user(f'{from_id}', {'number_speeches': {f'{group_id}': {current_day: count}}})
-                            else:
-                                await db.update_user_field(f'{from_id}', f"number_speeches.{group_id}.{current_day}",
-                                                     int(user_data['number_speeches'][f'{group_id}'][
-                                                             current_day]) + count)
-                speech_cache.clear()
+
+                if not speech_cache:
+                    continue
+                bot.logger.info(f"Start batch update speeches for {len(speech_cache)} users")
+
+                current_batch = dict(speech_cache)
+
+                await db.batch_update_speech_counts(current_batch)
+
+                for user_id in current_batch.keys():
+                    if user_id in speech_cache:
+                        del speech_cache[user_id]
+
+                bot.logger.info(f"Successfully batch updated {len(current_batch)} users")
             except Exception as e:
-                print(f"Batch update error: {e}")
-
-
+                bot.logger.error(f"Batch update error: {e}")
 
     @bot.on(GroupMessageEvent)
     async def on_start(event: GroupMessageEvent):
+        """启动批量更新任务"""
         global batch_update_task
         if not batch_update_task:
             asyncio.create_task(batch_update_speeches())
             batch_update_task = True
+            bot.logger.info("Batch update task started")
 
     @bot.on(GroupMessageEvent)
     async def number_speeches_count(event: GroupMessageEvent):
+        """记录发言计数到内存缓存"""
         context = event.pure_text
         target_group = int(event.group_id)
         from_id = int(event.sender.user_id)
@@ -61,8 +65,46 @@ def main(bot, config):
         year, month, day = today.year, today.month, today.day
         current_day = f'{year}_{month}_{day}'
 
-        # 将计数记录到内存缓存
+        # 使用默认字典，自动创建嵌套结构
         speech_cache[from_id][target_group][current_day] += 1
+
+    # 手动触发批量更新的函数（用于测试或特殊情况）
+    async def manual_batch_update():
+        """手动触发批量更新"""
+        try:
+            if speech_cache:
+                current_batch = dict(speech_cache)
+                await db.batch_update_speech_counts(current_batch)
+                speech_cache.clear()
+                bot.logger.info("Manual batch update completed")
+            else:
+                bot.logger.info("No data to update")
+        except Exception as e:
+            bot.logger.error(f"Manual batch update error: {e}")
+
+    # 性能监控函数
+    async def monitor_cache_performance():
+        """监控缓存性能"""
+        while True:
+            await asyncio.sleep(60)  # 每分钟检查一次
+
+            if speech_cache:
+                total_users = len(speech_cache)
+                total_records = sum(
+                    len(groups) * len(days)
+                    for groups in speech_cache.values()
+                    for days in groups.values()
+                )
+
+                bot.logger.info(f"Cache stats - Users: {total_users}, Records: {total_records}")
+
+                # 如果缓存过大，提前触发更新
+                if total_records > 10000:  # 超过1万条记录时提前更新
+                    bot.logger.warning("Cache size exceeded threshold, triggering early update")
+                    await manual_batch_update()
+
+    # 启动性能监控
+    # asyncio.create_task(monitor_cache_performance())
 
     @bot.on(GroupMessageEvent)
     async def number_speeches_check(event: GroupMessageEvent):

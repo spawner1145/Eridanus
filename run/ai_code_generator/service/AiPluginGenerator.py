@@ -280,7 +280,7 @@ from developTools.message.message_components import Text, Image, At, Reply,Card
 Text("文本内容")
 
 # 图片消息  
-Image(file="图片路径或Url")
+Image(file="图片路径或Url") #只需要传入file参数即可，其他参数无需传入
 
 # @某人
 At(qq=user_id)

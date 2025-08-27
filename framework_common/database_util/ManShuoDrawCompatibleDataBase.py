@@ -1,14 +1,16 @@
 import aiosqlite
 import json
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import os
 from datetime import datetime
 from pathlib import Path
+from collections import defaultdict
 
 from developTools.utils.logger import get_logger
 
-logger=get_logger(__name__.split('.')[-1])
+logger = get_logger(__name__.split('.')[-1])
+
 
 # 递归合并字典中的同名字段
 def merge_dicts(dict1, dict2):
@@ -129,7 +131,7 @@ class AsyncSQLiteDatabase:
 
     async def read_user(self, user_id: str) -> Dict[str, Any]:
         """
-        读取用户数据，并将 JSON 字符串反序列化为嵌套字典。草
+        读取用户数据，并将 JSON 字符串反序列化为嵌套字典。
         """
         logger.info(f"Reading user {user_id} from {self.db_path}")
         conn = await self._get_connection()
@@ -143,6 +145,162 @@ class AsyncSQLiteDatabase:
             if row:
                 return json.loads(row['user_data'])
             return {}
+        finally:
+            await self._release_connection(conn)
+
+    async def batch_read_users(self, user_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+        """
+        批量读取多个用户数据，减少数据库查询次数
+        :param user_ids: 用户ID列表
+        :return: 用户ID到用户数据的映射字典
+        """
+        if not user_ids:
+            return {}
+
+        logger.info(f"Batch reading {len(user_ids)} users from {self.db_path}")
+
+        conn = await self._get_connection()
+        try:
+            # 构造 IN 查询
+            placeholders = ','.join(['?' for _ in user_ids])
+            query = f'SELECT user_id, user_data FROM users WHERE user_id IN ({placeholders})'
+
+            cursor = await conn.execute(query, user_ids)
+
+            result = {}
+            async for row in cursor:
+                user_id = row['user_id']
+                user_data = json.loads(row['user_data'])
+                result[user_id] = user_data
+
+            # 为不存在的用户返回空字典
+            for user_id in user_ids:
+                if user_id not in result:
+                    result[user_id] = {}
+
+            return result
+        finally:
+            await self._release_connection(conn)
+
+    async def batch_update_speech_counts(self, speech_cache: Dict[int, Dict[int, Dict[str, int]]]):
+        """
+        批量更新用户的发言统计数据，专门针对发言统计的高效更新方法
+        :param speech_cache: 格式 {user_id: {group_id: {day: count}}}
+        """
+        if not speech_cache:
+            return
+
+        logger.info(f"Batch updating speech counts for {len(speech_cache)} users")
+
+        # 获取所有需要更新的用户ID
+        user_ids = [str(user_id) for user_id in speech_cache.keys()]
+
+        # 批量读取现有用户数据
+        existing_users = await self.batch_read_users(user_ids)
+
+        # 准备批量更新的数据
+        updates = []
+
+        for user_id, groups in speech_cache.items():
+            user_id_str = str(user_id)
+            current_data = existing_users.get(user_id_str, {})
+
+            # 确保 number_speeches 字段存在
+            if 'number_speeches' not in current_data:
+                current_data['number_speeches'] = {}
+
+            # 更新每个群组的发言统计
+            for group_id, days in groups.items():
+                group_id_str = str(group_id)
+
+                if group_id_str not in current_data['number_speeches']:
+                    current_data['number_speeches'][group_id_str] = {}
+
+                # 更新每天的发言数量
+                for day, count in days.items():
+                    if day in current_data['number_speeches'][group_id_str]:
+                        # 累加现有计数
+                        current_data['number_speeches'][group_id_str][day] += count
+                    else:
+                        # 设置新的计数
+                        current_data['number_speeches'][group_id_str][day] = count
+
+            # 准备批量更新的数据
+            json_data = json.dumps(current_data, ensure_ascii=False)
+            updates.append((json_data, user_id_str))
+
+        # 执行批量更新
+        conn = await self._get_connection()
+        try:
+            await conn.execute('BEGIN TRANSACTION')
+
+            await conn.executemany('''
+                INSERT OR REPLACE INTO users (user_id, user_data, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+            ''', [(user_id, json_data) for json_data, user_id in updates])
+
+            await conn.commit()
+            logger.info(f"Successfully batch updated {len(updates)} users")
+
+        except Exception as e:
+            await conn.rollback()
+            logger.error(f"Batch update failed: {e}")
+            raise e
+        finally:
+            await self._release_connection(conn)
+
+    async def batch_increment_counters(self, counter_updates: Dict[str, Dict[str, int]]):
+        """
+        批量增量更新计数器，适用于需要在现有数值基础上增加的场景
+        :param counter_updates: 格式 {user_id: {field_path: increment_value}}
+        """
+        if not counter_updates:
+            return
+
+        logger.info(f"Batch incrementing counters for {len(counter_updates)} users")
+
+        user_ids = list(counter_updates.keys())
+        existing_users = await self.batch_read_users(user_ids)
+
+        updates = []
+
+        for user_id, field_updates in counter_updates.items():
+            current_data = existing_users.get(user_id, {})
+
+            for field_path, increment in field_updates.items():
+                # 解析嵌套字段路径
+                keys = field_path.split('.')
+                target = current_data
+
+                # 确保路径上的所有字典都存在
+                for key in keys[:-1]:
+                    if key not in target or not isinstance(target[key], dict):
+                        target[key] = {}
+                    target = target[key]
+
+                # 增量更新最终值
+                final_key = keys[-1]
+                current_value = target.get(final_key, 0)
+                target[final_key] = current_value + increment
+
+            json_data = json.dumps(current_data, ensure_ascii=False)
+            updates.append((json_data, user_id))
+
+        # 执行批量更新
+        conn = await self._get_connection()
+        try:
+            await conn.execute('BEGIN TRANSACTION')
+
+            await conn.executemany('''
+                INSERT OR REPLACE INTO users (user_id, user_data, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+            ''', [(json_data, user_id) for json_data, user_id in updates])
+
+            await conn.commit()
+
+        except Exception as e:
+            await conn.rollback()
+            raise e
         finally:
             await self._release_connection(conn)
 
@@ -319,7 +477,8 @@ class AsyncSQLiteDatabase:
         pass
 
     @classmethod
-    async def get_instance(cls, db_path: str = "ManshuoCompatibledData.db", storage_dir: str = "data/database")-> "AsyncSQLiteDatabase":
+    async def get_instance(cls, db_path: str = "ManshuoCompatibledData.db",
+                           storage_dir: str = "data/database") -> "AsyncSQLiteDatabase":
         """
         获取数据库实例的异步方法
         """
@@ -330,108 +489,25 @@ class AsyncSQLiteDatabase:
         return instance
 
 
-# 示例使用
-async def main():
+# 优化后的批量更新示例
+async def optimized_batch_update_speeches(speech_cache, db):
     """
-    异步示例使用方法
+    优化后的批量更新发言统计函数
     """
-    # 指定存储目录和数据库文件名
-    storage_dir = "E:\\Others\\github\\bot\\Eridanus\\data\\dataBase"
-    storage_file = "test.db"
+    try:
+        logger.info("Start optimized batch update speeches")
 
-    # 获取数据库实例（单例模式）
-    db = await AsyncSQLiteDatabase.get_instance(storage_file, storage_dir)
+        if not speech_cache:
+            return
 
-    # 写入单个用户数据（嵌套字典形式存储）
-    user_data = {
-        "name": "Alice",
-        "age": 25,
-        "address": {
-            "city": "New York",
-            "zip": "10001"
-        },
-        "preferences": {
-            "food": "Pizza",
-            "color": "Blue"
-        }
-    }
-    await db.write_user("user1", user_data)
+        # 使用新的批量更新方法，一次性处理所有数据
+        await db.batch_update_speech_counts(speech_cache)
 
-    # 读取单个用户数据
-    user1_data = await db.read_user("user1")
-    print("User1 Data:", user1_data)
+        # 清空缓存
+        speech_cache.clear()
 
-    # 更新用户数据中的某个嵌套字段
-    await db.update_user_field("user1", "address.city", "Los Angeles")
-    updated_user1 = await db.read_user("user1")
-    print("Updated User1 Data:", updated_user1)
+        logger.info("Optimized batch update completed successfully")
 
-    # 删除用户数据中的某个嵌套字段
-    await db.delete_user_field("user1", "preferences.food")
-    user1_after_deletion = await db.read_user("user1")
-    print("User1 Data After Field Deletion:", user1_after_deletion)
-
-    # 写入多个用户数据
-    users = {
-        "user2": {
-            "name": "Bob",
-            "age": 30,
-            "address": {
-                "city": "Chicago",
-                "zip": "60601"
-            },
-            "preferences": {
-                "food": "Burger",
-                "color": "Red"
-            }
-        },
-        "user3": {
-            "name": "Charlie",
-            "age": 22,
-            "address": {
-                "city": "San Francisco",
-                "zip": "94101"
-            },
-            "preferences": {
-                "food": "Sushi",
-                "color": "Green"
-            }
-        }
-    }
-    await db.write_multiple_users(users)
-
-    # 读取所有用户数据
-    all_users = await db.read_all_users()
-    print("All Users Data:", all_users)
-
-    # 获取用户总数
-    user_count = await db.get_user_count()
-    print(f"Total users: {user_count}")
-
-    # 删除整个用户数据
-    await db.delete_user("user1")
-    print("User1 After Deletion:", await db.read_user("user1"))
-
-    # 手动保存数据到磁盘
-    await db.save_to_disk()
-
-    print(f"SQLite 数据已存储到指定目录：{storage_dir}, 文件名：{storage_file}")
-
-    # 演示高并发查询
-    print("\n演示高并发查询...")
-    tasks = []
-    for i in range(100):
-        task = db.read_user(f"user{i % 3 + 1}")  # 循环查询已存在的用户
-        tasks.append(task)
-
-    # 并发执行所有查询
-    start_time = datetime.now()
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    end_time = datetime.now()
-
-    print(f"完成100个并发查询，耗时: {(end_time - start_time).total_seconds():.3f}秒")
-    print(f"成功查询数: {sum(1 for r in results if isinstance(r, dict))}")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    except Exception as e:
+        logger.error(f"Optimized batch update error: {e}")
+        raise e

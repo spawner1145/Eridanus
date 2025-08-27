@@ -1,42 +1,62 @@
 import httpx
+from pathlib import Path
 
-# 设置代理（如果需要）
-proxies = {
-    "http://": "http://127.0.0.1:10809",
-    "https://": "http://127.0.0.1:10809",
-}
+async def upload_image_with_quality(
+    image_path: str,
+    quality: int = 60,
+    token: str = None,
+    referer: str = None
+):
+    """
+    使用 httpx 异步上传图片
+    :param image_path: 图片文件路径
+    :param quality: 图片质量 (默认60)
+    :param token: PHPSESSID (必填)
+    :param referer: 可选的 Referer
+    :return: httpx.Response
+    """
 
-# 请求的 URL
-url = "https://up.ly93.cc/upload/token"
+    url = "https://dev.ruom.top/api.php"
 
-# 请求头
-headers = {
-    "Accept": "application/json, text/javascript, */*; q=0.01",
-    "Accept-Encoding": "gzip, deflate, br, zstd",
-    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
-    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-    "Origin": "https://up.ly93.cc",
-    "Referer": "https://up.ly93.cc/",
-    "Sec-CH-UA": '"Microsoft Edge";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-    "Sec-CH-UA-Mobile": "?0",
-    "Sec-CH-UA-Platform": '"Windows"',
-    "Sec-Fetch-Dest": "empty",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Site": "same-origin",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
-    "X-Requested-With": "XMLHttpRequest",
-}
+    # Cookies
+    cookies = {
+        "upload_count": '{"date":"2025-08-26","count":1}',   # 可根据实际情况改
+        "PHPSESSID": token if token else "",                  # 必须带上
+    }
 
-# 请求体数据
-data = {
-    # 填入实际需要的键值对
-    "name": "fsfsaf.mp3"
-}
+    # Headers
+    headers = {
+        "accept": "*/*",
+        "accept-encoding": "gzip, deflate, br, zstd",
+        "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+        "origin": "https://dev.ruom.top",
+        "referer": referer or "https://dev.ruom.top/",
+        "sec-ch-ua": '"Not;A=Brand";v="99", "Microsoft Edge";v="139", "Chromium";v="139"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0",
+    }
 
-# 发起请求
-with httpx.Client(proxies=proxies) as client:
-    response = client.post(url, headers=headers, data=data)
+    # 文件 & 表单
+    files = {
+        "image": (Path(image_path).name, open(image_path, "rb"), "image/jpeg"),
+    }
+    data = {
+        "quality": str(quality),
+    }
 
-# 输出响应
-print("状态代码:", response.status_code)
-print("响应内容:", response.text)
+    async with httpx.AsyncClient(cookies=cookies, headers=headers, timeout=60) as client:
+        response = await client.post(url, data=data, files=files)
+        print(response.json())
+        return response.json()["data"]["url"]
+
+
+# 用法示例
+# import asyncio
+# resp = asyncio.run(upload_image_with_quality("test.jpg", 60, token="3tfpmd0v6hc1lgp1cj8s35mkcb"))
+# print(resp.status_code, resp.text)
