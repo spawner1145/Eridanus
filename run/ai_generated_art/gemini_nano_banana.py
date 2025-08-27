@@ -61,10 +61,16 @@ async def call_gemini_api(contents, config) -> Dict[str, Any]:
     payload = {
         "system_instruction": {
             "parts": [
-                {"text": "你是一个得力画图助手，用户的每一次谈话你都需要输出图片"}
+                {"text": "You are a capable drawing assistant. For every conversation with the user, you must output an image. It is crucial to ensure that you generate an image and not return only text."}
             ]
         },
-        "contents": [{"parts": contents}]
+        "contents": [{"parts": contents}],
+        "safetySettings": [
+            {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', "threshold": "BLOCK_None"},
+            {'category': 'HARM_CATEGORY_HATE_SPEECH', "threshold": "BLOCK_None"},
+            {'category': 'HARM_CATEGORY_HARASSMENT', "threshold": "BLOCK_None"},
+            {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', "threshold": "BLOCK_None"}
+        ]
     }
 
     headers = {
@@ -74,16 +80,33 @@ async def call_gemini_api(contents, config) -> Dict[str, Any]:
     try:
         async with httpx.AsyncClient(timeout=None, proxies=proxies) as client:
             response = await client.post(url, json=payload, headers=headers)
+        
         print("API响应状态码:", response.status_code)
         response.raise_for_status()
         response_data = response.json()
+
         candidates = response_data.get("candidates")
         if not candidates:
+            feedback = response_data.get("promptFeedback", {})
+            block_reason = feedback.get("blockReason")
+            if block_reason:
+                return {"success": False, "error": f"请求被阻止", "details": f"原因: {block_reason}"}
             raise ValueError("API响应中未包含 'candidates'。")
-        content = candidates[0].get("content", {})
+
+        candidate = candidates[0]
+        content = candidate.get("content", {})
         parts = content.get("parts")
+
         if not parts:
-            raise ValueError("API响应的候选结果中未包含 'parts'。")
+            finish_reason = candidate.get("finishReason")
+            if finish_reason:
+                error_message = f"内容生成中止"
+                details = f"原因: {finish_reason}. 这通常由安全设置或不当内容导致。"
+                print(f"API调用失败: {details}")
+                return {"success": False, "error": error_message, "details": details}
+            else:
+                raise ValueError("API响应的候选结果中既未包含 'parts'，也未提供中止原因。")
+
         base64_data = None
         text_responses = []
         for part in parts:
@@ -91,15 +114,19 @@ async def call_gemini_api(contents, config) -> Dict[str, Any]:
                 base64_data = part["inlineData"]["data"]
             if "text" in part:
                 text_responses.append(part["text"])
+        
         full_text_response = " ".join(text_responses).strip()
+        
         if not base64_data and not full_text_response:
             raise ValueError("API响应既未包含图像数据，也未包含有效的文本。")
+        
         save_path = None
         if base64_data:
             save_path = f"data/pictures/cache/{random.randint(1000, 9999)}.png"
             Path(os.path.dirname(save_path)).mkdir(parents=True, exist_ok=True)
             with open(save_path, "wb") as f:
                 f.write(base64.b64decode(base64_data))
+        
         return {
             "success": True,
             "result_path": save_path,
@@ -116,7 +143,7 @@ async def call_gemini_api(contents, config) -> Dict[str, Any]:
     except (ValueError, KeyError, IndexError) as e:
         error_details = f"解析API响应失败: {e}\n{traceback.format_exc()}"
         print(error_details)
-        return {"success": False, "error": str(e), "details": error_details}
+        return {"success": False, "error": "无法解析API响应", "details": error_details}
     except Exception as e:
         error_details = f"未知错误: {e}\n{traceback.format_exc()}"
         print(error_details)
@@ -167,10 +194,12 @@ def main(bot, config):
             current_cache["active"] = False
             current_cache["messages"] = []
             
-            api_contents = []
+            text_parts = []
+            image_parts = []
+            
             for msg_item in messages_to_process:
                 if msg_item["type"] == "text":
-                    api_contents.append({"text": msg_item["content"]})
+                    text_parts.append({"text": msg_item["content"]})
                 
                 elif msg_item["type"] == "image":
                     try:
@@ -181,6 +210,11 @@ def main(bot, config):
 
                         with BytesIO(image_data) as img_buffer:
                             with PILImage.open(img_buffer) as img:
+                                # --- MODIFICATION: Image resizing logic ---
+                                max_size = 1024
+                                if img.width > max_size or img.height > max_size:
+                                    img.thumbnail((max_size, max_size))
+
                                 processed_img = img
                                 if getattr(img, 'is_animated', False):
                                     img.seek(0)
@@ -192,7 +226,7 @@ def main(bot, config):
                         
                         b64_data = base64.b64encode(processed_image_data).decode('utf-8')
                         
-                        api_contents.append({
+                        image_parts.append({
                             "inlineData": {
                                 "mime_type": "image/png",
                                 "data": b64_data
@@ -202,6 +236,8 @@ def main(bot, config):
                         error_msg = await bot.send(event, [Text(f"处理图片时出错: {str(e)}")], True)
                         await delay_recall(bot, error_msg, 15)
                         print(f"图片处理错误详情: {traceback.format_exc()}")
+
+            api_contents = text_parts + image_parts
             
             if not api_contents:
                 msg = await bot.send(event, [Text("没有有效的内容可提交，请重新输入")], True)
