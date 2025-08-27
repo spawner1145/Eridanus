@@ -57,7 +57,16 @@ async def call_gemini_api(contents, config) -> Dict[str, Any]:
     url = f"{config.ai_llm.config['llm']['gemini']['base_url']}/v1beta/models/gemini-2.5-flash-image-preview:generateContent"
     proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.common_config.basic_config["proxy"]["http_proxy"] else None
     proxies={"http://": proxy, "https://": proxy} if proxy else None
-    payload = {"contents": [{"parts": contents}]}
+    
+    payload = {
+        "system_instruction": {
+            "parts": [
+                {"text": "你是一个得力画图助手，用户的每一次谈话你都需要输出图片"}
+            ]
+        },
+        "contents": [{"parts": contents}]
+    }
+
     headers = {
         "x-goog-api-key": config.ai_generated_art.config["ai绘画"]["nano_banana的key"],
         "Content-Type": "application/json"
