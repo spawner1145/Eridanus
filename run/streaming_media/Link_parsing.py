@@ -90,6 +90,7 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def Link_Prising_search(event: GroupMessageEvent):
         global Cachecleaner
+        type_link = None
         if not Cachecleaner:
             asyncio.create_task(cleanup_teamlist(bot))
             
@@ -99,6 +100,8 @@ def main(bot, config):
             if 'meta' in event_context:
                 try:
                     url = "QQ小程序" + event_context['meta']['detail_1']['qqdocurl']
+                    if config.streaming_media.config["bili_dynamic"]["is_QQ_chek"] is not True:
+                        type_link = 'QQ_Check'
                 except:
                     pass
 
@@ -110,7 +113,6 @@ def main(bot, config):
             #url="".join([i for i in event.message_chain.get(Text) if i.text.strip()])
         else:
             return
-        #print(url)
         if event.group_id in teamlist:
             bot.logger.info('链接解析缓存中，开始推送~~')
             json = teamlist[event.group_id]['data']
@@ -126,9 +128,8 @@ def main(bot, config):
                 await call_bili_download_video(bot, event, config,'img')
         #if not re.search(r'https?://', url or '') and not url.startswith("QQ小程序"):
            # return
-        link_prising_json = await link_prising(url, filepath='data/pictures/cache/', proxy=proxy)
+        link_prising_json = await link_prising(url, filepath='data/pictures/cache/', proxy=proxy, type=type_link)
         send_context = f'{botname}识别结果：'
-        #print(link_prising_json)
         if link_prising_json['status']:
             bot.logger.info('链接解析成功，开始推送~~')
             if link_prising_json['video_url']:

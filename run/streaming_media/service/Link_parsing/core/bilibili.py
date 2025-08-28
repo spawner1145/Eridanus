@@ -29,7 +29,7 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
-async def bilibili(url,filepath=None,is_twice=None):
+async def bilibili(url,filepath=None,is_twice=None,type=None):
     """
         哔哩哔哩解析
     :param bot:
@@ -53,7 +53,6 @@ async def bilibili(url,filepath=None,is_twice=None):
     emoji_list = []
     label_list,image_list,context=[],[],''
     orig_desc=None
-    type=None
     introduce=None
     desc=None
     avatar_json=None
@@ -428,7 +427,8 @@ async def bilibili(url,filepath=None,is_twice=None):
          'content': [context]}]
 
     if is_twice is not True:
-        json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
+        if type != 'QQ_Check':
+            json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
         json_check['pic_url_list'].append(video_cover)
         return json_check
     return manshuo_draw_json
