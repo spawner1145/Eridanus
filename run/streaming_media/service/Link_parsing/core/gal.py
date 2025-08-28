@@ -230,7 +230,7 @@ async def Galgame_manshuo(url, filepath=None):
         desc = '\n'.join(desc_parts) if desc_parts else ''
         del desc_parts  # 清理描述部分列表
         # 组装最终内容
-        context_final = f'[title]{Title}[/title]\n{desc}'
+        context_final = f'[title]{Title}[/title]\n[des]{desc}[/des]'
         # 处理头像路径
         if avatar_name in name_qq_list:
             for name_check in name_qq_list:
@@ -369,5 +369,6 @@ async def gal_PILimg(text=None,img_context=None,filepath=None,proxy=None,type_so
             developer=text.split("开发商：")[1].replace(desc,'').replace('简介如下：','')
             title +=f'\n开发商：{developer}'
         context = f'[title]{title}[/title]\n{desc}'
-        json_check['pic_path'] = await manshuo_draw([{'type': 'img', 'subtype': 'common_with_des', 'img': img_context, 'content': [context],'max_des_length':2000}])
+        json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
+                                                     {'type': 'img', 'subtype': 'common_with_des', 'img': img_context, 'content': [context],'max_des_length':2000}])
         return json_check
