@@ -142,7 +142,7 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def group_check_steamid(event: GroupMessageEvent):
         if event.pure_text.lower() == 'steamcheck':
-            ids_list = db.read_user('SteamSnoopingList')
+            ids_list = await db.read_user('SteamSnoopingList')
             user_list, name_list = [],'当前群聊的 Steam视奸 列表为：\n'
             if not (ids_list and str(event.group_id) in ids_list) :
                 await bot.send(event, '该群还没有绑定视奸用户哦')

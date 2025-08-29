@@ -34,7 +34,7 @@ async def link_prising(url,filepath=None,proxy=None,type=None):
         match url:
             case url if 'bili' in url or 'b23' in url:
                 logger.info(f"解析bilibili链接:{url}")
-                link_prising_json = await bilibili(url, filepath=filepath)
+                link_prising_json = await bilibili(url, filepath=filepath,type=type)
             case url if 'douyin' in url:
                 logger.info(f"解析抖音链接:{url}")
                 link_prising_json = await dy(url, filepath=filepath)
