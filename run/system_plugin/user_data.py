@@ -86,19 +86,22 @@ async def call_user_data_sign(bot,event,config):
         card_ = "data/pictures/Amamiya/大兄.jpg"
         card_txt = '[title]凶[/title]\n事情可能不顺，\n容易遇到困难、损失或不幸。\n提醒谨慎，小心防范，避免冒险。'
 
-    draw_list = [
-        {'type': 'basic_set', 'img_width': 750, 'img_height': 3000, 'is_stroke_layer': True,
-         'backdrop_mode': 'one_color', 'backdrop_color': {'color1': (235, 239, 253, 225)}},
-        {'type': 'backdrop', 'subtype': 'img', 'background': [img]},
-        {'type': 'avatar', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640"], 'upshift_extra': 15,
-         'avatar_backdrop_color': (235, 239, 253, 0),
+    draw_list = [{'type': 'basic_set', 'img_width': 750, 'img_height': 3000, 'is_stroke_layer': True,
+         'backdrop_mode': 'one_color', 'backdrop_color': {'color1': (235, 239, 253, 225)}},]
+    if config.system_plugin.config["user_data"]["with_img_backdrop"]:
+        draw_list.extend([{'type': 'backdrop', 'subtype': 'img', 'background': [img]},])
+    draw_list.extend([
+        {'type': 'avatar', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640"], 'upshift_extra': 15,'avatar_backdrop_color': (235, 239, 253, 0),
          'content': [f"[name]{nickname} 今天签到啦～[/name]\n[time]当前时间：{formatted_date}[/time]"]},
-        f'[title]今天 {nickname} 签到了哦[/title]（签到天数：{uer_sign_days}）',
-        {'type': 'img', 'subtype': 'common', 'img': [img], 'jump_next_page': True},
-        '[title]您今天的塔罗牌和运势为：[/title]',
-        {'type': 'img', 'subtype': 'common_with_des_right', 'img': [tarotimg, card_], 'content': [tarottxt, card_txt],
-         'is_crop': False, 'number_per_row': 1}
-    ]
+        f'[title]今天 {nickname} 签到了哦[/title]（签到天数：{uer_sign_days}）',])
+    if config.system_plugin.config["user_data"]["with_taro"]:
+        draw_list.extend([
+            {'type': 'img', 'subtype': 'common', 'img': [img], 'jump_next_page': True},
+            '[title]您今天的塔罗牌和运势为：[/title]',
+            {'type': 'img', 'subtype': 'common_with_des_right', 'img': [tarotimg, card_],
+             'content': [tarottxt, card_txt],'is_crop': False, 'number_per_row': 1}])
+    else:
+        draw_list.extend([{'type': 'img', 'subtype': 'common', 'img': [img]},])
     bot.logger.info('开始制作用户签到图片')
     await bot.send(event, Image(file=(await manshuo_draw(draw_list))))
     if config.system_plugin.config["user_data"]["签到附带原图"] and img!= "data/system/bot.png":
