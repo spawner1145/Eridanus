@@ -303,12 +303,13 @@ def auth(func):
     return wrapper
 
 # 静态文件缓存控制，加快响应
-@app.after_request
-def after_request(response):
-    # 为静态文件添加缓存控制头
-    if request.endpoint == 'static':
-        response.headers['Cache-Control'] = 'public, max-age=2592000'  # 缓存一月
-    return response
+#先不要了，缓存不刷新，页面总是出问题
+# @app.after_request
+# def after_request(response):
+#     # 为静态文件添加缓存控制头
+#     if request.endpoint == 'static':
+#         response.headers['Cache-Control'] = 'public, max-age=2592000'  # 缓存一月
+#     return response
 
 @app.route("/api/load/<filename>", methods=["GET"])
 @auth
