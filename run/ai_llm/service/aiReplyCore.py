@@ -46,6 +46,12 @@ logger = get_logger("aiReplyCore")
 async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, event=None, system_instruction=None,
                       func_result=False, recursion_times=0, do_not_read_context=False):  # 后面几个函数都是供函数调用的场景使用的
     logger.info(f"aiReplyCore called with message: {processed_message}")
+    # 防止开头@信息影响人设
+    if isinstance(processed_message, list) and len(processed_message) > 0:
+        first_item = processed_message[0]
+        if isinstance(first_item, dict) and 'at' in first_item:
+            del processed_message[0]
+            logger.info(f"Removed first 'at' element from message, remaining message: {processed_message}")
     """
     递归深度约束
     """
