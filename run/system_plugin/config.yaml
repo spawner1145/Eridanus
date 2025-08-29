@@ -14,6 +14,8 @@ api_implements: #花里胡哨
   recall_level: 3  #撤回？
 user_data:
   签到附带原图: true
+  with_taro: true     #签到是否附带塔罗图和运势
+  with_img_backdrop: true   #签到是否使用图片作为背景
   auto_register: true  #自动为发送消息的用户注册。确保所有人都在数据库中，不建议关。
   change_info_operate_level: 0     #相关指令所需操作权限等级。默认0级最低，数字越大等级越高
   permit_user_operate_level: 1000    #允许使用授权#{目标QQ}#{level} 指令的操作权限等级
