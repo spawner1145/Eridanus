@@ -78,6 +78,8 @@ valid_message_actions = ['send_group_forward_msg','send_group_msg','upload_group
 # 用户信息文件
 user_file = "./user_info.yaml"
 
+is_saving_yaml = False
+
 # 会话信息字典（token跟expires）
 auth_info = {}
 
@@ -185,25 +187,29 @@ def merge_dicts(old, new):
 
 
 def conflict_file_dealer(old_data: dict, file_new='new_aiReply.yaml'):
-    logger.info(f"冲突文件处理: {file_new}")
-
-    old_data_yaml_str = StringIO()
-    yaml.dump(old_data, old_data_yaml_str)
-    old_data_yaml_str.seek(0)  # 将光标移到字符串开头，以便后续读取
-
-    # 将 YAML 字符串加载回 ruamel.yaml 对象
-    old_data = yaml.load(old_data_yaml_str)
-    # 加载新的YAML文件
-    with open(file_new, 'r', encoding="utf-8") as file:
-        new_data = yaml.load(file)
-
-    # 遍历旧的YAML数据并更新新的YAML数据中的相应值
-    merge_dicts(old_data, new_data)
-
-    # 把新的YAML数据保存到新的文件中，保留注释
-    with open(file_new, 'w', encoding="utf-8") as file:
-        yaml.dump(new_data, file)
-    return True
+    try:
+        logger.info(f"冲突文件处理: {file_new}")
+    
+        old_data_yaml_str = StringIO()
+        yaml.dump(old_data, old_data_yaml_str)
+        old_data_yaml_str.seek(0)  # 将光标移到字符串开头，以便后续读取
+    
+        # 将 YAML 字符串加载回 ruamel.yaml 对象
+        old_data = yaml.load(old_data_yaml_str)
+        # 加载新的YAML文件
+        with open(file_new, 'r', encoding="utf-8") as file:
+            new_data = yaml.load(file)
+    
+        # 遍历旧的YAML数据并更新新的YAML数据中的相应值
+        merge_dicts(old_data, new_data)
+    
+        # 把新的YAML数据保存到新的文件中，保留注释
+        with open(file_new, 'w', encoding="utf-8") as file:
+            yaml.dump(new_data, file)
+        return True
+    except Exception as e:
+        logger.error(f"冲突文件处理失败: {e}")
+        return False
 
 
 def extract_comments(data, path="", comments_dict=None):
@@ -325,6 +331,10 @@ def load_file(filename):
 @auth
 def save_file(filename):
     """接收前端数据并保存到 YAML 文件"""
+    global is_saving_yaml
+    if is_saving_yaml:
+        return jsonify({"error": "操作过快！"})
+    is_saving_yaml = True
     if filename not in YAML_FILES:
         return jsonify({"error": "文件名错误"})
 
@@ -335,12 +345,13 @@ def save_file(filename):
     data = request.json  # 获取前端发送的 JSON 数据
     if not data:
         return jsonify({"error": "无效数据"})
-
+    
     result = save_yaml(file_path, data)
+    is_saving_yaml = False
     if result:
         return jsonify({"message": "文件保存成功"})
-    else:
-        return jsonify(result)
+    elif result == False:
+        return jsonify({"error": "文件保存失败"})
 
 
 @app.route("/api/sources", methods=["GET"])
