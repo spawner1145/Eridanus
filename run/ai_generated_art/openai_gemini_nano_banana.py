@@ -156,6 +156,9 @@ def init_user_cache(user_id: int):
         }
 
 def main(bot, config):
+    if config.ai_generated_art.config["ai绘画"]["原生gemini接口"]:
+        bot.logger.warning("当前nano banana使用gemini官方接口")
+        return
     @bot.on(GroupMessageEvent)
     async def nano_message_handler(event: GroupMessageEvent):
         user_id = event.sender.user_id
