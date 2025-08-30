@@ -130,7 +130,8 @@ async def call_gemini_api(contents, config) -> Dict[str, Any]:
         return {
             "success": True,
             "result_path": save_path,
-            "text": full_text_response
+            "text": full_text_response,
+            "has_image": bool(base64_data)
         }
     except httpx.HTTPStatusError as e:
         error_details = f"HTTP错误 (状态码: {e.response.status_code}): {e.response.text}"
@@ -210,7 +211,6 @@ def main(bot, config):
 
                         with BytesIO(image_data) as img_buffer:
                             with PILImage.open(img_buffer) as img:
-                                # --- MODIFICATION: Image resizing logic ---
                                 max_size = 1024
                                 if img.width > max_size or img.height > max_size:
                                     img.thumbnail((max_size, max_size))
@@ -252,7 +252,8 @@ def main(bot, config):
 
             if api_result.get("success"):
                 remaining_uses_text = ""
-                if user_id not in UNLIMITED_USERS:
+                # 仅当返回图片时才更新计数
+                if user_id not in UNLIMITED_USERS and api_result["has_image"]:
                     usage_data = load_or_reset_usage_data()
                     current_uses = usage_data.get("usage_data", {}).get(str(user_id), 0)
                     new_uses = current_uses + 1
@@ -263,6 +264,9 @@ def main(bot, config):
                         remaining_uses_text = f"调用成功！你今天还剩下 {remaining} 次调用机会"
                     else:
                         remaining_uses_text = "今天没得🦌了"
+                # 没有返回图片时的提示
+                elif not api_result["has_image"]:
+                    remaining_uses_text = "本次调用未生成图片，不消耗次数"
                 
                 message_to_send = [Text("nano banana：")]
                 returned_text = api_result.get("text")
@@ -329,3 +333,4 @@ def main(bot, config):
                 await delay_recall(bot, msg, 10)
     
     return nano_message_handler
+    
