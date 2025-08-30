@@ -19,7 +19,7 @@ from framework_common.utils.utils import get_img, delay_recall
 # 普通用户每日最大调用次数
 MAX_USES_PER_DAY = 20
 # 不受限制的用户ID列表 (请将这里的数字替换为实际的QQ号)
-UNLIMITED_USERS = [1462079129, 2508473558]
+UNLIMITED_USERS = [1462079129, 2508473558,1840094972]
 # 使用记录文件路径
 USAGE_FILE_PATH = Path("data/uses.json")
 
@@ -56,7 +56,7 @@ def save_usage_data(data: Dict[str, Any]):
 async def call_openrouter_api(contents, config) -> Dict[str, Any]:
     url = "https://openrouter.ai/api/v1/chat/completions"
     proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.common_config.basic_config["proxy"]["http_proxy"] else None
-    proxies={"http://": proxy, "https-": proxy} if proxy else None
+    proxies={"http://": proxy, "https://": proxy} if proxy else None
     
     user_content = []
     for part in contents:
