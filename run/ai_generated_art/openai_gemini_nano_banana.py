@@ -123,6 +123,12 @@ async def call_openrouter_api(contents, config) -> Dict[str, Any]:
         full_text_response = " ".join(text_responses).strip()
 
         if not base64_data and not full_text_response:
+            
+            try:
+                print(response.status_code)
+                print(response.json())
+            except:
+                pass
             raise ValueError("API响应既未包含有效的图像数据，也未包含有效的文本。")
         
         save_path = None
@@ -229,7 +235,12 @@ def main(bot, config):
                 return
             
             processing_msg = await bot.send(event, [Text("已提交OpenRouter请求，正在处理...")], True)
-            api_result = await call_openrouter_api(api_parts, config)
+            try:
+                api_result = await call_openrouter_api(api_parts, config)
+            except Exception as e:
+                traceback.print_exc()
+                bot.logger.error("openrouter未能返回有效结果")
+                api_result = await call_openrouter_api(api_parts, config)
             await bot.recall(processing_msg)
 
             if api_result.get("success"):
