@@ -17,7 +17,7 @@ from developTools.message.message_components import Image, Text
 from framework_common.utils.utils import get_img, delay_recall
 
 # 普通用户每日最大调用次数
-MAX_USES_PER_DAY = 20
+MAX_USES_PER_DAY = 1000
 # 不受限制的用户ID列表 (请将这里的数字替换为实际的QQ号)
 UNLIMITED_USERS = [1462079129, 2508473558,1840094972]
 # 使用记录文件路径
