@@ -25,7 +25,8 @@ ai绘画:
 
   qwen_image_cookie: "" #在https://www.modelscope.cn/aigc/imageGeneration?tab=advanced&versionId=275167&modelType=Checkpoint&sdVersion=QWEN_IMAGE_20_B&modelUrl=modelscope%3A%2F%2FMusePublic%2FQwen-image%3Frevision%3Dv1这里跑一次图f12自己拿cookie
 
-  nano_banana的key: "" # 就是冲了米的gemini key
+  nano_banana的key: "" # 就是冲了米的gemini key。或是在https://openrouter.ai/google/gemini-2.5-flash-image-preview:free申请。
+  原生gemini接口: false  #如果用gemini官方apikey，则打开此项，使用上面openrouter或其他openai标准的中转api则无需打开。
   
   禁止nsfw: false
   allow_nsfw_groups:               #允许色图的群号，禁止nsfw开启时有效
