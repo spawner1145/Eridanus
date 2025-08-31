@@ -24,6 +24,23 @@ UNLIMITED_USERS = [1462079129, 2508473558]
 USAGE_FILE_PATH = Path("data/uses.json")
 
 user_cache: Dict[int, Dict[str, Any]] = {}
+"""
+轮询迭代器
+"""
+class RoundRobinSelector:
+    def __init__(self, items):
+        self.items = items if isinstance(items, list) else [items]
+        self.index = 0
+    
+    def get_next(self):
+        if not self.items:
+            raise ValueError("轮询列表为空")
+        item = self.items[self.index]
+        self.index = (self.index + 1) % len(self.items)
+        return item
+
+# 全局API key选择器
+api_key_selector = None
 
 def get_today_date() -> str:
     return datetime.now().strftime("%Y-%m-%d")
@@ -72,9 +89,15 @@ async def call_gemini_api(contents, config) -> Dict[str, Any]:
             {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', "threshold": "BLOCK_None"}
         ]
     }
-
+    global api_key_selector
+    api_keys = config.ai_generated_art.config["ai绘画"]["nano_banana_key"]
+    
+    if api_key_selector is None:
+        api_key_selector = RoundRobinSelector(api_keys)
+    
+    api_key = api_key_selector.get_next()
     headers = {
-        "x-goog-api-key": config.ai_generated_art.config["ai绘画"]["nano_banana的key"],
+        "x-goog-api-key": api_key,
         "Content-Type": "application/json"
     }
     try:
