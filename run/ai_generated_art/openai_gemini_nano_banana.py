@@ -24,6 +24,23 @@ UNLIMITED_USERS = [1462079129, 2508473558,1840094972]
 USAGE_FILE_PATH = Path("data/uses.json")
 
 user_cache: Dict[int, Dict[str, Any]] = {}
+"""
+轮询器
+"""
+class RoundRobinSelector:
+    def __init__(self, items):
+        self.items = items if isinstance(items, list) else [items]
+        self.index = 0
+    
+    def get_next(self):
+        if not self.items:
+            raise ValueError("轮询列表为空")
+        item = self.items[self.index]
+        self.index = (self.index + 1) % len(self.items)
+        return item
+
+# 全局API key选择器
+api_key_selector = None
 
 def get_today_date() -> str:
     return datetime.now().strftime("%Y-%m-%d")
@@ -78,9 +95,15 @@ async def call_openrouter_api(contents, config) -> Dict[str, Any]:
     
     try:
         # 修正了您之前指出的笔误
-        api_key = config.ai_generated_art.config["ai绘画"]["nano_banana的key"]
+        global api_key_selector
+        api_keys = config.ai_generated_art.config["ai绘画"]["nano_banana_key"]
+        
+        if api_key_selector is None:
+            api_key_selector = RoundRobinSelector(api_keys)
+        
+        api_key = api_key_selector.get_next()
     except KeyError:
-        error_msg = "未在配置文件中找到 nano_banana的key。请在 config.ai_generated_art.config['ai绘画']['nano_banana的key'] 中配置您的OpenRouter Key。"
+        error_msg = "未在配置文件中找到 nano_banana_key。请在 config.ai_generated_art.config['ai绘画']['nano_banana_key'] 中配置您的OpenRouter Key。"
         print(error_msg)
         return {"success": False, "error": "配置错误", "details": error_msg}
 
