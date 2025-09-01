@@ -85,6 +85,7 @@ async def get_user_data(steam_id: int, proxy='http://127.0.0.1:7890'):
     )
 
     result = {
+        'status': False,
         "description": "No information given.",
         "background": default_background,
         "avatar": default_avatar,
@@ -116,8 +117,9 @@ async def get_user_data(steam_id: int, proxy='http://127.0.0.1:7890'):
             else:
                 response.raise_for_status()
     except httpx.RequestError as exc:
+        print(exc)
         return result
-
+    result['status'] = True
     # player name
     player_name = re.search(r"<title>Steam 社区 :: (.*?)</title>", html)
     if player_name:
@@ -150,10 +152,9 @@ async def get_user_data(steam_id: int, proxy='http://127.0.0.1:7890'):
     # avatar
     # \t<link rel="image_src" href="https://avatars.akamai.steamstatic.com/3ade30f61c3d2cc0b8c80aaf567b573cd022c405_full.jpg">
     avatar_url = re.search(r'<link rel="image_src" href="(.*?)"', html)
+    result["avatar_url"] = 'https://gal.manshuo.ink/usr/uploads/2025/01/1664675676.png'
     if avatar_url:
         result["avatar_url"] = avatar_url.group(1)
-    else:
-        result["avatar_url"] = 'https://gal.manshuo.ink/usr/uploads/2025/01/1664675676.png'
 
     # recent 2 week play time
     # \t<div class="recentgame_quicklinks recentgame_recentplaytime">\r\n\t\t\t\t\t\t\t\t\t<div>15.5 小时（过去 2 周）</div>
@@ -221,9 +222,21 @@ async def get_user_data(steam_id: int, proxy='http://127.0.0.1:7890'):
     return result
 
 
+
+async def test():
+    proxies = {
+        "http://": "http://127.0.0.1:7890",
+        "https://": "http://127.0.0.1:7890"
+    }
+    async with httpx.AsyncClient(proxies=proxies) as client:
+        r = await client.get("https://avatars.steamstatic.com/9cf396a0da9cb87d7faefe58feeae7acf6e2b363_full.jpg", timeout=10.0)
+        print(r.status_code)
+
+
 if __name__ == "__main__":
     import asyncio
 
+    #asyncio.run(test())
     data = asyncio.run(get_user_data(76561199025034455))
     for item in data:print(item,data[item])
     print(data['avatar_url'])

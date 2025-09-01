@@ -64,7 +64,7 @@ def main(bot, config):
 
         if not (steamid and steam_friend_code):
             steaminfodata =await db.read_user(userid)
-            if steaminfodata and  'SteamSnooping' in steaminfodata:
+            if steaminfodata and  'SteamSnooping' in steaminfodata and 'steamid' in steaminfodata['SteamSnooping']:
                 #await bot.send(event, Image(file=(await manshuo_draw())))
                 steamid = steaminfodata["SteamSnooping"]["steamid"]
                 steam_friend_code = int(steamid) - STEAM_ID_OFFSET
@@ -73,11 +73,14 @@ def main(bot, config):
                 return
 
         #await bot.send(event, f'steamid: {steamid}, steam_friend_code: {steam_friend_code}')
-        recall_id=await bot.send(event, f'开始查询您的最近steam动态，请耐心等待喵')
+
         proxy_config = config.common_config.basic_config['proxy']['http_proxy']
         proxy_config = proxy_config if proxy_config else None
         player_data = await get_user_data(steamid, proxy_config)
-        
+        if player_data['status'] is False:
+            await bot.send(event, f'获取失败，请稍后重试喵')
+            return
+        recall_id = await bot.send(event, f'开始查询您的最近steam动态，请耐心等待喵')
         # 根据是否有userid构建不同的绘图参数
         proxy_for_draw = config.common_config.basic_config['proxy']['http_proxy'] if config.common_config.basic_config['proxy']['http_proxy'] else None
         
@@ -125,16 +128,16 @@ def main(bot, config):
         target_group = str(event.group_id)
         if event.message_chain.has(At) and event.message_chain.has(Text):
             userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
-        if context.lower().startswith('steamadd'):
+        if context.lower().startswith('steamadd') and context.lower() != 'steamaddall':
             steaminfodata =await db.read_user(userid)
-            if not (steaminfodata and  'SteamSnooping' in steaminfodata):
+            if not (steaminfodata and  'SteamSnooping' in steaminfodata and 'steamid' in steaminfodata['SteamSnooping']):
                 await bot.send(event, '此用户好像还未绑定，发送"steamhelp"来查看帮助哦')
                 return
             await db.write_user('SteamSnoopingList', {target_group:{userid:True,
                                                               f'{userid}_steamid':steaminfodata["SteamSnooping"]["steamid"],
                                                               }})
             await bot.send(event, [At(qq=userid), f' 已被加入视歼列表'])
-        elif context.lower()=='steamremove':
+        elif context.lower()=='steamremove' and context.lower() != 'steamremoveall':
             await db.write_user('SteamSnoopingList', {target_group:{userid:False}})
             await bot.send(event, [At(qq=userid), f' 已被移除视歼列表'])
 
@@ -158,6 +161,49 @@ def main(bot, config):
                 name_list += f'@{target_name} '
             await bot.send(event, name_list)
 
+    #取消视奸当前群聊的所有人
+    @bot.on(GroupMessageEvent)
+    async def group_check_steamid_remove_all(event: GroupMessageEvent):
+        if event.pure_text.lower() == 'steamremoveall':
+            ids_list = await db.read_user('SteamSnoopingList')
+            user_list, name_list = [],'已取消本群的视奸列表：：\n'
+            if not (ids_list and str(event.group_id) in ids_list) :
+                await bot.send(event, '该群还没有绑定视奸用户哦')
+            for user_id in ids_list[str(event.group_id)]:
+                if ids_list[str(event.group_id)][user_id] is not True: continue
+                user_list.append(user_id)
+            if user_list == []:
+                await bot.send(event, '该群还没有绑定视奸用户哦')
+                return
+            #print(user_list)
+            db_write_json = {}
+            for user_id in user_list :
+                target_name = (await bot.get_group_member_info(event.group_id, user_id))['data']['nickname']
+                db_write_json[user_id] = False
+                name_list += f'@{target_name} '
+            await db.write_user('SteamSnoopingList', {str(event.group_id): db_write_json})
+            await bot.send(event, name_list)
+
+    #取消视奸当前群聊的所有人
+    @bot.on(GroupMessageEvent)
+    async def group_check_steamid_add_all(event: GroupMessageEvent):
+        if event.pure_text.lower() == 'steamaddall':
+            all_users = await db.read_all_users()
+            user_list, name_list, steam_add_json = [], '已更新本群的视奸列表：：\n', {}
+            friendlist_get = await bot.get_group_member_list(event.group_id)
+            for friend in friendlist_get["data"]:
+                user_id = str(friend['user_id'])
+                if user_id not in all_users:continue
+                if 'SteamSnooping' not in all_users[user_id]:continue
+                if 'steamid' not in all_users[user_id]['SteamSnooping']:continue
+                target_name = (await bot.get_group_member_info(event.group_id, user_id))['data']['nickname']
+                name_list += f'@{target_name} '
+                steam_add_json[user_id] = True
+                steam_add_json[f'{user_id}_steamid'] = all_users[user_id]['SteamSnooping']['steamid']
+
+            await db.write_user('SteamSnoopingList', {str(event.group_id): steam_add_json})
+            await bot.send(event, name_list)
+
 
     #菜单
     @bot.on(GroupMessageEvent)
@@ -168,6 +214,7 @@ def main(bot, config):
             '在这里你可以通过bot随时随地[title]视奸[/title]你朋友的steam状态\n[des]但是要小心使用，至少经过朋友同意或者不影响他人哦[/des]\n[title]指令菜单：[/title]'
             '\n- 绑定Steam账号：steambind [Steam ID 或 Steam好友代码]（可艾特） \n- 查询Steam最近游玩内容：steaminfo\n（可艾特或者直接发送Steam ID or Steam好友代码）'
             '\n- 添加到当前群进行视奸：steamadd（可艾特）\n- 取消视奸：steamremove（可艾特）\n- 查看当前群视奸列表：steamcheck\n'
+            '\n- 视奸当前群聊添加的所有人：steamaddall\n- 取消视奸当前群聊的所有人：steamremoveall\n- 查看当前群视奸列表：steamcheck\n'
             '[title]注意注意！[/title]要先绑定自身的steamid才能进行视奸哦～～\n[des]当然你也可以帮别人绑定哦（逃[/des]\n'
             '[des]                                             Function By 漫朔[/des]'
                        ]
