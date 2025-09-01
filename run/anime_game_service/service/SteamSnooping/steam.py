@@ -222,9 +222,21 @@ async def get_user_data(steam_id: int, proxy='http://127.0.0.1:7890'):
     return result
 
 
+
+async def test():
+    proxies = {
+        "http://": "http://127.0.0.1:7890",
+        "https://": "http://127.0.0.1:7890"
+    }
+    async with httpx.AsyncClient(proxies=proxies) as client:
+        r = await client.get("https://avatars.steamstatic.com/9cf396a0da9cb87d7faefe58feeae7acf6e2b363_full.jpg", timeout=10.0)
+        print(r.status_code)
+
+
 if __name__ == "__main__":
     import asyncio
 
+    #asyncio.run(test())
     data = asyncio.run(get_user_data(76561199025034455))
     for item in data:print(item,data[item])
     print(data['avatar_url'])

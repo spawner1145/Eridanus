@@ -1,5 +1,5 @@
 from framework_common.manshuo_draw import *
-
+import httpx
 from .steam import (
     get_steam_id,
     get_user_data,
@@ -199,6 +199,9 @@ async def create_notification_task(bot, config, userid, steamid, replay_content,
         game_data = await game_task
         game = game_data["game_data"][0]
 
+        #替换被ban的steam cdn
+        new_players_dict[steamid]['avatarfull'] = game_data['avatar_url']
+
         # 并发获取所有群组的用户昵称
         group_results = await asyncio.gather(
             *[task for _, task in member_info_tasks],
@@ -239,6 +242,7 @@ async def send_notification_message(bot, config, group_id, userid, user_name,
         bot.logger.info(f"Steam视奸检测到新活动，开始制作图片并推送，用户：{userid}，昵称：{user_name}，群号：{group_id}")
 
         full_content = f'[title]{user_name}[/title]' + replay_content
+        #print(f'Steam Avatar: {new_players_dict[steamid]["avatarfull"]}')
         draw_json = [
             {'type': 'basic_set', 'img_width': 1500, 'proxy': config.common_config.basic_config['proxy']['http_proxy']},
             {'type': 'avatar', 'subtype': 'common',
@@ -275,7 +279,7 @@ async def send_notification_message(bot, config, group_id, userid, user_name,
 
 
 
-
 if __name__ == "__main__":
     pass
-    #asyncio.run(bind_handle())
+    #asyncio.run(test())
+
