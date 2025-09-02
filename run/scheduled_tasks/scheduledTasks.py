@@ -240,7 +240,7 @@ def main(bot: ExtendBot, config):
                     today = datetime.datetime.now()
                     year, month, day = today.year, today.month, today.day
                     current_day = f'{year}_{month}_{day}'
-                    all_users = db.read_all_users()
+                    all_users =await db.read_all_users()
                     target_group = group_id
                     number_speeches_check_list = []
                     # 处理得出本群的人员信息表
