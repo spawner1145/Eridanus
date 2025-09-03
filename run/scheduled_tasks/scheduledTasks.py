@@ -234,13 +234,13 @@ def main(bot: ExtendBot, config):
                     continue
         elif task_name == "每日壁画王":
             logger.info(f"获取到发言排行榜查询需求")
+            all_users = await db.read_all_users()
             for group_id in config.scheduled_tasks.sheduled_tasks_push_groups_ordinary[task_name]["groups"]:
                 if group_id == 0: continue
                 try:
                     today = datetime.datetime.now()
                     year, month, day = today.year, today.month, today.day
                     current_day = f'{year}_{month}_{day}'
-                    all_users = db.read_all_users()
                     target_group = group_id
                     number_speeches_check_list = []
                     # 处理得出本群的人员信息表
