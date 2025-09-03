@@ -212,7 +212,8 @@ def main(bot, config):
             draw_json=[{'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],'upshift_extra':15,
              'content': [f"[name]Steam视奸菜单[/name]\n[time]什么！你是怎么发现我可以视奸你的！！！！[/time]"]},
             '在这里你可以通过bot随时随地[title]视奸[/title]你朋友的steam状态\n[des]但是要小心使用，至少经过朋友同意或者不影响他人哦[/des]\n[title]指令菜单：[/title]'
-            '\n- 绑定Steam账号：steambind [Steam ID 或 Steam好友代码]（可艾特） \n- 查询Steam最近游玩内容：steaminfo\n（可艾特或者直接发送Steam ID or Steam好友代码）'
+            '\n- 绑定Steam账号：steambind [Steam ID 或 Steam好友代码]（可艾特） \n- 解绑Steam账号：steamunbind [Steam ID 或 Steam好友代码]（可艾特） '
+            '\n- 查询Steam最近游玩内容：steaminfo\n（可艾特或者直接发送Steam ID or Steam好友代码）'
             '\n- 添加到当前群进行视奸：steamadd（可艾特）\n- 取消视奸：steamremove（可艾特）\n- 查看当前群视奸列表：steamcheck\n'
             '\n- 视奸当前群聊添加的所有人：steamaddall\n- 取消视奸当前群聊的所有人：steamremoveall\n- 查看当前群视奸列表：steamcheck\n'
             '[title]注意注意！[/title]要先绑定自身的steamid才能进行视奸哦～～\n[des]当然你也可以帮别人绑定哦（逃[/des]\n'
