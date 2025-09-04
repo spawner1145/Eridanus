@@ -14,15 +14,14 @@ from PIL import Image as PILImage
 
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Image, Text
+from framework_common.database_util.User import get_user
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.utils.utils import get_img, delay_recall
 from run.ai_generated_art.service.nano_banana.gemini_official_banana import call_gemini_api
 from run.ai_generated_art.service.nano_banana.unofficial_banana import call_openrouter_api
 
-# 普通用户每日最大调用次数
-MAX_USES_PER_DAY = 20
-# 不受限制的用户ID列表 (请将这里的数字替换为实际的QQ号)
-UNLIMITED_USERS = [1462079129, 2508473558]
+
+
 # 使用记录文件路径
 USAGE_FILE_PATH = Path("data/uses.json")
 
@@ -81,11 +80,13 @@ def main(bot: ExtendBot, config):
                 msg = await bot.send(event, [Text("已处于监听状态，可直接发送消息或图片")], True)
                 await bot.delay_recall(msg,20)
             else:
-                if user_id not in UNLIMITED_USERS:
+                user_info=await get_user(event.user_id)
+                if user_info.permission < config.ai_generated_art.config["ai绘画"]["nano_banana不限制次数所需权限"]:
                     usage_data = load_or_reset_usage_data()
                     user_uses = usage_data.get("usage_data", {}).get(str(user_id), 0)
-                    if user_uses >= MAX_USES_PER_DAY:
-                        await bot.send(event, [Text(f"你今天已经达到 {MAX_USES_PER_DAY} 次调用上限，请明天再来吧！")], True)
+                    if user_uses >= config.ai_generated_art.config["ai绘画"]["nano_banana默认权限用户可用次数"]:
+                        use_times=config.ai_generated_art.config["ai绘画"]["nano_banana默认权限用户可用次数"]
+                        await bot.send(event, [Text(f"你今天已经达到 {use_times} 次调用上限，请明天再来吧！")], True)
                         return
                 
                 current_cache["active"] = True
@@ -169,13 +170,15 @@ def main(bot: ExtendBot, config):
             if api_result.get("success"):
                 remaining_uses_text = ""
                 # 仅当返回图片时才更新计数
-                if user_id not in UNLIMITED_USERS and api_result["has_image"]:
+                user_info=await get_user(event.user_id)
+                if user_info.permission < config.ai_generated_art.config["ai绘画"]["nano_banana不限制次数所需权限"] and api_result["has_image"]:
+
                     usage_data = load_or_reset_usage_data()
                     current_uses = usage_data.get("usage_data", {}).get(str(user_id), 0)
                     new_uses = current_uses + 1
                     usage_data["usage_data"][str(user_id)] = new_uses
                     save_usage_data(usage_data)
-                    remaining = MAX_USES_PER_DAY - new_uses
+                    remaining = config.ai_generated_art.config["ai绘画"]["nano_banana默认权限用户可用次数"] - new_uses
                     if remaining > 0:
                         remaining_uses_text = f"调用成功！你今天还剩下 {remaining} 次调用机会"
                     else:
