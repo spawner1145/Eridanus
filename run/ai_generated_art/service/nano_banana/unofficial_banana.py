@@ -107,7 +107,7 @@ async def call_openrouter_api(contents, config) -> Dict[str, Any]:
                 print(f"Base64解码失败: {b64_error}")
                 save_path = None
 
-        return {"success": True, "result_path": save_path, "text": full_text_response}
+        return {"success": True, "result_path": save_path, "text": full_text_response,"has_image": bool(base64_data)}
 
     except httpx.HTTPStatusError as e:
         error_details = f"HTTP错误 (状态码: {e.response.status_code}): {e.response.text}"
