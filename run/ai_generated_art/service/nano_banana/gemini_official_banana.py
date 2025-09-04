@@ -29,7 +29,9 @@ async def call_gemini_api(contents, config) -> Dict[str, Any]:
             {'category': 'HARM_CATEGORY_HATE_SPEECH', "threshold": "BLOCK_None"},
             {'category': 'HARM_CATEGORY_HARASSMENT', "threshold": "BLOCK_None"},
             {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', "threshold": "BLOCK_None"}
-        ]
+        ],
+        "generationConfig":
+            {"temperature": config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["temperature"]}
     }
     global api_key_selector
     api_keys = config.ai_generated_art.config["ai绘画"]["nano_banana_key"]

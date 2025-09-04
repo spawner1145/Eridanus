@@ -81,11 +81,11 @@ def main(bot: ExtendBot, config):
                 await bot.delay_recall(msg,20)
             else:
                 user_info=await get_user(event.user_id)
-                if user_info.permission < config.ai_generated_art.config["ai绘画"]["nano_banana不限制次数所需权限"]:
+                if user_info.permission < config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["nano_banana不限制次数所需权限"]:
                     usage_data = load_or_reset_usage_data()
                     user_uses = usage_data.get("usage_data", {}).get(str(user_id), 0)
-                    if user_uses >= config.ai_generated_art.config["ai绘画"]["nano_banana默认权限用户可用次数"]:
-                        use_times=config.ai_generated_art.config["ai绘画"]["nano_banana默认权限用户可用次数"]
+                    if user_uses >= config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["nano_banana默认权限用户可用次数"]:
+                        use_times=config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["nano_banana默认权限用户可用次数"]
                         await bot.send(event, [Text(f"你今天已经达到 {use_times} 次调用上限，请明天再来吧！")], True)
                         return
                 
@@ -155,7 +155,7 @@ def main(bot: ExtendBot, config):
                 return
             
             processing_msg = await bot.send(event, [Text("已提交nano banana请求，正在处理...")], True)
-            if not config.ai_generated_art.config["ai绘画"]["原生gemini接口"]:
+            if not config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["原生gemini接口"]:
                 bot.logger.warning("当前nano banana使用第三方中转")
                 try:
                     api_result = await call_openrouter_api(api_contents, config)
@@ -171,14 +171,14 @@ def main(bot: ExtendBot, config):
                 remaining_uses_text = ""
                 # 仅当返回图片时才更新计数
                 user_info=await get_user(event.user_id)
-                if user_info.permission < config.ai_generated_art.config["ai绘画"]["nano_banana不限制次数所需权限"] and api_result["has_image"]:
+                if user_info.permission < config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["nano_banana不限制次数所需权限"] and api_result["has_image"]:
 
                     usage_data = load_or_reset_usage_data()
                     current_uses = usage_data.get("usage_data", {}).get(str(user_id), 0)
                     new_uses = current_uses + 1
                     usage_data["usage_data"][str(user_id)] = new_uses
                     save_usage_data(usage_data)
-                    remaining = config.ai_generated_art.config["ai绘画"]["nano_banana默认权限用户可用次数"] - new_uses
+                    remaining = config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["nano_banana默认权限用户可用次数"] - new_uses
                     if remaining > 0:
                         remaining_uses_text = f"调用成功！你今天还剩下 {remaining} 次调用机会"
                     else:

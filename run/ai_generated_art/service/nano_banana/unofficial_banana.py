@@ -33,7 +33,7 @@ async def call_openrouter_api(contents, config) -> Dict[str, Any]:
          "content": "You are a capable drawing assistant. For every conversation with the user, you must output an image. It is crucial to ensure that you generate an image and not return only text."},
         {"role": "user", "content": user_content}
     ]
-    payload = {"model": "google/gemini-2.5-flash-image-preview:free", "messages": messages}
+    payload = {"model": "google/gemini-2.5-flash-image-preview:free", "messages": messages,"temperature": config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["temperature"]}
 
     try:
         # 修正了您之前指出的笔误
