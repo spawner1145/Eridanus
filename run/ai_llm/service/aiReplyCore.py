@@ -46,12 +46,18 @@ logger = get_logger("aiReplyCore")
 async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, event=None, system_instruction=None,
                       func_result=False, recursion_times=0, do_not_read_context=False):  # 后面几个函数都是供函数调用的场景使用的
     logger.info(f"aiReplyCore called with message: {processed_message}")
-    # 防止开头@信息影响人设
-    if isinstance(processed_message, list) and len(processed_message) > 0:
-        first_item = processed_message[0]
-        if isinstance(first_item, dict) and 'at' in first_item:
-            del processed_message[0]
-            logger.info(f"Removed first 'at' element from message, remaining message: {processed_message}")
+    # 防止开头@影响人设，只在bot或event存在时处理
+    if (bot or event) and isinstance(processed_message, list):
+        target_id = str(bot.id) if bot else str(event.self_id)
+        for i in range(len(processed_message)):
+            item = processed_message[i]
+            if isinstance(item, dict) and 'at' in item:
+                at_data = item['at']
+                if isinstance(at_data, dict) and 'qq' in at_data and str(at_data['qq']) == target_id:
+                    processed_message[i] = {
+                        'text': config.common_config.basic_config["bot"] + ','
+                    }
+                    logger.info(f"Replaced self at element with text: {processed_message[i]}")
     """
     递归深度约束
     """
@@ -519,8 +525,8 @@ def remove_mface_filenames(reply_message, config, directory="data/pictures/Mface
                 core_name = filename[1:-5]
                 mface_dict[core_name] = filename
 
-        brackets = r"\(\[\{\<"  # 开括号
-        brackets_close = r"\)\]\}\>"  # 闭括号
+        brackets = "\(\[\{\<"  # 开括号
+        brackets_close = "\)\]\}\>"  # 闭括号
         pattern = rf"[{brackets}]([^\[\](){{}}<>]+)[{brackets_close}]\.(gif|png|jpg)"
 
         matched_files = []
