@@ -8,7 +8,7 @@ from io import BytesIO
 from asyncio import get_event_loop
 from PIL import Image
 from .common import get_abs_path
-
+import traceback
 
 async def download_img(url, gray_layer=False, proxy="http://127.0.0.1:7890"):
     if url.startswith("data:image"):
@@ -30,9 +30,11 @@ async def download_img(url, gray_layer=False, proxy="http://127.0.0.1:7890"):
             response = await client.get(url)
             if response.status_code == 302:
                 new_url = response.headers['Location']
-                response = await client.get(new_url)
+                if new_url: response = await client.get(new_url)
         except Exception as e:
-            print(f'绘图框架无法获取图片{url}：{e}')
+            print(f'绘图框架无法获取图片{url}： {type(e)} {repr(e)}')
+            #print(proxies)
+            traceback.print_exc()
             try:
                 response = await client.get('https://gal.manshuo.ink/usr/uploads/galgame/zatan.png')
             except Exception:

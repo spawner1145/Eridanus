@@ -239,16 +239,16 @@ math:
   shadow_opacity_img: 50                #阴影的透明度
   blur_radius_img: 10                   #阴影模糊半径
 
-  #下面为本模块的内部图像处理定义
-  is_rounded_corners_math: true      #是否对模块进行圆角处理
+  #下面为本图表的内部图像处理定义
+  is_rounded_corners_math: true      #是否对图表进行圆角处理
   rounded_math_radius: 20            #圆角处理半径
 
-  is_stroke_math: false               #是否对模块进行描边处理
+  is_stroke_math: false               #是否对图表进行描边处理
   stroke_math_radius: 23             #描边的圆角弧度
   stroke_math_width: 10              #描边的圆角宽度
   stroke_math_color: (255, 255, 255, 80) #描边的圆角颜色
 
-  is_shadow_math: false               #是否对模块进行阴影处理
+  is_shadow_math: false               #是否对图表进行阴影处理
   shadow_offset_math: 10                 #阴影的偏移量
   shadow_opacity_math: 50                #阴影的透明度
   blur_radius_math: 10                   #阴影模糊半径
@@ -271,4 +271,4 @@ math:
     chart_height: 200
     padding_up: 30
     padding: 25
-    num_interline_draw: 5
+    num_interline_draw: 5               #每隔多少个条形图进行标注一次

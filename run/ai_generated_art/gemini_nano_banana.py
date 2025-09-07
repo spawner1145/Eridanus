@@ -14,16 +14,20 @@ from PIL import Image as PILImage
 
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Image, Text
+from framework_common.database_util.User import get_user
+from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.utils.utils import get_img, delay_recall
+from run.ai_generated_art.service.nano_banana.gemini_official_banana import call_gemini_api
+from run.ai_generated_art.service.nano_banana.unofficial_banana import call_openrouter_api
 
-# 普通用户每日最大调用次数
-MAX_USES_PER_DAY = 20
-# 不受限制的用户ID列表 (请将这里的数字替换为实际的QQ号)
-UNLIMITED_USERS = [1462079129, 2508473558]
+
+
 # 使用记录文件路径
 USAGE_FILE_PATH = Path("data/uses.json")
 
 user_cache: Dict[int, Dict[str, Any]] = {}
+
+
 
 def get_today_date() -> str:
     return datetime.now().strftime("%Y-%m-%d")
@@ -53,102 +57,7 @@ def save_usage_data(data: Dict[str, Any]):
     with open(USAGE_FILE_PATH, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-async def call_gemini_api(contents, config) -> Dict[str, Any]:
-    url = f"{config.ai_llm.config['llm']['gemini']['base_url']}/v1beta/models/gemini-2.5-flash-image-preview:generateContent"
-    proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.common_config.basic_config["proxy"]["http_proxy"] else None
-    proxies={"http://": proxy, "https://": proxy} if proxy else None
-    
-    payload = {
-        "system_instruction": {
-            "parts": [
-                {"text": "You are a capable drawing assistant. For every conversation with the user, you must output an image. It is crucial to ensure that you generate an image and not return only text."}
-            ]
-        },
-        "contents": [{"parts": contents}],
-        "safetySettings": [
-            {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', "threshold": "BLOCK_None"},
-            {'category': 'HARM_CATEGORY_HATE_SPEECH', "threshold": "BLOCK_None"},
-            {'category': 'HARM_CATEGORY_HARASSMENT', "threshold": "BLOCK_None"},
-            {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', "threshold": "BLOCK_None"}
-        ]
-    }
 
-    headers = {
-        "x-goog-api-key": config.ai_generated_art.config["ai绘画"]["nano_banana的key"],
-        "Content-Type": "application/json"
-    }
-    try:
-        async with httpx.AsyncClient(timeout=None, proxies=proxies) as client:
-            response = await client.post(url, json=payload, headers=headers)
-        
-        print("API响应状态码:", response.status_code)
-        response.raise_for_status()
-        response_data = response.json()
-
-        candidates = response_data.get("candidates")
-        if not candidates:
-            feedback = response_data.get("promptFeedback", {})
-            block_reason = feedback.get("blockReason")
-            if block_reason:
-                return {"success": False, "error": f"请求被阻止", "details": f"原因: {block_reason}"}
-            raise ValueError("API响应中未包含 'candidates'。")
-
-        candidate = candidates[0]
-        content = candidate.get("content", {})
-        parts = content.get("parts")
-
-        if not parts:
-            finish_reason = candidate.get("finishReason")
-            if finish_reason:
-                error_message = f"内容生成中止"
-                details = f"原因: {finish_reason}. 这通常由安全设置或不当内容导致。"
-                print(f"API调用失败: {details}")
-                return {"success": False, "error": error_message, "details": details}
-            else:
-                raise ValueError("API响应的候选结果中既未包含 'parts'，也未提供中止原因。")
-
-        base64_data = None
-        text_responses = []
-        for part in parts:
-            if "inlineData" in part and part["inlineData"].get("data"):
-                base64_data = part["inlineData"]["data"]
-            if "text" in part:
-                text_responses.append(part["text"])
-        
-        full_text_response = " ".join(text_responses).strip()
-        
-        if not base64_data and not full_text_response:
-            raise ValueError("API响应既未包含图像数据，也未包含有效的文本。")
-        
-        save_path = None
-        if base64_data:
-            save_path = f"data/pictures/cache/{random.randint(1000, 9999)}.png"
-            Path(os.path.dirname(save_path)).mkdir(parents=True, exist_ok=True)
-            with open(save_path, "wb") as f:
-                f.write(base64.b64decode(base64_data))
-        
-        return {
-            "success": True,
-            "result_path": save_path,
-            "text": full_text_response,
-            "has_image": bool(base64_data)
-        }
-    except httpx.HTTPStatusError as e:
-        error_details = f"HTTP错误 (状态码: {e.response.status_code}): {e.response.text}"
-        print(error_details)
-        return {"success": False, "error": "API请求失败", "details": error_details}
-    except httpx.RequestError as e:
-        error_details = f"请求错误: {e}"
-        print(error_details)
-        return {"success": False, "error": "网络连接或请求配置错误", "details": error_details}
-    except (ValueError, KeyError, IndexError) as e:
-        error_details = f"解析API响应失败: {e}\n{traceback.format_exc()}"
-        print(error_details)
-        return {"success": False, "error": "无法解析API响应", "details": error_details}
-    except Exception as e:
-        error_details = f"未知错误: {e}\n{traceback.format_exc()}"
-        print(error_details)
-        return {"success": False, "error": "处理过程中发生未知错误", "details": error_details}
 
 
 def init_user_cache(user_id: int):
@@ -158,7 +67,7 @@ def init_user_cache(user_id: int):
             "messages": []
         }
 
-def main(bot, config):
+def main(bot: ExtendBot, config):
     @bot.on(GroupMessageEvent)
     async def nano_message_handler(event: GroupMessageEvent):
         user_id = event.sender.user_id
@@ -169,13 +78,15 @@ def main(bot, config):
         if pure_text == "#nano":
             if current_cache["active"]:
                 msg = await bot.send(event, [Text("已处于监听状态，可直接发送消息或图片")], True)
-                await delay_recall(bot, msg, 10)
+                await bot.delay_recall(msg,20)
             else:
-                if user_id not in UNLIMITED_USERS:
+                user_info=await get_user(event.user_id)
+                if user_info.permission < config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["nano_banana不限制次数所需权限"]:
                     usage_data = load_or_reset_usage_data()
                     user_uses = usage_data.get("usage_data", {}).get(str(user_id), 0)
-                    if user_uses >= MAX_USES_PER_DAY:
-                        await bot.send(event, [Text(f"你今天已经达到 {MAX_USES_PER_DAY} 次调用上限，请明天再来吧！")], True)
+                    if user_uses >= config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["nano_banana默认权限用户可用次数"]:
+                        use_times=config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["nano_banana默认权限用户可用次数"]
+                        await bot.send(event, [Text(f"你今天已经达到 {use_times} 次调用上限，请明天再来吧！")], True)
                         return
                 
                 current_cache["active"] = True
@@ -208,7 +119,6 @@ def main(bot, config):
                             response = await client.get(msg_item["content"], timeout=30.0)
                             response.raise_for_status()
                         image_data = response.content
-
                         with BytesIO(image_data) as img_buffer:
                             with PILImage.open(img_buffer) as img:
                                 max_size = 1024
@@ -245,21 +155,30 @@ def main(bot, config):
                 return
             
             processing_msg = await bot.send(event, [Text("已提交nano banana请求，正在处理...")], True)
-            
-            api_result = await call_gemini_api(api_contents, config)
+            if not config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["原生gemini接口"]:
+                bot.logger.warning("当前nano banana使用第三方中转")
+                try:
+                    api_result = await call_openrouter_api(api_contents, config)
+                except Exception as e:
+                    traceback.print_exc()
+                    api_contents=None
+            else:
+                api_result = await call_gemini_api(api_contents, config)
             
             await bot.recall(processing_msg)
 
             if api_result.get("success"):
                 remaining_uses_text = ""
                 # 仅当返回图片时才更新计数
-                if user_id not in UNLIMITED_USERS and api_result["has_image"]:
+                user_info=await get_user(event.user_id)
+                if user_info.permission < config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["nano_banana不限制次数所需权限"] and api_result["has_image"]:
+
                     usage_data = load_or_reset_usage_data()
                     current_uses = usage_data.get("usage_data", {}).get(str(user_id), 0)
                     new_uses = current_uses + 1
                     usage_data["usage_data"][str(user_id)] = new_uses
                     save_usage_data(usage_data)
-                    remaining = MAX_USES_PER_DAY - new_uses
+                    remaining = config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["nano_banana默认权限用户可用次数"] - new_uses
                     if remaining > 0:
                         remaining_uses_text = f"调用成功！你今天还剩下 {remaining} 次调用机会"
                     else:

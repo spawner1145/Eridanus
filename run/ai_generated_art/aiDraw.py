@@ -484,6 +484,8 @@ def main(bot, config):
                 if event.pure_text.replace("style ", "") in ["像素风格","抽象风格","韩系淡彩风格","清新日漫风格","纯真动漫风格"]:
                     style_set = event.pure_text.replace("style ", "")
                 else:
+                    if event.pure_text != "style":
+                        return
                     style_set = "像素风格"
                 style_transfer_user[event.sender.user_id] = style_set
                 style_transfer_user[event.sender.user_id] = []
@@ -502,6 +504,8 @@ def main(bot, config):
                     if event.pure_text.replace(" ","").replace("style", "") in ["像素风格","抽象风格","韩系淡彩风格","清新日漫风格","纯真动漫风格"]:
                         style_set = event.pure_text.replace("style", "")
                     else:
+                        if event.pure_text != "style":
+                            return
                         style_set = "像素风格"
 
 

@@ -5,7 +5,7 @@ from asyncio import sleep
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-
+import asyncio
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Image, Text, Card
 from framework_common.database_util.User import get_users_with_permission_above, get_user
@@ -23,16 +23,14 @@ from run.group_fun.service.lex_burner_Ninja import Lexburner_Ninja
 from run.resource_collector.service.asmr.asmr100 import random_asmr_100
 from run.streaming_media.service.Link_parsing.Link_parsing import bangumi_PILimg
 from run.system_plugin.func_collection import trigger_tasks
-
+from framework_common.database_util.ManShuoDrawCompatibleDataBase import AsyncSQLiteDatabase
 
 def main(bot: ExtendBot, config):
     logger = bot.logger
     scheduledTasks = config.scheduled_tasks.config["scheduledTasks"]
-
     scheduler = AsyncIOScheduler()
-
     enabled = False
-
+    db = asyncio.run(AsyncSQLiteDatabase.get_instance())
 
     @bot.on(LifecycleMetaEvent)
     async def start_scheduler(_):
@@ -236,21 +234,13 @@ def main(bot: ExtendBot, config):
                     continue
         elif task_name == "每日壁画王":
             logger.info(f"获取到发言排行榜查询需求")
-            db_json = config.common_config.basic_config['redis']
-
-            db = RedisDatabase(host=db_json['redis_ip'], port=db_json['redis_port'], db=db_json['redis_db'])
+            all_users = await db.read_all_users()
             for group_id in config.scheduled_tasks.sheduled_tasks_push_groups_ordinary[task_name]["groups"]:
                 if group_id == 0: continue
                 try:
-
-
-
                     today = datetime.datetime.now()
-
-
                     year, month, day = today.year, today.month, today.day
                     current_day = f'{year}_{month}_{day}'
-                    all_users = db.read_all_users()
                     target_group = group_id
                     number_speeches_check_list = []
                     # 处理得出本群的人员信息表
