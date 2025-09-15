@@ -234,6 +234,7 @@ def main(bot, config):
                 keywords = context.replace(" ", "").split("查询")[1]
         else:
             return
+        recall_id_first = await bot.send(event, f"{botname} 正在查询中，请稍后喵")
         bot.logger.info("正在查询：" + keywords)
 
         nonlocal searchtask, recall_id, switch  # 变量提前，否则可能未定义
@@ -243,6 +244,7 @@ def main(bot, config):
                                                 type_soft=f'bangumi 查询', type='search',target=keywords,search_type=search_type,bot_id=event.self_id)
 
             if bangumi_json['status']:
+
                 bot.logger.info('bangumi搜索成功，开始推送~~~')
                 if bangumi_json['next_choice'] is True:
                     searchtask[event.sender.user_id] = bangumi_json['choice_contents']
@@ -256,11 +258,15 @@ def main(bot, config):
                         searchtask.pop(event.sender.user_id)
             else:
                 await bot.send(event, f"{botname}没有找到该番剧呢～")
+
         except Exception as e:
             bot.logger.error(e)
+            traceback.print_exc()
             if event.sender.user_id in searchtask:
                 searchtask.pop(event.sender.user_id)
             await bot.send(event, "查询失败，请稍后再试")
+        finally:
+            await bot.recall(recall_id_first['data']['message_id'])
 
     @bot.on(GroupMessageEvent)
     async def bangumi_search_detail(event: GroupMessageEvent):
@@ -281,6 +287,7 @@ def main(bot, config):
                 except Exception as e:pass
                 recall_id = await bot.send(event, "正在获取，请稍后~~~")
 
+                #print(order,bangumi_json_choice)
                 if 1 <= order <= len(bangumi_json_choice):
                     subject_id = bangumi_json_choice[order]
                 else:
@@ -289,20 +296,19 @@ def main(bot, config):
                     return
 
                 try:
-
                     bangumi_json = await bangumi_PILimg(filepath='data/pictures/cache/',type_soft=f'bangumi 查询', type='search_accurate',config=config, target=subject_id,bot_id=event.self_id)
-
                     if bangumi_json['status']:
                         bot.logger.info('bangumi搜索成功，开始推送~~~')
                         await bot.send(event,
                                        [f"这是{botname}为您查询到的结果～～", Image(file=bangumi_json['pic_path'])])
                 except Exception as e:
-                    bot.logger.error(e)
+                    bot.logger.error(f'Bangumi img make error: {e}')
+                    #traceback.print_exc()
                     await bot.send(event, "查询失败喵，请稍后再试喵～")
                 try:
                     searchtask.pop(event.sender.user_id)
                 except Exception as e:
-                    bot.logger.error(e)
+                    #bot.logger.error(e)
                     pass
             except Exception as e:
                 bot.logger.error(e)
@@ -313,6 +319,7 @@ def main(bot, config):
             try:
                 await bot.recall(recall_id['data']['message_id'])
             except Exception as e:
+                bot.logger.error(e)
                 pass
 
     @bot.on(GroupMessageEvent)
