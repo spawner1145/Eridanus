@@ -16,6 +16,7 @@ check_and_install_playwright()
 
 logger = get_logger("bili_cookie_manager")
 is_login_check = False
+cookie_content = {}
 
 class BiliCookieManager:
     """
@@ -157,10 +158,13 @@ class BiliCookieManager:
 
     async def _load_cookies(self):
         """从文件加载Cookie"""
-        if self.cookie_file.exists():
+        global cookie_content
+        if cookie_content != {}: self.cookies = cookie_content
+        if self.cookie_file.exists() and cookie_content == {}:
             try:
                 with open(self.cookie_file, 'r', encoding='utf-8') as f:
                     self.cookies = json.load(f)
+                    cookie_content = self.cookies
                 #logger.info(f"已加载 {len(self.cookies)} 个Cookie")
             except Exception as e:
                 logger.error(f"加载Cookie失败: {e}")
@@ -168,9 +172,11 @@ class BiliCookieManager:
 
     async def _save_cookies(self):
         """保存Cookie到文件"""
+        global cookie_content
         try:
             with open(self.cookie_file, 'w', encoding='utf-8') as f:
                 json.dump(self.cookies, f, indent=2, ensure_ascii=False)
+            cookie_content = self.cookies
             self.last_update_time = time.time()
             logger.info(f"Cookie已保存到: {self.cookie_file.absolute()}")
         except Exception as e:
