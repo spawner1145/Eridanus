@@ -1,5 +1,5 @@
 dir_rule:
-  base_dir: data/pictures/benzi/temp184712
+  base_dir: data/pictures/benzi/temp1213940
   rule: Bd
 download:
   Obfuscation: gif
@@ -9,3 +9,9 @@ download:
   threading:
     image: 3
     photo: 1
+plugins:
+  after_photo:
+  - kwargs:
+      filename_rule: Pid
+      pdf_dir: data/pictures/benzi
+    plugin: img2pdf
