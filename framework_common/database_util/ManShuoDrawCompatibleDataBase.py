@@ -171,12 +171,12 @@ class AsyncSQLiteDatabase:
             async for row in cursor:
                 user_id = row['user_id']
                 user_data = json.loads(row['user_data'])
-                result[user_id] = user_data
+                result[str(user_id)] = user_data
 
             # 为不存在的用户返回空字典
             for user_id in user_ids:
                 if user_id not in result:
-                    result[user_id] = {}
+                    result[str(user_id)] = {}
 
             return result
         finally:
@@ -376,9 +376,12 @@ class AsyncSQLiteDatabase:
         try:
             # 使用事务提高性能
             await conn.execute('BEGIN TRANSACTION')
-
+            user_list = [user_id for user_id, user_data in users.items()]
+            user_info_list = await self.batch_read_users(user_list)
             for user_id, user_data in users.items():
-                json_data = json.dumps(user_data, ensure_ascii=False)
+                existing_data = user_info_list[user_id]
+                merged_data = merge_dicts(existing_data, user_data)
+                json_data = json.dumps(merged_data, ensure_ascii=False)
                 await conn.execute('''
                     INSERT OR REPLACE INTO users (user_id, user_data, updated_at)
                     VALUES (?, ?, CURRENT_TIMESTAMP)
