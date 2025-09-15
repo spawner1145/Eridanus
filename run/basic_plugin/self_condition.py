@@ -14,7 +14,6 @@ self_task = None
 self_task_lock = asyncio.Lock()
 async def self_condition_loop(bot, config):
     """自身状态检查的主循环"""
-
     bot.logger.info_func("自身状态监控循环启动")
     while True:
         try:
@@ -26,11 +25,12 @@ async def self_condition_loop(bot, config):
         interval = 1800
         await asyncio.sleep(interval)
 
-def main_canceled(bot, config):
+def main(bot, config):
     """
 
     排查问题，控制变量，暂时停用
     """
+    if not config.basic_plugin.config["self_condition"]["enable"]: return
     #查询bot自身状态
     @bot.on(GroupMessageEvent)
     async def self_info(event: GroupMessageEvent):
@@ -42,8 +42,8 @@ def main_canceled(bot, config):
     @bot.on(LifecycleMetaEvent)
     async def start_self_condition_monitor(event):
         """生命周期事件处理"""
+        #print('1')
         global self_task, self_task_lock
-
         async with self_task_lock:
             # 检查是否已有任务在运行
             if self_task is not None and not self_task.done():
