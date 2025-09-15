@@ -249,7 +249,12 @@ async def basic_img_draw_text(canvas,content,params,box=None,limit_box=None,is_s
             if content['tag'] == 'emoji':
                 canvas.paste(text[i], (int(x), int(y - upshift_font + 3)), mask=text[i])
             elif await can_render_character(font, text[i],params):
-                if is_shadow: draw.text((x + 2, y - upshift_font + 2), text[i], font=font, fill=(148, 148,148))
+                if is_shadow:
+                    shadow_width = int(params['shadow_font_width'])
+                    for dx in range(-shadow_width, shadow_width+1):
+                        for dy in range(-shadow_width, shadow_width+1):
+                            if dx == 0 and dy == 0: continue
+                            draw.text((x + dx, y + dy - upshift_font), text[i], font=font, fill=eval(str(params['shadow_font_color'])))
                 draw.text((x, y - upshift_font), text[i], font=font, fill=eval(str(params[f'font_{last_tag}_color'])))
             else:
                 try:

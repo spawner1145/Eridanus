@@ -167,6 +167,8 @@ avatar:
   right_icon: None
   type_software: None
   is_shadow_font: false
+  shadow_font_width : 2
+  shadow_font_color: (148, 148, 148)   #字体阴影的颜色
   padding_up_font: 10  #头像右侧文字距离上部的距离
 
   judge_flag: default #此处判断头像的背景处理方式，目前有：'common'平铺样式、'list'列表样式、'default'自动判断
