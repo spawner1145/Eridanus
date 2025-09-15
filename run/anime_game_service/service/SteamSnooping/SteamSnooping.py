@@ -78,6 +78,7 @@ async def steamsnoopall(bot, config, db, steam_api_key):
                         item['game_start_time'] = ids_list['old_players_dict'][item["steamid"]]['game_start_time']
                     else:
                         item['game_start_time'] = int(time.time())
+                if 'gameextrainfo' in item and item['gameextrainfo'] in config.anime_game_service.config['steamsnooping']['game_white']:continue
                 new_players_dict[item["steamid"]] = item
 
             await db.write_user('SteamSnoopingList', {'old_players_dict': new_players_dict})
@@ -115,14 +116,13 @@ async def steamsnoopall(bot, config, db, steam_api_key):
                     continue
                 if old_players_dict[steamid]['gameextrainfo'] == new_players_dict[steamid]['gameextrainfo']:
                     continue
-                if (new_players_dict[steamid]['gameextrainfo'] in config.anime_game_service.config['steamsnooping'][
-                    'game_white'] or
-                        old_players_dict[steamid]['gameextrainfo'] in config.anime_game_service.config['steamsnooping'][
-                            'game_white']):
+                if (new_players_dict[steamid]['gameextrainfo'] in config.anime_game_service.config['steamsnooping']['game_white'] or
+                        old_players_dict[steamid]['gameextrainfo'] in config.anime_game_service.config['steamsnooping']['game_white']):
                     continue
 
                 # 构建回复内容
                 replay_content = ''
+                #print(new_players_dict[steamid]['gameextrainfo'],old_players_dict[steamid]['gameextrainfo'])
                 if new_players_dict[steamid]['gameextrainfo'] is not None and old_players_dict[steamid][
                     'gameextrainfo'] is not None:
                     replay_content += f"([title]{new_players_dict[steamid]['personaname']}[/title]) 停止玩 {old_players_dict[steamid]['gameextrainfo']}，开始玩 [title]{new_players_dict[steamid]['gameextrainfo']}[/title] 了"
@@ -245,7 +245,7 @@ async def send_notification_message(bot, config, group_id, userid, user_name,
         #print(f'Steam Avatar: {new_players_dict[steamid]["avatarfull"]}')
         draw_json = [
             {'type': 'basic_set', 'img_width': 1500, 'proxy': config.common_config.basic_config['proxy']['http_proxy']},
-            {'type': 'avatar', 'subtype': 'common',
+            {'type': 'avatar', 'subtype': 'common','auto_line_change':False,
              'img': [f'https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640', new_players_dict[steamid]['avatarfull']],
              'upshift_extra': 15, 'number_per_row': 2,
              'content': [

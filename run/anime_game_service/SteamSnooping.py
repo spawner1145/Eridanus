@@ -91,7 +91,7 @@ def main(bot, config):
             #if len(user_name) > 10: user_name = user_name[:10]
             draw_json=[
                 {'type': 'basic_set', 'img_width': 1500,'proxy': proxy_for_draw},
-                {'type': 'avatar', 'subtype': 'common', 'img': [f'https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640',player_data["avatar_url"]],'upshift_extra':15,'number_per_row': 2,
+                {'type': 'avatar', 'subtype': 'common', 'img': [f'https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640',player_data["avatar_url"]],'upshift_extra':15,'number_per_row': 2,'auto_line_change':False,
                  'content': [f"[name]qq昵称: {user_name}[/name]\n[time]游玩时间：{player_data['recent_2_week_play_time']}[/time]",f'[name]Steam昵称: {player_data["player_name"]}[/name]\n[time]好友代码：{steam_friend_code}[/time]'],
                  'is_rounded_corners_img':False,'is_stroke_img':False,'is_shadow_img':False},'[title]您的最近游戏动态：[/title]',
                 {'type': 'img', 'subtype': 'common_with_des_right',
@@ -105,7 +105,7 @@ def main(bot, config):
             # 无userid时只显示Steam头像
             draw_json=[
                 {'type': 'basic_set', 'img_width': 1500,'proxy': proxy_for_draw},
-                {'type': 'avatar', 'subtype': 'common', 'img': [player_data["avatar_url"]],'upshift_extra':15,
+                {'type': 'avatar', 'subtype': 'common', 'img': [player_data["avatar_url"]],'upshift_extra':15,'auto_line_change':False,
                  'content': [f'[name]Steam昵称: {player_data["player_name"]}[/name]\n[time]好友代码：{steam_friend_code}[/time]\n[time]游玩时间：{player_data["recent_2_week_play_time"]}[/time]'],
                  'is_rounded_corners_img':False,'is_stroke_img':False,'is_shadow_img':False},'[title]最近游戏动态：[/title]',
                 {'type': 'img', 'subtype': 'common_with_des_right',
