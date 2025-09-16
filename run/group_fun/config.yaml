@@ -13,3 +13,5 @@ today_wife:
   透群友撤回: True
   仅热门群友: False #只会透到最近发言较多的群友
   is_at: True #今日群友/管理/群主 是否艾特其本人
+emojimix:         #emoji合成相关
+  enable: True    #是否开启emoji合成

@@ -92,7 +92,7 @@ async def call_user_data_sign(bot,event,config):
         draw_list.extend([{'type': 'backdrop', 'subtype': 'img', 'background': [img]},])
     draw_list.extend([
         {'type': 'avatar', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640"], 'upshift_extra': 15,'avatar_backdrop_color': (235, 239, 253, 0),
-         'content': [f"[name]{nickname} 今天签到啦～[/name]\n[time]当前时间：{formatted_date}[/time]"]},
+         'content': [f"[name]{nickname} 今天签到啦～[/name]\n[time]当前时间：{formatted_date}[/time]"], 'shadow_font_color': (255,255,255), 'is_shadow_font': True},
         f'[title]今天 {nickname} 签到了哦[/title]（签到天数：{uer_sign_days}）',])
     if config.system_plugin.config["user_data"]["with_taro"]:
         draw_list.extend([

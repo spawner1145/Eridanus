@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from developTools.utils.logger import get_logger
 logger=get_logger()
 import json
+import traceback
 from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 
 bot_id_global=2319804644
@@ -66,7 +67,7 @@ async def bangumi_subjects_get_json_PIL(subject_id=None):
                 #print(data)
                 #print(json.dumps(data, indent=4))
                 #print(data["summary"])
-                contents_other=''
+                contents_other, week_fang, week_jishu = '', '未知', '未知'
                 for subject in data['infobox']:
                     if subject['key'] == "放送星期":
                         week_fang=subject['value']
@@ -94,6 +95,8 @@ async def bangumi_subjects_get_json_PIL(subject_id=None):
 
             return contents,img_url,contents_other
         except Exception as e:
+            #print(e)
+            traceback.print_exc()
             return False
 
 
@@ -165,7 +168,7 @@ async def bangumi_PILimg(text=None,img_context=None,filepath=None,proxy=None,typ
         if search_json_init is False:
             json_check['status'] = False
             return json_check
-        search_json=search_json_init['list']
+        #search_json=search_json_init['list']
 
         if int(search_json_init['results']) == 1:
             id = search_json_init['list'][0]['id']
@@ -193,10 +196,20 @@ async def bangumi_PILimg(text=None,img_context=None,filepath=None,proxy=None,typ
                 text_total += f"{count}、 {name_bangumi}----{search_item['rating']['score']}☆\n"
             else:
                 text_total += f"{count}、 {name_bangumi}\n"
+            #print(json.dumps(search_item['images'], indent=4))
             if int(search_json_init['results']) <= 5:
                 img_context.append(search_item['images']['large'].replace('http', 'https'))
             else:
-                img_context.append(search_item['images']['common_utils'].replace('http', 'https'))
+                if 'common_utils' in search_item['images']:
+                    img_context.append(search_item['images']['common_utils'].replace('http', 'https'))
+                elif 'common' in search_item['images']:
+                    img_context.append(search_item['images']['common'].replace('http', 'https'))
+                elif 'medium' in search_item['images']:
+                    img_context.append(search_item['images']['medium'].replace('http', 'https'))
+                elif 'small' in search_item['images']:
+                    img_context.append(search_item['images']['small'].replace('http', 'https'))
+                elif 'grid' in search_item['images']:
+                    img_context.append(search_item['images']['grid'].replace('http', 'https'))
 
         count = 0
         count_1 = 0

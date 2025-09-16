@@ -20,6 +20,13 @@ except Exception as e:config = YAMLManager("run")
 
 db=asyncio.run(AsyncSQLiteDatabase.get_instance())
 
+async def user_check(userid):
+    user_info =await db.read_user(userid)
+    pprint.pprint(user_info)
+    if user_info and 'skland' in user_info and 'user_info' in user_info['skland'] and 'character_info' in user_info['skland']:
+        return True
+
+    return False
 
 
 async def qrcode_get(userid,bot=None,event=None):
@@ -196,6 +203,7 @@ async def rouge_detailed_info(userid,rg_type,game_count=None,favored=False,bot=N
 if __name__ == '__main__':
 
     #asyncio.run(qrcode_get(1667962668))
-    #asyncio.run(self_info(1270858640))
-    asyncio.run(rouge_info(1667962668,'水月'))
+    asyncio.run(user_check(1667962668))
+    #asyncio.run(skland_signin(1270858640))
+    #asyncio.run(rouge_info(1667962668,'水月'))
     #asyncio.run(rouge_detailed_info(1667962668,'界园'))
