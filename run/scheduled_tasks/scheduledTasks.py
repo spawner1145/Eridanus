@@ -263,7 +263,7 @@ def main(bot: ExtendBot, config):
                         item["rank"] = idx
                     bot.logger.info(f"进入图片制作")
                     number_speeches_check_draw_list = [
-                        {'type': 'basic_set', 'img_width': 1200},
+                        {'type': 'basic_set', 'img_width': 1200,'auto_line_change':False},
                         {'type': 'avatar', 'subtype': 'common',
                          'img': [f"https://q1.qlogo.cn/g?b=qq&nk={bot.id}&s=640"],
                          'content': [
