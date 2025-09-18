@@ -78,6 +78,6 @@ Eridanus 采用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/
 <a href="https://github.com/AOrbitron/Eridanus/graphs/contributors" target="_blank">
   <img src="https://contrib.rocks/image?repo=AOrbitron/Eridanus" />
 </a>
-## Star History
+
 
 [![Star History Chart](https://api.star-history.com/svg?repos=AOrbitron/Eridanus&type=Date)](https://www.star-history.com/#AOrbitron/Eridanus&Date)
