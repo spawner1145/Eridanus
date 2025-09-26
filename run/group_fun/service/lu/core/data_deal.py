@@ -44,14 +44,15 @@ async def data_init(userid,day_info=None):
         if old_data and f'{userid}' in old_data and f'lu_others' in old_data[f'{userid}'] and f'lu_record' in old_data[f'{userid}'][f'lu_others']:
             user_info['lu']['lu_supple']['record'] = old_data[f'{userid}'][f'lu_others']['lu_record']
         month_data, year_data = 0, 0
-        for data in old_data[f'{userid}']:
-            if not ('lu' in old_data[f'{userid}'][data] and 'lu_length' in old_data[f'{userid}'][data]): continue
-            user_info['lu']['lu_done']['data'][data] = old_data[f'{userid}'][data]['lu']
-            user_info['lu']['length']['data'][data] = old_data[f'{userid}'][data]['lu_length']
-            if day_info['year'] in data: year_data += old_data[f'{userid}'][data]['lu']
-            if day_info['month'] in data: month_data += old_data[f'{userid}'][data]['lu']
-        user_info['lu']['times']['month'][day_info['month']], user_info['lu']['times']['year'][
-            day_info['year']] = month_data, year_data
+        if f'{userid}' in old_data:
+            for data in old_data[f'{userid}']:
+                if not ('lu' in old_data[f'{userid}'][data] and 'lu_length' in old_data[f'{userid}'][data]): continue
+                user_info['lu']['lu_done']['data'][data] = old_data[f'{userid}'][data]['lu']
+                user_info['lu']['length']['data'][data] = old_data[f'{userid}'][data]['lu_length']
+                if day_info['year'] in data: year_data += old_data[f'{userid}'][data]['lu']
+                if day_info['month'] in data: month_data += old_data[f'{userid}'][data]['lu']
+            user_info['lu']['times']['month'][day_info['month']], user_info['lu']['times']['year'][
+                day_info['year']] = month_data, year_data
 
     #pprint.pprint(user_info['lu'])
     return user_info['lu']
@@ -98,9 +99,25 @@ async def data_update(user_info,update_json,day_info=None):
                 user_info['times']['year'][f"{day_info['year']}"] = user_info['times']['year'][f"{day_info['year']}"] + 1
                 break
 
+async def user_list_get(user_list,day_info=None,type='month'):
+    if day_info is None: day_info = await date_get()
+    deal_user_list = []
+    for userid in user_list:
+        data_info = await data_init(userid)
+        if type == 'month':
+            data = data_info['times']['month'][day_info['month']]
+        elif type == 'year':
+            data = data_info['times']['year'][day_info['year']]
+        elif type == 'total':
+            data = data_info['collect']['lu_done']
+        deal_user_list.append({'times':data,'userid':userid})
+    deal_user_list.sort(key=lambda x: list(x.values())[0], reverse=True)
+    deal_user_list = deal_user_list[:10]
 
+    return deal_user_list
 
 
 if __name__ == '__main__':
     target_id = 1270858640
-    asyncio.run(data_init(target_id))
+    #asyncio.run(data_init(target_id))
+    asyncio.run(user_list_get([1270858640,2191331427]))

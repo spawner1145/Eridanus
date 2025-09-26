@@ -333,7 +333,7 @@ async def label_process(params, img, number_count, new_width):
     if label_width > new_width:
         label_width = new_width
 
-    label_canvas = Image.new("RGBA", (int(label_width), int(label_height)), eval(params['label_color']))
+    label_canvas = Image.new("RGBA", (int(label_width), int(label_height)), eval(str(params['label_color'])))
 
     try:
         # 调用方法绘制文字并判断是否需要描边和圆角
