@@ -3,6 +3,8 @@ import requests
 import platform
 import subprocess
 import re
+import os
+import subprocess
 import aiofiles
 import httpx
 from typing import Optional
@@ -172,11 +174,49 @@ async def merge_file_to_mp4(v_full_file_name: str, a_full_file_name: str, output
     :return:
     """
     #print(f'正在合并：{output_file_name}')
+    def file_exists_and_nonzero(file_path):
+        return os.path.isfile(file_path) and os.path.getsize(file_path) > 0
 
+    video_valid = file_exists_and_nonzero(v_full_file_name)
+    audio_valid = file_exists_and_nonzero(a_full_file_name)
     # 构建 ffmpeg 命令
-    command = f'ffmpeg -y -i "{v_full_file_name}" -i "{a_full_file_name}" -c copy "{output_file_name}"'
+    if video_valid and audio_valid:
+        # 视频和音频都存在且有效，合成
+        command = [
+            'ffmpeg', '-y',
+            '-i', v_full_file_name,
+            '-i', a_full_file_name,
+            '-c', 'copy',
+            output_file_name
+        ]
+    elif video_valid:
+        # 只有视频文件存在且有效，只转换视频
+        command = [
+            'ffmpeg', '-y',
+            '-i', v_full_file_name,
+            '-c', 'copy',
+            output_file_name
+        ]
+    else:
+        raise FileNotFoundError("视频文件不存在或大小为0，无法处理")
+
+
+    # command = f'ffmpeg -y -i "{v_full_file_name}" -i "{a_full_file_name}" -c copy "{output_file_name}"'
+    command = ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in command)
     stdout = None if log_output else subprocess.DEVNULL
     stderr = None if log_output else subprocess.DEVNULL
+    try:
+        # 调用 ffmpeg -version，捕获输出
+        result = subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode == 0:
+            pass
+        else:
+            print("ffmpeg 未安装或无法访问")
+            return False
+    except FileNotFoundError:
+        # 命令未找到，说明 ffmpeg 没有安装或不在 PATH 中
+        print("ffmpeg 未安装或不在系统 PATH 中")
+        return False
     #print(platform.system())
     if platform.system() == "Windows":
         # Windows 下使用 run_in_executor
@@ -276,6 +316,7 @@ async def download_b(video_url,audio_url,video_id,filepath=None):
         await merge_file_to_mp4(f"{path}-video.m4s", f"{path}-audio.m4s", f"{path}-res.mp4")
         return f"{path}-res.mp4"
     except Exception as e:
+        print(f'Blibili视频下载失败：{e}')
         traceback.print_exc()
 
 async def download_img(url: str, path: str = '', proxy: str = None, session=None, headers=None,len=None) -> str:

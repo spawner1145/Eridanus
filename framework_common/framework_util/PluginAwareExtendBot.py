@@ -1044,7 +1044,7 @@ class PluginManager:
                     func_file = "unknown"
                     if hasattr(func, '__code__') and hasattr(func.__code__, 'co_filename'):
                         func_file = func.__code__.co_filename
-
+                    traceback.print_exc()
                     self.logger.error(f"执行插件 {plugin_name} 的函数失败:")
                     self.logger.error(f"  - 函数名: {getattr(func, '__name__', str(func))}")
                     self.logger.error(f"  - 所在文件: {func_file}")

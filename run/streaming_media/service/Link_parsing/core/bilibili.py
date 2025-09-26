@@ -66,12 +66,14 @@ async def bilibili(url,filepath=None,is_twice=None,type=None):
         url: str = str(resp.url)
         #print(f'url:{url}')
     # AV/BV处理
-    if "av" in url:
+    #print(url)
+    if "av" in url and 'BV' not in url:
         return
         url= 'https://www.bilibili.com/video/' + av_to_bv(url)
     if re.match(r'^BV[1-9a-zA-Z]{10}$', url):
         url = 'https://www.bilibili.com/video/' + url
     json_check['url'] = url
+    #print(url)
     # ===============发现解析的是动态，转移一下===============
     if ('t.bilibili.com' in url or '/opus' in url or '/space' in url ) and BILI_SESSDATA != '':
         # 去除多余的参数
