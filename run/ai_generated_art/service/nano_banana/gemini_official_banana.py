@@ -11,7 +11,8 @@ from run.ai_generated_art.service.nano_banana.apikey_iterator import RoundRobinS
 
 api_key_selector = None
 async def call_gemini_api(contents, config) -> Dict[str, Any]:
-    url = f"{config.ai_llm.config['llm']['gemini']['base_url']}/v1beta/models/gemini-2.5-flash-image-preview:generateContent"
+    model_selected=config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["model"]
+    url = f"{config.ai_llm.config['llm']['gemini']['base_url']}/v1beta/models/{model_selected}:generateContent"
     proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.common_config.basic_config["proxy"][
         "http_proxy"] else None
     proxies = {"http://": proxy, "https://": proxy} if proxy else None
