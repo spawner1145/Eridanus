@@ -328,8 +328,8 @@ async def youxi_pil_new_text(filepath=None):
             author_data = response.json()
             #print(json.dumps(author_data, indent=4))
             author_url=author_data['avatar_urls']['96']
-            #print(author_url)
             avatar_name=author_data['name']
+        author_url = "https://q1.qlogo.cn/g?b=qq&nk=3231515355&s=640"
 
         json_dy = {'status': False, 'pendant_path': False, 'card_path': False, 'card_number': False,
                    'card_color': False,
@@ -372,3 +372,8 @@ async def gal_PILimg(text=None,img_context=None,filepath=None,proxy=None,type_so
         json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
                                                      {'type': 'img', 'subtype': 'common_with_des', 'img': img_context, 'content': [context],'max_des_length':2000}])
         return json_check
+
+if __name__ == "__main__":#测试用，不用管
+
+
+    asyncio.run(youxi_pil_new_text())

@@ -280,10 +280,10 @@ async def call_jm(bot,event,config,mode="preview",comic_id=607279,serach_topic=N
                         pdf_path=f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}.pdf"
                     for group_id in operating[comic_id]:
                         event.group_id = group_id  # 修改数据实现切换群聊，懒狗实现
+                        msg = await bot.send(event, "下载完成了( >ρ< ”)。请等待上传完成。")
                         await bot.send(event, File(file=pdf_path))
                         if config.resource_collector.config["JMComic"]["autoEncrypt"]:
                             await bot.send(event, f"加密成功，请注意查收。\n密码为：{comic_id}")
-                        msg=await bot.send(event, "下载完成了( >ρ< ”)。请等待上传完成。")
                         await delay_recall(bot, msg)
                     bot.logger.info("移除预览缓存")
                     operating.pop(comic_id)

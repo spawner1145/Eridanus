@@ -34,7 +34,7 @@ async def download_img(url, gray_layer=False, proxy="http://127.0.0.1:7890"):
         except Exception as e:
             print(f'绘图框架无法获取图片{url}： {type(e)} {repr(e)}')
             #print(proxies)
-            traceback.print_exc()
+            #traceback.print_exc()
             try:
                 response = await client.get('https://gal.manshuo.ink/usr/uploads/galgame/zatan.png')
             except Exception:

@@ -12,9 +12,10 @@ from PIL import Image as PImage
 from framework_common.framework_util.yamlLoader import YAMLManager
 try:config = YAMLManager.get_instance()
 except Exception as e:config = YAMLManager("run")
-db=asyncio.run(AsyncSQLiteDatabase.get_instance())
 botname = config.common_config.basic_config["bot"]
 import gc
+
+db=asyncio.run(AsyncSQLiteDatabase.get_instance())
 
 async def get_cpu_percent(process):
     # 在独立线程中调用阻塞的cpu_percent(interval=1.0)

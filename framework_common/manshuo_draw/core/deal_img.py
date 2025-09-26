@@ -118,10 +118,7 @@ async def deal_img(json_img): #此函数将逐个解析json文件中的每个字
             backdrop_class=Backdrop(basic_img_info, per_json_img)
             basic_img=await getattr(backdrop_class, per_json_img['subtype'])(basic_img)
 
-
-
-
-
+    basic_img = basic_img.convert("RGB")
     basic_img.save(img_path, "PNG")
     if basic_img_info.debug is True:
         basic_img.show()
