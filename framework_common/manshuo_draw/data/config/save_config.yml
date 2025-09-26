@@ -2,7 +2,7 @@
 basic_set:
   version: 1.0                      #绘图版本
   img_width: 1000                   #图像默认宽度
-  img_height: 2000                  #图像默认最大长度
+  img_height: 2500                  #图像默认最大长度
   max_num_of_columns: 3             #框架支持多列绘制，此处为最大列数，以免出现无限递归
   proxy: None                       #绘图框架从网络获取图片所用的代理端口
   padding_left_common: 25           #层级的左间距，注意，修改此处仅会影响部分间距，每个模块内可能有各自的间距设置
@@ -221,6 +221,7 @@ games:
 
 math:
   number_per_row: default           #每行图片个数，默认即为九宫格，可自定义
+  is_crop: True
   backdrop_color: (255,255,255,255)
   chart_color: (194, 228, 255)
   chart_width: default
