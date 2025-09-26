@@ -11,6 +11,7 @@ from run.ai_generated_art.service.nano_banana.apikey_iterator import RoundRobinS
 
 api_key_selector = None
 async def call_openrouter_api(contents, config) -> Dict[str, Any]:
+    model_selected=config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["model"]
     url = "https://openrouter.ai/api/v1/chat/completions"
     proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.common_config.basic_config["proxy"][
         "http_proxy"] else None
@@ -33,7 +34,7 @@ async def call_openrouter_api(contents, config) -> Dict[str, Any]:
          "content": "You are a capable drawing assistant. For every conversation with the user, you must output an image. It is crucial to ensure that you generate an image and not return only text."},
         {"role": "user", "content": user_content}
     ]
-    payload = {"model": "google/gemini-2.5-flash-image-preview:free", "messages": messages,"temperature": config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["temperature"]}
+    payload = {"model": model_selected, "messages": messages,"temperature": config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["temperature"]}
 
     try:
         # 修正了您之前指出的笔误
