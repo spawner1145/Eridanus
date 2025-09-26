@@ -28,7 +28,7 @@ ai绘画:
   nano_banana_key: # 就是冲了米的gemini key。或是在https://openrouter.ai/google/gemini-2.5-flash-image-preview:free申请。
   -  ""   #可继续添加更多apikey
   nano_banana_config:
-    model: gemini-2.5-flash-image-preview #给第三方兼容擦屁股。
+    model: gemini-2.5-flash-image-preview  #用第三方接口的自己翻第三方文档去，不接代看文档谢谢
     原生gemini接口: false  #如果用gemini官方apikey，则打开此项，使用上面openrouter或其他openai标准的中转api则无需打开。
     nano_banana不限制次数所需权限: 1  #超过此权限不受次数限制
     nano_banana默认权限用户可用次数: 10  #默认用户可用次数
