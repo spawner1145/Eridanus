@@ -11,7 +11,7 @@ import pprint
 from developTools.message.message_components import Text, Image, At
 from framework_common.manshuo_draw import *
 from run.group_fun.service.lu.core import *
-
+from framework_common.manshuo_draw import *
 db=asyncio.run(AsyncSQLiteDatabase.get_instance())
 
 
@@ -42,7 +42,7 @@ async def supple_lu(userid,bot=None,event=None):
     times_record = user_info['lu_supple']['record']
     times_record_check = int(times_record) // 3
     if times_record_check == 0:
-        await bot.send(event, [At(qq=target_id),
+        await bot.send(event, [At(qq=userid),
                                f' 您的补🦌次数好像不够呢喵~~（已连续{times_record}天）(3天1次)'])
     update_json = {'type':'supple_lu'}
     await data_update(user_info,update_json,day_info)
@@ -76,11 +76,40 @@ async def check_lu(userid,bot=None,event=None):
     else:
         pprint.pprint('今天🦌了！')
 
+async def rank_lu(userid_list,type_check='month',bot=None,event=None):
+    day_info = await date_get()
+    user_list = await user_list_get(userid_list,day_info,type_check)
+    #pprint.pprint(user_list)
+    if type_check == 'month':send_str = '本月'
+    elif type_check == 'year': send_str = '年度'
+    elif type_check == 'total':send_str = '总共'
+    if event:
+        self_id = event.self_id
+        self_name = (await bot.get_group_member_info(event.group_id, self_id))['data']['nickname']
+    else:
+        self_id,self_name = '2319804644','枫与岚'
+    draw_list = [
+        {'type': 'avatar', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={self_id}&s=640"],
+         'upshift_extra': 15,'content': [f"[name]{self_name} 一直在看着你哦～[/name]\n[time]看看群友都有多勤奋的🦌！[/time]"]},
+        f"[title]这是本群{send_str}的开🦌排行！[/title]",
+        {'type': 'math', 'subtype': 'bar_chart', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={item['userid']}&s=640" for item in user_list],
+         'number_per_row': 1, 'chart_height': 75,'max':user_list[0]['times'],'upshift_label':-5,
+         'is_stroke_label':True,'font_label_size':29,'font_label_color':(255, 255, 255),'label_color':(194, 228, 255, 255),
+         'content': [item['times'] for item in user_list],'label': [f"{item['times']}次" for item in user_list]},
+    ]
+    img_path = await manshuo_draw(draw_list)
+    if bot and event:
+        recall_id = await bot.send(event, [f"{self_name} 一直在看着你哦～",Image(file=img_path)])
+        return recall_id
+    else:
+        pprint.pprint('今天🦌了！')
+
+
 
 if __name__ == '__main__':
     start_time = time.time()
     target_id = 1270858640
-    asyncio.run(supple_lu(target_id))
+    asyncio.run(rank_lu([1270858640,2191331427,1270858640,2191331427,1270858640,2191331427,1270858640,2191331427,1270858640,2191331427,]))
     end_time = time.time()  # 记录结束时间
     duration = end_time - start_time  # 计算持续时间，单位为秒
 

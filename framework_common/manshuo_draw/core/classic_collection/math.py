@@ -35,8 +35,15 @@ class MathModule:
             img = Image.new("RGBA", (self.new_width,int(self.chart_height)), eval(str(self.backdrop_color)))
             img = await per_img_limit_deal(self.__dict__,img, type='math')#处理每个图片,您的每张图片绘制自定义区域
             if self.json_img_left_module_flag: break  # 修改模块的跳出条件，使得模块能够完整绘出
-            chart_img = Image.new("RGBA", (self.new_width,int(self.chart_height)), eval(str(self.chart_color))).crop((0, 0, int(img.width * percent), img.height))
-            img = await img_process(self.__dict__, img, chart_img, 0,0, 0, 'math')  # 对每个图像进行处理
+            if hasattr(self, 'processed_img') and self.number_count < len(self.processed_img):
+                chart_img = Image.new("RGBA", (self.new_width, int(self.chart_height)), eval(str(self.chart_color))).crop((0, 0, int((img.width - self.chart_height) * percent + self.chart_height), img.height))
+                img = await img_process(self.__dict__, img, chart_img, 0, 0, 0, 'math')  # 对每个图像进行处理
+                left_img = self.processed_img[self.number_count]
+                left_img = left_img.resize((self.chart_height, self.chart_height))
+                img = await img_process(self.__dict__, img, left_img, 0, 0, 0, 'img')
+            else:
+                chart_img = Image.new("RGBA", (self.new_width,int(self.chart_height)), eval(str(self.chart_color))).crop((0, 0, int(img.width * percent), img.height))
+                img = await img_process(self.__dict__, img, chart_img, 0,0, 0, 'math')  # 对每个图像进行处理
             img=await label_process(self.__dict__,img,self.number_count,self.new_width)#加入label绘制
             self.pure_backdrop = await img_process(self.__dict__,self.pure_backdrop, img, self.x_offset, self.current_y, self.upshift)#对每个图像进行处理
             await per_img_deal(self.__dict__,img)  # 处理每个图片的位置关系
