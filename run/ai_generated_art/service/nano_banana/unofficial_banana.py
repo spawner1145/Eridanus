@@ -12,8 +12,8 @@ from run.ai_generated_art.service.nano_banana.apikey_iterator import RoundRobinS
 api_key_selector = None
 async def call_openrouter_api(contents, config) -> Dict[str, Any]:
     model_selected=config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["model"]
-    base_url= config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["base_url"]
-    url = f"{base_url}/api/v1/chat/completions"
+    base_url= config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["quest_url"]
+    url = f"{base_url}"
     proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.common_config.basic_config["proxy"][
         "http_proxy"] else None
     proxies = {"http://": proxy, "https://": proxy} if proxy else None
