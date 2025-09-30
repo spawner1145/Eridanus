@@ -17,7 +17,7 @@ def main(bot, config):
     async def bind_sklandid(event: GroupMessageEvent):
         context, userid=event.pure_text, str(event.sender.user_id)
         order_list = ['sklandbind', '森空岛绑定']
-        if event.message_chain.has(At):
+        if event.message_chain.has(At) and event.message_chain.has(Text):
             userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
         if context in order_list:
             await qrcode_get(userid, bot, event)
@@ -28,7 +28,8 @@ def main(bot, config):
     async def sing_sklandid(event: GroupMessageEvent):
         order_list=['sklandsign','森空岛签到']
         context, userid=event.pure_text, str(event.sender.user_id)
-        if event.message_chain.has(At):userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
+        if event.message_chain.has(At) and event.message_chain.has(Text):
+            userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
         if context in order_list:await skland_signin(userid, bot, event)
 
     #森空岛信息查询
@@ -36,7 +37,8 @@ def main(bot, config):
     async def sing_sklandid(event: GroupMessageEvent):
         order_list=['sklandinfo','森空岛info','森空岛信息','我的森空岛']
         context, userid=event.pure_text, str(event.sender.user_id)
-        if event.message_chain.has(At):userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
+        if event.message_chain.has(At) and event.message_chain.has(Text):
+            userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
         if context in order_list:
             recall_id = await bot.send(event, f'开始查询您的森空岛信息，请耐心等待喵')
             await skland_info(userid, bot, event)
@@ -62,7 +64,8 @@ def main(bot, config):
     async def sing_sklandid(event: GroupMessageEvent):
         order_list=['sklandrogueinfo','sklandrginfo','肉鸽查询','查询肉鸽']
         context, userid, flag, game_count = event.pure_text, str(event.sender.user_id), True, None
-        if event.message_chain.has(At):userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
+        if event.message_chain.has(At) and event.message_chain.has(Text):
+            userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
         for order_check in order_list:
             if order_check in context:
                 flag=False

@@ -32,7 +32,7 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def bind_steamid(event: GroupMessageEvent):
         context, userid=event.pure_text, str(event.sender.user_id)
-        if event.message_chain.has(At):
+        if event.message_chain.has(At) and event.message_chain.has(Text):
             userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
         if context.lower().startswith('steambind '):
             steamid=get_steam_id(context.replace('steambind ', ''))

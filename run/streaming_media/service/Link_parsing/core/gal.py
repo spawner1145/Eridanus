@@ -180,8 +180,9 @@ async def Galgame_manshuo(url, filepath=None):
                             if paren_matches:
                                 potential_url = paren_matches[0]
                                 del paren_matches
-                        links_url = potential_url
-                        hikarinagi_flag = 1
+                        if not 'https://gal.manshuo.ink/usr/uploads/galgame/wechat.png' in potential_url:
+                            links_url = potential_url
+                            hikarinagi_flag = 1
                         # 清理临时变量
                         del url_matches, potential_url
             elif 'https://img-static.hikarinagi.com/uploads/' in context_check and hikarinagi_flag == 0:
@@ -194,7 +195,7 @@ async def Galgame_manshuo(url, filepath=None):
                     del url_matches
 
         #analyze_objects(2)  #占用略微增加，删除context_lines后即可
-
+        #print(links_url)
         # 清理context_lines
         del context_lines
         # 强制垃圾回收
@@ -221,7 +222,7 @@ async def Galgame_manshuo(url, filepath=None):
                 gc.collect()
             except Exception:
                 pass
-
+            #print(links_url)
             # 设置默认链接
             if links_url is None:
                 links_url = 'https://gal.manshuo.ink/usr/uploads/galgame/zatan.png'
@@ -248,7 +249,7 @@ async def Galgame_manshuo(url, filepath=None):
 
         # 调用analyze_objects
         #analyze_objects(3) #此时占用已经正常
-
+        #print(links_url)
         # 生成图片
         json_check['pic_path'] = await manshuo_draw([
             {'type': 'avatar', 'subtype': 'common', 'img': [avatar_path_url], 'upshift_extra': 20,

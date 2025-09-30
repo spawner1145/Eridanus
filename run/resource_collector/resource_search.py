@@ -414,7 +414,7 @@ def main(bot,config):
 
     @bot.on(GroupMessageEvent)
     async def download(event: GroupMessageEvent):
-        if event.pure_text.startswith("验车") or event.pure_text == "随机本子":
+        if event.pure_text.startswith("验车") or event.pure_text.lower().startswith("jm验车") or event.pure_text == "随机本子":
             user_info = await get_user(event.user_id)
             if user_info.permission < config.resource_collector.config["jmcomic"]["jm_comic_random_level"]:
                 await bot.send(event, "你没有权限使用该功能")
@@ -422,6 +422,8 @@ def main(bot,config):
             try:
                 if event.pure_text.startswith("验车"):
                     comic_id = int(event.pure_text.replace("验车", ""))
+                elif event.pure_text.lower().startswith("jm验车"):
+                    comic_id = int(event.pure_text.lower().replace("jm验车", ""))
                 else:
                     context = ['正在随机ing，请稍等喵~~', '正在翻找好看的本子喵~', '嘿嘿，JM，启动！！！！', '正在翻找JM.jpg',
                                '有色色！我来了', 'hero来了喵~~', '了解~', '全力色色ing~']
