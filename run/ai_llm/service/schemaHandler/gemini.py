@@ -12,7 +12,7 @@ class GeminiFormattedChat:
     一个封装了Gemini多轮对话和格式化JSON输出的异步客户端。
     """
 
-    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash",proxy:str=None,base_url: str="https://generativelanguage.googleapis.com"):
+    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash-lite",proxy:str=None,base_url: str="https://generativelanguage.googleapis.com"):
         """
         初始化Gemini聊天客户端。
 
