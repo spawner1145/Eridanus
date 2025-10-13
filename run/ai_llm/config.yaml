@@ -51,6 +51,11 @@ llm:
     base_url: https://generativelanguage.googleapis.com #后面的/v1/beta什么的会自动填充
     temperature: 0.7
     maxOutputTokens: 2048
+    fallback_models:   #code429即到达限额后，会按顺序change_model，直到成功。
+      - gemini-2.0-flash
+      - gemini-2.5-flash
+      - gemini-2.0-flash-lite
+      - gemini-2.5-flash-lite
   default:  #default全系列模型无函数调用，仅支持日常对话。
     model: gpt-4o-mini #可选claude-3-5-haiku，gpt-4-turbo-preview，gpt-4o-mini，gpt-4-32k，@cf/google/gemma-7b-it-lora，meta-llama/Llama-3.3-70B-Instruct-Turbo
   腾讯元器:     #极其不建议用，腾子搞得玩意稀烂，而且不支持函数调用。
