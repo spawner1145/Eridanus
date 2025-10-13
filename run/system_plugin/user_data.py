@@ -207,13 +207,17 @@ def main(bot,config):
                 nickname=event.pure_text.split("叫我")[1]
                 await call_change_name(bot,event,config,nickname)
 
-        if event.pure_text.startswith("授权#"):
+        if event.pure_text.startswith("授权#") or event.pure_text.startswith("授权群#"):
             try:
                 permission=int(event.pure_text.split("#")[2])
                 target_qq=int(event.pure_text.split("#")[1])
-                await call_permit(bot,event,config,target_qq,permission)
+                if event.pure_text.startswith("授权#"):
+                    await call_permit(bot,event,config,target_qq,permission)
+                elif event.pure_text.startswith("授权群#"):
+                    await call_permit(bot,event,config,target_qq,permission,type="group")
             except:
-                await bot.send(event, "请输入正确的权限值。\n指令为\n授权#{target_qq}#{level}\n如授权#1223434343#1")
+                await bot.send(event, "请输入正确的命令格式。\n指令为\n授权#{target_qq}#{level}\n如授权#1223434343#1\n授权群#{群号}#{level}\n如授权群#1223434343#1")
+
         if event.raw_message.startswith("授权"):
             match = re.search(r"qq=(\d+)", event.raw_message)
             if match: #f
