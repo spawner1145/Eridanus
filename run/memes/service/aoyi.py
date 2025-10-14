@@ -241,7 +241,7 @@ def draw_vertical_line_noise(img, prob=0.12, count=6, width=1, jitter=2):
             draw.line((xi, y0, xi, y1), fill=col)
     return img
 
-async def generate_animation(input_path, output_path, text, duration=2.0, fps=20, black_opacity=0.5, subtitle_opacity=0.85, font_path=DEFAULT_FONT, feather_radius=8, vignette_strength=0.6, noise_amount=0.06, swing_amplitude=14.0, swing_overshoot=1.3, subject_scale=1.04, total_frames=None, min_cycles=2, max_cycles=4, top_dark_opacity=0.35, line_prob=0.12, line_count=6, line_width=1, line_jitter=2, subtitle_padding=12, subtitle_radius=18, subtitle_feather=6, subtitle_bg_alpha=255, font_size=26, fast_freq=10.0, jitter_amp=2.0):
+async def generate_animation(input_path, output_path, text, duration=2.0, fps=20, black_opacity=0.5, subtitle_opacity=0.85, font_path=DEFAULT_FONT, feather_radius=8, vignette_strength=0.6, noise_amount=0.06, swing_amplitude=14.0, swing_overshoot=1.3, subject_scale=1.04, total_frames=None, min_cycles=2, max_cycles=4, top_dark_opacity=0.35, line_prob=0.12, line_count=6, line_width=1, line_jitter=2, subtitle_padding=12, subtitle_radius=18, subtitle_feather=6, subtitle_bg_alpha=255, font_size=26, fast_freq=10.0, jitter_amp=2.0, max_size=1024*1024):
     if not os.path.exists(input_path):
         raise FileNotFoundError(input_path)
     base = (await asyncio.to_thread(Image.open, input_path)).convert('RGBA')
@@ -355,7 +355,16 @@ async def generate_animation(input_path, output_path, text, duration=2.0, fps=20
         return frames
 
     frames = await asyncio.to_thread(generate_frames)
-    await asyncio.to_thread(imageio.mimsave, output_path, frames, format='GIF', duration=1.0/fps)
+    if max_size > 0:
+        quantize = 256
+        await asyncio.to_thread(imageio.mimsave, output_path, frames, format='GIF', duration=1.0/fps, optimize=True, quantize=quantize)
+        size = os.path.getsize(output_path)
+        while size > max_size and quantize > 16:
+            quantize = max(16, quantize // 2)
+            await asyncio.to_thread(imageio.mimsave, output_path, frames, format='GIF', duration=1.0/fps, optimize=True, quantize=quantize)
+            size = os.path.getsize(output_path)
+    else:
+        await asyncio.to_thread(imageio.mimsave, output_path, frames, format='GIF', duration=1.0/fps)
     return output_path
 
 if __name__ == '__main__':
@@ -386,6 +395,7 @@ if __name__ == '__main__':
     p.add_argument('--font_size', type=int, default=26, help='显式指定字幕字体大小（覆盖自动计算）')
     p.add_argument('--fast_freq', type=float, default=10, help='快速抖动频率（Hz）')
     p.add_argument('--jitter_amp', type=float, default=2.0, help='每帧随机抖动幅度（像素）')
+    p.add_argument('--max_size', type=int, default=1024*1024, help='最大文件大小（字节），默认1MB；设置为0或负数则不压缩')
     args = p.parse_args()
     out = asyncio.run(generate_animation(
         args.input, args.output, args.text,
@@ -410,5 +420,6 @@ if __name__ == '__main__':
         ,font_size=args.font_size
         ,fast_freq=args.fast_freq
         ,jitter_amp=args.jitter_amp
+        ,max_size=args.max_size
     ))
     print('已保存到:', out)
