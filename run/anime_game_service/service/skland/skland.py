@@ -14,9 +14,6 @@ import qrcode
 import pprint
 from developTools.message.message_components import Text, Image, At
 from framework_common.manshuo_draw import *
-from framework_common.framework_util.yamlLoader import YAMLManager
-try:config = YAMLManager.get_instance()
-except Exception as e:config = YAMLManager("run")
 
 db=asyncio.run(AsyncSQLiteDatabase.get_instance())
 
@@ -203,7 +200,7 @@ async def rouge_detailed_info(userid,rg_type,game_count=None,favored=False,bot=N
 if __name__ == '__main__':
 
     #asyncio.run(qrcode_get(1667962668))
-    asyncio.run(user_check(1667962668))
+    asyncio.run(user_check(1270858640))
     #asyncio.run(skland_signin(1270858640))
     #asyncio.run(rouge_info(1667962668,'水月'))
     #asyncio.run(rouge_detailed_info(1667962668,'界园'))

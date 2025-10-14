@@ -276,7 +276,8 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 tools=tools,
                 system_instruction=system_instruction,
                 temperature=config.ai_llm.config["llm"]["gemini"]["temperature"],
-                maxOutputTokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"]
+                maxOutputTokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"],
+                fallback_models=config.ai_llm.config["llm"]["gemini"]["fallback_models"],
             )
             logger.info(response_message)
             response_message=response_message['candidates'][0]["content"]

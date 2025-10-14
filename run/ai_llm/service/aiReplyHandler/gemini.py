@@ -10,14 +10,24 @@ from PIL import Image
 from developTools.utils.logger import get_logger
 from framework_common.database_util.llmDB import get_user_history, update_user_history
 from framework_common.utils.random_str import random_str
+from run.ai_llm.service.aiReplyHandler.ModelFallBackManager import ModelFallbackManager
 
 logger=get_logger("Gemini Prompt Construct and Request")
-async def geminiRequest(ask_prompt,base_url: str,apikey: str,model: str,proxy=None,tools=None,system_instruction=None,temperature=0.7,maxOutputTokens=2048):
+async def geminiRequest(ask_prompt,base_url: str,apikey: str,model: str,proxy=None,tools=None,system_instruction=None,temperature=0.7,maxOutputTokens=2048,fallback_models: list[str] = None):
     if proxy is not None and proxy !="":
         proxies={"http://": proxy, "https://": proxy}
     else:
         proxies=None
-    url = f"{base_url}/v1beta/models/{model}:generateContent?key={apikey}"
+    #url = f"{base_url}/v1beta/models/{model}:generateContent?key={apikey}"
+    """
+    模型降级操作
+    """
+    if fallback_models:
+        manager = ModelFallbackManager(fallback_models)
+        models_to_try = fallback_models
+    else:
+        models_to_try = [model]
+        manager = None
     # print(requests.get(url,verify=False))
     pay_load={
         "contents": ask_prompt,
@@ -45,11 +55,30 @@ async def geminiRequest(ask_prompt,base_url: str,apikey: str,model: str,proxy=No
         pay_load["tools"] = tools
 
 
-    async with httpx.AsyncClient(proxies=proxies, timeout=100) as client:
-        r = await client.post(url, json=pay_load)
-        return r.json()
+    #async with httpx.AsyncClient(proxies=proxies, timeout=100) as client:
+        #r = await client.post(url, json=pay_load)
+        #return r.json()
         #print(r.json())
         #return r.json()['candidates'][0]["content"]
+    for attempt in range(len(models_to_try)):
+        current_model = manager.get_current_model() if manager else model
+        url = f"{base_url}/v1beta/models/{current_model}:generateContent?key={apikey}"
+
+        async with httpx.AsyncClient(proxies=proxies, timeout=100) as client:
+            r = await client.post(url, json=pay_load)
+            result = r.json()
+
+            if isinstance(result, dict) and 'error' in result:
+                error_code = result.get('error', {}).get('code')
+                if error_code == 429:
+                    if manager and manager.fallback():
+                        logger.warning(f"模型 {current_model} 配额耗尽(429),切换到: {manager.get_current_model()}")
+                        continue
+                    else:
+                        logger.error(f"所有模型配额均已耗尽")
+                        return result
+
+            return result
 
 """
 gemini标准prompt构建

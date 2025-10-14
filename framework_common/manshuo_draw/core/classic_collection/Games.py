@@ -5,6 +5,9 @@ from datetime import datetime
 import calendar
 import weakref
 import time
+import os
+cache_img = {}
+
 
 class GamesModule:
     def __init__(self,layer_img_set,params):
@@ -34,6 +37,7 @@ class GamesModule:
 
     async def LuRecordMake(self):
         await init(self.__dict__)#对该模块进行初始化
+        global cache_img
         #构建图像阵列
         self.processed_img,self.content=[],[]
         first_day_of_week = datetime(datetime.now().year, datetime.now().month, 1).weekday() + 1
@@ -47,20 +51,29 @@ class GamesModule:
                 if self.content_list[f'{i}']['type'] == 'lu':self.processed_img.append(background_make)
                 elif self.content_list[f'{i}']['type'] == 'nolu': self.processed_img.append(background_make)
             else:self.processed_img.append(background_make_L)
-        weeky=['周日','周一','周二','周三','周四','周五','周六','周日']
-        x_offset_week=self.padding
-        for i in range(int(self.number_per_row)):
-            week_img_canves = Image.new("RGBA", background_make.size, (255, 255, 255, 255)).resize(
-                (self.new_width, int(self.new_width * background_make.height / background_make.width)))
-            img_week = (await basic_img_draw_text(week_img_canves, f"[title]{weeky[i]}[/title]", self.__dict__,box=(int(self.padding*1.2), week_img_canves.height//2 - self.font_title_size//2 - 3), ))['canvas']
-            self.pure_backdrop = await img_process(self.__dict__, self.pure_backdrop, img_week, x_offset_week, self.current_y, self.upshift)
-            x_offset_week += self.new_width + self.padding_with
+
+        if 'week_img' not in cache_img or not os.path.exists(cache_img['week_img']):
+            weeky=['周日','周一','周二','周三','周四','周五','周六','周日']
+            x_offset_week=self.padding
+            for i in range(int(self.number_per_row)):
+                week_img_canves = Image.new("RGBA", background_make.size, (255, 255, 255, 255)).resize(
+                    (self.new_width, int(self.new_width * background_make.height / background_make.width)))
+                img_week = (await basic_img_draw_text(week_img_canves, f"[title]{weeky[i]}[/title]", self.__dict__,box=(int(self.padding*1.2), week_img_canves.height//2 - self.font_title_size//2 - 3), ))['canvas']
+                self.pure_backdrop = await img_process(self.__dict__, self.pure_backdrop, img_week, x_offset_week, self.current_y, self.upshift)
+                x_offset_week += self.new_width + self.padding_with
+            
+
+
+
         self.current_y += img_week.height + self.padding_with
         #对每个图片进行单独处理
         week_list=[]
         for i in range(first_day_of_week):
             week_list.append(Image.new("RGBA", background_make.size, (0, 0, 0, 0)))
         self.processed_img=add_append_img(week_list,self.processed_img)
+
+
+
 
         for img in self.processed_img:
             if self.img_height_limit_module <= 0:break

@@ -6,7 +6,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import time
 from datetime import datetime
-
+from run.basic_plugin.service.self_condition import self_info_record
 
 
 
@@ -17,7 +17,6 @@ async def self_condition_loop(bot, config):
     bot.logger.info_func("自身状态监控循环启动")
     while True:
         try:
-            from run.basic_plugin.service.self_condition import self_info_record
             await self_info_record()
         except Exception as e:
             bot.logger.error(f"自身状态检查出错：{e}")
