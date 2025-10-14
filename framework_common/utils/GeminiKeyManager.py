@@ -128,6 +128,7 @@ class GeminiKeyManager:
                 self._key_iterator = itertools.cycle(self._available_keys)
                 logger.info(
                     f"检测完成。当前可用Key数量: {len(self._available_keys)}，不可用Key数量: {len(self._unavailable_keys)}")
+                logger.info(f"{list(key_manager._unavailable_keys.keys())}")
             else:
                 self._key_iterator = itertools.cycle([])
                 logger.warning("所有API Key均不可用或未配置。")
