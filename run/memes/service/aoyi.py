@@ -7,7 +7,7 @@ import random
 import argparse
 import asyncio
 
-DEFAULT_FONT = "./方正艺黑体.15.9.12.ttf"
+DEFAULT_FONT = "run/memes/service/方正艺黑体.15.9.12.ttf"
 
 def create_vignette_mask(size, strength=0.6):
     w, h = size
