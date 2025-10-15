@@ -14,7 +14,7 @@ async def simple_call_text2img1( config, tag):
         tag, log = await replace_wildcards(tag)
 
         path = f"data/pictures/cache/{random_str()}.png"
-        log.info(f"开始调用sd api。{tag}")
+        logger.info(f"开始调用sd api。{tag}")
         try:
 
             args = sd_user_args.get(114514, {})
