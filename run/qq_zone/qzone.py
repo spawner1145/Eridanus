@@ -220,7 +220,7 @@ def main(bot: ExtendBot,config: YAMLManager):
     async def task_executor(task_name, task_info):
         logger.info_func(f"执行任务：{task_name}, 时间：{datetime.datetime.now()}")
         if task_name=="早安":
-            r = await aiReplyCore([{"text": f"你现在要编辑一条qq空间早安消息。请在严格遵循你的角色设定的前提下，编写一条适合作为你的动态的早安问候消息(可以谈论天气、心情、感触、近期看的番剧/电影等任意话题)。注意，本条消息面向所有用户，而不只是我。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被发送至动态。"}], random.randint(0,114514), config,bot=bot,tools=None)
+            r = await aiReplyCore([{"text": f"你现在要编辑一条qq空间早安消息。请在严格遵循你的角色设定的前提下，编写一条适合作为你的动态的早安问候消息(可以谈论天气、心情、感触等任意话题)。注意，本条消息面向所有用户，而不只是我。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被发送至动态。"}], random.randint(0,114514), config,bot=bot,tools=None)
             if not config.qq_zone.config["定时发空间"][task_name]["绘制图片"]: await send_to_qzone(None,r, [])
             else:
                 r2=await aiReplyCore([{"text": f"你现在是一个绘图bot，你需要根据你的角色设定信息，生成英文tag用于图片绘制。请紧扣早安的主题(动作、表情、场景、天气等均可任意发挥)，生成适合于stable diffusion的英文tag。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被输入至图片生成器。"}], random.randint(0,114514), config,bot=bot,tools=None)
@@ -231,7 +231,7 @@ def main(bot: ExtendBot,config: YAMLManager):
                     else:
                         await send_to_qzone(None,r, [])
         if task_name=="晚安":
-            r = await aiReplyCore([{"text": f"你现在要编辑一条qq空间晚安消息。请在严格遵循你的角色设定的前提下，编写一条适合作为你的动态的晚安问候消息(可以谈论天气、心情、感触、近期看的番剧/电影等任意话题)。注意，本条消息面向所有用户，而不只是我。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被发送至动态。"}], random.randint(0,114514), config,bot=bot,tools=None)
+            r = await aiReplyCore([{"text": f"你现在要编辑一条qq空间晚安消息。请在严格遵循你的角色设定的前提下，编写一条适合作为你的动态的晚安问候消息(可以谈论天气、心情、感触等任意话题)。注意，本条消息面向所有用户，而不只是我。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被发送至动态。"}], random.randint(0,114514), config,bot=bot,tools=None)
             if not config.qq_zone.config["定时发空间"][task_name]["绘制图片"]: await send_to_qzone(None,r, [])
             else:
                 r2=await aiReplyCore([{"text": f"你现在是一个绘图bot，你需要根据你的角色设定信息，生成英文tag用于图片绘制。请紧扣晚安的主题(动作、表情、场景、天气等均可任意发挥)，生成适合于stable diffusion的英文tag。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被输入至图片生成器。"}], random.randint(0,114514), config,bot=bot,tools=None)
