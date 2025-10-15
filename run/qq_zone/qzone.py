@@ -14,7 +14,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from framework_common.utils.install_and_import import install_and_import
 
-qzone_api=install_and_import("qzone-api")
+qzone_api=install_and_import("qzone-api","qzone_api")
 from qzone_api import QzoneApi
 from qzone_api.login import QzoneLogin
 
