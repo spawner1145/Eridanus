@@ -263,6 +263,9 @@ def main(bot: ExtendBot,config: YAMLManager):
             for task_name, task_info in scheduledTasks.items():
                 await task_executor(task_name, task_info)
         if event.pure_text=="发送晚安" and event.user_id==config.common_config.basic_config["master"]['id']:
+            await bot.send(event, [Text("正在向空间发送晚安消息...")])
             await task_executor("晚安", scheduledTasks["晚安"])
+
         if event.pure_text=="发送早安" and event.user_id==config.common_config.basic_config["master"]['id']:
+            await bot.send(event, [Text("正在向空间发送早安消息...")])
             await task_executor("早安", scheduledTasks["早安"])
