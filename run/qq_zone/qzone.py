@@ -13,7 +13,7 @@ import httpx
 from apscheduler.triggers.cron import CronTrigger
 
 from framework_common.utils.install_and_import import install_and_import
-
+pyzbar=install_and_import("pyzbar")
 qzone_api=install_and_import("qzone-api")
 from qzone_api import QzoneApi
 from qzone_api.login import QzoneLogin
