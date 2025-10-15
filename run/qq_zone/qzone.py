@@ -72,6 +72,9 @@ def main(bot: ExtendBot,config: YAMLManager):
                 bot.logger.info("使用本地 cookie 登录 Qzone")
                 return
             login_result = await qzone_login.login()
+    """
+    cookie过期监测还没做
+    """
     @bot.on(GroupMessageEvent)
     async def handle_group_message_event(event: GroupMessageEvent):
         nonlocal qzone_status
