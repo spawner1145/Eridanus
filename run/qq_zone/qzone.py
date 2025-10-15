@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import json
 import re
 import uuid
 from asyncio import sleep
@@ -25,10 +26,40 @@ def main(bot: ExtendBot,config: YAMLManager):
     qzone = QzoneApiFixed()
     qzone_status = False
 
+    """
+    本地的cookie缓存
+    """
+    cookie_file = Path("qzone_cookie.json")  # ✅ 新增
+    def load_cookie_cache():
+        if cookie_file.exists():
+            try:
+                with open(cookie_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                bot.logger.info("已加载本地 cookie.json")
+                return data
+            except Exception as e:
+                bot.logger.warning(f"读取 cookie.json 失败: {e}")
+        return None
+
+    def save_cookie_cache(data):
+        try:
+            with open(cookie_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            bot.logger.info("已保存 cookie.json")
+        except Exception as e:
+            bot.logger.error(f"保存 cookie.json 失败: {e}")
+    if load_cookie_cache():
+        login_result = load_cookie_cache()
+        bot.logger.info("使用本地 cookie 登录 Qzone")
     @bot.on(LifecycleMetaEvent)
     async def handle_lifecycle_event(event: LifecycleMetaEvent):
         nonlocal login_result
         if not login_result:
+            cached = load_cookie_cache()
+            if cached:
+                login_result = cached
+                bot.logger.info("使用本地 cookie 登录 Qzone")
+                return
             login_result = await qzone_login.login()
     @bot.on(GroupMessageEvent)
     async def handle_group_message_event(event: GroupMessageEvent):
@@ -89,30 +120,35 @@ def main(bot: ExtendBot,config: YAMLManager):
         """
         目前没写多图支持
         """
-        if img_cache:
-            bot.logger.info("发送到空间的消息包含图片")
-            img_path = img_cache[0]
-            cookies = login_result["cookies"]
-            login_result["qq"] = login_result["qq"].replace("o", "")
+        try:
+            if img_cache:
+                bot.logger.info("发送到空间的消息包含图片")
+                img_path = img_cache[0]
+                cookies = login_result["cookies"]
+                login_result["qq"] = login_result["qq"].replace("o", "")
 
-            r = await qzone._send_zone_with_pic(
-                target_qq=int(login_result["qq"]),
-                content=text_cache,
-                pic_path=img_path,
-                cookies=cookies,
-                g_tk=login_result["bkn"]
-            )
-        else:
-            bot.logger.info("发送到空间的消息不包含图片")
-            cookies = login_result["cookies"]
-            login_result["qq"] = login_result["qq"].replace("o", "")
+                r = await qzone._send_zone_with_pic(
+                    target_qq=int(login_result["qq"]),
+                    content=text_cache,
+                    pic_path=img_path,
+                    cookies=cookies,
+                    g_tk=login_result["bkn"]
+                )
+            else:
+                bot.logger.info("发送到空间的消息不包含图片")
+                cookies = login_result["cookies"]
+                login_result["qq"] = login_result["qq"].replace("o", "")
 
-            r = await qzone._send_zone(
-                target_qq=int(login_result["qq"]),
-                content=text_cache,
-                cookies='; '.join([f"{k}={v}" for k, v in cookies.items()]),
-                g_tk=login_result["bkn"]
-            )
+                r = await qzone._send_zone(
+                    target_qq=int(login_result["qq"]),
+                    content=text_cache,
+                    cookies='; '.join([f"{k}={v}" for k, v in cookies.items()]),
+                    g_tk=login_result["bkn"]
+                )
+        except Exception as e:
+            bot.logger.error(f"发送到空间失败: {str(e)}")
+            await bot.send(event, [Text(f"发送到空间失败: {str(e)} token过期,请重新登录")])
+            await login_task_wrapper(event)
 
     async def login_task_wrapper(event):
         nonlocal login_result, login_task
@@ -138,6 +174,7 @@ def main(bot: ExtendBot,config: YAMLManager):
             login_result = await login_task
             await bot.send(event, [Text("登录成功!")])
             print(login_result)
+            save_cookie_cache(login_result)
             if qr_path.exists():
                 qr_path.unlink()
         except Exception as e:

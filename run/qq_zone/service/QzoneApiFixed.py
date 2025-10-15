@@ -7,7 +7,12 @@ from qzone_api import QzoneApi
 from run.qq_zone.service.QzoneResponseParser import QzoneResponseParser
 
 from loguru import logger
+
+from run.qq_zone.service.custom_api_base import ApiBaseFixed
+
+api_base_fixed=ApiBaseFixed()
 class QzoneApiFixed(QzoneApi):
+
 
     async def _send_zone_with_pic(self,target_qq: int,pic_path: str,content: str, cookies: dict, g_tk: int) -> Optional[Dict[str, Any]]:
         '''
@@ -52,7 +57,7 @@ class QzoneApiFixed(QzoneApi):
             'picfile': base64_image  # Base64 编码的图片数据
         }
         cookies_str = '; '.join([f"{k}={v}" for k, v in cookies.items()])
-        response=await self._make_post_request(url=upload_url, data=form_data, cookies=cookies_str)
+        response=await api_base_fixed._make_post_request(url=upload_url, data=form_data, cookies=cookies_str)
         richval = QzoneResponseParser.extract_richval(response)
         pic_bo = QzoneResponseParser.extract_pic_bo(response)
 
@@ -79,7 +84,7 @@ class QzoneApiFixed(QzoneApi):
         "qzreferrer": f"https://user.qzone.qq.com/{target_qq}"
         }
         try:
-            return await self._make_post_request(url=f"{self.send_url}?&g_tk={g_tk}", data=params, cookies=cookies_str)
+            return await api_base_fixed._make_post_request(url=f"{self.send_url}?&g_tk={g_tk}", data=params, cookies=cookies_str)
         except Exception as e:
             logger.error(f"发送说说失败: {e}")
             return None
