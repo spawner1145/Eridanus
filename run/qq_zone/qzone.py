@@ -223,9 +223,9 @@ def main(bot: ExtendBot,config: YAMLManager):
             r = await aiReplyCore([{"text": f"你现在要编辑一条qq空间早安消息。请在严格遵循你的角色设定的前提下，编写一条适合作为你的动态的早安问候消息。注意，本条消息面向所有用户，而不只是我。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被发送至动态。"}], random.randint(0,114514), config,bot=bot,tools=None)
             if not config.qq_zone.config["定时发空间"][task_name]["绘制图片"]: await send_to_qzone(None,r, [])
             else:
-                r=await aiReplyCore([{"text": f"你现在是一个绘图bot，你需要根据你的角色设定信息，生成英文tag用于图片绘制。请紧扣早安的主题(动作、表情、场景等均可任意发挥)，生成适合于stable diffusion的英文tag。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被输入至图片生成器。"}], random.randint(0,114514), config,bot=bot,tools=None)
-                if r:
-                    img_path = await simple_call_text2img1(config,r)
+                r2=await aiReplyCore([{"text": f"你现在是一个绘图bot，你需要根据你的角色设定信息，生成英文tag用于图片绘制。请紧扣早安的主题(动作、表情、场景等均可任意发挥)，生成适合于stable diffusion的英文tag。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被输入至图片生成器。"}], random.randint(0,114514), config,bot=bot,tools=None)
+                if r2:
+                    img_path = await simple_call_text2img1(config,r2)
                     if img_path:
                         await send_to_qzone(None,r, [img_path])
                     else:
@@ -234,9 +234,9 @@ def main(bot: ExtendBot,config: YAMLManager):
             r = await aiReplyCore([{"text": f"你现在要编辑一条qq空间晚安消息。请在严格遵循你的角色设定的前提下，编写一条适合作为你的动态的晚安问候消息。注意，本条消息面向所有用户，而不只是我。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被发送至动态。"}], random.randint(0,114514), config,bot=bot,tools=None)
             if not config.qq_zone.config["定时发空间"][task_name]["绘制图片"]: await send_to_qzone(None,r, [])
             else:
-                r=await aiReplyCore([{"text": f"你现在是一个绘图bot，你需要根据你的角色设定信息，生成英文tag用于图片绘制。请紧扣晚安的主题(动作、表情、场景等均可任意发挥)，生成适合于stable diffusion的英文tag。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被输入至图片生成器。"}], random.randint(0,114514), config,bot=bot,tools=None)
-                if r:
-                    img_path = await simple_call_text2img1(config,r)
+                r2=await aiReplyCore([{"text": f"你现在是一个绘图bot，你需要根据你的角色设定信息，生成英文tag用于图片绘制。请紧扣晚安的主题(动作、表情、场景等均可任意发挥)，生成适合于stable diffusion的英文tag。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被输入至图片生成器。"}], random.randint(0,114514), config,bot=bot,tools=None)
+                if r2:
+                    img_path = await simple_call_text2img1(config,r2)
                     if img_path:
                         await send_to_qzone(None,r, [img_path])
                     else:
