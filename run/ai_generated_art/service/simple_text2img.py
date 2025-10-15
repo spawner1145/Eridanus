@@ -10,14 +10,14 @@ async def simple_call_text2img1( config, tag):
     if config.ai_generated_art.config["ai绘画"]["sd画图"] and config.ai_generated_art.config["ai绘画"][
         "sdUrl"] != "" and config.ai_generated_art.config["ai绘画"]["sdUrl"] != '':
         global turn
-        global sd_user_args
+
         tag, log = await replace_wildcards(tag)
 
         path = f"data/pictures/cache/{random_str()}.png"
         logger.info(f"开始调用sd api。{tag}")
         try:
 
-            args = sd_user_args.get(114514, {})
+            args = {}
 
             p = await SdDraw0(tag, path, config, 114514, args)
 
