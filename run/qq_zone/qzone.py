@@ -209,8 +209,8 @@ def main(bot: ExtendBot,config: YAMLManager):
     scheduler = AsyncIOScheduler()
     enabled = False
 
-    @bot.on(LifecycleMetaEvent)
-    async def start_scheduler_on_lifecycle(_):
+    @bot.on(GroupMessageEvent)
+    async def start_scheduler_on_lifecycle(event: GroupMessageEvent):
         nonlocal enabled
         if not enabled:
             enabled = True
