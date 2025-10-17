@@ -1,6 +1,10 @@
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 import numpy as np
-import imageio
+
+from framework_common.utils.install_and_import import install_and_import
+
+imageio=install_and_import('imageio')
+
 import math
 import os
 import random
