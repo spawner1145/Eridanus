@@ -22,7 +22,7 @@ from bs4 import BeautifulSoup
 import os
 import time
 from .common import name_qq_list,card_url_list
-
+from urllib.parse import unquote
 
 
 
@@ -215,6 +215,11 @@ async def Galgame_manshuo(url, filepath=None):
                             url_matches = URL_PATTERN.findall(context_check)
                             if url_matches:
                                 links_url = url_matches[0]
+                                if not (links_url.lower().endswith('.png') or links_url.lower().endswith('.jpg') or links_url.lower().endswith('.wedp')):
+                                    pattern_check = re.compile(r'\[([^\]]+)\]\(([^)]+)\)')
+                                    matches = pattern_check.findall(context_check)
+                                    if matches:
+                                        name, links_url = matches[0]
                                 del url_matches
                                 break
                 del backup_lines
@@ -222,9 +227,9 @@ async def Galgame_manshuo(url, filepath=None):
                 gc.collect()
             except Exception:
                 pass
-            #print(links_url)
+            print(links_url)
             # 设置默认链接
-            if links_url is None:
+            if links_url is None or links_url == 'https://gal.manshuo.ink/usr/uploads/galgame/wechat.png':
                 links_url = 'https://gal.manshuo.ink/usr/uploads/galgame/zatan.png'
 
         # 组装描述
@@ -350,7 +355,6 @@ async def youxi_pil_new_text(filepath=None):
 
 async def gal_PILimg(text=None,img_context=None,filepath=None,proxy=None,type_soft='Bangumi 番剧',name=None,url=None,
                          type=None,target=None,search_type=None):
-    contents=[]
     json_check = copy.deepcopy(json_init)
     json_check['soft_type'] = 'Galgame'
     json_check['status'] = True
@@ -362,16 +366,25 @@ async def gal_PILimg(text=None,img_context=None,filepath=None,proxy=None,type_so
             return json_check
     else:
         name = f'{int(time.time())}'
+    desc, developer = '', ''
     if type is None:
-        title=text.split("gid")[0]
-        contents.append(f"title:{title}")
-        desc=text.split("简介如下：")[1]
+        if type_soft == 'Galgame 推荐':
+            title = text.split("gid")[0]
+            desc=text.split("简介如下：")[1]
+        elif type_soft == 'gal查询':
+            title = text.split("\n")[0]
+            desc = text.split("简介：")[1].split("\n游戏品牌机构")[0]
+
         if '开发商：' in text:
-            developer=text.split("开发商：")[1].replace(desc,'').replace('简介如下：','')
-            title +=f'\n开发商：{developer}'
-        context = f'[title]{title}[/title]\n{desc}'
+            if type_soft == 'Galgame 推荐':
+                developer='开发商：' + text.split("开发商：")[1].replace(desc,'').replace('简介如下：','')
+            elif type_soft == 'gal查询':
+                developer = '开发商：' + text.split("开发商：")[1].split("|")[0] + ' | ' + '发布时间：' + text.split("发布时间：")[1].split("|")[0]
+
+        context = f'[title]{title}[/title]\n{developer}\n[des]{desc}[/des]'
         json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
-                                                     {'type': 'img', 'subtype': 'common_with_des', 'img': img_context, 'content': [context],'max_des_length':2000}])
+                                                     {'type': 'img', 'subtype': 'common_with_des', 'img': img_context, 'content': [context]
+                                                      ,'label':[f'{type_soft}'], 'max_des_length':2000}])
         return json_check
 
 if __name__ == "__main__":#测试用，不用管

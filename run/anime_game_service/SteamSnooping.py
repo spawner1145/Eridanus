@@ -1,4 +1,5 @@
 import asyncio
+import re
 
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Text, Image, At
@@ -128,6 +129,9 @@ def main(bot, config):
         target_group = str(event.group_id)
         if event.message_chain.has(At) and event.message_chain.has(Text):
             userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
+        else:
+            check = context.lower().replace('steamadd', '').replace('steamremove', '').strip()
+            if check != '' and bool(re.match(r'^[-+]?(\d+(\.\d*)?|\.\d+)$', check)): userid = int(check)
         if context.lower().startswith('steamadd') and context.lower() != 'steamaddall':
             steaminfodata =await db.read_user(userid)
             if not (steaminfodata and  'SteamSnooping' in steaminfodata and 'steamid' in steaminfodata['SteamSnooping']):
@@ -137,7 +141,7 @@ def main(bot, config):
                                                               f'{userid}_steamid':steaminfodata["SteamSnooping"]["steamid"],
                                                               }})
             await bot.send(event, [At(qq=userid), f' 已被加入视歼列表'])
-        elif context.lower()=='steamremove' and context.lower() != 'steamremoveall':
+        elif context.lower().startswith('steamremove') and context.lower() != 'steamremoveall':
             await db.write_user('SteamSnoopingList', {target_group:{userid:False}})
             await bot.send(event, [At(qq=userid), f' 已被移除视歼列表'])
 
@@ -209,10 +213,12 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def menu_steamid(event: GroupMessageEvent):
         if event.pure_text.lower() == 'steamhelp':
-            draw_json=[{'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],'upshift_extra':15,
-             'content': [f"[name]Steam视奸菜单[/name]\n[time]什么！你是怎么发现我可以视奸你的！！！！[/time]"]},
+            draw_json=[
+            {'type': 'basic_set','img_name_save': 'steamhelp.png'},
+            {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],'upshift_extra':15,
+            'content': [f"[name]Steam视奸菜单[/name]\n[time]什么！你是怎么发现我可以视奸你的！！！！[/time]"]},
             '在这里你可以通过bot随时随地[title]视奸[/title]你朋友的steam状态\n[des]但是要小心使用，至少经过朋友同意或者不影响他人哦[/des]\n[title]指令菜单：[/title]'
-            '\n- 绑定Steam账号：steambind [Steam ID 或 Steam好友代码]（可艾特） \n- 解绑Steam账号：steamunbind [Steam ID 或 Steam好友代码]（可艾特） '
+            '\n- 绑定Steam账号：steambind [Steam ID 或 Steam好友代码]（可艾特） \n- 解绑Steam账号：steamunbind（可艾特） '
             '\n- 查询Steam最近游玩内容：steaminfo\n（可艾特或者直接发送Steam ID or Steam好友代码）'
             '\n- 添加到当前群进行视奸：steamadd（可艾特）\n- 取消视奸：steamremove（可艾特）\n- 查看当前群视奸列表：steamcheck\n'
             '\n- 视奸当前群聊添加的所有人：steamaddall\n- 取消视奸当前群聊的所有人：steamremoveall\n- 查看当前群视奸列表：steamcheck\n'

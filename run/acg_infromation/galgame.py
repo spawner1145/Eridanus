@@ -1,8 +1,8 @@
 import datetime
-
+import re
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-
+from asyncio import sleep
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Node, Text, Image, Text, Image, At
 from run.acg_infromation.service.galgame import Get_Access_Token,Get_Access_Token_json,flag_check,params_check,get_game_image, \
@@ -11,15 +11,161 @@ from run.streaming_media.service.Link_parsing import *
 
 def main(bot,config):
 
+    # 暂定标记状态flag：
+    # flag：1，精确游戏查询
+    # flag：2，游戏列表查询
+    # flag：3，gid 查询单个游戏的详情
+    # flag：4，orgId 查询机构详情
+    # flag：5，cid 查询角色详情
+    # flag：6，orgId 查询机构下的游戏
+    # flag：7，查询日期区间内发行的游戏
+    # flag：8，随机游戏
+    filepath = 'data/pictures/cache'
+
     @bot.on(GroupMessageEvent)
-    async def gal_search(event: GroupMessageEvent):
-        context, userid=event.pure_text, str(event.sender.user_id)
-        order_list = ['sklandbind', '森空岛绑定']
+    async def random_gal_get(event: GroupMessageEvent):
+        context, userid = event.pure_text, str(event.sender.user_id)
+        order_list = ['galgame推荐', 'gal推荐','随机gal']
         if event.message_chain.has(At) and event.message_chain.has(Text):
             userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
-        if context in order_list:
-            pass
+        if context.lower() not in order_list:
+            return
+        bot.logger.info(f'有玩gal的下头男，galgame推荐开启，张数：1')
+        flag, keyword, cmList = 8, '', []
+        url = flag_check(flag)
+        params = params_check(flag, keyword)
+        access_token = await Get_Access_Token()
+        json_check = await Get_Access_Token_json(access_token, url, params)
+        # print(json_check)
+        state = json_check['success']
+        # print(state)
+        cmList.append(Node(content=[Text(f'今天的gal推荐，请君过目：')]))
+        if state:
+            data_count = len(json_check["data"])
+            for i in range(data_count):
+                data = json_check['data'][i]
+                context = await context_assemble(data)
+                # print(data)
+                gid = data["gid"]
+                introduction = await get_introduction(gid)
+                mainImg_state = 'https://store.ymgal.games/' + data["mainImg"]
+                if config.acg_infromation.config["绘图框架"]['gal_recommend'] is False:
+                    img_path = await get_game_image(mainImg_state, 'data/pictures/cache')
+                    cmList.append(Node(content=[Image(file=img_path)]))
+                    cmList.append(Node(content=[Text(f'{context}')]))
+                    cmList.append(Node(content=[Text(f'{introduction}')]))
+                    cmList.append(Node(content=[Text(
+                        f'当前菜单：\n1，gal查询\n2，gid_gal单个游戏详情查询\n3，orgId_gal机构详情查询\n4，cid_gal游戏角色详情查询\n5，orgId_gal机构下的游戏查询\n6，本月新作，本日新作（单此一项请艾特bot食用\n7，galgame推荐')]))
+                    cmList.append(Node(content=[Text(
+                        f'该功能由YMGalgame API实现，支持一下谢谢喵\n本功能由“漫朔”开发\n部分功能还在完善，欢迎催更')]))
+                    await bot.send(event, cmList)
+                elif config.acg_infromation.config["绘图框架"]['gal_recommend'] is True:
+                    text = f"{context}\n{introduction}"
+                    bangumi_json = await gal_PILimg(text, [mainImg_state], 'data/pictures/cache/',
+                                                    type_soft=f'Galgame 推荐')
+                    if bangumi_json['status']:
+                        bot.logger.info('gal推荐图片制作成功，开始推送~~~')
+                        await bot.send(event, Image(file=bangumi_json['pic_path']))
 
+
+    @bot.on(GroupMessageEvent)
+    async def gal_search_one(event: GroupMessageEvent):
+        context, userid = event.pure_text.lower(), str(event.sender.user_id)
+        if event.message_chain.has(At) and event.message_chain.has(Text):
+            userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
+        order_list = ['gal精确查询', 'gal精确查找','gal精确搜索']
+        if not (any(word in context for word in order_list)): return
+        keyword = re.compile('|'.join(map(re.escape, order_list))).sub('', context).strip()
+        #print(keyword)
+        bot.logger.info(f'开始进行Gal精确查询，目标：{keyword}')
+
+        flag, cmList = 1, []
+        url, params = flag_check(flag), params_check(flag, keyword)
+        access_token = await Get_Access_Token()
+        json_check = await Get_Access_Token_json(access_token, url, params)
+        print(json_check)
+        state = json_check['success']
+        if not state:
+            await bot.send(event, json_check['msg'])
+        if state:
+            recall_id = await bot.send(event, f'开始进行Gal精确查询, 目标：{keyword}')
+            context = await context_assemble(json_check ,access_token)
+            mainImg_state = json_check["data"]["game"]["mainImg"]
+            img_path = await get_game_image(mainImg_state, filepath)
+            #print(context)
+            #print(img_path)
+
+            bangumi_json = await gal_PILimg(context, [img_path], 'data/pictures/cache/',type_soft='gal查询')
+            if bangumi_json['status']:
+                bot.logger.info('gal查询图片制作成功，开始推送~~~')
+                await bot.send(event, Image(file=bangumi_json['pic_path']))
+
+            cmList.append(Node(content=[Image(file=img_path)]))
+            cmList.append(Node(content=[Text(f'{context}')]))
+            cmList.append(Node(content=[Text(
+                f'当前菜单：\n1，gal查询\n2，gid_gal单个游戏详情查询\n3，orgId_gal机构详情查询\n4，cid_gal游戏角色详情查询\n5，orgId_gal机构下的游戏查询\n6，本月新作，本日新作（单此一项请艾特bot食用\n7，galgame推荐')]))
+            cmList.append(Node(content=[
+                Text(f'该功能由YMGalgame API实现，支持一下谢谢喵\n本功能由“漫朔”开发\n部分功能还在完善，欢迎催更')]))
+            await bot.send(event, cmList)
+            await bot.recall(recall_id['data']['message_id'])
+
+    @bot.on(GroupMessageEvent)
+    async def gal_search_many(event: GroupMessageEvent):
+        context, userid = event.pure_text.lower(), str(event.sender.user_id)
+        if event.message_chain.has(At) and event.message_chain.has(Text):
+            userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
+        order_list = ['gal查询', 'gal查找', 'gal搜索', 'galgame查询']
+        if not (any(word in context for word in order_list)): return
+        keyword = re.compile('|'.join(map(re.escape, order_list))).sub('', context).strip()
+        # print(keyword)
+        bot.logger.info(f'开始进行Gal查询，目标：{keyword}')
+
+        flag, cmList, gal_namelist = 2, [], ''
+        url, params = flag_check(flag), params_check(flag, keyword)
+        access_token = await Get_Access_Token()
+        json_check = await Get_Access_Token_json(access_token, url, params)
+        #print(json_check)
+        state = json_check['success']
+        if not state:
+            await bot.send(event, json_check['msg'])
+        if state:
+            total = int(json_check["data"]["total"])
+            if total > 1:
+                if total > 10: total = 10
+                for i in range(total):
+                    data = json_check['data']['result'][i]
+                    name_check = data["name"]
+                    if name_check and "chineseName" in json_check['data']['result'][i]: name_check = data["chineseName"]
+                    gal_namelist += f"{name_check} \n"
+                context = f'存在多个匹配对象，请发送 ‘gal精确查询 + 名称’ \n来精确您的查询目标:\n{gal_namelist}'
+                recall_id = await bot.send(event, context)
+                await sleep(55)
+                await bot.recall(recall_id['data']['message_id'])
+                return
+
+            data, flag = json_check['data']['result'][0], 1
+            name_check = data["name"]
+            if name_check and "chineseName" in json_check['data']['result'][0]: name_check = data["chineseName"]
+            recall_id = await bot.send(event, f'开始进行Gal查询 {name_check}')
+            url, params = flag_check(flag), params_check(flag, name_check)
+            json_check = await Get_Access_Token_json(access_token, url, params)
+            context = await context_assemble(json_check, access_token)
+            mainImg_state = json_check["data"]["game"]["mainImg"]
+            img_path = await get_game_image(mainImg_state, filepath)
+
+            bangumi_json = await gal_PILimg(context, [img_path], 'data/pictures/cache/', type_soft='gal查询')
+            if bangumi_json['status']:
+                bot.logger.info('gal查询图片制作成功，开始推送~~~')
+                await bot.send(event, Image(file=bangumi_json['pic_path']))
+
+            cmList.append(Node(content=[Image(file=img_path)]))
+            cmList.append(Node(content=[Text(f'{context}')]))
+            cmList.append(Node(content=[Text(
+                f'当前菜单：\n1，gal查询\n2，gid_gal单个游戏详情查询\n3，orgId_gal机构详情查询\n4，cid_gal游戏角色详情查询\n5，orgId_gal机构下的游戏查询\n6，本月新作，本日新作（单此一项请艾特bot食用\n7，galgame推荐')]))
+            cmList.append(Node(content=[
+                Text(f'该功能由YMGalgame API实现，支持一下谢谢喵\n本功能由“漫朔”开发\n部分功能还在完善，欢迎催更')]))
+            await bot.send(event, cmList)
+            await bot.recall(recall_id['data']['message_id'])
 
 
 
@@ -101,11 +247,13 @@ def main(bot,config):
 
         if ("galgame推荐" == str(event.pure_text) or "Galgame推荐" == str(event.pure_text) or "gal推荐" == str(event.pure_text)or "Gal推荐" == str(event.pure_text)
                 or ("随机" in str(event.pure_text) and ("gal" in str(event.pure_text) or "Gal" in str(event.pure_text)))):
-            flag = 8
+            return
+            flag = 0
             flag_check_test = 3
             bot.logger.info(f'有玩gal的下头男，galgame推荐开启，张数：1')
 
         if flag ==2:
+            return
             print('进行gal列表查询')
             url = flag_check(flag)
             params = params_check(flag, keyword)
@@ -164,6 +312,7 @@ def main(bot,config):
                 pass
 
         elif flag == 1:
+            return
             print('进行gal精确查询')
             url = flag_check(flag)
             params = params_check(flag, keyword)

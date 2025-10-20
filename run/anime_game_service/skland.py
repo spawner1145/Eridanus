@@ -49,7 +49,8 @@ def main(bot, config):
     async def sing_rouge_info(event: GroupMessageEvent):
         order_list=['sklandrogue','sklandrg','肉鸽信息']
         context, userid, flag=event.pure_text, str(event.sender.user_id), True
-        if event.message_chain.has(At):userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
+        if event.message_chain.has(At) and event.message_chain.has(Text):
+            userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
         for order_check in order_list:
             if order_check in context:
                 flag=False
@@ -89,7 +90,9 @@ def main(bot, config):
     async def menu_steamid(event: GroupMessageEvent):
         order_list=['sklandhelp','森空岛帮助','森空岛help','明日方舟帮助','明日方舟help']
         if event.pure_text in order_list:
-            draw_json=[{'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],'upshift_extra':15,
+            draw_json=[
+            {'type': 'basic_set', 'img_name_save': 'sklandhelp.png'},
+            {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],'upshift_extra':15,
              'content': [f"[name]森空岛帮助菜单[/name]\n[time]各位博士们，欢迎使用森空岛功能～～[/time]"]},
             '[title]指令菜单：[/title]'
             '\n- 绑定森空岛账号：sklandbind, 森空岛绑定\n- 森空岛签到：sklandsign, 森空岛签到\n'

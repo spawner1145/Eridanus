@@ -109,7 +109,7 @@ def tarotChoice(mode):
 
         img_folder = mode_to_folder.get(mode, "TarotImages")  # 默认值为 "TarotImages"
         img = f'data/pictures/tarot/{img_folder}/{tarots[3]}'
-        return txt, img
+        return txt, img, tarots[0]
     if ints == 1:
         tarots = random.choice(tarot)
         txt = f'[title]{tarots[0]}[/title]' + '\n' + '逆位' + '\n' + tarots[2] + '\n[des]仅供娱乐，切勿迷信[/des]'
@@ -124,7 +124,7 @@ def tarotChoice(mode):
         if not os.path.exists(f'data/pictures/tarot/side{img_folder}'):
             os.mkdir(f'data/pictures/tarot/side{img_folder}')
         if os.path.exists(img1):
-            return txt, img1
+            return txt, img1, tarots[0] + '_逆位'
         else:
             # 打开图像
             img = Image.open(f'data/pictures/tarot/{img_folder}/{tarots[3]}')
@@ -135,7 +135,7 @@ def tarotChoice(mode):
 
             # 保存旋转后的图像
             rotated_img.save(f'data/pictures/tarot/side{img_folder}/' + tarots[3])
-            return txt, img1
+            return txt, img1, tarots[0] + '_逆位'
 lucky = [
     "——中吉——\n天上有云飘过的日子，天气令人十分舒畅。\n工作非常顺利，连午睡时也会想到好点子。\n突然发现，与老朋友还有其他的共同话题…\n——每一天，每一天都要积极开朗地度过——",
     "——中吉——\n十年磨一剑，今朝示霜刃。\n恶运已销，身临否极泰来之时。\n苦练多年未能一显身手的才能，\n现今有了大展身手的极好机会。\n若是遇到阻碍之事，亦不必迷惘，\n大胆地拔剑，痛快地战斗一番吧。",
