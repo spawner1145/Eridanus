@@ -134,7 +134,7 @@ async def remove_game_image(file_path):
         print(f"文件 '{file_path}' 已删除。")
     else:
         print(f"文件 '{file_path}' 不存在。")
-async def context_assemble(json_check):
+async def context_assemble(json_check, access_token):
     context=''
     if 'gid' in json_check:
         if 'name' in json_check:
@@ -247,7 +247,7 @@ async def context_assemble(json_check):
                         else:
                             characterPosition_check = '未知'
 
-                        character_name = await character_check(cid)
+                        character_name = await character_check(cid, access_token)
                         if character_name:
                             #context += f"开发商：{developer_name}|"
                             if "cvId" in json_check['data'][state_check]['characters'][i]:
@@ -293,13 +293,13 @@ async def developers_check(keyword):
         name=json_check['data']['org']['chineseName']
     #print(name)
     return name
-async def character_check(keyword):
+async def character_check(keyword, access_token):
     name = None
     flag = 5
     keyword = str(keyword)
     url = flag_check(flag)
     params = params_check(flag, keyword)
-    access_token = await Get_Access_Token()
+    #access_token = await Get_Access_Token()
     json_check = await Get_Access_Token_json(access_token, url, params)
     #print(json_check)
     name = json_check['data']['character']['name']

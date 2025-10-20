@@ -6,7 +6,7 @@ import shutil
 import httpx
 import re
 import copy
-
+import pprint
 from framework_common.utils.install_and_import import install_and_import
 from .login_core import ini_login_Link_Prising
 from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME
@@ -113,11 +113,16 @@ async def dou_transfer_other(dou_url):
         images = item.get("images", [])
         # 只有在有图片的情况下才发送
         if images:
+            #pprint.pprint(data)
             author = data.get("author", { }).get("name", "")
             title = data.get("item", { }).get("title", "")
-            return cover, author, title, images
+            avatar_url = data.get("author", { }).get("avatar", "")
+            video_time = data.get("stat", { }).get("time", "")
+            dt = datetime.fromtimestamp(video_time)  # 本地时间，如果想要 UTC 时间用 utcfromtimestamp
+            video_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+            return cover, author, title, images ,avatar_url, video_time
 
-    return None, None, None, None
+    return None, None, None, None, None, None
 
 
 
@@ -143,18 +148,32 @@ async def dy(url,filepath=None):
     dou_url_2 = httpx.get(dou_url).headers.get('location')
     json_check['url'] = dou_url
     logger.info(f'dou_url:{dou_url}')
-    #logger.info(f'dou_url_2:{dou_url_2}')
+    logger.info(f'dou_url_2:{dou_url_2}')
 
     # 实况图集临时解决方案，eg.  https://v.douyin.com/iDsVgJKL/
     if "share/slides" in dou_url_2:
-        cover, author, title, images = await dou_transfer_other(dou_url)
+        cover, author, title, img_context,avatar_url, video_time = await dou_transfer_other(dou_url)
         # 如果第一个不为None 大概率是成功
         if author is not None:
             pass
             #logger.info(f"{GLOBAL_NICKNAME}识别：【抖音】\n作者：{author}\n标题：{title}")
             #logger.info(url for url in images)
-        # 截断后续操作
-        return
+            # 截断后续操作
+            title = title.replace('#', '\n[tag]#', 1)
+            if '#' in title: title += '[/tag]'
+
+            if len(img_context) != 1:
+                json_check['pic_path'] = await manshuo_draw([
+                    {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url], 'upshift_extra': 20,
+                     'content': [f"[name]{author}[/name]\n[time]{video_time}[/time]"], 'type_software': 'dy'},
+                    img_context, [title]])
+            else:
+                json_check['pic_path'] = await manshuo_draw([
+                    {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url], 'upshift_extra': 20,
+                     'content': [f"[name]{author}[/name]\n[time]{video_time}[/time]"], 'type_software': 'dy', },
+                    {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': [title]}])
+            json_check['pic_url_list'] = img_context
+            return json_check
     # logger.error(dou_url_2)
     reg2 = r".*(video|note)\/(\d+)\/(.*?)"
     # 获取到ID
@@ -232,7 +251,7 @@ async def dy(url,filepath=None):
                             {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url],'upshift_extra': 20,
                              'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]" ], 'type_software': 'dy', },
                             {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': [context]}])
-        #print(out_path)
+        #print(json_check['pic_path'])
         json_check['pic_url_list'] = img_context
         return json_check
 

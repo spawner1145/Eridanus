@@ -455,11 +455,11 @@ async def download_video_link_prising(json,filepath=None,proxy=None):
         video_path = await download_video(json['video_url'], filepath=filepath)
     video_json['video_path'] = video_path
     file_size_in_mb = get_file_size_mb(video_path)
-    if file_size_in_mb < 10:
+    if file_size_in_mb < 25:
         video_type='video'
-    elif file_size_in_mb < 30:
+    elif file_size_in_mb < 80:
         video_type='video_bigger'
-    elif file_size_in_mb < 100:
+    elif file_size_in_mb < 150:
         video_type='file'
     else:
         video_type = 'too_big'

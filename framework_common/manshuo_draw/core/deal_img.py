@@ -84,7 +84,6 @@ async def deal_img(json_img): #此函数将逐个解析json文件中的每个字
         if 'basic_set' in per_json_img['type']:
             basic_img_info = basicimgset(per_json_img)
             break
-
     if basic_img_info.is_abs_path_convert is True:
         basic_img_info.img_path_save = get_abs_path(basic_img_info.img_path_save,is_ignore_judge=True)
         basic_img_info.color_emoji_path = get_abs_path(basic_img_info.color_emoji_path, is_ignore_judge=True)

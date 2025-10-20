@@ -13,7 +13,8 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def today_LU(event: GroupMessageEvent):
         context, userid=event.pure_text, str(event.sender.user_id)
-        if event.message_chain.has(At):userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
+        if event.message_chain.has(At) and event.message_chain.has(Text):
+            userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
         if not context.startswith('🦌'):return
         times_add = 0
         for context_check in context:
@@ -36,7 +37,8 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def today_LU2(event: GroupMessageEvent):
         context, userid=event.pure_text, str(event.sender.user_id)
-        if event.message_chain.has(At):userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
+        if event.message_chain.has(At) and event.message_chain.has(Text):
+            userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
         order_list = ['鹿','这倒提醒我了','🦌！','鹿！']
         if context in order_list:
             bot.logger.info("接收到🦌请求")
@@ -48,7 +50,8 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def check_LU(event: GroupMessageEvent):
         context, userid=event.pure_text, str(event.sender.user_id)
-        if event.message_chain.has(At):userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
+        if event.message_chain.has(At) and event.message_chain.has(Text):
+            userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
         order_list = ['查🦌']
         if context in order_list:
             bot.logger.info("接收到查🦌请求")
