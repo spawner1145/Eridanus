@@ -8,6 +8,7 @@ from developTools.message.message_components import Node, Text, Image, Text, Ima
 from run.acg_infromation.service.galgame import Get_Access_Token,Get_Access_Token_json,flag_check,params_check,get_game_image, \
     context_assemble, get_introduction
 from run.streaming_media.service.Link_parsing import *
+from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 
 def main(bot,config):
 
@@ -44,7 +45,7 @@ def main(bot,config):
             data_count = len(json_check["data"])
             for i in range(data_count):
                 data = json_check['data'][i]
-                context = await context_assemble(data)
+                context = await context_assemble(data,access_token)
                 # print(data)
                 gid = data["gid"]
                 introduction = await get_introduction(gid)
@@ -167,16 +168,67 @@ def main(bot,config):
             await bot.send(event, cmList)
             await bot.recall(recall_id['data']['message_id'])
 
+    @bot.on(GroupMessageEvent)
+    async def new_gal_get(event: GroupMessageEvent):
+        context, userid = event.pure_text, str(event.sender.user_id)
+        order_list = ['本日新作', '今日新作','当前新作','本月新作','昨日新作']
+        if event.message_chain.has(At) and event.message_chain.has(Text):
+            userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
+        if context.lower() not in order_list:
+            return
+        now = datetime.datetime.now().date()
+        month, year, day = now.month, now.year, now.day
+        if "本日" in str(event.pure_text) or "今日" in str(event.pure_text) or "今天" in str(event.pure_text):
+            date = datetime.date(year, month, day)
+            check_time = '今日'
+        elif "昨日" in str(event.pure_text):
+            date = datetime.date(year, month, day - 1)
+            check_time = '昨日'
+        elif "本月" in str(event.pure_text):
+            date = datetime.date(year, month - 1, day)
+            check_time = '本月'
+        bot.logger.info(f'{check_time}新作查询')
+        recall_id = await bot.send(event, f'正在查询 {check_time} 新作')
+        flag, cmList = 7, []
+        url = flag_check(flag)
+        keyword = True
+        releaseStartDate = date
+        releaseEndDate = now
 
+        params = params_check(flag, keyword, releaseStartDate, releaseEndDate)
+        access_token = await Get_Access_Token()
+        json_check = await Get_Access_Token_json(access_token, url, params)
+        #print(json_check)
+        state = json_check['success']
+        #print(state)
+        if state:
+            data_count = len(json_check["data"])
+            if int(data_count) == 0:
+                await bot.send(event, '当前好像没有新作')
+                await bot.recall(recall_id['data']['message_id'])
+                return
+            img_list, context_list = [], []
+            for i in range(data_count):
+                data = json_check['data'][i]
+                context = await context_assemble(data,access_token)
+                context = f'{context.split("gid:")[0]}发售日期：{context.split("发售日期：")[1].split("| state：")[0]}'
+                #print(context)
+                mainImg_state = data["mainImg"]
+                img_path = await get_game_image(mainImg_state, filepath)
+                img_list.append(img_path)
+                context_list.append(context)
+            bot.logger.info(f'进入图片制作')
+            pic_path = await manshuo_draw(
+                [{'type': 'basic_set', 'img_width': 1300},
+                 {'type': 'avatar', 'subtype': 'common','img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],'upshift': 25,
+                  'content': [f"[name]{check_time}Galgame新作[/name]\n[time]{datetime.datetime.now().strftime('%Y年%m月%d日 %H:%M')}[/time]"]},
+                 {'type': 'img', 'subtype': 'common_with_des_right','number_per_row':2,'is_crop':True,
+                  'img': img_list, 'content': context_list},])
+            await bot.send(event, Image(file=pic_path))
+            await bot.recall(recall_id['data']['message_id'])
 
 
     @bot.on(GroupMessageEvent)
-    async def galgame_group_reply(event: GroupMessageEvent):
-        loop = asyncio.get_running_loop()
-        with ThreadPoolExecutor() as executor:
-            await loop.run_in_executor(executor, asyncio.run,
-                                       galgame_group_check(event))
-
     async def galgame_group_check(event: GroupMessageEvent):
         #暂定标记状态flag：
         # flag：1，精确游戏查询
@@ -211,8 +263,6 @@ def main(bot,config):
                         keyword = keyword[+1:]
                         pass
                 flag = 2
-                if "精确" in str(event.pure_text):
-                    flag = 1
                 if "机构" in str(event.pure_text):
                     flag = 4
                     if "游戏" in str(event.pure_text):
@@ -223,111 +273,11 @@ def main(bot,config):
                 if "角色" in str(event.pure_text):
                     flag = 5
                 bot.logger.info(f'access_token：{access_token}，flag:{flag}，gal查询目标：{keyword}')
-
-        if "新作" in str(event.pure_text) :
-            now = datetime.datetime.now().date()
-            flag=7
-            month = datetime.datetime.now().date().month
-            year = datetime.datetime.now().date().year
-            day = datetime.datetime.now().date().day
-            if "本日" in str(event.pure_text) or "今日" in str(event.pure_text) or "今天" in str(event.pure_text):
-                flag_check_test=3
-                date = datetime.date(year, month, day)
-                bot.logger.info(f'本日新作查询')
-            elif "昨日" in str(event.pure_text):
-                flag_check_test=3
-                date = datetime.date(year, month, day - 1)
-                bot.logger.info(f'昨日新作查询')
-            elif "本月" in str(event.pure_text):
-                date = datetime.date(year, month - 1, day)
-                flag_check_test = 3
-                bot.logger.info(f'本月新作查询')
-            else:
-                return
-
-        if ("galgame推荐" == str(event.pure_text) or "Galgame推荐" == str(event.pure_text) or "gal推荐" == str(event.pure_text)or "Gal推荐" == str(event.pure_text)
-                or ("随机" in str(event.pure_text) and ("gal" in str(event.pure_text) or "Gal" in str(event.pure_text)))):
+        else:
             return
-            flag = 0
-            flag_check_test = 3
-            bot.logger.info(f'有玩gal的下头男，galgame推荐开启，张数：1')
-
-        if flag ==2:
-            return
-            print('进行gal列表查询')
-            url = flag_check(flag)
-            params = params_check(flag, keyword)
-            #access_token = Get_Access_Token()
-            json_check = await Get_Access_Token_json(access_token, url, params)
-            #print(json_check)
-            state=json_check['success']
-            #print(state)
-            if state:
-                total = json_check["data"]["total"]
-                #print(total)
-                #print(json_check)
-                if total > 1:
-                    gal_namelist = ''
-                    total=int(total)
-                    if total >10:
-                        total = 10
-                    for i in range(total):
-                        data = json_check['data']['result'][i]
-                        #print(data)
-                        name_check = data["name"]
-                        print(name_check)
-                        if name_check:
-                            if "chineseName" in json_check['data']['result'][i]:
-                                name_check = data["chineseName"]
-                        gal_namelist += f"{name_check} \n"
-                    #print(f'存在多个匹配对象，请精确您的查询目标:\n{gal_namelist}')
-                    context=f'存在多个匹配对象，请发送 ‘gal精确查询’ 来精确您的查询目标:\n{gal_namelist}'
-                    flag_check_test = 1
-                elif total == 1:
-                    flag = 1
-                    data = json_check['data']['result'][0]
-                    #print(data)
-                    name_check = data["name"]
-                    if name_check:
-                        if "chineseName" in json_check['data']['result'][0]:
-                            name_check = data["chineseName"]
-                    #data = json_check['data']['result'][i]
-                    keyword=name_check
-                    #print(keyword)
-            if flag ==1:
-                print('进行gal精确查询')
-                print(keyword)
-                url = flag_check(flag)
-                params = params_check(flag, keyword)
-                json_check = await Get_Access_Token_json(access_token, url, params)
-                #print(json_check)
-                state = json_check['success']
-                if state:
-                    context=await context_assemble(json_check)
-                    mainImg_state = json_check["data"]["game"]["mainImg"]
-                    img_path = await get_game_image(mainImg_state, filepath)
-                    #print(context)
-                    pass
-            else:
-                pass
-
-        elif flag == 1:
-            return
-            print('进行gal精确查询')
-            url = flag_check(flag)
-            params = params_check(flag, keyword)
-            json_check = await Get_Access_Token_json(access_token, url, params)
-            # print(json_check)
-            state = json_check['success']
-            if state:
-                context = await context_assemble(json_check)
-                mainImg_state = json_check["data"]["game"]["mainImg"]
-                img_path = await get_game_image(mainImg_state, filepath)
-                # print(context)
-                pass
 
 
-        elif flag ==3:
+        if flag ==3:
             url = flag_check(flag)
             params = params_check(flag, keyword)
             access_token = await Get_Access_Token()
@@ -336,7 +286,7 @@ def main(bot,config):
             state = json_check['success']
             # print(state)
             if state:
-                context = await context_assemble(json_check)
+                context = await context_assemble(json_check,access_token)
                 #print(context)
                 mainImg_state = json_check["data"]["game"]["mainImg"]
                 img_path = await get_game_image(mainImg_state, filepath)
@@ -350,7 +300,7 @@ def main(bot,config):
             state = json_check['success']
             # print(state)
             if state:
-                context = await context_assemble(json_check)
+                context = await context_assemble(json_check,access_token)
                 #print(context)
                 if 'mainImg' in json_check["data"]["org"]:
                     mainImg_state = json_check["data"]["org"]["mainImg"]
@@ -367,7 +317,7 @@ def main(bot,config):
             state = json_check['success']
             # print(state)
             if state:
-                context = await context_assemble(json_check)
+                context = await context_assemble(json_check,access_token)
                 #print(context)
                 mainImg_state = json_check["data"]["character"]["mainImg"]
                 img_path = await get_game_image(mainImg_state, filepath)
@@ -386,7 +336,7 @@ def main(bot,config):
                     state = False
                 for i in range(data_count):
                     data = json_check['data'][i]
-                    context = await context_assemble(data)
+                    context = await context_assemble(data,access_token)
                     #print(context)
                     mainImg_state = data["mainImg"]
                     img_path = await get_game_image(mainImg_state, filepath)
@@ -394,66 +344,8 @@ def main(bot,config):
                     cmList.append(Node(content=[Text(f'{context}')]))
                 #print(context)
 
-        elif flag ==7:
-            url = flag_check(flag)
-            keyword=True
-            releaseStartDate = date
-            releaseEndDate = now
-            params = params_check(flag, keyword,releaseStartDate,releaseEndDate)
-            access_token = await Get_Access_Token()
-            json_check = await Get_Access_Token_json(access_token, url, params)
-            #print(json_check)
-            state = json_check['success']
-            # print(state)
-            if state:
-                data_count = len(json_check["data"])
-                if int(data_count) ==0:
-                    state = False
-                for i in range(data_count):
-                    data = json_check['data'][i]
-                    context = await context_assemble(data)
-                    #print(data)
-                    mainImg_state = data["mainImg"]
-                    img_path = await get_game_image(mainImg_state, filepath)
-                    cmList.append(Node(content=[Image(file=img_path)]))
-                    cmList.append(Node(content=[Text(f'{context}')]))
-                    if int(data_count) < 4:
-                        gid = data["gid"]
-                        introduction=await get_introduction(gid)
-                        cmList.append(Node(content=[Text(f'{introduction}')]))
-                #print(context)
-
-        elif flag ==8:
-            url = flag_check(flag)
-            params =params_check(flag, keyword)
-            access_token = await Get_Access_Token()
-            json_check = await Get_Access_Token_json(access_token, url, params)
-            #print(json_check)
-            state = json_check['success']
-            # print(state)
-            cmList.append(Node(content=[Text(f'今天的gal推荐，请君过目：')]))
-            if state:
-                data_count = len(json_check["data"])
-                for i in range(data_count):
-                    data = json_check['data'][i]
-                    context = await context_assemble(data)
-                    #print(data)
-                    gid=data["gid"]
-                    introduction = await get_introduction(gid)
-                    mainImg_state = 'https://store.ymgal.games/'+data["mainImg"]
-                    if config.acg_infromation.config["绘图框架"]['gal_recommend'] is False:
-                        img_path = await get_game_image(mainImg_state, filepath)
-                        cmList.append(Node(content=[Image(file=img_path)]))
-                        cmList.append(Node(content=[Text(f'{context}')]))
-                        cmList.append(Node(content=[Text(f'{introduction}')]))
-
-                    elif config.acg_infromation.config["绘图框架"]['gal_recommend'] is True:
-                        text=f"{context}\n{introduction}"
-                        bangumi_json = await gal_PILimg(text, [mainImg_state], 'data/pictures/cache/',type_soft=f'Galgame 推荐')
-                        if bangumi_json['status']:
-                            bot.logger.info('gal推荐图片制作成功，开始推送~~~')
-                            await bot.send(event, Image(file=bangumi_json['pic_path']))
-                        flag =0
+        else:
+            flag = 0
 
 
         if flag != 0 :
