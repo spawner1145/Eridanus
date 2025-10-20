@@ -4,13 +4,13 @@ from framework_common.framework_util.yamlLoader import YAMLManager
 from developTools.message.message_components import Node, Text, Image, At
 import re
 import aiohttp
-import logging
+import pprint
 
 
 def main(bot: ExtendBot, config: YAMLManager):
     """插件主函数"""
     # 合并配置
-    trigger_prefix = '伪造消息'
+    trigger_prefix = '伪造消息 '
     help_trigger = '伪造帮助'
     error_message = "格式错误，请使用：伪造消息 QQ号 内容 | QQ号 内容 | ..."
     qq_name_api = "http://api.mmp.cc/api/qqname?qq="
@@ -22,10 +22,7 @@ def main(bot: ExtendBot, config: YAMLManager):
     async def get_qq_nickname(qq_number,target_group=None):
         qq_name = ''
         """获取QQ昵称"""
-        try:
-            qq_name = (await bot.get_group_member_info(target_group, qq_number))['data']['nickname']
-        except:
-            pass
+        qq_name = (await bot.get_group_member_info(target_group, qq_number))['data']['nickname']
         if qq_name != '':
             return qq_name
         try:
@@ -39,7 +36,6 @@ def main(bot: ExtendBot, config: YAMLManager):
                             if nickname:
                                 qq_name = nickname
         except Exception as e:
-            logger.error(f"获取QQ昵称失败: {str(e)}")
             qq_name = f"用户{qq_number}"
         return qq_name
 
@@ -47,84 +43,73 @@ def main(bot: ExtendBot, config: YAMLManager):
     async def parse_message_segments(event):
         """解析消息段，将图片正确分配到对应的消息段"""
         segments = []
-        current_segment = {"text": "", "images": []}
-        prefix_skipped = False
 
-        # 提取纯文本和图片
-        pure_text = event.pure_text
-        if event.message_chain.has(At):
-            pure_text =event.message_chain.get(Text)[0].text
-        # 处理文本前缀
-        if pure_text.startswith(trigger_prefix):
-            prefix_skipped = True
+        pure_text=''
+        for obj in event.message_chain:
+            if obj.comp_type == 'text':pure_text+=f"{obj.text}"
+            elif obj.comp_type == 'image':pure_text+=f"{obj.url}.png"
+            elif obj.comp_type == 'at':pure_text += f"{obj.qq} "
 
-        if not prefix_skipped:
-            return []
+        pure_text = pure_text[len(trigger_prefix):]
 
-        #处理图片并重新整合消息
-        if event.message_chain.has(Image) or event.message_chain.has(At):
-            pure_text=''
-            for obj in event.message_chain:
-                if obj.comp_type == 'text':pure_text+=f"{obj.text}"
-                elif obj.comp_type == 'image':pure_text+=f"{obj.url}"
-                elif obj.comp_type == 'at':pure_text += f"{obj.qq}"
-
-        pure_text = pure_text[len(trigger_prefix):].lstrip()
-        pure_text = pure_text.replace("\n", "")
-        #print(pure_text)
-
-        # 分割文本为消息段
-        if pure_text:
-            text_segments = re.split(f'({separators_pattern})', pure_text)
-            text_parts = []
-            for part in text_segments:
-                #print(part)
-                if part in allowed_separators:
-                    if text_parts:
-                        segments.append({"text": ''.join(text_parts).strip(), "images": []})
-                        text_parts = []
-                else:
-                    text_parts.append(part)
-            
-            if text_parts:
-                segments.append({"text": ''.join(text_parts).strip(), "images": []})
-
-
-        return [s for s in segments if s["text"] or s["images"]]
+        segments_parts = [p for p in re.split(r'[|｜]+', pure_text) if p]
+        for part in segments_parts:
+            segments_check = {'faker':{}, 'message_chain':[]}
+            #提取开头伪造者id
+            m = re.match(r'^\s*(\d+)(?=\s|$)', part)
+            faker_id = int(m.group(1)) if m else None
+            segments_check['faker']['id'] = faker_id
+            part = part[len(f'{faker_id}'):]
+            if part.startswith(' '):part = part[len(f' '):]
+            #构造后续消息链
+            if bool(re.search(r'https?://[^\s]+?\.(?:jpg|jpeg|png|gif|bmp)', part, re.IGNORECASE)):
+                parts = re.split(r'(https?://[^\s]+?\.(?:jpg|jpeg|png|gif|bmp))', part, flags=re.IGNORECASE)
+                for part in parts:
+                    if 'http' in part:
+                        part = part.replace('.png','')
+                        segments_check['message_chain'].append(Image(file=part))
+                    else:
+                        segments_check['message_chain'].append(Text(text=part))
+            else:
+                segments_check['message_chain'].append(Text(text=part))
+            segments.append(segments_check)
+        return segments
 
     async def create_forward_nodes(segments,event):
         """创建转发消息节点"""
         nodes = []
-        qq_number = 0
+        friendlist_get = await bot.get_group_member_list(event.group_id)
+        friendlist = [friend['user_id'] for friend in friendlist_get["data"]]
         for segment in segments:
-            text = segment["text"].strip()
-            content_list_check=[]
-
-            # 匹配QQ号和内容
-            match = re.split(r'\s+', text)
-            if not match:
-                continue
-
-            for count in range(len(match)):
-                if count == 0: qq_number = match[count] if match[count] else f'{event.self_id}'
-                else:
-                    content_text = match[count] if match[count] else ""
-                    if content_text:
-                        if content_text.startswith('http'):content_list_check.append(Image(file=content_text))
-                        else:content_list_check.append(Text(text=content_text))
-
+            content_list_check = segment['message_chain']
+            qq_number = segment['faker']['id']
             # 获取昵称
-            nickname = await get_qq_nickname(qq_number,int(event.group_id))
-            
-            # 创建节点
-            if content_list_check:
-                node = Node(
-                    user_id=qq_number,
-                    nickname=nickname,
-                    content=content_list_check
-                )
-                nodes.append(node)
-        
+
+            qq_name = ''
+            """获取QQ昵称"""
+            if qq_number in friendlist:
+                qq_name = (await bot.get_group_member_info(event.group_id, qq_number))['data']['nickname']
+            else:
+                try:
+                    url = f"{qq_name_api}{qq_number}"
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(url, timeout=5) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                if data.get("code") == 200 and "data" in data and "name" in data["data"]:
+                                    nickname = data["data"]["name"]
+                                    if nickname:
+                                        qq_name = nickname
+                except Exception as e:
+                    qq_name = f"用户{qq_number}"
+
+            #print(content_list_check)
+            node = Node(
+                user_id=f'{qq_number}',
+                nickname=qq_name,
+                content=content_list_check
+            )
+            nodes.append(node)
         return nodes
 
     async def handle_message(event):
