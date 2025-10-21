@@ -2,6 +2,7 @@ import os
 import random
 import traceback
 import shutil
+import pprint
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Node, Text, Image, Music
 from framework_common.database_util.User import get_user
@@ -11,25 +12,31 @@ from run.basic_plugin.service.anime_setu import anime_setu, anime_setu1
 from run.basic_plugin.service.cloudMusic import cccdddm
 from run.basic_plugin.service.divination import tarotChoice
 from run.basic_plugin.service.weather_query import weather_query
-from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
+from framework_common.manshuo_draw.manshuo_draw import *
 """
 供func call调用
 """
 async def call_menu(bot, event, config):
-    file_lists = []
+    file_lists,reply_list = [],[]
     for file in os.listdir('data/pictures/doc'):
         if file.endswith('.png'):
             file_lists.append(file)
+    if file_lists == []:
+        await bot.send(event, f'图片菜单丢失，请联系管理员重新生成\n{config.common_config.menu["help_menu"]["send_text"]}')
+        return
     if config.common_config.menu["help_menu"]["send_as_node"]:
         node_list = [Node(
-            content=[Text("项目文档：https://eridanus.netlify.app/\n项目地址：https://github.com/AOrbitron/Eridanus")])]
+            content=[Text(config.common_config.menu["help_menu"]["send_text"])])]
+
         for file_name in file_lists:
             node_list.append(Node(content=[Image(file=os.path.join('data/pictures/doc', file_name))]))
         await bot.send(event, node_list)
     else:
-        for file_name in file_lists:
-            await bot.send(event, Image(file=os.path.join('data/pictures/doc', file_name)))
-        await bot.send(event, "项目文档：https://eridanus.netlify.app/\n项目地址：https://github.com/AOrbitron/Eridanus")
+        file_lists.sort(key=lambda x: int(x.split('page')[-1].replace('.png','')))
+        for file_name in file_lists:reply_list.append(Image(file=os.path.join('data/pictures/doc', file_name)))
+        reply_list.append(config.common_config.menu["help_menu"]["send_text"])
+        await bot.send(event, reply_list)
+
 
 async def call_quit_chat(bot, event, config):
     return False
@@ -192,13 +199,10 @@ def main(bot, config):
 
             help_menu_list, reply_list = {}, []
             #pprint.pprint(config.common_config.menu)
-            for page_number in config.common_config.menu['help_menu']['content']:
-                help_menu_list[page_number] = []
-                for item in config.common_config.menu['help_menu']['content'][page_number]:
-                    help_menu_list[page_number].append(item)
-            for page_number in help_menu_list:
+            menu_context = await menu_maker()
+            for page_number in menu_context:
                 bot.logger.info(f"开始生成 {page_number} 菜单")
-                reply_list.append(Node(content=[Image(file=await manshuo_draw(help_menu_list[page_number]))]))
+                reply_list.append(Node(content=[Image(file=await manshuo_draw(menu_context[page_number]))]))
             bot.logger.info(f"菜单生成完毕，开始推送")
             await bot.send(event, reply_list)
             for file_name in file_lists:
