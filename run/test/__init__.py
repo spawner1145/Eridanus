@@ -1,1 +1,0 @@
-plugin_description="演示插件"

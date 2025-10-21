@@ -2,6 +2,7 @@ import os
 import random
 import traceback
 import shutil
+import pprint
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Node, Text, Image, Music
 from framework_common.database_util.User import get_user
@@ -11,25 +12,31 @@ from run.basic_plugin.service.anime_setu import anime_setu, anime_setu1
 from run.basic_plugin.service.cloudMusic import cccdddm
 from run.basic_plugin.service.divination import tarotChoice
 from run.basic_plugin.service.weather_query import weather_query
-from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
+from framework_common.manshuo_draw.manshuo_draw import *
 """
 供func call调用
 """
 async def call_menu(bot, event, config):
-    file_lists = []
+    file_lists,reply_list = [],[]
     for file in os.listdir('data/pictures/doc'):
         if file.endswith('.png'):
             file_lists.append(file)
+    if file_lists == []:
+        await bot.send(event, f'图片菜单丢失，请联系管理员重新生成\n{config.common_config.menu["help_menu"]["send_text"]}')
+        return
     if config.common_config.menu["help_menu"]["send_as_node"]:
         node_list = [Node(
-            content=[Text("项目文档：https://eridanus.netlify.app/\n项目地址：https://github.com/AOrbitron/Eridanus")])]
+            content=[Text(config.common_config.menu["help_menu"]["send_text"])])]
+
         for file_name in file_lists:
             node_list.append(Node(content=[Image(file=os.path.join('data/pictures/doc', file_name))]))
         await bot.send(event, node_list)
     else:
-        for file_name in file_lists:
-            await bot.send(event, Image(file=os.path.join('data/pictures/doc', file_name)))
-        await bot.send(event, "项目文档：https://eridanus.netlify.app/\n项目地址：https://github.com/AOrbitron/Eridanus")
+        file_lists.sort(key=lambda x: int(x.split('page')[-1].replace('.png','')))
+        for file_name in file_lists:reply_list.append(Image(file=os.path.join('data/pictures/doc', file_name)))
+        reply_list.append(config.common_config.menu["help_menu"]["send_text"])
+        await bot.send(event, reply_list)
+
 
 async def call_quit_chat(bot, event, config):
     return False
@@ -142,7 +149,6 @@ async def call_fortune(bot, event, config):
 async def call_pick_music(bot, event, config, aim):
     try:
         r = await cccdddm(aim)
-        #print(r)
         await bot.send(event, Music(type="163", id=r[0][1]))
     except Exception as e:
         bot.logger.error(f"Error in pick_music: {e}")
@@ -184,23 +190,26 @@ def main(bot, config):
         if event.pure_text in ["帮助", "菜单", "/help", "/menu"]:
             await call_menu(bot, event, config)
         if "/remenu"==event.pure_text and event.sender.user_id==config.common_config.basic_config["master"]["id"]:
+            bot.logger.info(f"开始重新生成菜单")
+            await bot.send(event, "开始重新生成菜单")
             file_lists = ['help_menu_page1.png', 'help_menu_page2.png', 'help_menu_page3.png', 'help_menu_page4.png', 'help_menu_page5.png']
             for file_name in file_lists:
                 if os.path.exists(os.path.join('data/pictures/cache', file_name)):
                     os.remove(os.path.join('data/pictures/cache', file_name))
 
             help_menu_list, reply_list = {}, []
-            for page_number in config.common_config.menu['help_menu']['content']:
-                help_menu_list[page_number] = []
-                for item in config.common_config.menu['help_menu']['content'][page_number]:
-                    help_menu_list[page_number].append(item)
-            for page_number in help_menu_list:
-                reply_list.append(Node(content=[Image(file=await manshuo_draw(help_menu_list[page_number]))]))
+            #pprint.pprint(config.common_config.menu)
+            menu_context = await menu_maker()
+            for page_number in menu_context:
+                bot.logger.info(f"开始生成 {page_number} 菜单")
+                reply_list.append(Node(content=[Image(file=await manshuo_draw(menu_context[page_number]))]))
+            bot.logger.info(f"菜单生成完毕，开始推送")
+            await bot.send(event, reply_list)
             for file_name in file_lists:
                 if os.path.exists(os.path.join('data/pictures/cache', file_name)):
                     shutil.copy(os.path.join('data/pictures/cache', file_name), 'data/pictures/doc')
                     os.remove(os.path.join('data/pictures/cache', file_name))
-            await bot.send(event, reply_list)
+            #await bot.send(event, reply_list)
 
 
     @bot.on(GroupMessageEvent)
@@ -212,15 +221,15 @@ def main(bot, config):
                 card = random.choice(cards_)
                 img, txt = list(card.items())[0]
                 if txt == "": txt = "no description"
-            else:txt, img = tarotChoice(config.basic_plugin.config["tarot"]["mode"])
+            else:txt, img, tarots = tarotChoice(config.basic_plugin.config["tarot"]["mode"])
         elif event.pure_text == "抽象塔罗":
-            txt, img = tarotChoice('AbstractImages')
+            txt, img, tarots = tarotChoice('AbstractImages')
         elif event.pure_text == "ba塔罗":
-            txt, img = tarotChoice('blueArchive')
+            txt, img, tarots = tarotChoice('blueArchive')
         elif event.pure_text == "bili塔罗" or event.pure_text == "2233塔罗":
-            txt, img = tarotChoice('bilibili')
+            txt, img, tarots = tarotChoice('bilibili')
         else:return
-        await bot.send(event, Image(file=(await manshuo_draw([{'type': 'basic_set', 'img_width':750},
+        await bot.send(event, Image(file=(await manshuo_draw([{'type': 'basic_set', 'img_width':750, 'img_name_save': f'{event.pure_text}_{tarots}.png'},
                                                               {'type': 'img', 'subtype': 'common_with_des_right','img': [img],'content': [txt]}]))))
 
 

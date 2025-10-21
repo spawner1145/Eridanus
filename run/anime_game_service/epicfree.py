@@ -21,7 +21,9 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def menu_steamid(event: GroupMessageEvent):
         if event.pure_text.lower() in ['epichelp','epic帮助']:
-            draw_json=[{'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],'upshift_extra':15,
+            draw_json=[
+                {'type': 'basic_set', 'img_name_save': 'epichelp.png'},
+                {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],'upshift_extra':15,
                         'content': [f"[name]Epic菜单[/name]\n[time]咕咕咕[/time]"]},
                        '[title]指令菜单：[/title]'
                        '\n- Epic喜加一：epicfree、epic喜加一\n其他功能亟待开发，咕咕咕~~~~\n'
