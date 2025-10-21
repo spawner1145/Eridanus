@@ -37,7 +37,14 @@ class DualBotManager:
 
                     # 处理心跳等非业务消息
                     if 'heartbeat' not in str(data):
-                        self.secondary_bot.logger.info_msg(f"副Bot收到服务端响应: {data}")
+                        try:
+                            if 'user_id' in data:
+                                data['user_id']=self.secondary_bot.fix_id
+                            if 'sender' in data:
+                                data['sender']['user_id']=self.secondary_bot.fix_id
+                        except Exception as e:
+                            self.secondary_bot.logger.error(f"bot id修正失败: {e}")
+                        self.secondary_bot.logger.info(f"副Bot收到服务端响应: {data}")
 
                     # 处理API响应
                     if "status" in data and "echo" in data:

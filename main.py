@@ -191,6 +191,7 @@ def main_sync():
 
             # 3. 创建双Bot管理器（如果有副Bot）
             if bot2:
+                bot2.fix_id=config.common_config.basic_config["master"]["id"]
                 dual_manager = DualBotManager(bot1, bot2, target_group_id=879886836)
                 bot1.logger.info("🔧 双Bot管理器已创建，开始启动双Bot系统...")
                 # 启动双Bot系统
