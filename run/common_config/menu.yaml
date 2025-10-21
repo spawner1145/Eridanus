@@ -275,3 +275,13 @@ help_menu: #不要在webui修改本文件！不要在webui修改本文件！
       - '   '
       - {'type': 'text','content': ['[title]防自言自语插件[/title]
       \n  被动技能，自动触发    [des]在配置文件中编辑[/des]'],'layer':2}
+      - '   '
+      - {'type': 'text','content': ['[title]qq空间[/title]
+      \n  [des]此功能尚在开发中[/des]
+      \n  /qzone login  [des]登录[/des]
+      \n  /发空间      [des]然后发送图文混合消息[/des]
+      \n  早晚自动发空间，可接入sd
+      \n  [des]此功能尚在开发中，回复空间动态、cookie保活等均未完成。[/des]'],'layer':2}
+      - '   '
+      - {'type': 'text','content': ['[title]绝区零插件[/title]
+      \n  绝区零功能尚在开发中，敬请期待。'],'layer':2}
