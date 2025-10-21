@@ -270,14 +270,17 @@ def merge_dicts(old, new):
             merge_dicts(v, new[k])
         # 如果值是列表，且新旧值都是列表，则合并并去重
         elif isinstance(v, list) and k in new and isinstance(new[k], list):
-            if k in ["api_keys","sdUrl","其他默认绘图参数","card_index","steam_api_key","nano_banana_key","自定义入群欢迎"]:  # 特殊处理, 保留旧值
+            if k in ["api_keys","sdUrl","其他默认绘图参数","card_index","steam_api_key","nano_banana_key","固定入群欢迎"]:  # 特殊处理, 保留旧值
                 logger.info(f"覆盖列表 key: {k}")
                 new[k] = v  # 使用旧的列表覆盖新的列表
             elif k.startswith("page"):
                 logger.warning(f"当前任务为菜单，使用最新配置覆盖旧配置。")
             else:
                 logger.info(f"合并列表 key: {k}")
-                new[k] = list(dict.fromkeys(new[k] + v))  # 保持顺序去重
+                try:
+                    new[k] = list(dict.fromkeys(new[k] + v))  # 保持顺序去重
+                except:
+                    logger.error("沟槽的出错了，默认用最新配置")
         # 如果键在新的yaml文件中，但值类型不同，以新值为准
         elif k in new and type(v) != type(new[k]):
             logger.info(f"类型冲突，保留新的值 key: {k}, old value type: {type(v)}, new value type: {type(new[k])}")
