@@ -1,6 +1,6 @@
 help_menu: #不要在webui修改本文件！不要在webui修改本文件！
-  send_as_node: false
-  send_text: '详细文档请访问以下网址查看喵～\nhttps://gal.manshuo.ink/archives/627/'      #跟随菜单附带的文字
+  send_as_node: true
+  send_text: "项目文档：https://eridanus.netlify.app/\n项目地址：https://github.com/AOrbitron/Eridanus"      #跟随菜单附带的文字
 
   content:
     page1: #https://q1.qlogo.cn/g?b=qq&nk=3552663628&s=640这里面可以换成你自己botqq
