@@ -52,6 +52,9 @@ async def copy_yaml():
     for page in menu_context:
         new_menu_context[page], num = {}, 1
         for item in menu_context[page]:
+            if isinstance(item, set):
+                new_menu_context[page] = menu_context[page]
+                continue
             if 'type' not in item:
                 new_menu_context[page][f'序号{num}'] = {'类型': '文字','内容文本': item}
             elif item['type'] == 'basic_set':
