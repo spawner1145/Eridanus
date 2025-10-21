@@ -110,7 +110,7 @@ def main(bot, config):
                             continue
 
                     if cmList:
-                        cmList.append(Node(content=[Text(f'漫朔今日老婆图床地址：bangumi.manshuo.ink:8092/picture_bed')]))
+                        cmList.append(Node(content=[Text(f'漫朔今日老婆图床地址：http://bangumi.manshuo.ink:8092/picture_bed')]))
                         await bot.send(event, cmList)
 
                     # 清理临时文件

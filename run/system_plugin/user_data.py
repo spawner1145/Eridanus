@@ -68,7 +68,7 @@ async def call_user_data_sign(bot,event,config):
         traceback.print_exc()
         bot.logger.error("获取图片失败，使用预设图片: data/system/bot.png")
         img="data/system/bot.png"
-    tarottxt, tarotimg = tarotChoice(config.basic_plugin.config["tarot"]["mode"])
+    tarottxt, tarotimg, tarots = tarotChoice(config.basic_plugin.config["tarot"]["mode"])
     r = random.randint(1, 100)
     if r <= 10:
         card_ = "data/pictures/Amamiya/谕吉.jpg"
