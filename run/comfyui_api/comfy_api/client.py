@@ -162,7 +162,7 @@ class ComfyUIClient:
                                 if message.get('type') == 'progress':
                                     data = message.get('data', {})
                                     print(f"  - 进度更新: 节点 {data.get('node', 'N/A')} - 步数 {data.get('value', 0)}/{data.get('max', 1)}")
-                                elif message.get('type') == 'executing' and message.get('data', {}).get('prompt_id') == prompt_id and message['data'].get('node') is None:
+                                if message.get('type') == 'execution_success' and message.get('data', {}).get('prompt_id') == prompt_id:
                                     print("✅ 任务执行流程结束。")
                                     return True
                         except asyncio.TimeoutError:
