@@ -12,13 +12,27 @@ _SENTINEL = object()
 
 class ComfyUIClient:
     def __init__(self, base_url: str, proxy: Optional[str] = None):
-        self.base_url = base_url.rstrip('/')
+        if "@" in base_url:
+            token, real_base_url = base_url.split("@", 1)
+            self.base_url = real_base_url.rstrip('/')
+            self._headers = {"Authorization": f"Bearer {token}"}
+        else:
+            self.base_url = base_url.rstrip('/')
+            self._headers = {}
+        
         self.client_id = str(uuid.uuid4())
         ws_protocol = "ws" if self.base_url.startswith("http:") else "wss"
         host = self.base_url.split("://")[1]
         self.ws_address = f"{ws_protocol}://{host}/ws?clientId={self.client_id}"
+        
         proxies = {"http://": proxy, "https://": proxy} if proxy else None
-        self._client = httpx.AsyncClient(proxies=proxies, timeout=HTTP_TIMEOUT, follow_redirects=True)
+        
+        self._client = httpx.AsyncClient(
+            proxies=proxies,
+            timeout=HTTP_TIMEOUT,
+            follow_redirects=True,
+            headers=self._headers
+        )
 
     async def __aenter__(self): return self
     async def __aexit__(self, exc_type, exc_val, exc_tb): await self.close()
