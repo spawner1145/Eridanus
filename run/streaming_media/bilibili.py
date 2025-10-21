@@ -137,6 +137,8 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)
     async def _(event):
+        if not config.streaming_media.config["bili_dynamic"]["enable"]:
+            return
         if event.pure_text.startswith("看看动态"):
             target_id = event.pure_text.split("看看动态")[1]
             bot.logger.info(f"Fetching dynamic id of {target_id}")
@@ -149,6 +151,8 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)
     async def _(event):
+        if not config.streaming_media.config["bili_dynamic"]["enable"]:
+            return
         if event.pure_text.startswith("/bili add "):
             target_id = event.pure_text.split("/bili add ")[1]
             try:
@@ -172,6 +176,8 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)
     async def _(event):
+        if not config.streaming_media.config["bili_dynamic"]["enable"]:
+            return
         if event.pure_text == "/bili login":
             async with BiliCookieManager() as manager:
                 await manager.get_cookies(auto_login=True,bot=bot,group_id=event.group_id,login=True)
