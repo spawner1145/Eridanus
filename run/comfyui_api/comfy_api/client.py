@@ -159,7 +159,7 @@ class ComfyUIClient:
                             message_data = await asyncio.wait_for(ws.recv(), timeout=effective_timeout)
                             if isinstance(message_data, str):
                                 message = json.loads(message_data)
-                                print(f"监听状态更新：消息类型={message.get('type')}，内容={json.dumps(message.get('data', {}), ensure_ascii=False)}")
+                                #print(f"监听状态更新：消息类型={message.get('type')}，内容={json.dumps(message.get('data', {}), ensure_ascii=False)}")
                                 if message.get('type') == 'progress':
                                     data = message.get('data', {})
                                     print(f"  - 进度更新: 节点 {data.get('node', 'N/A')} - 步数 {data.get('value', 0)}/{data.get('max', 1)}")
