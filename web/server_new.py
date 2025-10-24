@@ -118,8 +118,8 @@ def build_yaml_file_map(run_dir):
             if not file.endswith('.yaml'):
                 continue
             # 如果文件名包含"基础配置.menu"则跳过
-            if "menu.yaml" in file:
-                continue
+            # if "menu.yaml" in file:
+                # continue
             abs_path = os.path.join(root, file)
             rel_path = os.path.relpath(abs_path, run_dir).replace("\\", "/")
             parts = rel_path.split("/")
@@ -803,6 +803,32 @@ def del_history():
 def restart_server():
     try:
         return jsonify({"message": "功能开发中，敬请期待"})
+    except Exception as e:
+        return jsonify({"error":e})
+
+
+# 菜单编辑器
+@app.route("/api/menu/load", methods=["GET"])
+@auth
+def menu_editor():
+    """加载菜单的 YAML 文件"""
+    file_path = YAML_FILES["基础配置.menu"]
+    data_with_comments = load_yaml(file_path)
+    rtd = jsonify(data_with_comments["data"]["help_menu"]["content"])
+    return rtd
+
+@app.route("/api/menu/update", methods=["POST"])
+@auth
+def update_menu():
+    """更新菜单的 YAML 文件"""
+    try:
+        data = {"data": {"help_menu": {"content": request.json}}}  # 将收到的数据封装到新字典
+        file_path = YAML_FILES["基础配置.menu"]
+        result = save_yaml(file_path, data)
+        if result:
+            return jsonify({"message": "菜单保存成功"})
+        else:
+            return jsonify({"error": "菜单保存失败"})
     except Exception as e:
         return jsonify({"error":e})
 
