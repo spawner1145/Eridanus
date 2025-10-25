@@ -61,7 +61,6 @@ RUN set -eux \
     && rm -rf /var/lib/apt/lists/* \
     && npm cache clean --force
 
-COPY --from=builder /install /usr/local
 COPY . /app/Eridanus
 RUN sed -i 's|ws://127.0.0.1:3001|ws://napcat:3001|g' /app/Eridanus/run/common_config/basic_config.yaml \
     && sed -i 's|redis_ip: default|redis_ip: "redis"|g' /app/Eridanus/run/common_config/basic_config.yaml
