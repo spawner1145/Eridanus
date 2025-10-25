@@ -53,6 +53,7 @@ RUN set -eux; \
 COPY --from=builder /install /usr/local
 COPY . /app/Eridanus
 RUN sed -i 's|ws://127.0.0.1:3001|ws://napcat:3001|g' /app/Eridanus/run/common_config/basic_config.yaml
+RUN sed -i 's|redis_ip: default|redis_ip: "redis"|g' /app/Eridanus/run/common_config/basic_config.yaml
 
 WORKDIR /app
 ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
