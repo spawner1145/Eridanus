@@ -13,7 +13,10 @@ RUN set -eux; \
         libffi-dev \
         python3-dev \
         cmake \
-        meson; \
+        meson \
+        fonts-liberation \
+        wget \
+        unzip; \
     curl -fsSL https://deb.nodesource.com/setup_18.x | bash -; \
     apt-get install -y --no-install-recommends nodejs; \
     rm -rf /var/lib/apt/lists/*
@@ -27,7 +30,13 @@ RUN pip config set global.index-url https://pypi.org/simple/ \
         brotli \
         qrcode \
         qrcode_terminal \
-        flask_sock
+        flask_sock \
+        pytz \
+        qzone_api \
+        cloudscraper \
+        fuzzywuzzy \
+        playwright
+RUN playwright install chromium
 
 FROM python:3.11-slim
 
@@ -39,9 +48,11 @@ RUN set -eux; \
         ffmpeg \
         libjpeg-dev \
         zlib1g-dev \
-        libpq-dev \
         libcairo2 \
         tzdata \
+        fonts-liberation \
+        wget \
+        unzip; \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && ln -fs /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
