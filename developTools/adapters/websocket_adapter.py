@@ -486,6 +486,9 @@ class WebSocketBot:
             if event_obj.processed_message==[]:
                 event_obj.processed_message=parse_message_2processed_message(event_obj.message)
         return event_obj
+    async def get_forward_msg(self, message_id: str):
+        source_msg = await self._call_api("get_forward_msg", {"id": message_id})
+        return source_msg
     """
     撤回、禁言等群管类
     """
