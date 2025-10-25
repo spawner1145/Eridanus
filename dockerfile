@@ -1,8 +1,8 @@
 FROM python:3.11-slim AS builder
 
-RUN set -eux; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends \
+RUN set -eux \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
         git \
@@ -16,10 +16,10 @@ RUN set -eux; \
         meson \
         fonts-liberation \
         wget \
-        unzip; \
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -; \
-    apt-get install -y --no-install-recommends nodejs; \
-    rm -rf /var/lib/apt/lists/*
+        unzip \
+    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /build/requirements.txt
 RUN pip config set global.index-url https://pypi.org/simple/ \
@@ -35,14 +35,14 @@ RUN pip config set global.index-url https://pypi.org/simple/ \
         qzone_api \
         cloudscraper \
         fuzzywuzzy \
-        playwright
-RUN playwright install chromium
+        playwright \
+    && python -m playwright install chromium
 
 FROM python:3.11-slim
 
-RUN set -eux; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends \
+RUN set -eux \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
         ffmpeg \
@@ -63,8 +63,8 @@ RUN set -eux; \
 
 COPY --from=builder /install /usr/local
 COPY . /app/Eridanus
-RUN sed -i 's|ws://127.0.0.1:3001|ws://napcat:3001|g' /app/Eridanus/run/common_config/basic_config.yaml
-RUN sed -i 's|redis_ip: default|redis_ip: "redis"|g' /app/Eridanus/run/common_config/basic_config.yaml
+RUN sed -i 's|ws://127.0.0.1:3001|ws://napcat:3001|g' /app/Eridanus/run/common_config/basic_config.yaml \
+    && sed -i 's|redis_ip: default|redis_ip: "redis"|g' /app/Eridanus/run/common_config/basic_config.yaml
 
 WORKDIR /app
 ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
