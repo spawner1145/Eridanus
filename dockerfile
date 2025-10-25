@@ -1,10 +1,6 @@
-FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/python:3.11-slim AS builder
+FROM python:3.11-slim AS builder
 
 RUN set -eux; \
-    codename="$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)"; \
-    echo "deb https://mirrors.tuna.tsinghua.edu.cn/debian $codename main contrib non-free non-free-firmware\n\
-deb https://mirrors.tuna.tsinghua.edu.cn/debian $codename-updates main contrib non-free non-free-firmware\n\
-deb https://mirrors.tuna.tsinghua.edu.cn/debian-security $codename-security main contrib non-free non-free-firmware" > /etc/apt/sources.list; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         curl \
@@ -23,7 +19,7 @@ deb https://mirrors.tuna.tsinghua.edu.cn/debian-security $codename-security main
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /build/requirements.txt
-RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ \
+RUN pip config set global.index-url https://pypi.org/simple/ \
     && pip install --upgrade pip \
     && pip install --no-cache-dir --prefix=/install \
         -r /build/requirements.txt \
@@ -33,13 +29,9 @@ RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ \
         qrcode_terminal \
         flask_sock
 
-FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/python:3.11-slim
+FROM python:3.11-slim
 
 RUN set -eux; \
-    codename="$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)"; \
-    echo "deb https://mirrors.tuna.tsinghua.edu.cn/debian $codename main contrib non-free non-free-firmware\n\
-deb https://mirrors.tuna.tsinghua.edu.cn/debian $codename-updates main contrib non-free non-free-firmware\n\
-deb https://mirrors.tuna.tsinghua.edu.cn/debian-security $codename-security main contrib non-free non-free-firmware" > /etc/apt/sources.list; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         curl \
@@ -59,7 +51,6 @@ deb https://mirrors.tuna.tsinghua.edu.cn/debian-security $codename-security main
     && npm cache clean --force
 
 COPY --from=builder /install /usr/local
-
 COPY . /app/Eridanus
 RUN sed -i 's|ws://127.0.0.1:3001|ws://napcat:3001|g' /app/Eridanus/run/common_config/basic_config.yaml
 

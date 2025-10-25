@@ -1,6 +1,6 @@
 import os
 import re
-
+import random
 import httpx
 from httpx._urlparse import urlparse
 
@@ -11,23 +11,40 @@ from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.random_str import random_str
 
 
-def main(bot: ExtendBot,config:YAMLManager):
+def main(bot: ExtendBot, config: YAMLManager):
     @bot.on(GroupMessageEvent)
     async def today_husband(event: GroupMessageEvent):
         text = str(event.pure_text)
         if not text.startswith("今") or not any(keyword in text for keyword in ["今日", "今天"]):
             return
+
         url_map = {
-            "腿": "https://api.dwo.cc/api/meizi",
-            "黑丝": "https://api.dwo.cc/api/hs_img",
-            "白丝": "https://api.dwo.cc/api/bs_img",
-            "头像": "https://api.dwo.cc/api/dmtou",
+            "腿": [
+                "https://api.dwo.cc/api/meizi",
+                "https://api.yujn.cn/api/tuijian",
+            ],
+            "黑丝": [
+                "https://api.dwo.cc/api/hs_img",
+                "https://img.sorahub.site/?tag=black%20pantyhose",
+            ],
+            "白丝": [
+                "https://api.dwo.cc/api/bs_img",
+                "https://img.sorahub.site/?tag=white%20socks",
+            ],
+            "头像": [
+                "https://api.dwo.cc/api/dmtou",
+            ],
+            "cos": [
+                "https://img.sorahub.site",
+            ],
         }
 
-        url = next((u for k, u in url_map.items() if k in text), None)
-        if not url and re.search(r'cos|cosplay|bacos|bacosplay|ba美女|ba小姐姐', text, re.IGNORECASE):
-            bot.logger.info("今日bacos开启！")
-            url = 'https://img.sorahub.site'
+        matched_key = next((k for k in url_map if k in text), None)
+        url = None
+        if matched_key:
+            url_list = url_map[matched_key]
+            url = random.choice(url_list)
+            bot.logger.info(f"今日 {matched_key} API 选择：{url}")
 
         if not url:
             return
@@ -43,27 +60,34 @@ def main(bot: ExtendBot,config:YAMLManager):
                     with open(img_path, 'wb') as f:
                         f.write(response.content)
                     await bot.send(event, [Image(file=img_path)])
+                    return
 
-                elif 'json' in content_type:
-                    data = response.json()
-                    img_url = data.get('数据', {}).get('pic') or data.get('data') or data.get('url')
+                if 'json' in content_type or response.text.strip().startswith('{'):
+                    try:
+                        data = response.json()
+                    except Exception:
+                        await bot.send(event, 'API 返回的 JSON 无法解析喵~')
+                        return
 
-                    if img_url:
-                        ext = os.path.splitext(urlparse(img_url).path)[1] or '.jpg'
-                        img_path = f'data/pictures/cache/{random_str()}{ext}'
-                        img_response = await client.get(img_url)
-                        with open(img_path, 'wb') as f:
-                            f.write(img_response.content)
+                    img_urls = extract_all_urls_from_json(data)
+                    if not img_urls:
+                        await bot.send(event, 'API 返回了 JSON 但没找到图片 URL 喵~')
+                        return
 
-                        msg_chain = [Image(file=img_path)]
-                        if 'artistName' in data:
-                            msg_chain.append(f'\ncoser：{data["artistName"]}')
-                        await bot.send(event, msg_chain)
-                    else:
-                        await bot.send(event, 'API 返回了 JSON 但没有图片 URL 喵~')
+                    img_url = random.choice(img_urls)
+                    bot.logger.info(f"发现图片 URL：{img_url}")
 
-                else:
-                    await bot.send(event, 'API 返回了未知格式数据喵~')
+                    ext = os.path.splitext(urlparse(img_url).path)[1] or '.jpg'
+                    img_path = f'data/pictures/cache/{random_str()}{ext}'
+                    img_response = await client.get(img_url)
+                    with open(img_path, 'wb') as f:
+                        f.write(img_response.content)
+
+                    await bot.send(event, [Image(file=img_path)])
+                    return
+
+                # 其他格式
+                await bot.send(event, 'API 返回了未知格式数据喵~')
 
         except Exception as e:
             bot.logger.error(f'API 请求失败: {e}')
@@ -75,3 +99,24 @@ def main(bot: ExtendBot,config:YAMLManager):
         elif 'webp' in content_type:
             return '.webp'
         return '.jpg'
+
+    def extract_all_urls_from_json(data):
+        urls = []
+        img_pattern = re.compile(
+            r'https?://[^\s\'"]+\.(?:jpg|jpeg|png|webp|gif|bmp|tiff|svg)(?:\?[^\s\'"]*)?',
+            re.IGNORECASE
+        )
+
+        def _scan(obj):
+            if isinstance(obj, dict):
+                for v in obj.values():
+                    _scan(v)
+            elif isinstance(obj, list):
+                for v in obj:
+                    _scan(v)
+            elif isinstance(obj, str):
+                matches = img_pattern.findall(obj)
+                urls.extend(matches)
+
+        _scan(data)
+        return urls
