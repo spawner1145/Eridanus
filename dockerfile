@@ -24,7 +24,7 @@ RUN set -eux \
 COPY requirements.txt /build/requirements.txt
 RUN pip config set global.index-url https://pypi.org/simple/ \
     && pip install --upgrade pip \
-    && pip install --no-cache-dir --prefix=/install \
+    && pip install --no-cache-dir \
         -r /build/requirements.txt \
         PyJWT \
         brotli \
