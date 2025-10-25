@@ -10,7 +10,14 @@ deb https://mirrors.tuna.tsinghua.edu.cn/debian-security $codename-security main
         curl \
         ca-certificates \
         git \
-        build-essential; \
+        build-essential \
+        pkg-config \
+        libcairo2-dev \
+        libjpeg-dev \
+        libffi-dev \
+        python3-dev \
+        cmake \
+        meson; \
     curl -fsSL https://deb.nodesource.com/setup_18.x | bash -; \
     apt-get install -y --no-install-recommends nodejs; \
     rm -rf /var/lib/apt/lists/*
@@ -41,6 +48,7 @@ deb https://mirrors.tuna.tsinghua.edu.cn/debian-security $codename-security main
         libjpeg-dev \
         zlib1g-dev \
         libpq-dev \
+        libcairo2 \
         tzdata \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
