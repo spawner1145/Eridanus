@@ -60,4 +60,4 @@ ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
 ENV TZ=Asia/Shanghai
 
 EXPOSE 5007
-CMD ["python", "Eridanus/launch.py"]
+CMD ["python", "Eridanus/main.py"]
