@@ -52,7 +52,7 @@ RUN set -eux; \
         tzdata \
         fonts-liberation \
         wget \
-        unzip; \
+        unzip \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && ln -fs /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
