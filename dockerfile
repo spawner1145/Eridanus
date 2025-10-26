@@ -33,7 +33,7 @@ RUN pip config set global.index-url https://pypi.org/simple/ && \
         cloudscraper \
         fuzzywuzzy \
         imageio \
-        python-datautil
+        python-dateutil
 
 FROM python:3.11-slim
 
