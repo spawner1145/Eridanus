@@ -31,7 +31,9 @@ RUN pip config set global.index-url https://pypi.org/simple/ && \
         pytz \
         qzone_api \
         cloudscraper \
-        fuzzywuzzy
+        fuzzywuzzy \
+        imageio \
+        python-datautil
 
 FROM python:3.11-slim
 
@@ -45,7 +47,8 @@ RUN set -eux; \
         zlib1g-dev \
         libpq-dev \
         libcairo2 \
-        tzdata; \
+        tzdata \
+        libzbar0; \
     curl -fsSL https://deb.nodesource.com/setup_18.x | bash -; \
     apt-get install -y --no-install-recommends nodejs; \
     ln -fs /usr/share/zoneinfo/Asia/Shanghai /etc/localtime; \
