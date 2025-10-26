@@ -316,6 +316,7 @@ def main(bot:ExtendBot, config):
                 if isinstance(i,Text):
                     mes_chain.append(Text(i.text))
                 elif isinstance(i,Image):
+                    bot.logger.info(i)
                     mes_chain.append(Image(file=i.file or i.url))
                 elif isinstance(i,Record):
                     mes_chain.append(Record(file=i.file or i.url))
