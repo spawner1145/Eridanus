@@ -21,15 +21,17 @@ def main(bot: ExtendBot, config: YAMLManager):
         url_map = {
             "腿": [
                 "https://api.dwo.cc/api/meizi",
-                "https://api.yujn.cn/api/tuijian",
             ],
             "黑丝": [
                 "https://api.dwo.cc/api/hs_img",
                 "https://img.sorahub.site/?tag=black%20pantyhose",
+                "https://v2.api-m.com/api/heisi?return=302",
+                ""
             ],
             "白丝": [
                 "https://api.dwo.cc/api/bs_img",
                 "https://img.sorahub.site/?tag=white%20socks",
+                "https://v2.api-m.com/api/baisi?return=302",
             ],
             "头像": [
                 "https://api.dwo.cc/api/dmtou",
