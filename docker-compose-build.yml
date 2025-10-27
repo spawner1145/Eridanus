@@ -12,7 +12,6 @@ services:
     image: docker.1ms.run/mlikiowa/napcat-docker:latest
     container_name: napcat
     ports:
-      - "3000:3000"
       - "3001:3001"
       - "6099:6099"
     restart: unless-stopped
@@ -26,7 +25,7 @@ services:
   eridanus:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: dockerfile
     container_name: eridanus
     ports:
       - "5007:5007"
