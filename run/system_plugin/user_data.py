@@ -223,10 +223,17 @@ def main(bot,config):
             if match: #f
                 target_qq = match.group(1)
                 if '用户' in event.raw_message:
-                    await call_permit(bot, event, config, target_qq, 1)
+                    await update_user(user_id=target_qq, permission=1)
+                    await bot.send(event, [At(qq=int(target_qq)), f' 被设定为用户'])
+                elif '关注者' in event.raw_message:
+                    await update_user(user_id=target_qq, permission=2)
+                    await bot.send(event, [At(qq=int(target_qq)), f' 被设定为关注者'])
                 elif '贡献者' in event.raw_message:
-                    await call_permit(bot, event, config, target_qq, 2)
+                    await update_user(user_id=target_qq, permission=3)
+                    await bot.send(event, [At(qq=int(target_qq)), f' 被设定为贡献者'])
                 elif '信任' in event.raw_message:
-                    await call_permit(bot, event, config, target_qq, 3)
+                    await update_user(user_id=target_qq, permission=4)
+                    await bot.send(event, [At(qq=int(target_qq)), f' 被设定为信任者'])
                 elif '管理员' in event.raw_message:
-                    await call_permit(bot, event, config, target_qq, 10)
+                    await update_user(user_id=target_qq, permission=10)
+                    await bot.send(event, [At(qq=int(target_qq)), f' 被设定为管理员'])
