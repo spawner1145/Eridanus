@@ -54,7 +54,7 @@ def main(bot: ExtendBot, config):
                 await bot.send(event, str(r))
             else:
                 flag = False
-                for single_group in config.groupManager.config["自定义入群欢迎"]:
+                for single_group in config.groupManager.config["固定入群欢迎"]:
                     if event.group_id in single_group:
                         mes = single_group[event.group_id]
                         await bot.send(event, mes)
