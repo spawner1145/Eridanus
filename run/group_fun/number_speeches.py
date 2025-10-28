@@ -115,7 +115,7 @@ def main(bot, config):
                 context=context.replace(i,'')
                 flag=False
         if flag:return
-        if '今日' == context or '每日' == context:today = datetime.now()
+        if context in ['今日','每日','本日']:today = datetime.now()
         elif '昨日' == context:today =datetime.now() - timedelta(days=1)
         elif '明日' == context:
             await bot.send(event, '小南娘说话还挺逗')
@@ -129,7 +129,10 @@ def main(bot, config):
         target_group = int(event.group_id)
         number_speeches_check_list = []
         #处理得出本群的人员信息表
-        for user in all_users:
+        friendlist_get = await bot.get_group_member_list(event.group_id)
+        friendlist = [str(friend['user_id']) for friend in friendlist_get["data"]]
+        for user in friendlist:
+            if user not in all_users:continue
             if 'number_speeches' in all_users[user] and f'{target_group}' in all_users[user]['number_speeches'] and current_day in all_users[user]['number_speeches'][f'{target_group}']:
                 try:
                     target_name = (await bot.get_group_member_info(target_group, user))['data']['nickname']
@@ -143,7 +146,7 @@ def main(bot, config):
             if len(number_speeches_check_list) >= 16: break
         for idx, item in enumerate(number_speeches_check_list, start=1):
             item["rank"] = idx
-        bot.logger.info(f"进入图片制作")
+        bot.logger.info(f"进入发言排行榜图片制作")
         number_speeches_check_draw_list = [
             {'type': 'basic_set','img_width':1200,'auto_line_change':False},
             {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],
@@ -165,7 +168,7 @@ def main(bot, config):
                 context=context.replace(i,'')
                 flag=False
         if flag:return
-        if '本月' == context or '当月' == context:today = datetime.now()
+        if context in ['本月','当月','月度']:today = datetime.now()
         elif '上个月' == context or '上月' == context:
 
             today =datetime.now() - relativedelta(months=1)
@@ -176,12 +179,15 @@ def main(bot, config):
         bot.logger.info(f"获取到发言排行榜查询需求")
         recall_id = await bot.send(event, f'收到查询指令，请耐心等待喵')
         year, month, day = today.year, today.month, today.day
-        current_month = f'{year}_{month}'
+        current_month = f'{year}_{month}_'
         all_users =await db.read_all_users()
         target_group = int(event.group_id)
         number_speeches_check_list = []
         #处理得出本群的人员信息表
-        for user in all_users:
+        friendlist_get = await bot.get_group_member_list(event.group_id)
+        friendlist = [str(friend['user_id']) for friend in friendlist_get["data"]]
+        for user in friendlist:
+            if user not in all_users:continue
             if 'number_speeches' in all_users[user] and f'{target_group}' in all_users[user]['number_speeches']:
                 count=0
                 for count_check in all_users[user]['number_speeches'][f'{target_group}']:
@@ -198,7 +204,67 @@ def main(bot, config):
             if len(number_speeches_check_list) >= 16: break
         for idx, item in enumerate(number_speeches_check_list, start=1):
             item["rank"] = idx
-        bot.logger.info(f"进入图片制作")
+        bot.logger.info(f"进入发言排行榜图片制作")
+        number_speeches_check_draw_list = [
+            {'type': 'basic_set','img_width':1400,'auto_line_change':False},
+            {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],
+             'content': [f"[name]{context}发言排行榜[/name]\n[time]{datetime.now().strftime('%Y年%m月%d日 %H:%M')}[/time]"]},
+            {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={list['name']}&s=640" for list in number_speeches_check_list],
+             'content': [f"[name]{list['nicknime']}[/name]\n[time]发言次数：{list['number_speeches_count']}次 排名：{list['rank']}[/time]" for list in number_speeches_check_list], 'number_per_row': 2,
+             'background': [f"https://q1.qlogo.cn/g?b=qq&nk={list['name']}&s=640" for list in number_speeches_check_list]},
+        ]
+        await bot.send(event, Image(file=(await manshuo_draw(number_speeches_check_draw_list))))
+        await bot.recall(recall_id['data']['message_id'])
+
+
+
+    @bot.on(GroupMessageEvent)
+    async def number_speeches_check_year(event: GroupMessageEvent):
+        context = event.pure_text
+        flag=True
+        for i in ['发言排行','发言次数','bb次数','bb排行','b话王','逼话王','壁画王']:
+            if i in context:
+                context=context.replace(i,'')
+                flag=False
+        if flag:return
+        today = datetime.now()
+        year, month, day = today.year, today.month, today.day
+        if context in ['今年','年度']:pass
+        elif '去年' == context or '去年' == context:
+            year -= 1
+        elif context in ['明年','来年']:
+            await bot.send(event, '小南娘说话还挺逗')
+            return
+        else:return
+        bot.logger.info(f"获取到发言排行榜查询需求")
+        recall_id = await bot.send(event, f'收到查询指令，请耐心等待喵')
+
+        current_month = f'{year}_'
+        all_users =await db.read_all_users()
+        target_group = int(event.group_id)
+        number_speeches_check_list = []
+        #处理得出本群的人员信息表
+        friendlist_get = await bot.get_group_member_list(event.group_id)
+        friendlist = [str(friend['user_id']) for friend in friendlist_get["data"]]
+        for user in friendlist:
+            if user not in all_users:continue
+            if 'number_speeches' in all_users[user] and f'{target_group}' in all_users[user]['number_speeches']:
+                count=0
+                for count_check in all_users[user]['number_speeches'][f'{target_group}']:
+                    if current_month in count_check: count += int(all_users[user]['number_speeches'][f'{target_group}'][count_check])
+                try:
+                    target_name = (await bot.get_group_member_info(target_group, user))['data']['nickname']
+                except:
+                    target_name = '小壁画'
+                number_speeches_check_list.append({'name':user,'nicknime':target_name,'number_speeches_count':count})
+        number_speeches_check_list_nolimited = sorted(number_speeches_check_list, key=lambda x: x["number_speeches_count"], reverse=True)
+        number_speeches_check_list=[]
+        for item in number_speeches_check_list_nolimited:
+            number_speeches_check_list.append(item)
+            if len(number_speeches_check_list) >= 16: break
+        for idx, item in enumerate(number_speeches_check_list, start=1):
+            item["rank"] = idx
+        bot.logger.info(f"进入发言排行榜图片制作")
         number_speeches_check_draw_list = [
             {'type': 'basic_set','img_width':1400,'auto_line_change':False},
             {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],
