@@ -212,7 +212,7 @@ def main(bot, config):
     #菜单
     @bot.on(GroupMessageEvent)
     async def menu_steamid(event: GroupMessageEvent):
-        if event.pure_text.lower() == 'steamhelp':
+        if event.pure_text.lower() in ['steamhelp','steam帮助'] :
             draw_json=[
             {'type': 'basic_set','img_name_save': 'steamhelp.png'},
             {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={event.self_id}&s=640"],'upshift_extra':15,
