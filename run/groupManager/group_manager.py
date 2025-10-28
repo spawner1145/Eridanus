@@ -36,7 +36,8 @@ def main(bot: ExtendBot, config):
     @bot.on(GroupDecreaseNoticeEvent)
     async def group_decrease(event: GroupDecreaseNoticeEvent):
         if event.user_id != event.self_id:
-            await bot.send_group_message(event.group_id, f"{event.user_id} 悄悄离开了")
+            if config.groupManager.config["退群通知"]:
+                await bot.send_group_message(event.group_id, f"{event.user_id} 悄悄离开了")
 
     @bot.on(GroupIncreaseNoticeEvent)
     async def GroupIncreaseNoticeHandler(event: GroupIncreaseNoticeEvent):
@@ -53,7 +54,7 @@ def main(bot: ExtendBot, config):
                 await bot.send(event, str(r))
             else:
                 flag = False
-                for single_group in config.groupManager.config["固定入群欢迎"]:
+                for single_group in config.groupManager.config["自定义入群欢迎"]:
                     if event.group_id in single_group:
                         mes = single_group[event.group_id]
                         await bot.send(event, mes)
