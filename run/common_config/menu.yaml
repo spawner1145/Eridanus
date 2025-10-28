@@ -1,4 +1,4 @@
-help_menu: #不要在webui修改本文件！不要在webui修改本文件！
+help_menu: #如果打开菜单编辑器发现内容为空，请先运行一遍/remenu！！！
   send_as_node: true
   send_text: "项目文档：https://eridanus.netlify.app/\n项目地址：https://github.com/AOrbitron/Eridanus"      #跟随菜单附带的文字
 
