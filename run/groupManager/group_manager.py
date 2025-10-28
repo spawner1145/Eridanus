@@ -4,7 +4,7 @@ from framework_common.framework_util.websocket_fix import ExtendBot
 from run.ai_llm.service.aiReplyCore import aiReplyCore
 from framework_common.database_util.User import get_user
 from run.groupManager.func_collection import quit_group
-
+from developTools.message.message_components import Text, Image, At
 
 def main(bot: ExtendBot, config):
     checked_group = []
@@ -36,7 +36,8 @@ def main(bot: ExtendBot, config):
     @bot.on(GroupDecreaseNoticeEvent)
     async def group_decrease(event: GroupDecreaseNoticeEvent):
         if event.user_id != event.self_id:
-            await bot.send_group_message(event.group_id, f"{event.user_id} 悄悄离开了")
+            if config.groupManager.config["退群通知"]:
+                await bot.send_group_message(event.group_id, f"{event.user_id} 悄悄离开了")
 
     @bot.on(GroupIncreaseNoticeEvent)
     async def GroupIncreaseNoticeHandler(event: GroupIncreaseNoticeEvent):
@@ -50,16 +51,19 @@ def main(bot: ExtendBot, config):
                 r = await aiReplyCore([{"text": f"{name}加入了群聊，为他发送入群欢迎语"}], event.group_id, config,
                                       bot=bot,
                                       tools=None)
-                await bot.send(event, str(r))
+                if config.groupManager.config["is_at"]: await bot.send(event, [At(qq=event.user_id), str(r)])
+                else: await bot.send(event, str(r))
             else:
                 flag = False
                 for single_group in config.groupManager.config["固定入群欢迎"]:
                     if event.group_id in single_group:
                         mes = single_group[event.group_id]
-                        await bot.send(event, mes)
+                        if config.groupManager.config["is_at"]: await bot.send(event, [At(qq=event.user_id), mes])
+                        else: await bot.send(event, mes)
                         flag = True
                 if not flag:
-                    await bot.send(event, config.groupManager.config["通用入群欢迎"])
+                    if config.groupManager.config["is_at"]: await bot.send(event, [At(qq=event.user_id), config.groupManager.config["通用入群欢迎"]])
+                    else: await bot.send(event, config.groupManager.config["通用入群欢迎"])
 
     @bot.on(GroupMessageEvent)
     async def group_message(event: GroupMessageEvent):

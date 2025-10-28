@@ -21,12 +21,13 @@ async def call_menu(bot, event, config):
     for file in os.listdir('data/pictures/doc'):
         if file.endswith('.png'):
             file_lists.append(file)
+    send_text = config.common_config.menu["help_menu"]["send_text"].replace(r'\\n','\n').replace(r'\n','\n')
     if file_lists == []:
-        await bot.send(event, f'图片菜单丢失，请联系管理员重新生成\n{config.common_config.menu["help_menu"]["send_text"]}')
+        await bot.send(event, f'图片菜单丢失，请联系管理员重新生成\n{send_text}')
         return
     if config.common_config.menu["help_menu"]["send_as_node"]:
         node_list = [Node(
-            content=[Text(config.common_config.menu["help_menu"]["send_text"])])]
+            content=[Text(send_text)])]
 
         for file_name in file_lists:
             node_list.append(Node(content=[Image(file=os.path.join('data/pictures/doc', file_name))]))
@@ -34,7 +35,7 @@ async def call_menu(bot, event, config):
     else:
         file_lists.sort(key=lambda x: int(x.split('page')[-1].replace('.png','')))
         for file_name in file_lists:reply_list.append(Image(file=os.path.join('data/pictures/doc', file_name)))
-        reply_list.append(config.common_config.menu["help_menu"]["send_text"])
+        reply_list.append(send_text)
         await bot.send(event, reply_list)
 
 

@@ -6,7 +6,7 @@ import time
 from asyncio import sleep
 import shutil
 from pathlib import Path
-
+import pprint
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, FriendRequestEvent, GroupRequestEvent, \
     LifecycleMetaEvent
 from developTools.message.message_components import Record, Text, Image, File, Node, Mface
@@ -316,8 +316,7 @@ def main(bot:ExtendBot, config):
                 if isinstance(i,Text):
                     mes_chain.append(Text(i.text))
                 elif isinstance(i,Image):
-                    bot.logger.info(i)
-                    mes_chain.append(Image(file=i.file or i.url))
+                    mes_chain.append(Image(file=i.url or i.file))
                 elif isinstance(i,Record):
                     mes_chain.append(Record(file=i.file or i.url))
                 elif isinstance(i,File):
@@ -326,6 +325,7 @@ def main(bot:ExtendBot, config):
                     mes_chain.append(Mface(file=i.file or i.url))
                 else:
                     mes_chain.append(i)
+            #pprint.pprint(mes_chain)
             await bot.send(event,f"正在转发消息至所有群，请稍后...\n任务群数量：{len(groups['data'])}")
             for group in groups["data"]:
                 try:

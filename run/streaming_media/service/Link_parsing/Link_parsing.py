@@ -95,7 +95,7 @@ async def link_prising(url,filepath=None,proxy=None,type=None):
                     #traceback.print_exc()
                     continue
 
-
+        logger.info(f"解析完成，返回识别结果")
         return link_prising_json
     else:
         json_check['status'] = False
@@ -120,7 +120,6 @@ if __name__ == "__main__":#测试用，不用管
     url='https://live.bilibili.com/1947172143'
     url='https://t.bilibili.com/1082791822623768624?share_source=pc_native'
     url='https://t.bilibili.com/1091661166310064137'
-    url='https://gal.manshuo.ink/archives/692/'
 
     asyncio.run(link_prising(url))
     #asyncio.run(youxi_pil_new_text())
