@@ -104,7 +104,7 @@ def main(bot: ExtendBot,config: YAMLManager):
                 try:
                     await check_cookie_expire()
                 except Exception as e:
-                    await login_task_wrapper(event)
+                    await login_task_wrapper(None)
                     bot.logger.error(f"cookie过期监测失败: {str(e)}")
     """
     控制指令
