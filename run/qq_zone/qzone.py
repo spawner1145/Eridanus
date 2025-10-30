@@ -93,7 +93,7 @@ def main(bot: ExtendBot,config: YAMLManager):
                 g_tk = login_result["bkn"]
                 #print(login_result)
                 r = await qzone._get_zone(target_qq=target_qq, g_tk=g_tk, cookies=cookies)
-                print(r,type(r))
+                #print(r,type(r))
                 if '"code":0' not in r:
                     await bot.send_friend_message(config.common_config.basic_config["master"]['id'],
                                                   [Text(f"cookie可能过期: {r.get('msg')}")])
