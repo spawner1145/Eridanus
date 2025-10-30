@@ -73,7 +73,40 @@ def main(bot: ExtendBot,config: YAMLManager):
                 return
             login_result = await qzone_login.login()
     """
-    cookie过期监测还没做
+    cookie过期监测
+    """
+    activated_monitor = False
+    @bot.on(GroupMessageEvent)
+    async def monitor_cookie_expire(event: GroupMessageEvent):
+        nonlocal activated_monitor
+        if not activated_monitor:
+            activated_monitor = True
+            async def check_cookie_expire():
+                nonlocal login_result
+                login_result["qq"] = login_result["qq"].replace("o", "")
+                target_qq = int(login_result["qq"])
+
+                cookies = login_result["cookies"]
+                cookies = '; '.join([f"{k}={v}" for k, v in cookies.items()])
+
+                g_tk = login_result["bkn"]
+                #print(login_result)
+                r = await qzone._get_zone(target_qq=target_qq, g_tk=g_tk, cookies=cookies)
+                #print(r)
+                if r.get("code") != 0:
+                    await bot.send_friend_message(config.common_config.basic_config["master"]['id'],
+                                                  [Text(f"cookie可能过期: {r.get('msg')}")])
+                    await login_task_wrapper(event)
+                    bot.logger.warning(f"cookie过期: {r.get('code')}")
+            while True:
+                await asyncio.sleep(3600)
+                try:
+                    await check_cookie_expire()
+                except Exception as e:
+                    await login_task_wrapper(event)
+                    bot.logger.error(f"cookie过期监测失败: {str(e)}")
+    """
+    控制指令
     """
     @bot.on(GroupMessageEvent)
     async def handle_group_message_event(event: GroupMessageEvent):
@@ -87,20 +120,21 @@ def main(bot: ExtendBot,config: YAMLManager):
         elif qzone_status and event.user_id==config.common_config.basic_config["master"]['id']:
             qzone_status=False
             await set_cache(event)
-
-        '''if event.pure_text=="test":
-            nonlocal login_result
-            cookies = login_result["cookies"]
+        elif event.pure_text=="获取动态":
+            await bot.send(event, [Text("正在获取动态...")])
             login_result["qq"]=login_result["qq"].replace("o","")
+            target_qq=int(login_result["qq"])
 
-            r=await qzone._send_zone_with_pic(
-                target_qq=int(login_result["qq"]),
-                content="test",
-                pic_path="D:\python\Eridanus\FIfk1xV.png",
-                cookies=cookies,
-                g_tk=login_result["bkn"]
-            )
-            print(r)'''
+            cookies = login_result["cookies"]
+            cookies='; '.join([f"{k}={v}" for k, v in cookies.items()])
+
+            g_tk = login_result["bkn"]
+            print(login_result)
+            r=await qzone._get_zone(target_qq=target_qq,g_tk=g_tk,cookies=cookies)
+            print(r)
+            if r.get("code")!=0:
+                await bot.send_friend_message(config.common_config.basic_config["master"]['id'], [Text(f"cookie可能过期: {r.get('msg')}")])
+
 
     @bot.on(PrivateMessageEvent)
     async def handle_private_message_event(event: PrivateMessageEvent):
@@ -114,6 +148,7 @@ def main(bot: ExtendBot,config: YAMLManager):
         elif qzone_status and event.user_id==config.common_config.basic_config["master"]['id']:
             qzone_status=False
             await set_cache(event)
+
 
     async def set_cache(event):
         text_cache = ""

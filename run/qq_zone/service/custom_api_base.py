@@ -25,6 +25,7 @@ class ApiBaseFixed:
                     if response.status == 200:
                         content = await response.text()
                         logger.debug(f"POST响应内容: {content[:100]}")
+                        print(response.cookies)
                         if 'text/html' in response.headers.get('Content-Type', ''):
                             match = re.search(r'({.*})', content)
                             if match:
@@ -65,5 +66,5 @@ class ApiBaseFixed:
                     logger.error(f"请求失败状态码: {response.status}")
                     return None
         except Exception as e:
-            logger.error(f"请求异常: {e}")
+            traceback.print_exc()
             return None
