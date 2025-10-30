@@ -4,6 +4,7 @@ import datetime
 import json
 import random
 import re
+import traceback
 import uuid
 from asyncio import sleep
 from pathlib import Path
@@ -78,12 +79,11 @@ def main(bot: ExtendBot,config: YAMLManager):
     activated_monitor = False
     @bot.on(GroupMessageEvent)
     async def monitor_cookie_expire(event: GroupMessageEvent):
-        nonlocal activated_monitor
+        nonlocal activated_monitor,login_result
         if not activated_monitor:
             bot.logger.info("启动 qzone cookie 过期监测")
             activated_monitor = True
             async def check_cookie_expire():
-                nonlocal login_result
                 login_result["qq"] = login_result["qq"].replace("o", "")
                 target_qq = int(login_result["qq"])
 
@@ -105,6 +105,7 @@ def main(bot: ExtendBot,config: YAMLManager):
                     await check_cookie_expire()
                 except Exception as e:
                     await login_task_wrapper(None)
+                    traceback.print_exc()
                     bot.logger.error(f"cookie过期监测失败: {str(e)}")
     """
     控制指令
