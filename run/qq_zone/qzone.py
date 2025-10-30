@@ -81,8 +81,9 @@ def main(bot: ExtendBot,config: YAMLManager):
     async def monitor_cookie_expire(event: GroupMessageEvent):
         nonlocal activated_monitor,login_result
         if not activated_monitor:
-            bot.logger.info("启动 qzone cookie 过期监测")
             activated_monitor = True
+            bot.logger.info("启动 qzone cookie 过期监测")
+
             async def check_cookie_expire():
                 login_result["qq"] = login_result["qq"].replace("o", "")
                 target_qq = int(login_result["qq"])
@@ -95,10 +96,10 @@ def main(bot: ExtendBot,config: YAMLManager):
                 r = await qzone._get_zone(target_qq=target_qq, g_tk=g_tk, cookies=cookies)
                 #print(r,type(r))
                 if '"code":0' not in r:
-                    await bot.send_friend_message(config.common_config.basic_config["master"]['id'],
-                                                  [Text(f"cookie可能过期: {r.get('msg')}")])
+                    #await bot.send_friend_message(config.common_config.basic_config["master"]['id'],
+                                                  #[Text(f"cookie可能过期: {r.get('msg')}")])
                     await login_task_wrapper(event)
-                    bot.logger.warning(f"cookie过期: {r.get('code')}")
+                    bot.logger.warning(f"cookie过期: {r}")
                 else:
                     bot.logger.info("cookie 未过期")
             while True:
