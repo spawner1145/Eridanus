@@ -93,20 +93,22 @@ def main(bot: ExtendBot,config: YAMLManager):
                 g_tk = login_result["bkn"]
                 #print(login_result)
                 r = await qzone._get_zone(target_qq=target_qq, g_tk=g_tk, cookies=cookies)
-                #print(r)
-                if r.get("code") != 0:
+                print(r,type(r))
+                if '"code":0' not in r:
                     await bot.send_friend_message(config.common_config.basic_config["master"]['id'],
                                                   [Text(f"cookie可能过期: {r.get('msg')}")])
                     await login_task_wrapper(event)
                     bot.logger.warning(f"cookie过期: {r.get('code')}")
+                else:
+                    bot.logger.info("cookie 未过期")
             while True:
-                await asyncio.sleep(1000)
                 try:
                     await check_cookie_expire()
                 except Exception as e:
                     await login_task_wrapper(None)
                     traceback.print_exc()
                     bot.logger.error(f"cookie过期监测失败: {str(e)}")
+                await asyncio.sleep(600)
     """
     控制指令
     """
@@ -134,9 +136,11 @@ def main(bot: ExtendBot,config: YAMLManager):
             print(login_result)
             r=await qzone._get_zone(target_qq=target_qq,g_tk=g_tk,cookies=cookies)
             print(r)
-            if r.get("code")!=0:
+            if '"code":0' not in r:
+                bot.logger.warning(f"获取动态失败: {r}")
                 await bot.send_friend_message(config.common_config.basic_config["master"]['id'], [Text(f"cookie可能过期: {r.get('msg')}")])
-
+            else:
+                bot.logger.info("cookie 未过期")
 
     @bot.on(PrivateMessageEvent)
     async def handle_private_message_event(event: PrivateMessageEvent):
