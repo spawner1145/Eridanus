@@ -102,13 +102,14 @@ def main(bot: ExtendBot,config: YAMLManager):
                 else:
                     bot.logger.info("cookie 未过期")
             while True:
+                bot.logger.info("开始 cookie 过期监测: 尝试抓取空间动态")
                 try:
                     await check_cookie_expire()
                 except Exception as e:
                     await login_task_wrapper(None)
                     traceback.print_exc()
                     bot.logger.error(f"cookie过期监测失败: {str(e)}")
-                await asyncio.sleep(600)
+                await asyncio.sleep(250)
     """
     控制指令
     """
