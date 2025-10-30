@@ -99,7 +99,7 @@ def main(bot: ExtendBot,config: YAMLManager):
                     await login_task_wrapper(event)
                     bot.logger.warning(f"cookie过期: {r.get('code')}")
             while True:
-                await asyncio.sleep(3600)
+                await asyncio.sleep(1000)
                 try:
                     await check_cookie_expire()
                 except Exception as e:
