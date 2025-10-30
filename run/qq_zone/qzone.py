@@ -80,6 +80,7 @@ def main(bot: ExtendBot,config: YAMLManager):
     async def monitor_cookie_expire(event: GroupMessageEvent):
         nonlocal activated_monitor
         if not activated_monitor:
+            bot.logger.info("启动 qzone cookie 过期监测")
             activated_monitor = True
             async def check_cookie_expire():
                 nonlocal login_result
