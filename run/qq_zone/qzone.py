@@ -109,7 +109,7 @@ def main(bot: ExtendBot,config: YAMLManager):
                     await login_task_wrapper(None)
                     traceback.print_exc()
                     bot.logger.error(f"cookie过期监测失败: {str(e)}")
-                await asyncio.sleep(250)
+                await asyncio.sleep(150)
     """
     控制指令
     """
