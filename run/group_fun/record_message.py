@@ -178,7 +178,7 @@ def main(bot, config):
             elif len("".join(parts)) >= 400: img_width = 2000
             draw_list.append(
                 {'type': 'avatar', 'img': [item['avatar_img']],'content': [f"[name]{item['nickname']}[/name]   [time]{item['time']}[/time]"],'padding_up_bottom':8,'padding_up_font':10,'avatar_size':50,'font_name_size':28})
-            draw_list.append(f'   {item['content']}')
+            draw_list.append(f"   {item['content']}")
         #print(f'final img width: {img_width}')；
         #pprint.pprint(draw_list)
         draw_list.append({'type': 'basic_set', 'img_width': img_width, 'font_title_size':125,'img_path_save':img_path_save, 'img_name_save': img_name_save, 'padding_up_layer':10})
