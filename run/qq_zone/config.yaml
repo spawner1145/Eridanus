@@ -7,3 +7,5 @@
     enable: true
     time: 21/3      #推送时间
     绘制图片: false  #是否绘制图片
+cookie设置:
+  保活: false  #是否开启保活，目前未经充分测试。
