@@ -79,17 +79,19 @@ def main(bot: ExtendBot,config: YAMLManager):
     """
     global activated_monitor
     activated_monitor = False
-    global failed_times
-    failed_times=0
+    failed_times = 0
+
     @bot.on(LifecycleMetaEvent)
     async def monitor_cookie_expire(event: LifecycleMetaEvent):
         global activated_monitor
-        nonlocal login_result
+        global failed_times
+        global login_result  # 如果 login_result 是模块全局变量
         if not activated_monitor:
             activated_monitor = True
             bot.logger.info("启动 qzone cookie 过期监测")
 
             async def check_cookie_expire():
+                global failed_times
                 login_result["qq"] = login_result["qq"].replace("o", "")
                 target_qq = int(login_result["qq"])
 
@@ -103,12 +105,11 @@ def main(bot: ExtendBot,config: YAMLManager):
                 if '"code":0' not in r:
                     #await bot.send_friend_message(config.common_config.basic_config["master"]['id'],
                                                   #[Text(f"cookie可能过期: {r.get('msg')}")])
-                    global failed_times
+
                     failed_times+=1
                     if failed_times>3: await login_task_wrapper(event)
                     bot.logger.warning(f"cookie过期: {r}")
                 else:
-                    global failed_times
                     failed_times=0
                     bot.logger.info("cookie 未过期")
             while True:
