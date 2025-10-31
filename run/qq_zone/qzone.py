@@ -77,10 +77,11 @@ def main(bot: ExtendBot,config: YAMLManager):
     cookie过期监测
     """
     activated_monitor = False
-    @bot.on(GroupMessageEvent)
-    async def monitor_cookie_expire(event: GroupMessageEvent):
+    @bot.on(LifecycleMetaEvent)
+    async def monitor_cookie_expire(event: LifecycleMetaEvent):
         nonlocal activated_monitor,login_result
         if not activated_monitor:
+
             activated_monitor = True
             bot.logger.info("启动 qzone cookie 过期监测")
 
