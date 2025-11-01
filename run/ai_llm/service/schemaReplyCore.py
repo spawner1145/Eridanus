@@ -18,7 +18,7 @@ async def schemaReplyCore(config,schema: Dict[str, Any],user_message: str,user_i
         if group_messages_bg:
             copy_history.insert(0,group_messages_bg[0])
             copy_history.insert(1,group_messages_bg[1])
-        model_response_parts = await gemini_chatter.chat(copy_history, schema)
+        model_response_parts = await gemini_chatter.chat(copy_history, schema,func_model_name=config.ai_code_generator.ai_coder["使用模型"])
         if config.ai_code_generator.ai_coder["多轮对话"] and keep_history:
             copy_history.append({"role": "model", "parts":[{"text": str(model_response_parts)}]})
             await update_user_history(user_id, copy_history)
