@@ -2,12 +2,11 @@ plugin_description="系统功能"
 
 
 dynamic_imports = {
-    "run.system_plugin.func_collection": ["operate_group_push_tasks"],
     "run.system_plugin.Mface_Record": ["call_send_mface"],
-    "run.system_plugin.user_data": [
+    "run.system_plugin.func_collection": [
         "call_user_data_register", "call_user_data_query", "call_user_data_sign",
         "call_change_city", "call_change_name", "call_permit",
-        "call_delete_user_history", "call_clear_all_history"
+        "call_delete_user_history", "call_clear_all_history","operate_group_push_tasks"
     ],
 }
 function_declarations=[
