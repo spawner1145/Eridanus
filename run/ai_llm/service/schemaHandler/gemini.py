@@ -38,7 +38,7 @@ class GeminiFormattedChat:
         self._client = httpx.AsyncClient(proxies=self.proxies)
         #self.history: List[Dict[str, Any]] = [] # 存储多轮对话历史
 
-    async def _send_request(self, payload: Dict[str, Any],func_model_name:str=None) -> Optional[Dict[str, Any]]:
+    async def _send_request(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         内部方法：发送HTTP请求到Gemini API。
         """
@@ -46,11 +46,7 @@ class GeminiFormattedChat:
             "x-goog-api-key": self.api_key,
             "Content-Type": "application/json"
         }
-        if func_model_name:
-            temp_model_name=func_model_name
-        else:
-            temp_model_name=self.model_name
-        url=self.base_url.replace(self.model_name,temp_model_name)
+
         try:
             response = await self._client.post(self.base_url, headers=headers, json=payload, timeout=60.0)
             response.raise_for_status()  # 如果状态码是 4xx 或 5xx，则抛出异常
@@ -73,7 +69,6 @@ class GeminiFormattedChat:
         prompt: list,
         response_schema: Optional[Dict[str, Any]] = None,
         generation_config: Optional[Dict[str, Any]] = None,
-        func_model_name: str = None,
     ) -> Optional[Union[str, Dict[str, Any], List[Dict[str, Any]]]]:
         """
         发送用户消息并获取Gemini的响应。支持自定义JSON格式输出。
