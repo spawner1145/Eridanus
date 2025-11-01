@@ -65,7 +65,7 @@ def main(bot: ExtendBot,config: YAMLManager):
                 await call_change_name(bot,event,config,nickname)
 
     @bot.on(GroupMessageEvent)
-    async def handle_group_message(event):
+    async def handle_group_message1(event):
         if event.pure_text.startswith("授权#") or event.pure_text.startswith("授权群#"):
             try:
                 permission=int(event.pure_text.split("#")[2])

@@ -293,9 +293,22 @@ Card(audio="音频url", title="标题", image="封面")
 ```
 
 ## 配置文件使用
-```python
+```
 # 从config中读取配置
-api_key = config.get("api_key", "default_value")
+value = config.{module_name}{config_name}["key"]
+如插件名称为weather_plugin，配置文件名为config.yaml，假设此时配置文件内容为
+api_key: "your_api_key"
+则读取方式为：：
+api_key = config.weather_plugin.config["api_key"]
+
+
+```
+## 导入非python标准库
+```python
+from framework_common.utils.install_and_import import install_and_import
+module = install_and_import(package_name, import_name) 
+#然后进行进一步的导入，如PIL = install_and_import("pillow","PIL")
+from PIL import Image
 ```
 
 ## 注意事项
@@ -389,7 +402,7 @@ api_key = config.get("api_key", "default_value")
 - plugin_description: 插件功能描述
 - main_code: 主插件文件的完整Python代码
 - init_code: __init__.py文件的完整代码
-- config_example: 配置文件示例（如果需要，否则返回空JSON对象字符串）
+- config: 配置文件示例（如果需要，否则返回空JSON对象字符串）
 - usage_instructions: 插件使用说明
 
 注意：
@@ -397,13 +410,13 @@ api_key = config.get("api_key", "default_value")
 2. 必须使用提供的SDK接口
 3. 插件名称使用下划线命名法
 4. 确保所有import语句正确
-5. config_example如果不需要配置，请返回 {''} 的 字符串
+5. config.yaml如果不需要配置，请返回 {'example': 'example'} 的 字符串
 6. 当用户要求重新生成或修改时，新的插件名必须和先前生成的插件名保持一致
-7. 如果引入了新的第三方库，请在导入前使用
+**7. 如果使用了非python标准库，必须使用如下方式导入。此方式可以自动安装并导入依赖包。
 from framework_common.utils.install_and_import import install_and_import
 module = install_and_import(package_name, import_name) 
-然后进行进一步的导入，如watchdog = install_and_import("watchdog")
-from watchdog.watchmedo import load_config
+然后进行进一步的导入，如PIL = install_and_import("pillow","PIL")
+from PIL import Image**
 """
 
     def _create_plugin_files(self, parsed_result: Dict[str, Any]) -> Path:
