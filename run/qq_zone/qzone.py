@@ -4,11 +4,13 @@ import datetime
 import json
 import random
 import re
+import traceback
 import uuid
 from asyncio import sleep
 from pathlib import Path
 from typing import Optional, Dict, Any
 
+import aiohttp
 import httpx
 from apscheduler.triggers.cron import CronTrigger
 
@@ -73,7 +75,52 @@ def main(bot: ExtendBot,config: YAMLManager):
                 return
             login_result = await qzone_login.login()
     """
-    cookie过期监测还没做
+    cookie过期监测
+    """
+    global activated_monitor
+    activated_monitor = False
+    failed_times = 0
+
+    @bot.on(LifecycleMetaEvent)
+    async def monitor_cookie_expire(event: LifecycleMetaEvent):
+        global activated_monitor
+        if not activated_monitor and config.qq_zone.config["cookie设置"]["保活"]:
+            activated_monitor = True
+            bot.logger.info("启动 qzone cookie 过期监测")
+
+            async def check_cookie_expire():
+                global failed_times,login_result
+                login_result["qq"] = login_result["qq"].replace("o", "")
+                target_qq = int(login_result["qq"])
+
+                cookies = login_result["cookies"]
+                cookies = '; '.join([f"{k}={v}" for k, v in cookies.items()])
+
+                g_tk = login_result["bkn"]
+                #print(login_result)
+                r = await qzone._get_zone(target_qq=target_qq, g_tk=g_tk, cookies=cookies)
+                #print(r,type(r))
+                if '"code":0' not in r:
+                    #await bot.send_friend_message(config.common_config.basic_config["master"]['id'],
+                                                  #[Text(f"cookie可能过期: {r.get('msg')}")])
+
+                    failed_times+=1
+                    if failed_times>3: await login_task_wrapper(event)
+                    bot.logger.warning(f"cookie过期: {r}")
+                else:
+                    failed_times=0
+                    bot.logger.info("cookie 未过期")
+            while True:
+                bot.logger.info("开始 cookie 过期监测: 尝试抓取空间动态")
+                try:
+                    await check_cookie_expire()
+                except Exception as e:
+                    await login_task_wrapper(None)
+                    traceback.print_exc()
+                    bot.logger.error(f"cookie过期监测失败: {str(e)}")
+                await asyncio.sleep(170)
+    """
+    控制指令
     """
     @bot.on(GroupMessageEvent)
     async def handle_group_message_event(event: GroupMessageEvent):
@@ -87,20 +134,23 @@ def main(bot: ExtendBot,config: YAMLManager):
         elif qzone_status and event.user_id==config.common_config.basic_config["master"]['id']:
             qzone_status=False
             await set_cache(event)
-
-        '''if event.pure_text=="test":
-            nonlocal login_result
-            cookies = login_result["cookies"]
+        elif event.pure_text=="获取动态":
+            await bot.send(event, [Text("正在获取动态...")])
             login_result["qq"]=login_result["qq"].replace("o","")
+            target_qq=int(login_result["qq"])
 
-            r=await qzone._send_zone_with_pic(
-                target_qq=int(login_result["qq"]),
-                content="test",
-                pic_path="D:\python\Eridanus\FIfk1xV.png",
-                cookies=cookies,
-                g_tk=login_result["bkn"]
-            )
-            print(r)'''
+            cookies = login_result["cookies"]
+            cookies='; '.join([f"{k}={v}" for k, v in cookies.items()])
+
+            g_tk = login_result["bkn"]
+            print(login_result)
+            r=await qzone._get_zone(target_qq=target_qq,g_tk=g_tk,cookies=cookies)
+            print(r)
+            if '"code":0' not in r:
+                bot.logger.warning(f"获取动态失败: {r}")
+                await bot.send_friend_message(config.common_config.basic_config["master"]['id'], [Text(f"cookie可能过期: {r.get('msg')}")])
+            else:
+                bot.logger.info("cookie 未过期")
 
     @bot.on(PrivateMessageEvent)
     async def handle_private_message_event(event: PrivateMessageEvent):
@@ -114,6 +164,7 @@ def main(bot: ExtendBot,config: YAMLManager):
         elif qzone_status and event.user_id==config.common_config.basic_config["master"]['id']:
             qzone_status=False
             await set_cache(event)
+
 
     async def set_cache(event):
         text_cache = ""
@@ -218,29 +269,60 @@ def main(bot: ExtendBot,config: YAMLManager):
 
     # 定时任务执行器（留空，仅打印任务信息）
     async def task_executor(task_name, task_info):
-        logger.info_func(f"执行任务：{task_name}, 时间：{datetime.datetime.now()}")
-        if task_name=="早安":
-            r = await aiReplyCore([{"text": f"你现在要编辑一条qq空间早安消息。请在严格遵循你的角色设定的前提下，编写一条适合作为你的动态的早安问候消息(可以谈论天气、心情、感触等任意话题)。注意，本条消息面向所有用户，而不只是我。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被发送至动态。"}], random.randint(0,114514), config,bot=bot,tools=None)
-            if not config.qq_zone.config["定时发空间"][task_name]["绘制图片"]: await send_to_qzone(None,r, [])
+        logger.info(f"执行任务：{task_name}, 时间：{datetime.datetime.now()}")
+
+        # === 先获取老黄历信息 ===
+        festival_or_term = await get_almanac_info()
+        has_festival = bool(festival_or_term)
+
+        if task_name in ["早安", "晚安"]:
+            random_seed = random.randint(0, 114514)
+
+            # === 构造 prompt ===
+            if has_festival:
+                prompt = (
+                    f"你现在要编辑一条qq空间{task_name}消息。今天是{festival_or_term}，"
+                    f"请在严格遵循你的角色设定的前提下，结合{festival_or_term}的主题，"
+                    f"编写一条适合作为你的动态的{task_name}问候消息（可以谈论天气(随机天气，不要总是晴天)、"
+                    f"心情、节日/节气感触等）。注意，这条消息面向所有用户，而不只是我。"
+                    f"编辑完成后，请直接发送编辑好的内容，无需对当前提示内容做出回应，结果将直接被发送至动态。"
+                )
             else:
-                r2=await aiReplyCore([{"text": f"你现在是一个绘图bot，你需要根据你的角色设定信息，生成英文tag用于图片绘制。请紧扣早安的主题(动作、表情、场景、天气等均可任意发挥)，生成适合于stable diffusion的英文tag。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被输入至图片生成器。"}], random.randint(0,114514), config,bot=bot,tools=None)
-                if r2:
-                    img_path = await simple_call_text2img1(config,r2)
-                    if img_path:
-                        await send_to_qzone(None,r, [img_path])
-                    else:
-                        await send_to_qzone(None,r, [])
-        if task_name=="晚安":
-            r = await aiReplyCore([{"text": f"你现在要编辑一条qq空间晚安消息。请在严格遵循你的角色设定的前提下，编写一条适合作为你的动态的晚安问候消息(可以谈论天气、心情、感触等任意话题)。注意，本条消息面向所有用户，而不只是我。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被发送至动态。"}], random.randint(0,114514), config,bot=bot,tools=None)
-            if not config.qq_zone.config["定时发空间"][task_name]["绘制图片"]: await send_to_qzone(None,r, [])
+                prompt = (
+                    f"你现在要编辑一条qq空间{task_name}消息。请在严格遵循你的角色设定的前提下，"
+                    f"编写一条适合作为你的动态的{task_name}问候消息(可以谈论天气(随机天气，不要总是晴天)、心情、感触等)。"
+                    f"注意，本条消息面向所有用户，而不只是我。编辑完成后，请直接发送编辑好的内容，无需对当前提示内容做出回应，结果将直接被发送至动态。"
+                )
+
+            # === 生成文字内容 ===
+            r = await aiReplyCore([{"text": prompt}], random_seed, config, bot=bot, tools=None)
+
+            # === 是否绘制图片 ===
+            if not config.qq_zone.config["定时发空间"][task_name]["绘制图片"]:
+                await send_to_qzone(None, r, [])
             else:
-                r2=await aiReplyCore([{"text": f"你现在是一个绘图bot，你需要根据你的角色设定信息，生成英文tag用于图片绘制。请紧扣晚安的主题(动作、表情、场景、天气等均可任意发挥)，生成适合于stable diffusion的英文tag。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被输入至图片生成器。"}], random.randint(0,114514), config,bot=bot,tools=None)
+                if has_festival:
+                    tag_prompt = (
+                        f"你现在是一个绘图bot，请根据{festival_or_term}的主题生成英文tag用于图片绘制，"
+                        f"保持与{task_name}氛围相符（动作、表情、场景、天气、节日元素等均可），"
+                        f"生成适合于stable diffusion的英文tag。"
+                        f"编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被输入至图片生成器。"
+                    )
+                else:
+                    tag_prompt = (
+                        f"你现在是一个绘图bot，你需要根据你的角色设定信息，生成英文tag用于图片绘制。"
+                        f"请紧扣{task_name}的主题（动作、表情、场景、天气等均可任意发挥），"
+                        f"生成适合于stable diffusion的英文tag。编辑完成后，请直接发送编辑好的内容，无需对提示词做出回应，结果将直接被输入至图片生成器。"
+                    )
+
+                # === 生成绘图tag ===
+                r2 = await aiReplyCore([{"text": tag_prompt}], random_seed, config, bot=bot, tools=None)
                 if r2:
-                    img_path = await simple_call_text2img1(config,r2)
+                    img_path = await simple_call_text2img1(config, r2)
                     if img_path:
-                        await send_to_qzone(None,r, [img_path])
+                        await send_to_qzone(None, r, [img_path])
                     else:
-                        await send_to_qzone(None,r, [])
+                        await send_to_qzone(None, r, [])
     def create_dynamic_jobs():
         for task_name, task_info in scheduledTasks.items():
             if task_info.get("enable"):
@@ -269,3 +351,37 @@ def main(bot: ExtendBot,config: YAMLManager):
         if event.pure_text=="发送早安" and event.user_id==config.common_config.basic_config["master"]['id']:
             await bot.send(event, [Text("正在向空间发送早安消息...")])
             await task_executor("早安", scheduledTasks["早安"])
+    """
+    老黄历
+    """
+
+    async def get_almanac_info():
+        logger=bot.logger
+        """调用老黄历API，返回节日/节气信息"""
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        url = f"https://www.36jxs.com/api/Commonweal/almanac?sun={today}"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=10) as resp:
+                    data = await resp.json()
+                    if data.get("code") != 1:
+                        logger.warning(f"老黄历API返回异常: {data}")
+                        return None
+                    d = data.get("data", {})
+                    # 优先判断节气或节日
+                    solar_term = d.get("SolarTermName") or ""
+                    lunar_festival = d.get("LJie") or ""
+                    gregorian_festival = d.get("GJie") or ""
+
+                    # 取第一个节日
+                    if lunar_festival:
+                        lunar_festival = lunar_festival.split()[0]
+                    if gregorian_festival:
+                        gregorian_festival = gregorian_festival.split()[0]
+
+                    # 优先级：节气 > 农历节日 > 公历节日
+                    festival_or_term = solar_term or lunar_festival or gregorian_festival
+                    return festival_or_term
+        except Exception as e:
+            logger.error(f"获取老黄历信息失败: {e}")
+            return None

@@ -3,6 +3,7 @@ import json
 from typing import Optional, Dict, Any
 
 from qzone_api import QzoneApi
+from qzone_api.api.api_parms import get_feeds
 
 from run.qq_zone.service.QzoneResponseParser import QzoneResponseParser
 
@@ -87,4 +88,15 @@ class QzoneApiFixed(QzoneApi):
             return await api_base_fixed._make_post_request(url=f"{self.send_url}?&g_tk={g_tk}", data=params, cookies=cookies_str)
         except Exception as e:
             logger.error(f"发送说说失败: {e}")
+            return None
+    async def _get_zone(self, target_qq: int, g_tk: int, cookies: str,page:int=1,count:int=10,begintime:int=0) -> Optional[Dict[str, Any]]:
+        """获取空间动态"""
+        try:
+            # 获取动态参数
+            #print(f"target_qq:{target_qq}")
+            params = get_feeds(target_qq, g_tk,page=page,count=count,begintime=begintime)
+            #print(params)
+            return await api_base_fixed._make_get_request(self.user_url, params, cookies)
+        except Exception as e:
+            logger.error(f"获取空间动态失败: {e}")
             return None

@@ -68,7 +68,7 @@ class GeminiFormattedChat:
         self,
         prompt: list,
         response_schema: Optional[Dict[str, Any]] = None,
-        generation_config: Optional[Dict[str, Any]] = None
+        generation_config: Optional[Dict[str, Any]] = None,
     ) -> Optional[Union[str, Dict[str, Any], List[Dict[str, Any]]]]:
         """
         发送用户消息并获取Gemini的响应。支持自定义JSON格式输出。
@@ -117,7 +117,7 @@ class GeminiFormattedChat:
             "generationConfig": payload_generation_config
         }
         #print(prompt)
-        response_data = await self._send_request(payload)
+        response_data = await self._send_request(payload,func_model_name)
 
         if not response_data or "candidates" not in response_data:
             logger.error("未能从Gemini获取有效响应。")

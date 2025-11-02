@@ -14,30 +14,6 @@ def main(bot: ExtendBot, config: YAMLManager):
     help_trigger = '伪造帮助'
     error_message = "格式错误，请使用：伪造消息 QQ号 内容 | QQ号 内容 | ..."
     qq_name_api = "http://api.mmp.cc/api/qqname?qq="
-    allowed_separators = ["|", "｜"]
-    
-    # 构建分隔符正则表达式
-    separators_pattern = '|'.join(re.escape(sep) for sep in allowed_separators)
-
-    async def get_qq_nickname(qq_number,target_group=None):
-        qq_name = ''
-        """获取QQ昵称"""
-        qq_name = (await bot.get_group_member_info(target_group, qq_number))['data']['nickname']
-        if qq_name != '':
-            return qq_name
-        try:
-            url = f"{qq_name_api}{qq_number}"
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=5) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        if data.get("code") == 200 and "data" in data and "name" in data["data"]:
-                            nickname = data["data"]["name"]
-                            if nickname:
-                                qq_name = nickname
-        except Exception as e:
-            qq_name = f"用户{qq_number}"
-        return qq_name
 
 
     async def parse_message_segments(event):
@@ -47,11 +23,9 @@ def main(bot: ExtendBot, config: YAMLManager):
         pure_text=''
         for obj in event.message_chain:
             if obj.comp_type == 'text':pure_text+=f"{obj.text}"
-            elif obj.comp_type == 'image':pure_text+=f"{obj.url}.png"
+            elif obj.comp_type == 'image':pure_text+=f" {obj.url}.png"
             elif obj.comp_type == 'at':pure_text += f"{obj.qq} "
-
-        pure_text = pure_text[len(trigger_prefix):]
-
+        pure_text = pure_text[len(trigger_prefix):].lstrip()
         segments_parts = [p for p in re.split(r'[|｜]+', pure_text) if p]
         for part in segments_parts:
             segments_check = {'faker':{}, 'message_chain':[]}
@@ -59,8 +33,7 @@ def main(bot: ExtendBot, config: YAMLManager):
             m = re.match(r'^\s*(\d+)(?=\s|$)', part)
             faker_id = int(m.group(1)) if m else None
             segments_check['faker']['id'] = faker_id
-            part = part[len(f'{faker_id}'):]
-            if part.startswith(' '):part = part[len(f' '):]
+            part = part[len(f'{faker_id}'):].lstrip()
             #构造后续消息链
             if bool(re.search(r'https?://[^\s]+?\.(?:jpg|jpeg|png|gif|bmp)', part, re.IGNORECASE)):
                 parts = re.split(r'(https?://[^\s]+?\.(?:jpg|jpeg|png|gif|bmp))', part, flags=re.IGNORECASE)
@@ -115,7 +88,7 @@ def main(bot: ExtendBot, config: YAMLManager):
     async def handle_message(event):
         """处理消息事件"""
         # 检查帮助指令
-        if event.pure_text == help_trigger:
+        if event.pure_text in ['伪造消息','伪造帮助']:
             help_text = """📱 伪造转发消息插件使用说明 📱
 
 【基本格式】

@@ -5,13 +5,12 @@ from developTools.message.message_components import Record, Node, Text, Image, A
 from developTools.event.events import GroupMessageEvent
 import re
 from framework_common.manshuo_draw import *
+from datetime import datetime, timedelta
 # 构建分隔符正则表达式
 separators_pattern = '|'.join(re.escape(sep) for sep in ["|", "｜"])
 
 async def parse_message_segments(event,bot):
     """解析消息段，将图片正确分配到对应的消息段"""
-    segments = []
-    current_segment = {"text": "", "images": []}
     pure_text = ''
     # 处理图片并重新整合消息
     for obj in event.message_chain:
@@ -29,7 +28,6 @@ async def parse_message_segments(event,bot):
             except:
                 target_name = '未知用户'
             pure_text += f"@{target_name}"
-
 
     return [{'text':pure_text}]
 
@@ -66,7 +64,7 @@ def main(bot, config):
         else:
             return
         event_obj = await bot.get_msg(int(event.get("reply")[0]["id"]))
-
+        if event_obj.message[0]['type'] == 'forward': return
         check = await parse_message_segments(event_obj,bot)
         #print(check)
         context = check[0]["text"]
@@ -74,8 +72,6 @@ def main(bot, config):
         context_len = len("".join(parts))
         if '[title]' in context: context_len += 5
         img_width = 700
-
-
         userid, target_group = event_obj.sender.user_id, event.group_id
         try:
             target_name = (await bot.get_group_member_info(target_group, userid))['data']['nickname']
@@ -122,5 +118,71 @@ def main(bot, config):
          'content': [f'{context}\n{check_name}']},
         ]
         await bot.send(event, Image(file=(await manshuo_draw(draw_list))))
+
+
+
+    @bot.on(GroupMessageEvent)
+    async def record_message_reply_forword(event: GroupMessageEvent):
+        if event.get("reply") and event.get("text"):
+            context = event.get("text")[0].strip().replace(' ','')
+            if context not in ['记录消息','消息记录']: return
+        else:
+            return
+        event_obj = await bot.get_msg(int(event.get("reply")[0]["id"]))
+        if event_obj.message[0]['type'] != 'forward': return
+
+        message_check = event_obj.message[0]['data']['content']
+        #pprint.pprint(message_check)
+        #pprint.pprint(event_obj.processed_message)
+        forward_list = []
+        for item in message_check:
+            time = datetime.utcfromtimestamp(item['time']) + timedelta(hours=8)
+            per_item_check, per_result = item['message'], ''
+            for per_msg in per_item_check:
+                if per_msg['type'] == 'text':
+                    per_result += per_msg['data']['text']
+                elif per_msg['type'] == 'image':
+                    if per_result == '': per_result += f"[title][emoji]{per_msg['data']['url']}[/emoji][/title]"
+                    else: per_result += f"\n[title][emoji]{per_msg['data']['url']}[/emoji][/title]"
+                elif per_msg['type'] == 'forward':
+                    per_result += '这里是聊天记录喵'
+            per_message = {'group_id': item['group_id'], 'user_id':item['user_id'], 'nickname':item['sender']['nickname'], 'avatar_img':f"https://q1.qlogo.cn/g?b=qq&nk={item['user_id']}&s=640",
+                           'time':time.strftime('%Y-%m-%d %H:%M:%S'), 'content':per_result}
+            forward_list.append(per_message)
+        #pprint.pprint(forward_list)
+
+        userid, target_group = event_obj.sender.user_id, event.group_id
+        img_path_save = f'data/pictures/record_message/{target_group}'
+        img_number = 0
+        if os.path.exists(img_path_save):
+            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff'}
+            file_list = os.listdir(img_path_save)
+            for filename in file_list:
+                if filename.startswith(f'{userid}'):
+                    ext = os.path.splitext(filename)[1].lower()  # 获取扩展名并转小写
+                    if ext in image_extensions:
+                        img_number += 1
+            if f'{userid}_{img_number}' in file_list:
+                for i in range(len(file_list)):
+                    if f'{userid}_{img_number}' in file_list: img_number += 1
+                    else:break
+        img_name_save = f'{userid}_{img_number}.png'
+        # 保证存储文件夹存在
+        if not os.path.exists(img_path_save):
+            os.makedirs(img_path_save)
+        draw_list, img_width = [], 700
+        for item in forward_list:
+            parts = re.split(r'\[title\].*?\[/title\]', item['content'])
+            if 200 > len("".join(parts)) > 40: img_width = 1100
+            elif 400 > len("".join(parts)) >= 200: img_width = 1500
+            elif len("".join(parts)) >= 400: img_width = 2000
+            draw_list.append(
+                {'type': 'avatar', 'img': [item['avatar_img']],'content': [f"[name]{item['nickname']}[/name]   [time]{item['time']}[/time]"],'padding_up_bottom':8,'padding_up_font':10,'avatar_size':50,'font_name_size':28})
+            draw_list.append(f"   {item['content']}")
+        #print(f'final img width: {img_width}')；
+        #pprint.pprint(draw_list)
+        draw_list.append({'type': 'basic_set', 'img_width': img_width, 'font_title_size':125,'img_path_save':img_path_save, 'img_name_save': img_name_save, 'padding_up_layer':10})
+        await bot.send(event, Image(file=(await manshuo_draw(draw_list))))
+
 
 

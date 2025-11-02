@@ -1,3 +1,4 @@
 code_generation_permission_need: 100 #100级以上权限用户才可以生成代码
 prefix: "/写插件"
 多轮对话: true
+使用模型: "gemini-2.5-pro"
