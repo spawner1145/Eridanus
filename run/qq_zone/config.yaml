@@ -1,10 +1,10 @@
 定时发空间:
   早安:
-    enable: true
+    enable: false
     time: 8/3      #推送时间
     绘制图片: false  #是否绘制图片
   晚安:
-    enable: true
+    enable: false
     time: 21/3      #推送时间
     绘制图片: false  #是否绘制图片
 cookie设置:
