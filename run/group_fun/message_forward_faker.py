@@ -28,6 +28,7 @@ def main(bot: ExtendBot, config: YAMLManager):
         pure_text = pure_text[len(trigger_prefix):].lstrip()
         segments_parts = [p for p in re.split(r'[|｜]+', pure_text) if p]
         for part in segments_parts:
+            part = part.lstrip()
             segments_check = {'faker':{}, 'message_chain':[]}
             #提取开头伪造者id
             m = re.match(r'^\s*(\d+)(?=\s|$)', part)

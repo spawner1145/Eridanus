@@ -63,6 +63,7 @@ def main(bot, config):
             if context not in ['记录消息','消息记录']: return
         else:
             return
+        #print(int(event.get("reply")[0]["id"]))
         event_obj = await bot.get_msg(int(event.get("reply")[0]["id"]))
         if event_obj.message[0]['type'] == 'forward': return
         check = await parse_message_segments(event_obj,bot)
@@ -77,7 +78,7 @@ def main(bot, config):
             target_name = (await bot.get_group_member_info(target_group, userid))['data']['nickname']
         except:
             target_name = '未知用户'
-        check_name = f'                     --By {target_name}'
+        check_name = f'                   --By {target_name}'
         #print(context_len)
         if 200 > context_len > 40:
             img_width = 1100
@@ -146,7 +147,16 @@ def main(bot, config):
                     else: per_result += f"\n[title][emoji]{per_msg['data']['url']}[/emoji][/title]"
                 elif per_msg['type'] == 'forward':
                     per_result += '这里是聊天记录喵'
-            per_message = {'group_id': item['group_id'], 'user_id':item['user_id'], 'nickname':item['sender']['nickname'], 'avatar_img':f"https://q1.qlogo.cn/g?b=qq&nk={item['user_id']}&s=640",
+            user_id = event.self_id
+            if 'user_id' in item and int(item['user_id']) != 1094950020: user_id = item['user_id']
+            else:
+                try:
+                    message_id = item['message_id']
+                    event_obj_user = await bot.get_msg(int(message_id))
+                    #pprint.pprint(event_obj_user)
+                except:pass
+            #print(user_id)
+            per_message = {'group_id': item['group_id'], 'user_id':user_id, 'nickname':item['sender']['nickname'], 'avatar_img':f"https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=640",
                            'time':time.strftime('%Y-%m-%d %H:%M:%S'), 'content':per_result}
             forward_list.append(per_message)
         #pprint.pprint(forward_list)
