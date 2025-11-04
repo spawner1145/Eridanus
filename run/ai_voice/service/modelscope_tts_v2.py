@@ -86,7 +86,8 @@ class MihoyoTTS:
                     if event:
                         if "output" in event:
                             audio_url=event["output"]["data"][1]["url"]
-                            async with httpx.AsyncClient(proxies=proxies,headers=headers,timeout=None) as client:
+                            logger.info(f"audio_url: {audio_url}")
+                            async with httpx.AsyncClient(headers=headers,timeout=None) as client:
                                 response = await client.get(audio_url)
                                 with open(f"data/voice/cache/{session_hash}.wav", "wb") as f:
                                     f.write(response.content)
