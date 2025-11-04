@@ -82,6 +82,7 @@ class MihoyoTTS:
                 async for line in event_stream_response.aiter_text():
                     event = line.replace("data:", "").strip()
                     event = json.loads(event)
+                    print(event)
                     if event:
                         if "output" in event:
                             audio_url=event["output"]["data"][1]["url"]
