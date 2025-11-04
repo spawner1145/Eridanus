@@ -71,13 +71,14 @@ async def get_all_speakers(bot,event,config):
     mihoyo_speakers = all_speakers[6]
     await bot.send(event, [
         Node(content=[Text(f"使用 /xx说xxxxx")]),
-        Node(content=[Text(f"napcat_tts可用角色：\n{napcat_speakers}")]),
         Node(content=[Text(f"PrettyDerby可用角色：\n{PrettyDerby_speakers}")]),
+        Node(content=[Text(f"OttoTTS可用角色：\n{otto}")]),
+        Node(content=[Text(f"MihoyoTTS可用角色：\n{mihoyo_speakers}")]),
+        Node(content=[Text(f"napcat_tts可用角色：\n{napcat_speakers}")]),
         Node(content=[Text(f"blue_archive_speakers可用角色：\n{blue_archive_speakers}")]),
         Node(content=[Text(f"vits可用角色：\n{vits_speakers}")]),
         Node(content=[Text(f"online_vits2可用角色：\n{online_vits2_speakers}")])],
-        Node(content=[Text(f"OttoTTS可用角色：\n{otto}")]),
-        Node(content=[Text(f"MihoyoTTS可用角色：\n{mihoyo_speakers}")]),)
+                   )
 
 def main(bot: ExtendBot,config: YAMLManager):
     @bot.on(GroupMessageEvent)
