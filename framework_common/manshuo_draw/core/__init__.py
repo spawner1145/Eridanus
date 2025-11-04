@@ -1,6 +1,6 @@
 # __init__.py
 from .deal_img import deal_img
-from .db_core.RedisDatabase import *
+from .db_core import *
 from .classic_collection import json_check
 from .menu_maker import menu_maker
 
