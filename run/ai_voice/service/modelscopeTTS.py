@@ -33,8 +33,9 @@ speakers = {
         "speaker": "Speaker"
     },
     "东雪莲": {
-        "url": "https://xzjosh-azuma-bert-vits2-2-3.ms.show/run/predict",
-        "newurp": "https://xzjosh-azuma-bert-vits2-2-3.ms.show/file="
+        "url": "https://kozue001-azuma-bert-vits2.ms.show/run/predict",
+        "newurp": "https://kozue001-azuma-bert-vits2.ms.show/file=",
+        "speaker": "Azuma"
     },
     "嘉然": {
         "url": "https://www.modelscope.cn/api/v1/studio/xzjosh/Diana-Bert-VITS2-2.3/gradio/run/predict",
