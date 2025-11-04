@@ -105,7 +105,7 @@ def main(bot: ExtendBot,config: YAMLManager):
                                                   #[Text(f"cookie可能过期: {r.get('msg')}")])
 
                     failed_times+=1
-                    if failed_times>3: await login_task_wrapper(event)
+                    if failed_times>10 and config.qq_zone.config["cookie设置"]["失效时自动重新登陆"]: await login_task_wrapper(event)
                     bot.logger.warning(f"cookie过期: {r}")
                 else:
                     failed_times=0
@@ -115,10 +115,10 @@ def main(bot: ExtendBot,config: YAMLManager):
                 try:
                     await check_cookie_expire()
                 except Exception as e:
-                    await login_task_wrapper(None)
+                    #await login_task_wrapper(None)
                     traceback.print_exc()
                     bot.logger.error(f"cookie过期监测失败: {str(e)}")
-                await asyncio.sleep(170)
+                await asyncio.sleep(200)
     """
     控制指令
     """
