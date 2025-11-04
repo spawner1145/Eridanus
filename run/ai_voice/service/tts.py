@@ -115,6 +115,8 @@ class TTS:
             otto=OttoTTS()
             return await otto.speak(text)
         elif mode=="MihoyoTTS":
+            if speaker is None:
+                speaker=config.ai_voice.config["tts"]["MihoyoTTS"]["speaker"]
             Mihoyo_tts=MihoyoTTS()
             audio=Mihoyo_tts.modelscope_tts_v2(text, speaker, proxy=config.common_config.basic_config["proxy"]["http_proxy"])
             return audio
