@@ -6,7 +6,7 @@ from developTools.event.events import GroupMessageEvent
 import re
 from framework_common.manshuo_draw import *
 from datetime import datetime, timedelta
-# 构建分隔符正则表达式
+# 构建分隔符正则表达式 
 separators_pattern = '|'.join(re.escape(sep) for sep in ["|", "｜"])
 
 async def parse_message_segments(event,bot):
