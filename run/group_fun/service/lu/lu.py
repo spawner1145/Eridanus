@@ -93,7 +93,7 @@ async def rank_lu(userid_list,type_check='month',bot=None,event=None):
          'upshift_extra': 15,'content': [f"[name]{self_name} 一直在看着你哦～[/name]\n[time]看看群友都有多勤奋的🦌！[/time]"]},
         f"[title]这是本群{send_str}的开🦌排行！[/title]",
         {'type': 'math', 'subtype': 'bar_chart', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={item['userid']}&s=640" for item in user_list],
-         'number_per_row': 1, 'chart_height': 75,'max':user_list[0]['times'],'upshift_label':-5,
+         'number_per_row': 1, 'chart_height': 75,'upshift_label':-5,
          'is_stroke_label':True,'font_label_size':29,'font_label_color':(255, 255, 255),'label_color':(194, 228, 255, 255),
          'content': [item['times'] for item in user_list],'label': [f"{item['times']}次" for item in user_list]},
     ]

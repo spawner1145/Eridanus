@@ -51,9 +51,9 @@ def main(bot: ExtendBot,config: YAMLManager):
         #print(user_info)
         if event.pure_text == "注册":
             await call_user_data_register(bot,event,config)
-        elif event.pure_text =="我的信息":
+        elif event.pure_text =="我的信息" and config.system_plugin.config["user_data"]["是否启用个人信息查询"]:
             await call_user_data_query(bot,event,config)
-        elif event.pure_text == "签到":
+        elif event.pure_text == "签到" and config.system_plugin.config["user_data"]["是否启用签到"]:
             await call_user_data_sign(bot,event,config)
         elif event.pure_text.startswith("修改城市"):
             city=event.pure_text.split("修改城市")[1]

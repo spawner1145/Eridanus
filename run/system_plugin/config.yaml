@@ -13,6 +13,8 @@ api_implements: #花里胡哨
   send_like: 0     #“赞我”功能所需权限等级
   recall_level: 3  #撤回？
 user_data:
+  是否启用签到: True
+  是否启用个人信息查询: True
   签到附带原图: true
   with_taro: true     #签到是否附带塔罗图和运势
   with_img_backdrop: true   #签到是否使用图片作为背景

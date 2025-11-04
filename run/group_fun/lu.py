@@ -76,7 +76,7 @@ def main(bot, config):
     async def rank_LU(event: GroupMessageEvent):
         context, userid, type_check=event.pure_text, str(event.sender.user_id), 'month'
         #if event.message_chain.has(At):userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
-        order_list = ['🦌排行']
+        order_list = ['🦌排行','🦌排名']
         if not any(word in context for word in order_list):return
         bot.logger.info("接收到🦌排行请求")
         if any(word in context for word in ['每月','本月','当月']): type_check = 'month'
