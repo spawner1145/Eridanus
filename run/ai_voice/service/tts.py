@@ -143,7 +143,7 @@ class TTS:
         PrettyDerby_speakers=await fetch_speakers(get_PrettyDerby_speakers,error_msg="Error in get_PrettyDerby_speakers")
         blue_archive_speakers=await fetch_speakers(get_huggingface_blue_archive_speakers,error_msg="Error in get_huggingface_blue_archive_speakers")
         Mihoyo=MihoyoTTS()
-        mihoyo_speakers=Mihoyo.get_speakers()
+        mihoyo_speakers=await Mihoyo.get_speakers()
         return {"speakers": [nc_speakers,PrettyDerby_speakers,  vits_speakers, online_vits2_speakers,blue_archive_speakers,["otto"],mihoyo_speakers]}
 
 
