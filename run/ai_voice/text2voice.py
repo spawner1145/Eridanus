@@ -16,7 +16,7 @@ async def call_tts(bot,event,config,text,speaker=None,mood="中立"):
 
     # 获取所有 speakers
     all_speakers = (await call_all_speakers(bot, event, config))["speakers"]
-    ncspk, PrettyDerby_speakers, vits_speakers, online_vits2_speakers,blue_archive_speakers,otto = all_speakers
+    ncspk, PrettyDerby_speakers, vits_speakers, online_vits2_speakers,blue_archive_speakers,otto,mihoyo_speakers = all_speakers
 
     # 检查是否有可用 speakers
     if not any(all_speakers):
@@ -29,7 +29,8 @@ async def call_tts(bot,event,config,text,speaker=None,mood="中立"):
         (vits_speakers, [(speaker, "vits")]),
         (online_vits2_speakers, [(speaker, "online_vits2")]),
         (blue_archive_speakers, [(speaker, "blue_archive")]),
-        (otto, [("otto", "OttoTTS")])
+        (otto, [("otto", "OttoTTS")]),
+        (mihoyo_speakers, [(speaker, "MihoyoTTS")]),
     ]
 
     # 匹配 speaker 和 mode
@@ -66,13 +67,17 @@ async def get_all_speakers(bot,event,config):
     vits_speakers = all_speakers[2]
     online_vits2_speakers = all_speakers[3]
     blue_archive_speakers = all_speakers[4]
+    otto = all_speakers[5]
+    mihoyo_speakers = all_speakers[6]
     await bot.send(event, [
         Node(content=[Text(f"使用 /xx说xxxxx")]),
         Node(content=[Text(f"napcat_tts可用角色：\n{napcat_speakers}")]),
         Node(content=[Text(f"PrettyDerby可用角色：\n{PrettyDerby_speakers}")]),
         Node(content=[Text(f"blue_archive_speakers可用角色：\n{blue_archive_speakers}")]),
         Node(content=[Text(f"vits可用角色：\n{vits_speakers}")]),
-        Node(content=[Text(f"online_vits2可用角色：\n{online_vits2_speakers}")])], )
+        Node(content=[Text(f"online_vits2可用角色：\n{online_vits2_speakers}")])],
+        Node(content=[Text(f"OttoTTS可用角色：\n{otto}")]),
+        Node(content=[Text(f"MihoyoTTS可用角色：\n{mihoyo_speakers}")]),)
 
 def main(bot: ExtendBot,config: YAMLManager):
     @bot.on(GroupMessageEvent)

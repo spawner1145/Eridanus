@@ -5,6 +5,8 @@ tts:
   ai_translator: false  #是否使用AI翻译，默认false，提高翻译质量
   PrettyDerby:
     speaker: "natuki"  #见https://huggingface.co/spaces/AkitoP/umamusume_bert_vits2
+  MihoyoTTS:
+    speaker: "羽生田千鹤" #见https://www.modelscope.cn/studios/Genius-Society/hoyoTTS
   blue_archive:
     speaker: "JP_Mari"   #前往https://huggingface.co/spaces/ORI-Muchim/BlueArchiveTTS查看支持的speakers
   online_vits2:
