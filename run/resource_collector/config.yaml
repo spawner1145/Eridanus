@@ -32,4 +32,11 @@ JMComic:                  #禁漫相关功能设置
   autoClearPDF: True      #下载后自动清除pdf
   autoEncrypt: True       #下载后自动加密pdf
   savePath: "data/pictures/benzi"  #下载为pdf的默认保存路径
+  jm_ban:     #是否ban掉一些车牌号的下载验车
+    - 350234
+    - 350235
+  ban_answer:     #ban掉的车牌号回复语句
+    - 带着你的董卓吃大份去吧
+    - 还真是一对苦命鸳鸯
+    - 带着你的苦命鸳鸯实大变去罢！
 
