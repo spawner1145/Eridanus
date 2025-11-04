@@ -117,7 +117,7 @@ class GeminiFormattedChat:
             "generationConfig": payload_generation_config
         }
         #print(prompt)
-        response_data = await self._send_request(payload,func_model_name)
+        response_data = await self._send_request(payload)
 
         if not response_data or "candidates" not in response_data:
             logger.error("未能从Gemini获取有效响应。")
