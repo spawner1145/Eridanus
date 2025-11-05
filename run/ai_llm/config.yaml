@@ -61,15 +61,15 @@ llm:
   腾讯元器:     #极其不建议用，腾子搞得玩意稀烂，而且不支持函数调用。
     智能体ID: ""
     token: ""
-heartflow:     #心流模式，自动根据群聊内容回复。此功能极其消耗tokens，建议在自己的群内使用。
+heartflow:     #心流模式，自动根据群聊内容回复，需完成gemini相关配置。
   enabled: false
   reply_threshold: 0.6
   energy_decay_rate: 0.1
   energy_recovery_rate: 0.02
   context_messages_count: 10
   interaction_timeout: 300
-  whitelist_enabled: true
-  chat_whitelist:   #仅在白名单群内启用
+  whitelist_enabled: true  #关闭则所有群都启用
+  chat_whitelist:   #白名单群
     - 1050663831
     - 699455559
   weight_relevance: 0.25
