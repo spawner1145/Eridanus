@@ -192,7 +192,7 @@ def main(bot, config):
             try:
 
                 persona = await read_chara(user_id, await use_folder_chara(config.ai_llm.config["llm"]["chara_file_name"]))
-
+                persona=persona.replace("{bot_name}",config.common_config.basic_config["bot"])
                 if len(persona) > 500:
                     persona = await summarize_persona(persona)
 
