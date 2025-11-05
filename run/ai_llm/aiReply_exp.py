@@ -7,6 +7,7 @@ from typing import Dict
 from dataclasses import dataclass, field
 
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
+from developTools.message.message_components import At
 from framework_common.database_util.Group import get_last_20_and_convert_to_prompt
 from framework_common.database_util.User import get_user, update_user
 from framework_common.database_util.llmDB import delete_latest2_history, read_chara, use_folder_chara
@@ -414,7 +415,10 @@ def main(bot, config):
             return
         if not event.pure_text or not event.pure_text.strip():
             return
-
+        if event.message_chain.has(At):
+            if event.message_chain.get(At)[0].qq in [bot.id, 1000000]:
+                bot.logger.info(f"心流插件：跳过@机器人消息")
+                return
         # 白名单检查
         if config.ai_llm.config["heartflow"]["whitelist_enabled"]:
             if event.group_id not in config.ai_llm.config["heartflow"]["chat_whitelist"]:

@@ -63,7 +63,13 @@ def main(bot, config):
         """
         if config.ai_llm.config["heartflow"]["whitelist_enabled"]:
             if event.group_id in config.ai_llm.config["heartflow"]["chat_whitelist"]:
-                return
+                if event.message_chain.has(At):
+                    if event.message_chain.get(At)[0].qq in [bot.id,1000000]:
+                        pass
+                    else:
+                        return
+                else:
+                    return
         """
         原有处理逻辑
         """
