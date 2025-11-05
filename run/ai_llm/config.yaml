@@ -62,7 +62,7 @@ llm:
     智能体ID: ""
     token: ""
 heartflow:     #心流模式，自动根据群聊内容回复。此功能极其消耗tokens，建议在自己的群内使用。
-  enable: true
+  enabled: true
   reply_threshold: 0.6
   energy_decay_rate: 0.1
   energy_recovery_rate: 0.02
