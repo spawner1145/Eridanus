@@ -5,6 +5,7 @@
 import asyncio
 import datetime
 import time
+import traceback
 from typing import Dict
 from dataclasses import dataclass, field
 
@@ -12,7 +13,9 @@ from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from framework_common.database_util.Group import get_last_20_and_convert_to_prompt
 from framework_common.database_util.User import get_user, update_user
 from framework_common.database_util.llmDB import delete_latest2_history, read_chara, use_folder_chara
+from framework_common.utils.GeminiKeyManager import GeminiKeyManager
 from run.ai_llm.service.aiReplyCore import aiReplyCore, send_text, count_tokens_approximate
+from run.ai_llm.service.aiReplyHandler.gemini import geminiRequest
 from run.ai_llm.service.schemaReplyCore import schemaReplyCore
 
 
@@ -40,7 +43,28 @@ class ChatState:
     total_replies: int = 0
     recent_interactions: Dict[int, float] = field(default_factory=dict)
 
-
+async def gemma_reply(config,prompt,group_messages_bg=None):
+    copy_history = []
+    copy_history.append({"role": "user", "parts": [{"text": prompt}]})
+    if group_messages_bg:
+        copy_history.insert(0, group_messages_bg[0])
+        copy_history.insert(1, group_messages_bg[1])
+    #print(copy_history)
+    response_message = await geminiRequest(
+        copy_history,
+        config.ai_llm.config["llm"]["gemini"]["base_url"],
+        await GeminiKeyManager.get_gemini_apikey(),
+        config.ai_llm.config["llm"]["gemini"]["model"],
+        config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"][
+            "enable_proxy"] else None,
+        tools=None,
+        system_instruction=None,
+        temperature=config.ai_llm.config["llm"]["gemini"]["temperature"],
+        maxOutputTokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"],
+        fallback_models=["gemma-3-27b-it"],
+    )
+    print(response_message)
+    return response_message['candidates'][0]["content"]["parts"][0]["text"]
 def main(bot, config):
     """
     此插件代码参考了https://github.com/advent259141/Astrbot_plugin_Heartflow
@@ -179,26 +203,16 @@ def main(bot, config):
     async def summarize_persona(original_persona: str) -> str:
         """精简人格设定"""
         try:
-            schema = {
-                "type": "object",
-                "properties": {
-                    "summarized_persona": {
-                        "type": "string",
-                        "description": "精简后的角色设定，保留核心特征和行为方式，100-200字以内"
-                    }
-                },
-                "required": ["summarized_persona"]
-            }
 
             prompt = f"""请将以下机器人角色设定总结为简洁的核心要点。
-总结后的内容应该在100-200字以内，突出最重要的角色特点。
+            总结后的内容应该在100-200字以内，突出最重要的角色特点。
+            
+            原始角色设定：
+            {original_persona}"""
 
-原始角色设定：
-{original_persona}"""
-
-            result = await schemaReplyCore(
-                config, schema, prompt,
-                keep_history=False, user_id=0
+            result = await gemma_reply(
+                config,
+                prompt,
             )
 
             summarized = result.get("summarized_persona", "")
@@ -221,41 +235,6 @@ def main(bot, config):
                 event.group_id, config.ai_llm.config["heartflow"]["context_messages_count"], "gemini", bot
             )
 
-            schema = {
-                "type": "object",
-                "properties": {
-                    "relevance": {
-                        "type": "number",
-                        "description": "内容相关度(0-10)：消息是否有趣、有价值、适合回复",
-                        "minimum": 0, "maximum": 10
-                    },
-                    "willingness": {
-                        "type": "number",
-                        "description": "回复意愿(0-10)：基于当前精力和状态的回复意愿",
-                        "minimum": 0, "maximum": 10
-                    },
-                    "social": {
-                        "type": "number",
-                        "description": "社交适宜性(0-10)：在当前群聊氛围下回复是否合适",
-                        "minimum": 0, "maximum": 10
-                    },
-                    "timing": {
-                        "type": "number",
-                        "description": "时机恰当性(0-10)：回复时机是否恰当",
-                        "minimum": 0, "maximum": 10
-                    },
-                    "continuity": {
-                        "type": "number",
-                        "description": "对话连贯性(0-10)：当前消息与上次回复的关联程度",
-                        "minimum": 0, "maximum": 10
-                    },
-                    "reasoning": {
-                        "type": "string",
-                        "description": "详细分析原因"
-                    }
-                },
-                "required": ["relevance", "willingness", "social", "timing", "continuity", "reasoning"]
-            }
 
             recent_messages = "\n---\n".join([
                 msg.get("text", "") for msg in group_messages_bg[-5:]
@@ -283,40 +262,72 @@ def main(bot, config):
                 
                 回复阈值: {reply_threshold}
                 请从5个维度评估（0-10分）。"""
+            prompt += """
 
-            result = await schemaReplyCore(
-                config, schema, prompt,
-                keep_history=False, user_id=0,
+            请根据上述信息做出判断，并按以下格式输出：
+
+            相关度: 0-10
+            意愿: 0-10
+            社交: 0-10
+            时机: 0-10
+            连贯: 0-10
+            理由: 详细说明为什么应或不应回复（结合角色特性）
+
+            ⚠️ 请严格保持该格式，每个分数字只能写一个纯数字。
+            """
+
+            # 替换 schemaReplyCore → gemma_reply
+            result_text = await gemma_reply(
+                config,
+                prompt,
                 group_messages_bg=group_messages_bg
             )
+            #print(result_text)
+            #print(type(result_text))
+            # 使用正则解析分数
+            import re
+
+            def ext(name):
+                m = re.search(rf"(?:{name})\s*[:：]\s*(\d+)", result_text)
+                return float(m.group(1)) if m else 0.0
+
+            relevance = ext("相关度|内容相关度|relevance")
+            willingness = ext("意愿|回复意愿|willingness")
+            social = ext("社交|社交适宜性|social")
+            timing = ext("时机|时机恰当性|timing")
+            continuity = ext("连贯|对话连贯|continuity")
+
+
+            # 提取理由
+            reasoning_match = re.search(r"(理由|分析|原因)[:：]\s*(.+)", result_text, re.S)
+            reasoning = reasoning_match.group(2).strip() if reasoning_match else result_text.strip()
 
             overall_score = (
-                                    result["relevance"] * weights["relevance"] +
-                                    result["willingness"] * weights["willingness"] +
-                                    result["social"] * weights["social"] +
-                                    result["timing"] * weights["timing"] +
-                                    result["continuity"] * weights["continuity"]
+                                    relevance * weights["relevance"] +
+                                    willingness * weights["willingness"] +
+                                    social * weights["social"] +
+                                    timing * weights["timing"] +
+                                    continuity * weights["continuity"]
                             ) / 10.0
 
             should_reply = overall_score >= reply_threshold
-
-            bot.logger.info(
-                f"心流判断 | 群:{event.group_id} | 评分:{overall_score:.2f} | "
-                f"回复:{should_reply} | 理由:{result['reasoning'][:30]}..."
-            )
-
-            return JudgeResult(
-                relevance=result["relevance"],
-                willingness=result["willingness"],
-                social=result["social"],
-                timing=result["timing"],
-                continuity=result["continuity"],
-                reasoning=result["reasoning"],
+            #print(should_reply)
+            r=JudgeResult(
+                relevance=relevance,
+                willingness=willingness,
+                social=social,
+                timing=timing,
+                continuity=continuity,
+                reasoning=reasoning,
                 should_reply=should_reply,
                 confidence=overall_score,
                 overall_score=overall_score
             )
+            print(r)
+            return r
+
         except Exception as e:
+            traceback.print_exc()
             bot.logger.error(f"心流判断异常: {e}")
             return JudgeResult(should_reply=False, reasoning=f"异常: {str(e)}")
 
