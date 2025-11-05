@@ -159,7 +159,7 @@ def main(bot, config):
             if not chara_file or chara_file == "default":
                 chara_file = config.ai_llm.config["llm"]["chara_file_name"]
 
-            chara_path = f"./data/system/{chara_file}"
+            chara_path = f"./data/system/chara/{chara_file}"
             try:
                 with open(chara_path, 'r', encoding='utf-8') as f:
                     persona = f.read().strip()
