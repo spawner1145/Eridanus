@@ -1,7 +1,4 @@
-"""
-心流主动回复插件 - 基于结构化输出的智能判断系统
-完全符合框架插件规范，无需修改主程序
-"""
+
 import asyncio
 import datetime
 import time
@@ -43,28 +40,35 @@ class ChatState:
     total_replies: int = 0
     recent_interactions: Dict[int, float] = field(default_factory=dict)
 
-async def gemma_reply(config,prompt,group_messages_bg=None):
+async def gemma_reply(config,prompt,group_messages_bg=None,recursion_times=0):
     copy_history = []
     copy_history.append({"role": "user", "parts": [{"text": prompt}]})
     if group_messages_bg:
         copy_history.insert(0, group_messages_bg[0])
         copy_history.insert(1, group_messages_bg[1])
     #print(copy_history)
-    response_message = await geminiRequest(
-        copy_history,
-        config.ai_llm.config["llm"]["gemini"]["base_url"],
-        await GeminiKeyManager.get_gemini_apikey(),
-        config.ai_llm.config["llm"]["gemini"]["model"],
-        config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"][
-            "enable_proxy"] else None,
-        tools=None,
-        system_instruction=None,
-        temperature=config.ai_llm.config["llm"]["gemini"]["temperature"],
-        maxOutputTokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"],
-        fallback_models=["gemma-3-27b-it"],
-    )
-    print(response_message)
-    return response_message['candidates'][0]["content"]["parts"][0]["text"]
+    try:
+        response_message = await geminiRequest(
+            copy_history,
+            config.ai_llm.config["llm"]["gemini"]["base_url"],
+            await GeminiKeyManager.get_gemini_apikey(),
+            config.ai_llm.config["llm"]["gemini"]["model"],
+            config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"][
+                "enable_proxy"] else None,
+            tools=None,
+            system_instruction=None,
+            temperature=config.ai_llm.config["llm"]["gemini"]["temperature"],
+            maxOutputTokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"],
+            fallback_models=["gemma-3-27b-it"],
+        )
+        print(response_message)
+        return response_message['candidates'][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        traceback.print_exc()
+        recursion_times+=1
+        print(f"Recursion times: {recursion_times}")
+        if recursion_times > config.ai_llm.config["llm"]["recursion_limit"]:
+            return None
 def main(bot, config):
     """
     此插件代码参考了https://github.com/advent259141/Astrbot_plugin_Heartflow
@@ -213,6 +217,7 @@ def main(bot, config):
             result = await gemma_reply(
                 config,
                 prompt,
+                recursion_times=7
             )
 
             summarized = result.get("summarized_persona", "")
