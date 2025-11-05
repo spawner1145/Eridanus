@@ -439,8 +439,8 @@ def main(bot, config):
                     if not user_info.permission >= config.ai_llm.config["core"]["ai_reply_group"]:
                         return
 
-                    if event.group_id in [913122269, 1050663831] and not user_info.permission >= 66:
-                        return
+                    #if event.group_id in [913122269, 1050663831] and not user_info.permission >= 66:
+                        #return
 
                     if not user_info.permission >= config.ai_llm.config["core"]["ai_token_limt"]:
                         if user_info.ai_token_record >= config.ai_llm.config["core"]["ai_token_limt_token"]:
