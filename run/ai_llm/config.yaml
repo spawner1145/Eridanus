@@ -61,6 +61,21 @@ llm:
   腾讯元器:     #极其不建议用，腾子搞得玩意稀烂，而且不支持函数调用。
     智能体ID: ""
     token: ""
+heartflow:     #心流模式，自动根据群聊内容回复。此功能极其消耗tokens，建议在自己的群内使用。
+  enable: true
+  reply_threshold: 0.6
+  energy_decay_rate: 0.1
+  energy_recovery_rate: 0.02
+  context_messages_count: 10
+  interaction_timeout: 300
+  whitelist_enabled: true
+  chat_whitelist:   #仅在白名单群内启用
+    - 1050663831
+  weight_relevance: 0.25
+  weight_willingness: 0.20
+  weight_social: 0.20
+  weight_timing: 0.15
+  weight_continuity: 0.20
 core:
   ai_reply_group: 0    #群内ai对话所需权限等级
   ai_reply_private: 0  #私聊ai对话所需权限等级
