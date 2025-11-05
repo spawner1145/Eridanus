@@ -6,7 +6,7 @@ from developTools.event.events import GroupMessageEvent
 import re
 from framework_common.manshuo_draw import *
 from datetime import datetime, timedelta
-# 构建分隔符正则表达式
+# 构建分隔符正则表达式 
 separators_pattern = '|'.join(re.escape(sep) for sep in ["|", "｜"])
 
 async def parse_message_segments(event,bot):
@@ -60,7 +60,7 @@ def main(bot, config):
     async def record_message_reply(event: GroupMessageEvent):
         if event.get("reply") and event.get("text"):
             context = event.get("text")[0].strip().replace(' ','')
-            if context not in ['记录消息','消息记录']: return
+            if context not in ['记录消息','消息记录',"动词名词","名词动词"]: return
         else:
             return
         #print(int(event.get("reply")[0]["id"]))
