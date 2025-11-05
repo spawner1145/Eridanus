@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from framework_common.database_util.Group import get_last_20_and_convert_to_prompt
 from framework_common.database_util.User import get_user, update_user
-from framework_common.database_util.llmDB import delete_latest2_history
+from framework_common.database_util.llmDB import delete_latest2_history, read_chara, use_folder_chara
 from run.ai_llm.service.aiReplyCore import aiReplyCore, send_text, count_tokens_approximate
 from run.ai_llm.service.schemaReplyCore import schemaReplyCore
 
@@ -161,8 +161,8 @@ def main(bot, config):
 
             chara_path = f"./data/system/chara/{chara_file}"
             try:
-                with open(chara_path, 'r', encoding='utf-8') as f:
-                    persona = f.read().strip()
+
+                persona = await read_chara(user_id, await use_folder_chara(config.ai_llm.config["llm"]["chara_file_name"]))
 
                 if len(persona) > 500:
                     persona = await summarize_persona(persona)
