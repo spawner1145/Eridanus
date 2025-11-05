@@ -71,6 +71,7 @@ heartflow:     #心流模式，自动根据群聊内容回复。此功能极其�
   whitelist_enabled: true
   chat_whitelist:   #仅在白名单群内启用
     - 1050663831
+    - 699455559
   weight_relevance: 0.25
   weight_willingness: 0.20
   weight_social: 0.20
