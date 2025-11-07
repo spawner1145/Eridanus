@@ -75,6 +75,7 @@ def main(bot, config):
     此插件代码参考了https://github.com/advent259141/Astrbot_plugin_Heartflow
     """
     """心流插件主函数"""
+    summarized_chara=None
     # 获取tools配置（从原框架复制）
     tools = None
     if config.ai_llm.config["llm"]["func_calling"]:
