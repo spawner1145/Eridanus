@@ -208,7 +208,9 @@ def main(bot, config):
     async def summarize_persona(original_persona: str) -> str:
         """精简人格设定"""
         try:
-
+            nonlocal summarized_chara
+            if summarized_chara:
+                return summarized_chara
             prompt = f"""请将以下机器人角色设定总结为简洁的核心要点。
             总结后的内容应该在100-200字以内，突出最重要的角色特点。
             
@@ -220,8 +222,8 @@ def main(bot, config):
                 prompt,
                 recursion_times=7
             )
-
-            summarized = result.get("summarized_persona", "")
+            summarized_chara=result
+            summarized = result
             if summarized and len(summarized.strip()) > 10:
                 bot.logger.info(f"心流插件：人格精简完成 {len(original_persona)} -> {len(summarized)}")
                 return summarized
