@@ -372,8 +372,7 @@ def main(bot, config):
                         config,
                         tools=tools,
                         bot=bot,
-                        event=current_event,
-                        do_not_read_context=True,
+                        event=current_event
                     )
 
                     if reply_message is None or '' == str(reply_message) or 'Maximum recursion depth' in reply_message:
