@@ -456,9 +456,9 @@ module = install_and_import(package_name, import_name)
             f.write(parsed_result["init_code"])
 
         # 如果有配置示例且不是空的JSON对象，创建配置文件
-        config_example = parsed_result.get("config_example", "")
+        config_example = parsed_result.get("config", "")
         if config_example and config_example.strip() not in ["", "{}"]:
-            config_file = plugin_dir / "config_example.yaml"
+            config_file = plugin_dir / "config.yaml"
             with open(config_file, 'w', encoding='utf-8') as f:
                 f.write(config_example)
 
@@ -513,7 +513,7 @@ module = install_and_import(package_name, import_name)
                     "type": "string",
                     "description": "__init__.py文件的完整Python代码，通常用于初始化包或导出模块。如果不需要，可以是空字符串。"
                 },
-                "config_example": {
+                "config": {
                     "type": "string",
                     "description": "配置文件（例如：config.json）的示例内容，用于配置API密钥等敏感信息或可变参数。内容应是有效的JSON字符串。如果不需要配置，请返回空JSON对象 `{}` 的字符串表示。"
                 },
@@ -527,7 +527,7 @@ module = install_and_import(package_name, import_name)
                 "plugin_description",
                 "main_code",
                 "init_code",
-                "config_example",
+                "config",
                 "usage_instructions"
             ]
         }
