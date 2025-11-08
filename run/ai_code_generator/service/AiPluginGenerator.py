@@ -307,7 +307,7 @@ api_key = config.weather_plugin.config["api_key"]
 ```python
 from framework_common.utils.install_and_import import install_and_import
 module = install_and_import(package_name, import_name) 
-#然后进行进一步的导入，如PIL = install_and_import("pillow","PIL")
+#然后进行进一步的导入，如PIL = install_and_import('pillow','PIL')
 from PIL import Image
 ```
 
@@ -415,8 +415,8 @@ from PIL import Image
 **7. 如果使用了非python标准库，必须使用如下方式导入。此方式可以自动安装并导入依赖包。
 from framework_common.utils.install_and_import import install_and_import
 module = install_and_import(package_name, import_name) 
-然后进行进一步的导入，如PIL = install_and_import("pillow","PIL")
-from PIL import Image**
+然后进行进一步的导入，如PIL = install_and_import('pillow','PIL')
+from PIL import Image
 """
 
     def _create_plugin_files(self, parsed_result: Dict[str, Any]) -> Path:
