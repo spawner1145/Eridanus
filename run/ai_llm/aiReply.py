@@ -61,6 +61,7 @@ def main(bot, config):
         """
         以免和第二套回复模式产生冲突
         """
+        await check_commands(event)
         if config.ai_llm.config["heartflow"]["whitelist_enabled"]:
             if event.group_id in config.ai_llm.config["heartflow"]["chat_whitelist"]:
                 if event.message_chain.has(At):
@@ -73,7 +74,6 @@ def main(bot, config):
         """
         原有处理逻辑
         """
-        await check_commands(event)
         if (event.message_chain.has(At) and event.message_chain.get(At)[0].qq in [bot.id,1000000]) or prefix_check(str(event.pure_text), config.ai_llm.config["llm"]["prefix"]):
             bot.logger.info(f"接受消息{event.processed_message}")
 

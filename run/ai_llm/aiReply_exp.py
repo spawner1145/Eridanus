@@ -75,6 +75,7 @@ def main(bot, config):
     此插件代码参考了https://github.com/advent259141/Astrbot_plugin_Heartflow
     """
     """心流插件主函数"""
+    summarized_chara=None
     # 获取tools配置（从原框架复制）
     tools = None
     if config.ai_llm.config["llm"]["func_calling"]:
@@ -208,7 +209,9 @@ def main(bot, config):
     async def summarize_persona(original_persona: str) -> str:
         """精简人格设定"""
         try:
-
+            nonlocal summarized_chara
+            if summarized_chara:
+                return summarized_chara
             prompt = f"""请将以下机器人角色设定总结为简洁的核心要点。
             总结后的内容应该在100-200字以内，突出最重要的角色特点。
             
@@ -220,8 +223,8 @@ def main(bot, config):
                 prompt,
                 recursion_times=7
             )
-
-            summarized = result.get("summarized_persona", "")
+            summarized_chara=result
+            summarized = result
             if summarized and len(summarized.strip()) > 10:
                 bot.logger.info(f"心流插件：人格精简完成 {len(original_persona)} -> {len(summarized)}")
                 return summarized
@@ -369,8 +372,7 @@ def main(bot, config):
                         config,
                         tools=tools,
                         bot=bot,
-                        event=current_event,
-                        do_not_read_context=True,
+                        event=current_event
                     )
 
                     if reply_message is None or '' == str(reply_message) or 'Maximum recursion depth' in reply_message:
