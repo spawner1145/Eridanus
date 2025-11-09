@@ -2,7 +2,6 @@ import asyncio
 import datetime
 import random
 import traceback
-
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Text, At
 from framework_common.database_util.Group import clear_group_messages, get_last_20_and_convert_to_prompt
