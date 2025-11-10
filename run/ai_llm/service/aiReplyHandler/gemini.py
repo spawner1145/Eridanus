@@ -224,7 +224,7 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                 message = await gemini_prompt_elements_construct(event_obj.processed_message) #
                 prompt_elements.extend(message["parts"])
             except Exception as e:
-                traceback.print_exc()
+                #traceback.print_exc()
                 logger.warning(f"引用消息解析失败:{e}")
                 continue
         else:

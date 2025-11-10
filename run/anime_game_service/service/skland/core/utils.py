@@ -3,7 +3,7 @@ from developTools.utils.logger import get_logger
 logger=get_logger()
 from pydantic import AnyUrl as Url
 import pprint
-
+import traceback
 from .schemas import CRED, ArkSignResult
 from .api import SklandAPI, SklandLoginAPI
 from .config import RES_DIR
@@ -51,8 +51,8 @@ def refresh_access_token_if_needed(func):
             except (RequestException, LoginException, UnauthorizedException) as e:
                 logger.error(f"接口请求失败,{e.args[0]}")
         except RequestException as e:
-            logger.error(f"接口请求失败,{e.args[0]}")
-
+            logger.error(f"接口请求失败RequestException,{e.args[0]}")
+            traceback.print_exc()
     return wrapper
 
 

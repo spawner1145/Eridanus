@@ -80,6 +80,10 @@ def main(bot: ExtendBot,config: YAMLManager):
             match = re.search(r"qq=(\d+)", event.raw_message)
             if match: #f
                 target_qq = match.group(1)
+                user_info = await get_user(event.user_id, event.sender.nickname)
+                if user_info.permission < config.system_plugin.config["user_data"]["permit_user_operate_level"]:
+                    await bot.send(event, [At(qq=int(target_qq)), f' 的权限好像不够喵'])
+                    return
                 if '用户' in event.raw_message:
                     await update_user(user_id=target_qq, permission=1)
                     await bot.send(event, [At(qq=int(target_qq)), f' 被设定为用户'])

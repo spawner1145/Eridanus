@@ -3,10 +3,13 @@ import gc
 from .classic_collection import *
 from .classic_collection.util import *
 
-
+#basic_img_info：已经初始化的基础模块
+#json_img：需要绘制的模块参数
+#json_img_left：需要保留的模块参数，留给下一列进行绘制
+#layer：层级标志
 async def layer_deal(basic_img_info,json_img,json_img_left,layer=1):
     layer_img_info = LayerSet(basic_img_info)
-
+    json_check = {}
     #重写之前的处理逻辑，实现边绘制边修改自身设置
     canvas_dict, count_number, i = {}, 0, 0
     while i < len(json_img):
@@ -57,18 +60,20 @@ async def layer_deal(basic_img_info,json_img,json_img_left,layer=1):
                 if json_check['json_img_left_module']:json_img_left.append(json_check['json_img_left_module'])
                 #print(json_check['canvas_bottom'] + layer_img_info.padding_up_layer, layer_img_info.img_height_limit, json_check['canvas_bottom'] + layer_img_info.padding_up_layer+layer_img_info.img_height_limit)
         elif layer_check > layer:
-
             json_check=await layer_deal(layer_img_info,json_img,json_img_left,layer=layer+1)
             json_img=add_append_img([{'type':'layer_processed','content':json_check['content'],'layer':layer}],json_img)
         elif layer_check < layer:
             break
     #对生成的模块进行拼接
     layer_img_canvas=await layer_img_info.paste_img(canvas_dict)
+    #对是否跳过本列直接进行下一列绘制进行判断
+    if json_check and 'without_draw' in json_check: without_draw_layer = json_check['without_draw']
+    else:without_draw_layer=False
     #layer_img_canvas.show()
     upshift,downshift=0,0
     return {'layer_img_canvas':layer_img_canvas,
             'content':{'canvas':layer_img_canvas, 'canvas_bottom': layer_img_canvas.height - layer_img_info.padding_up_common * 3  ,
-                       'upshift':layer_img_info.padding_up_common * 2 ,'downshift':downshift,'without_draw':False,'json_img_left_module':[]}}
+                       'upshift':layer_img_info.padding_up_common * 2 ,'downshift':downshift,'without_draw':without_draw_layer,'json_img_left_module':[]}}
 
 
 

@@ -4,7 +4,7 @@ import hashlib
 from typing import Literal
 from datetime import datetime
 from urllib.parse import urlparse
-
+import pprint
 import httpx
 
 from ..schemas import CRED, ArkCard, RogueData, ArkSignResponse,Topics
@@ -69,11 +69,12 @@ class SklandAPI:
         return {"cred": cred.cred, **cls._headers, "sign": signature, **header_ca}
 
     @classmethod
-    async def ark_sign(cls, cred: CRED, uid: str, channel_master_id: str) -> ArkSignResponse:
+    async def ark_sign(cls, cred: CRED, uid: str, channel_master_id: str):
         """进行明日方舟签到"""
         body = {"uid": uid, "gameId": channel_master_id}
         json_body = json.dumps(body, ensure_ascii=False, separators=(", ", ": "), allow_nan=False)
         sign_url = f"{base_url}/game/attendance"
+        error_message = 'nothing'
         headers = cls.get_sign_header(
             cred,
             sign_url,
@@ -94,9 +95,11 @@ class SklandAPI:
                     elif status == 10002:
                         raise LoginException(f"角色 {uid} 签到失败：{response.json().get('message')}")
                     elif status != 0:
-                        raise RequestException(f"角色 {uid} 签到失败：{response.json().get('message')}")
+                        raise RequestException(f"{response.json().get('message')}")
             except httpx.HTTPError as e:
+                error_message = e
                 raise RequestException(f"角色 {uid} 签到失败: {e}")
+            #print(error_message)
             return ArkSignResponse(**response.json()["data"])
 
     @classmethod
@@ -136,7 +139,39 @@ class SklandAPI:
                         raise LoginException(f"获取账号 game_info 失败：{response.json().get('message')}")
                     if status != 0:
                         raise RequestException(f"获取账号 game_info 失败：{response.json().get('message')}")
-                return ArkCard(**response.json()["data"])
+                #pprint.pprint(response.json()["data"]["building"])
+                ark_data = response.json()["data"]
+                #下面对其进行检查
+                if ark_data["building"]["hire"] is None:
+                    ark_data["building"]["hire"] = {'chars': [{'ap': 864405,
+                                                                 'bubble': {'assist': {'add': -1, 'ts': 0},
+                                                                            'normal': {'add': 94, 'ts': 1748721600}},
+                                                                 'charId': 'char_180_amgoat',
+                                                                 'index': 0,
+                                                                 'lastApAddTime': 1757755044,
+                                                                 'workTime': 86400}],
+                                                      'completeWorkTime': -1,
+                                                      'level': 3,
+                                                      'refreshCount': 3,
+                                                      'slotId': 'slot_23',
+                                                      'slotState': 2,
+                                                      'state': 0}
+                if ark_data["building"]["training"] is None:
+                    ark_data["building"]["training"] = {'lastUpdateTime': 1757755044,
+                                                          'level': 3,
+                                                          'remainPoint': 0.65,
+                                                          'remainSecs': 0,
+                                                          'slotId': 'slot_13',
+                                                          'slotState': 2,
+                                                          'speed': 1.05,
+                                                          'trainee': {'ap': 8640000,
+                                                                      'charId': 'char_2024_chyue',
+                                                                      'lastApAddTime': 1757755044,
+                                                                      'targetSkill': -1},
+                                                          'trainer': {'ap': 8640000,
+                                                                      'charId': 'char_362_saga',
+                                                                      'lastApAddTime': 1757755044}}
+                return ArkCard(**ark_data)
             except httpx.HTTPError as e:
                 raise RequestException(f"获取账号 userId 失败: {e}")
 

@@ -63,6 +63,7 @@ def main(bot, config):
             if context not in ['记录消息','消息记录',"动词名词","名词动词"]: return
         else:
             return
+        bot.logger.info("开始进行消息记录")
         #print(int(event.get("reply")[0]["id"]))
         event_obj = await bot.get_msg(int(event.get("reply")[0]["id"]))
         if event_obj.message[0]['type'] == 'forward': return
@@ -71,7 +72,6 @@ def main(bot, config):
         context = check[0]["text"]
         parts = re.split(r'\[title\].*?\[/title\]', context)
         context_len = len("".join(parts))
-        if '[title]' in context: context_len += 5
         img_width = 700
         userid, target_group = event_obj.sender.user_id, event.group_id
         try:
@@ -89,7 +89,7 @@ def main(bot, config):
         elif context_len >= 400:
             img_width = 2000
             check_name = f'                                                                                {check_name}'
-        total_line_breaks = context.count('\n') + context.count('\r') + 1
+        total_line_breaks = context.count('\n') + context.count('\r') + 1 + 1 * context.count('[title]')
         #print(total_line_breaks,total_line_breaks * 43,img_width / 3 - 40,context_len)
         if total_line_breaks * 43 > img_width / 3 - 40: img_width = total_line_breaks * 43 * 3 + 40
         if len(target_name) > 4:
@@ -130,8 +130,9 @@ def main(bot, config):
         else:
             return
         event_obj = await bot.get_msg(int(event.get("reply")[0]["id"]))
+        if event_obj is None or event_obj.message is None: return
         if event_obj.message[0]['type'] != 'forward': return
-
+        bot.logger.info("开始进行消息记录")
         message_check = event_obj.message[0]['data']['content']
         #pprint.pprint(message_check)
         #pprint.pprint(event_obj.processed_message)
