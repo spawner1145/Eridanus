@@ -48,7 +48,7 @@ async def render_ark_card(props ,bg ):
     #print(bg)
 
     img_path=await manshuo_draw(
-        [{'type': 'basic_set','img_height':1230,'font_common_color':(255,255,255),'font_title_color':(255,255,255),'font_des_color':(255,255,255),
+        [{'type': 'basic_set','img_height':2000,'font_common_color':(255,255,255),'font_title_color':(255,255,255),'font_des_color':(255,255,255),
           'backdrop_color':{'color1':'(80, 80, 80, 255)'},'stroke_layer_color':(130,130,130),'stroke_img_color':(130,130,130)},
          {'type': 'backdrop', 'subtype': 'gradient','left_color': (5,22,29),'right_color': (84,89,88)},
          {'type': 'avatar', 'img': [props.status.avatar.url],'upshift_extra': 20,'background':[bg],
@@ -64,7 +64,8 @@ async def render_ark_card(props ,bg ):
                      f'蚀刻章\n{props.medal.total}',]},
         '   ',{'type': 'text', 'content': ['[title]助战干员[/title]'],'layer':2},
         {'type':'img','is_crop':False,'img':[char.portrait for char in props.assistChars],'layer':2,
-         'is_stroke_img':False, 'is_shadow_img':False, 'is_rounded_corners_img': False, 'number_per_row': 3},
+         'is_stroke_img':False, 'is_shadow_img':False, 'is_rounded_corners_img': False, 'number_per_row': 3,'jump_next_page':True},
+
         {'type': 'text', 'content': ['[title]基建信息[/title]'],'layer':2},
         {'type': 'img', 'subtype': 'common_with_des_right', 'number_per_row': 2,'layer': 2,
          'is_shadow_img':False,'magnification_img':8,'padding': 11,
