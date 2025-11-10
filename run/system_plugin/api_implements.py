@@ -53,10 +53,9 @@ def main(bot, config):
     async def sendLike(event: GroupMessageEvent):
         if event.pure_text == "赞我":
             user_info = await get_user(event.user_id)
-
             if user_info.permission >= config.system_plugin.config["api_implements"]["send_like"]:
                 await bot.send_like(event.user_id)
-                await bot.send(event, "👎🏻")
+                await bot.send(event, config.system_plugin.config["api_implements"]["send_like_message"])
         if event.pure_text.startswith("改备注"):
             await bot.send(event, "已修改")
             remark = event.pure_text.split("改备注")[1].strip()
