@@ -90,8 +90,9 @@ async def data_update(user_info,update_json,day_info=None):
         user_info['times']['month'][f"{day_info['month']}"] = user_info['times']['month'][f"{day_info['month']}"] + update_json['times']
         user_info['times']['year'][f"{day_info['year']}"] = user_info['times']['year'][f"{day_info['year']}"] + update_json['times']
     elif update_json['type'] == 'lu_no':
-        user_info['lu_no']['data'][f"{day_info['day']}"] = user_info['lu_no']['data'][f"{day_info['day']}"] + update_json['times']
-        user_info['collect']['lu_no'] = user_info['collect']['lu_no'] + update_json['times']
+        #user_info['lu_no']['data'][f"{day_info['day']}"] = user_info['lu_no']['data'][f"{day_info['day']}"] + update_json['times']
+        #user_info['collect']['lu_no'] = user_info['collect']['lu_no'] + update_json['times']
+        user_info['lu_done']['data'][f"{day_info['day']}"] = 0
     elif update_json['type'] == 'supple_lu':
         if user_info['lu_supple']['record'] == {}: user_info['lu_supple']['record'] = 3
         user_info['lu_supple']['record'] -= 3
