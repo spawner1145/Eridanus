@@ -62,6 +62,20 @@ async def today_lu(userid,times=1,bot=None,event=None,type_check='self'):
     else:
         pprint.pprint('今天🦌了！')
 
+
+async def no_lu(userid,bot=None,event=None,type_check='self'):
+    day_info = await date_get()
+    user_info =await data_init(userid,day_info)
+    #进行数据更新
+    update_json = {'type':'lu_no'}
+    await data_update(user_info,update_json,day_info)
+    await db.write_user(userid, {'lu': user_info})
+    if bot and event:
+        await bot.send(event, [At(qq=userid)," 您今天的🦌数据已清空"])
+    else:
+        pprint.pprint('您今天的🦌数据已清空')
+
+
 async def supple_lu(userid,bot=None,event=None):
     day_info = await date_get()
     # 用户信息读取
@@ -95,7 +109,7 @@ async def supple_lu(userid,bot=None,event=None):
 async def check_lu(userid,bot=None,event=None):
     day_info = await date_get()
     user_info =await data_init(userid,day_info)
-    pprint.pprint(user_info)
+    #pprint.pprint(user_info)
     if bot and event:target_name = (await bot.get_group_member_info(event.group_id, userid))['data']['nickname']
     else:target_name = '您'
     content = [f"{target_name} 的{day_info['today'].strftime('%Y年%m月')}的开🦌计划",

@@ -51,6 +51,14 @@ def main(bot, config):
                 await bot.recall(recall_id['data']['message_id'])
 
     @bot.on(GroupMessageEvent)
+    async def no_LU(event: GroupMessageEvent):
+        context, userid=event.pure_text, str(event.sender.user_id)
+        order_list = ['戒🦌']
+        if context not in order_list: return
+        bot.logger.info("接收到戒🦌请求")
+        await no_lu(userid, bot=bot, event=event)
+
+    @bot.on(GroupMessageEvent)
     async def lock_LU_self(event: GroupMessageEvent):
         context, userid=event.pure_text, str(event.sender.user_id)
         order_list = ['贞操锁']
@@ -59,10 +67,8 @@ def main(bot, config):
         if not (any(word in context for word in order_list) and any(word in context for word in total_list)):return
         target = next((t for t in total_list if t in context), None)
         context = re.compile('|'.join(map(re.escape, order_list + total_list))).sub('', context).strip()
-        if context != '': return
-        if target in open_list:status = 1
-        elif target in close_list:status = 0
-        else:return
+        status = 1 if target in open_list else 0 if target in close_list else None
+        if status is None or context != '': return
         bot.logger.info("贞操锁请求设定中")
         await lock_lu(userid,status,bot=bot,event=event)
 
@@ -119,9 +125,11 @@ def main(bot, config):
             '\n- 🦌：一种生活方式'
             '\n- 多🦌！：🦌*n  eg：🦌🦌🦌🦌🦌🦌'
             '\n- 补🦌：帮你补上一天的🦌！'
+            '\n- 戒🦌：清空你今天的🦌数据'
             '\n- 别名🦌： 鹿，这倒提醒我了，🦌！，鹿！'
             '\n- 🦌排行： 本月/年度/总共 🦌排行'
             '\n- 查🦌： 看看您最近🦌的状况'
+            '\n- 贞操锁： 开启/关闭 贞操锁（开启后别人都无法帮你🦌，只能自己🦌了喵'
             '\n[des]                                             Function By 漫朔[/des]'
                        ]
             await bot.send(event, Image(file=(await manshuo_draw(draw_json))))
