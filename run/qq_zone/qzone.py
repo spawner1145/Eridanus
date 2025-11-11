@@ -15,10 +15,15 @@ import httpx
 from apscheduler.triggers.cron import CronTrigger
 
 from framework_common.utils.install_and_import import install_and_import
-
-qzone_api=install_and_import("qzone-api","qzone_api")
-from qzone_api import QzoneApi
-from qzone_api.login import QzoneLogin
+try:
+    qzone_api=install_and_import("qzone-api","qzone_api")
+    from qzone_api import QzoneApi
+    from qzone_api.login import QzoneLogin
+except:
+    traceback.print_exc()
+    print("请自行搜索安装：Microsoft Visual C++ 2013 Redistributable Package")
+    print("请自行搜索安装：Microsoft Visual C++ 2013 Redistributable Package")
+    print("请自行搜索安装：Microsoft Visual C++ 2013 Redistributable Package")
 
 from developTools.event.events import LifecycleMetaEvent, GroupMessageEvent, PrivateMessageEvent
 from developTools.message.message_components import Text, Image, Mface
