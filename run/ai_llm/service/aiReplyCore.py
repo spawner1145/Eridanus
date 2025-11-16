@@ -72,7 +72,10 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
     mface_files = None
     user_info = None
     if tools is not None and config.ai_llm.config["llm"]["表情包发送"] and not config.ai_llm.config["llm"]["联网搜索"]:
-        tools = await add_send_mface(tools, config)
+        try:
+            tools = await add_send_mface(tools, config)
+        except:
+            logger.error(f"无法添加func【表情包发送】，建议自己检查设置是不是乱几把改了。\n{tools}")
     if not system_instruction:
         if config.ai_llm.config["llm"]["system"]:
             system_instruction = await read_chara(user_id, config.ai_llm.config["llm"]["system"])
