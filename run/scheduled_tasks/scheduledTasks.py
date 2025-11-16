@@ -74,7 +74,7 @@ def main(bot: ExtendBot, config):
                     location = user_info.city
                     weather = await free_weather_query(location)
                     r = await aiReplyCore([{
-                        "text": f"保持你当前对话的角色，根据今天的天气信息给出建议，直接发送结果，不要发送'好的'之类的命令应答提示。今天的天气信息：{weather}"}],
+                        "text": f"保持你当前对话的角色，播报今天的天气信息并给出建议，直接发送结果，不要发送'好的'之类的命令应答提示。今天的天气信息：{weather}"}],
                         int(user["user_id"]),
                         config, bot=bot)
                     await bot.send_friend_message(int(user["user_id"]), r)
