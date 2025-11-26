@@ -9,6 +9,7 @@ from pathlib import Path
 import json
 from datetime import datetime
 
+import re
 import httpx
 from PIL import Image as PILImage
 
@@ -19,7 +20,6 @@ from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.utils.utils import get_img, delay_recall
 from run.ai_generated_art.service.nano_banana.gemini_official_banana import call_gemini_api
 from run.ai_generated_art.service.nano_banana.unofficial_banana import call_openrouter_api
-
 
 
 # 使用记录文件路径
@@ -155,7 +155,8 @@ def main(bot: ExtendBot, config):
                 return
             
             processing_msg = await bot.send(event, [Text("已提交nano banana请求，正在处理...")], True)
-            if not config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["原生gemini接口"]:
+            isNative = config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["原生gemini接口"]
+            if not isNative:
                 bot.logger.warning("当前nano banana使用第三方中转")
                 try:
                     api_result = await call_openrouter_api(api_contents, config)
@@ -168,10 +169,33 @@ def main(bot: ExtendBot, config):
             await bot.recall(processing_msg)
 
             if api_result.get("success"):
+                # logger.info(f"{api_result}")
+                hasImage = bool(api_result.get("has_image"))
+                b64_url = ""
                 remaining_uses_text = ""
+                if not isNative:
+                    #中转API可能从text里面返回图片
+                    if api_result.get("text"):
+                        # 提取 markdown 图片链接，可能是 base64 也可能是 http(s)
+                        img_match = re.search(r'!\[.*?\]\((.*?)\)', api_result["text"])
+                        if img_match:
+                            hasImage = True
+                            img_url = img_match.group(1)
+                            if img_url.startswith("data:image/"):
+                                b64_url = f"base64://{img_url}"
+                                # base64 图片
+                                b64_match = re.search(r'data:image/[^;]+;base64,([a-zA-Z0-9+/]+={0,2})', img_url)
+                                if b64_match:
+                                #     hasImage = True
+                                    b64_img_data = b64_match.group(1)
+                                    b64_url = f"base64://{b64_img_data}"
+                            else:
+                                # http(s) 图片链接
+                                b64_url = img_url
+
                 # 仅当返回图片时才更新计数
                 user_info=await get_user(event.user_id)
-                if user_info.permission < config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["nano_banana不限制次数所需权限"] and api_result["has_image"]:
+                if user_info.permission < config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["nano_banana不限制次数所需权限"] and hasImage:
 
                     usage_data = load_or_reset_usage_data()
                     current_uses = usage_data.get("usage_data", {}).get(str(user_id), 0)
@@ -183,17 +207,24 @@ def main(bot: ExtendBot, config):
                         remaining_uses_text = f"调用成功！你今天还剩下 {remaining} 次调用机会"
                     else:
                         remaining_uses_text = "今天没得🦌了"
-                # 没有返回图片时的提示
-                elif not api_result["has_image"]:
+
+
+                            # message_to_send.append(Image(file=f"base64://{b64_data}"))
+                        # else:
+                            # remaining_uses_text = "本次调用未生成图片，不消耗次数"
+                    # 没有返回图片时的提示
+                elif not hasImage:
                     remaining_uses_text = "本次调用未生成图片，不消耗次数"
                 
                 message_to_send = [Text("nano banana：")]
                 returned_text = api_result.get("text")
-                if returned_text:
+                if returned_text and not hasImage:
                     message_to_send.append(Text(f"\n{returned_text}"))
                 result_path = api_result.get("result_path")
                 if result_path and os.path.exists(result_path):
                     message_to_send.append(Image(file=result_path))
+                elif b64_url:
+                    message_to_send.append(Image(file=b64_url))
                 if remaining_uses_text:
                     message_to_send.append(Text(f"\n{remaining_uses_text}"))
                 if len(message_to_send) > 1:
