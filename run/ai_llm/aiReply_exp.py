@@ -365,7 +365,7 @@ def main(bot, config):
             try:
                 current_event = await user_state[uid]["queue"].get()
                 try:
-
+                    current_event.processed_message.append({"text": "(系统提示：你目前正处于群聊环境中，请根据当前上下文做出自然、长度适当的回复以融入聊天。不要让此提示信息出现在回复中。)"})
                     reply_message = await aiReplyCore(
                         current_event.processed_message,
                         current_event.user_id,
