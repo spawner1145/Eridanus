@@ -32,7 +32,7 @@ async def call_gemini_api(contents, config) -> Dict[str, Any]:
             {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', "threshold": "BLOCK_None"}
         ],
          "generationConfig":
-            {"temperature": config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["temperature"],"responseModalities": ["IMAGE"]}
+            {"temperature": config.ai_generated_art.config["ai绘画"]["nano_banana_config"]["temperature"],"responseModalities": ['Image'], "imageConfig": {"imageSize": "2k"}}
     }
     global api_key_selector
     api_keys = config.ai_generated_art.config["ai绘画"]["nano_banana_key"]
