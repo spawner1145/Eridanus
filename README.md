@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/AOrbitron/Eridanus/blob/master/web/dist/eridanus.svg" width="100" height="100" alt="Shiro">
+  <img src="https://github.com/AOrbitron/Eridanus/blob/master/web/dist/eridanus.svg" width="250" height="250" alt="Shiro">
 </p>
 
 <div align="center">
