@@ -27,12 +27,7 @@ _🎊 基于 [OneBot](https://github.com/howmanybots/onebot/blob/master/README.m
   <a href="">参与贡献</a>
 </p>
 
-<div align="center">
 
-![Alt](https://repobeats.axiom.co/api/embed/2e669d8cf896cdd4259d7810df2f07fbfa5fe0df.svg "Repobeats analytics image")
-
-
-</div>
 
 # 部署
 [文档](https://eridanus.netlify.app)    
