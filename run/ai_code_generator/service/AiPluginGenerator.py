@@ -295,11 +295,11 @@ Card(audio="音频url", title="标题", image="封面")
 ## 配置文件使用
 ```
 # 从config中读取配置
-value = config.{module_name}{config_name}["key"]
+value = config.{module_name}{config_name}[key]
 如插件名称为weather_plugin，配置文件名为config.yaml，假设此时配置文件内容为
-api_key: "your_api_key"
-则读取方式为：：
-api_key = config.weather_plugin.config["api_key"]
+api_key: your_api_key
+则读取方式为：
+api_key = config.weather_plugin.config[‘api_key’]
 
 
 ```
@@ -307,8 +307,7 @@ api_key = config.weather_plugin.config["api_key"]
 ```python
 from framework_common.utils.install_and_import import install_and_import
 module = install_and_import(package_name, import_name) 
-#然后进行进一步的导入，如PIL = install_and_import("pillow","PIL")
-from PIL import Image
+#然后进行进一步的导入
 ```
 
 ## 注意事项
@@ -410,13 +409,12 @@ from PIL import Image
 2. 必须使用提供的SDK接口
 3. 插件名称使用下划线命名法
 4. 确保所有import语句正确
-5. config.yaml如果不需要配置，请返回 {'example': 'example'} 的 字符串
+5. config.yaml如果不需要配置，请生成一个空的key value对
 6. 当用户要求重新生成或修改时，新的插件名必须和先前生成的插件名保持一致
 **7. 如果使用了非python标准库，必须使用如下方式导入。此方式可以自动安装并导入依赖包。
 from framework_common.utils.install_and_import import install_and_import
 module = install_and_import(package_name, import_name) 
-然后进行进一步的导入，如PIL = install_and_import("pillow","PIL")
-from PIL import Image**
+
 """
 
     def _create_plugin_files(self, parsed_result: Dict[str, Any]) -> Path:
@@ -458,9 +456,9 @@ from PIL import Image**
             f.write(parsed_result["init_code"])
 
         # 如果有配置示例且不是空的JSON对象，创建配置文件
-        config_example = parsed_result.get("config_example", "")
+        config_example = parsed_result.get("config", "")
         if config_example and config_example.strip() not in ["", "{}"]:
-            config_file = plugin_dir / "config_example.yaml"
+            config_file = plugin_dir / "config.yaml"
             with open(config_file, 'w', encoding='utf-8') as f:
                 f.write(config_example)
 
@@ -515,7 +513,7 @@ from PIL import Image**
                     "type": "string",
                     "description": "__init__.py文件的完整Python代码，通常用于初始化包或导出模块。如果不需要，可以是空字符串。"
                 },
-                "config_example": {
+                "config": {
                     "type": "string",
                     "description": "配置文件（例如：config.json）的示例内容，用于配置API密钥等敏感信息或可变参数。内容应是有效的JSON字符串。如果不需要配置，请返回空JSON对象 `{}` 的字符串表示。"
                 },
@@ -529,7 +527,7 @@ from PIL import Image**
                 "plugin_description",
                 "main_code",
                 "init_code",
-                "config_example",
+                "config",
                 "usage_instructions"
             ]
         }

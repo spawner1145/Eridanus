@@ -7,6 +7,7 @@ from framework_common.utils.ai_translate import Translator
 from run.ai_voice.service.PrettyDerbyTTS import get_PrettyDerby_speakers, PrettyDerby_TTS
 from run.ai_voice.service.blue_archive_tts import get_huggingface_blue_archive_speakers, huggingface_blue_archive_tts
 from run.ai_voice.service.modelscopeTTS import modelscope_tts, get_modelscope_tts_speakers
+from run.ai_voice.service.modelscope_tts_v2 import MihoyoTTS
 from run.ai_voice.service.napcat_tts import napcat_tts_speak, napcat_tts_speakers
 from run.ai_voice.service.online_vits import huggingface_online_vits
 from run.ai_voice.service.online_vits2 import huggingface_online_vits2, get_huggingface_online_vits2_speakers
@@ -113,6 +114,12 @@ class TTS:
         elif mode=="OttoTTS":
             otto=OttoTTS()
             return await otto.speak(text)
+        elif mode=="MihoyoTTS":
+            if speaker is None:
+                speaker=config.ai_voice.config["tts"]["MihoyoTTS"]["speaker"]
+            Mihoyo_tts=MihoyoTTS()
+            audio=await Mihoyo_tts.modelscope_tts_v2(text, speaker, proxy=config.common_config.basic_config["proxy"]["http_proxy"])
+            return audio
         else:
             pass
     async def get_speakers(self,bot=None):
@@ -135,7 +142,9 @@ class TTS:
         )
         PrettyDerby_speakers=await fetch_speakers(get_PrettyDerby_speakers,error_msg="Error in get_PrettyDerby_speakers")
         blue_archive_speakers=await fetch_speakers(get_huggingface_blue_archive_speakers,error_msg="Error in get_huggingface_blue_archive_speakers")
-        return {"speakers": [nc_speakers,PrettyDerby_speakers,  vits_speakers, online_vits2_speakers,blue_archive_speakers,["otto"]]}
+        Mihoyo=MihoyoTTS()
+        mihoyo_speakers=await Mihoyo.get_speakers()
+        return {"speakers": [nc_speakers,PrettyDerby_speakers,  vits_speakers, online_vits2_speakers,blue_archive_speakers,["otto"],mihoyo_speakers]}
 
 
 

@@ -14,6 +14,7 @@ import qrcode
 import pprint
 from developTools.message.message_components import Text, Image, At
 from framework_common.manshuo_draw import *
+from run.anime_game_service.service.skland.core.exception import LoginException, RequestException, UnauthorizedException
 
 db=asyncio.run(AsyncSQLiteDatabase.get_instance())
 
@@ -100,7 +101,15 @@ async def skland_signin(userid,bot=None,event=None):
     async def sign_in(user_info, uid: str, channel_master_id: str):
         """执行签到逻辑"""
         cred = CRED(cred=user_info['cred'], token=user_info['cred_token'])
-        return await SklandAPI.ark_sign(cred, uid, channel_master_id=channel_master_id)
+        ark_info = {'error':None}
+        try:
+            ark_sign_info = await SklandAPI.ark_sign(cred, uid, channel_master_id=channel_master_id)
+            ark_info['ark_sign_info'] = ark_sign_info
+            return ark_info
+        except (RequestException) as e:
+            ark_info['error'] = e
+            return ark_info
+
 
     user_info =await db.read_user(userid)
     if not (user_info and 'skland' in user_info and 'user_info' in user_info['skland'] and 'character_info' in user_info['skland']):
@@ -109,12 +118,26 @@ async def skland_signin(userid,bot=None,event=None):
         return
     user_info_self, character_info_self = user_info['skland']['user_info'], user_info['skland']['character_info']
     sign_result: dict[str, ArkSignResponse] = {}
-    sign_result[character_info_self['nickname']] = await sign_in(user_info_self, str(character_info_self['uid']), character_info_self['channel_master_id'])
+    sing_info = await sign_in(user_info_self, str(character_info_self['uid']), character_info_self['channel_master_id'])
+    print(sing_info)
+    if sing_info is  None:
+        msg = f"Dr.{character_info_self['nickname']} ，登录已过期，请重新登录"
+        if bot and event: await bot.send(event, msg)
+        else: print(msg)
+        return
+    if sing_info['error'] is not None:
+        msg = f"Dr.{character_info_self['nickname']} ，{sing_info['error']}"
+        if bot and event: await bot.send(event, msg)
+        else: print(msg)
+        return
+    sign_result[character_info_self['nickname']] = sing_info['ark_sign_info']
     msg=''
     if sign_result:
+        #pprint.pprint(sign_result)
         for nickname, sign in sign_result.items():
             if sign:msg+=f"角色: {nickname} 签到成功，获得了:\n"+ "\n".join(f"{award.resource.name} x {award.count}" for award in sign.awards)
-            else: msg+=f'Dr.{nickname} ，您今天是不是已经签到过了喵？'
+            else: msg+=f'Dr.{nickname} ，您的token可能已失效，请重新登录'
+
     if bot and event:
         await bot.send(event, msg)
     else:
@@ -200,7 +223,8 @@ async def rouge_detailed_info(userid,rg_type,game_count=None,favored=False,bot=N
 if __name__ == '__main__':
 
     #asyncio.run(qrcode_get(1667962668))
-    asyncio.run(user_check(1270858640))
-    #asyncio.run(skland_signin(1270858640))
+    #asyncio.run(user_check(3922292124))
+    asyncio.run(skland_info(1270858640))
+    #asyncio.run(skland_info(942755190))
     #asyncio.run(rouge_info(1667962668,'水月'))
     #asyncio.run(rouge_detailed_info(1667962668,'界园'))

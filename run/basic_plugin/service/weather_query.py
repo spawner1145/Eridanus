@@ -20,4 +20,9 @@ async def free_weather_query(city):
     async with httpx.AsyncClient() as client:
         r=await client.get(f"https://api.52vmy.cn/api/query/tian/three?city={city}")
         data=r.json()
-        return data["data"]
+        return f"{city},{data['data']['data'][1]}"
+
+if __name__ == '__main__':
+    import asyncio
+    result = asyncio.run(free_weather_query("清远市"))
+    print(result)

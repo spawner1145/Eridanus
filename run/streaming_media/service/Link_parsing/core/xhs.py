@@ -40,9 +40,10 @@ async def xiaohongshu(url,filepath=None):
         xhs_ck='abRequestId=c6f047f3-ec40-5f6a-8a39-6335b5ab7e7e;webBuild=4.55.1;xsecappid=xhs-pc-web;a1=194948957693s0ib4oyggth91hnr3uu4hls0psf7c50000379922;webId=a0f8b87b02a4f0ded2c2c5933780e39e;acw_tc=0ad6fb2417376588181626090e345e91f0d4afd3f1601e0050cac6099b93e4;websectiga=f47eda31ec9%3B545da40c2f731f0630efd2b0959e1dd10d5fedac3dce0bd1e04d;sec_poison_id=3ffe8085-c380-4003-9700-4d63eb6f442f;web_session=030037a0a1c5b6776a218ed7ea204a5d5eaa3b;unread={%22ub%22:%2264676bf40000000027012fbf%22%2C%22ue%22:%2263f40762000000000703bfc2%22%2C%22uc%22:27};gid=yj4j4YjKKDx2yj4j4Yj2W1MiKjqM83D4lvkkMWS9xjyxI828Fq774U888qWjjJJ8y4K4Sif8;'
     # 请求头
     headers = {
-                  'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,'
+                  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,'
                             'application/signed-exchange;v=b3;q=0.9',
-                  'cookie': xhs_ck,
+                  'Cookie': xhs_ck,
+                  'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36 EdgA/142.0.0.0'
               } | COMMON_HEADER
     if "xhslink" in msg_url:
         msg_url = httpx.get(msg_url, headers=headers, follow_redirects=True).url

@@ -132,6 +132,7 @@ def updaat(f=False, source=None, yamls:dict=None):
         for i in sources:
             logger.info(f"{sources.index(i)}. {i}")
         logger.info("拉取bot代码\n--------------------")
+        logger.warning("0为git源，其他镜像源可能存在版本滞后现象。如拉取失败可自行为environments/MinGit/cmd/git.exe配置代理(windows)。")
         source = input("选择更新源(输入数字 )：")
 
     if source.isdigit():

@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
-
+import pprint
 from developTools.utils.logger import get_logger
 
 logger = get_logger(__name__.split('.')[-1])
@@ -105,16 +105,17 @@ class AsyncSQLiteDatabase:
         finally:
             await self._release_connection(conn)
 
-    async def write_user(self, user_id: str, user_data: Dict[str, Any]):
+    async def write_user(self, user_id: str, user_data: Dict[str, Any], is_merged=True):
         """
         将用户数据以嵌套字典的形式存储到 SQLite 中（通过 JSON 序列化）。
         """
         logger.info(f"Writing user {user_id} to {self.db_path}")
-        # 读取旧数据
-        existing_data = await self.read_user(user_id)
 
         # 合并新数据与旧数据（旧数据保留，新数据覆盖同名字段）
-        merged_data = merge_dicts(existing_data, user_data)
+        if is_merged:
+            existing_data = await self.read_user(user_id)
+            merged_data = merge_dicts(existing_data, user_data)
+        else: merged_data = user_data
 
         # 序列化为 JSON 字符串
         json_data = json.dumps(merged_data, ensure_ascii=False)
@@ -347,7 +348,7 @@ class AsyncSQLiteDatabase:
         if keys[-1] in target:
             target.pop(keys[-1], None)
             # 写回数据库
-            await self.write_user(user_id, user_data)
+            await self.write_user(user_id, user_data, is_merged=False)
             return True
         return False
 

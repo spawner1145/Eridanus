@@ -6,6 +6,7 @@ import sys
 from PIL import Image, ImageDraw, ImageFont, ImageOps,ImageFilter
 import platform
 import psutil
+import math
 
 global debug_mode #设定全局变量，表示绘图是否开启调试功能
 debug_mode = False
@@ -98,7 +99,29 @@ async def crop_to_square(img_list):
 
     return img_processed_list
 
+async def math_convert_percent(values):
+    """
+    把一串正数映射到0~100的百分制，且满足对数增长趋势。
+    """
+    # 为了防止log(0)，先确保所有值都大于0
+    min_val = min(values)
+    if min_val <= 0:
+        shift = 1 - min_val  # 让最小值变为1（或更大）
+        values = [v + shift for v in values]
+    else:
+        shift = 0
 
+    # 计算对数值
+    log_values = [math.log(v) for v in values]
+
+    # 线性归一化到0~100
+    min_log = min(log_values)
+    max_log = max(log_values)
+    range_log = max_log - min_log if max_log - min_log != 0 else 1
+
+    percents = [(lv - min_log) / range_log  for lv in log_values]
+
+    return percents
 
 
 

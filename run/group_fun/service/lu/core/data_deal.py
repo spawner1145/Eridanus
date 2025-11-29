@@ -21,7 +21,9 @@ async def data_init(userid,day_info=None):
     #初始化变量
     for key in ['lu_done', 'lu_no', 'times', 'length', 'lu_supple', 'others', 'collect']:
         user_info['lu'].setdefault(key, {})
-    user_info['lu']['lu_supple'].setdefault('record', {})
+    user_info['lu']['others'].setdefault('lock_lu', 0)
+    user_info['lu']['lu_supple'].setdefault('record', 0)
+    user_info['lu']['lu_supple'].setdefault('data', [])
     for item in ['lu_done', 'lu_no', 'length']:
         for key in ['data']:
             user_info['lu'][item].setdefault(key, {})
@@ -60,13 +62,14 @@ async def data_init(userid,day_info=None):
 
 async def date_get():
     current_date = datetime.now()
+    timestamp = int(current_date.timestamp())
     current_year = current_date.year
     current_month = current_date.month
     current_day = current_date.day
     day = f'{current_year}_{current_month}_{current_day}'
     month = f'{current_year}_{current_month}'
     year = f'{current_year}'
-    return_json = {'day':day, 'month':month, 'year':year,'today':current_date}
+    return_json = {'day':day, 'month':month, 'year':year,'today':current_date,'time':timestamp}
     return return_json
 
 
@@ -78,13 +81,20 @@ async def data_update(user_info,update_json,day_info=None):
         user_info['lu_done']['data'][f"{day_info['day']}"] = user_info['lu_done']['data'][f"{day_info['day']}"] + update_json['times']
         user_info['length']['data'][f"{day_info['day']}"] = user_info['length']['data'][f"{day_info['day']}"] + length_add
         user_info['collect']['lu_done'], user_info['collect']['length'] = user_info['collect']['lu_done'] + update_json['times'], user_info['collect']['length'] + length_add
+        #补🦌次数更新
+        if user_info['lu_supple']['record'] == {}:user_info['lu_supple']['record'] = 0
+        if f"{day_info['day']}" not in user_info['lu_supple']['data']:
+            user_info['lu_supple']['record'] += 1
+            user_info['lu_supple']['data'].append(f"{day_info['day']}")
         #更新位于times的年度记录数据
         user_info['times']['month'][f"{day_info['month']}"] = user_info['times']['month'][f"{day_info['month']}"] + update_json['times']
         user_info['times']['year'][f"{day_info['year']}"] = user_info['times']['year'][f"{day_info['year']}"] + update_json['times']
     elif update_json['type'] == 'lu_no':
-        user_info['lu_no']['data'][f"{day_info['day']}"] = user_info['lu_no']['data'][f"{day_info['day']}"] + update_json['times']
-        user_info['collect']['lu_no'] = user_info['collect']['lu_no'] + update_json['times']
+        #user_info['lu_no']['data'][f"{day_info['day']}"] = user_info['lu_no']['data'][f"{day_info['day']}"] + update_json['times']
+        #user_info['collect']['lu_no'] = user_info['collect']['lu_no'] + update_json['times']
+        user_info['lu_done']['data'][f"{day_info['day']}"] = 0
     elif update_json['type'] == 'supple_lu':
+        if user_info['lu_supple']['record'] == {}: user_info['lu_supple']['record'] = 3
         user_info['lu_supple']['record'] -= 3
         for i in range(day_info['today'].day):
             day = day_info['today'].day - i

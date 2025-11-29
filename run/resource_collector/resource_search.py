@@ -197,8 +197,13 @@ async def check_latest_asmr(bot,event,config):
 async def call_jm(bot,event,config,mode="preview",comic_id=607279,serach_topic=None):
     async def _call_jm():
         global operating
-        if mode=="preview":
+        #print()
+        if comic_id in config.resource_collector.config["JMComic"]["jm_ban"]:
+            answers = config.resource_collector.config["JMComic"]["ban_answer"]
+            await bot.send(event, answers[random.randint(0, len(answers) - 1)], True)
+            return
 
+        if mode=="preview":
             if hasattr(event, "group_id"):
                 temp_id = event.group_id
             else:

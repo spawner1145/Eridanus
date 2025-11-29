@@ -132,6 +132,9 @@ async def change_folder_chara(file_name, user_id, folder_path='data/system/chara
         # 获取文件夹中的所有文件名
         folder_contents = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
 
+        for item in folder_contents:
+            if file_name in item: file_name = item
+        
         # 检查文件名是否在文件夹内容中
         if file_name in folder_contents:
             chara = await use_folder_chara(file_name)

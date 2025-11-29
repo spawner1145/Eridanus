@@ -89,7 +89,7 @@ async def lu_img_maker(user_info,content='枫与岚',day_info=None):
             canvas.paste(img_list[i], (int(x), int(y)), mask=img_list[i])
         else:
             check_i = i - len(img_list) + 1
-            if f"{day_info['month']}_{check_i}" in user_info['lu_done']['data']:
+            if f"{day_info['month']}_{check_i}" in user_info['lu_done']['data'] and user_info['lu_done']['data'][f"{day_info['month']}_{check_i}"] not in [0]:
                 canvas.paste(background_make, (int(x), int(y)), mask=background_make)
                 if user_info['lu_done']['data'][f"{day_info['month']}_{check_i}"] not in [0,1]:
                     time_str = user_info['lu_done']['data'][f"{day_info['month']}_{check_i}"]

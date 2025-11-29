@@ -4,6 +4,7 @@ steamsnooping:
     - None
   game_white:         #Steam游戏播报白名单，在此名单内的游戏不会被bot播报
     - Wallpaper Engine
+    - MyDockFinder
     - MyDockerFinder
     - DSX
-
+    - Source SDK

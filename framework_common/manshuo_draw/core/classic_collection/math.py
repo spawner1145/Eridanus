@@ -80,7 +80,7 @@ class MathModule:
 
 
     async def data_deal(self,type=None):
-        processed_content=[]
+        processed_content,covert_flag=[],False
         if type in ['bar_chart_vertical']:
             if all(not isinstance(item, list) for item in self.content):
                 self.content =[self.content]
@@ -93,9 +93,14 @@ class MathModule:
                     except ValueError:
                         if item_check.endswith('%'): item_check = float(item_check[:-1].repalce(' ','')) / 100
                     if self.max is not False and item_check >= 0:processed_content2.append(item_check / float(self.max))
-                    elif 1 >= item_check >= 0:processed_content2.append(item_check)
-                    elif item_check >= 1:processed_content2.append(1 / (1 + math.exp(-item_check)) - 0.5)
-                    else:processed_content2.append(0)
+                    elif 1 > item_check >= 0:processed_content2.append(item_check)
+                    elif item_check >= 1:
+                        covert_flag = True
+                        processed_content2.append(item_check)
+                #大于1的进行百分制转换
+                if covert_flag:
+                    covert_flag = False
+                    processed_content2 = await math_convert_percent(processed_content2)
                 processed_content.append(processed_content2)
                 continue
             try:
@@ -103,7 +108,9 @@ class MathModule:
             except ValueError:
                 if item.endswith('%'):item = float(item[:-1].repalce(' ','')) / 100
             if self.max is not False and item >= 0:processed_content.append(item / float(self.max))
-            elif 1 >= item >= 0:processed_content.append(item)
-            elif item >= 1:processed_content.append(1 / (1 + math.exp(-item)) - 0.5)
-            else:processed_content.append(0)
+            elif 1 > item >= 0:processed_content.append(item)
+            elif item >= 1:
+                covert_flag = True
+                processed_content.append(item)
+        if covert_flag:processed_content = await math_convert_percent(processed_content)
         self.content = processed_content

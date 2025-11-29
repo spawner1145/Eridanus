@@ -6,7 +6,7 @@ from developTools.event.events import GroupMessageEvent
 import re
 from framework_common.manshuo_draw import *
 from datetime import datetime, timedelta
-# 构建分隔符正则表达式
+# 构建分隔符正则表达式 
 separators_pattern = '|'.join(re.escape(sep) for sep in ["|", "｜"])
 
 async def parse_message_segments(event,bot):
@@ -60,9 +60,11 @@ def main(bot, config):
     async def record_message_reply(event: GroupMessageEvent):
         if event.get("reply") and event.get("text"):
             context = event.get("text")[0].strip().replace(' ','')
-            if context not in ['记录消息','消息记录']: return
+            if context not in ['记录消息','消息记录',"动词名词","名词动词"]: return
         else:
             return
+        bot.logger.info("开始进行消息记录")
+        #print(int(event.get("reply")[0]["id"]))
         event_obj = await bot.get_msg(int(event.get("reply")[0]["id"]))
         if event_obj.message[0]['type'] == 'forward': return
         check = await parse_message_segments(event_obj,bot)
@@ -70,14 +72,13 @@ def main(bot, config):
         context = check[0]["text"]
         parts = re.split(r'\[title\].*?\[/title\]', context)
         context_len = len("".join(parts))
-        if '[title]' in context: context_len += 5
         img_width = 700
         userid, target_group = event_obj.sender.user_id, event.group_id
         try:
             target_name = (await bot.get_group_member_info(target_group, userid))['data']['nickname']
         except:
             target_name = '未知用户'
-        check_name = f'                     --By {target_name}'
+        check_name = f'                   --By {target_name}'
         #print(context_len)
         if 200 > context_len > 40:
             img_width = 1100
@@ -88,7 +89,7 @@ def main(bot, config):
         elif context_len >= 400:
             img_width = 2000
             check_name = f'                                                                                {check_name}'
-        total_line_breaks = context.count('\n') + context.count('\r') + 1
+        total_line_breaks = context.count('\n') + context.count('\r') + 1 + 1 * context.count('[title]')
         #print(total_line_breaks,total_line_breaks * 43,img_width / 3 - 40,context_len)
         if total_line_breaks * 43 > img_width / 3 - 40: img_width = total_line_breaks * 43 * 3 + 40
         if len(target_name) > 4:
@@ -129,8 +130,9 @@ def main(bot, config):
         else:
             return
         event_obj = await bot.get_msg(int(event.get("reply")[0]["id"]))
+        if event_obj is None or event_obj.message is None: return
         if event_obj.message[0]['type'] != 'forward': return
-
+        bot.logger.info("开始进行消息记录")
         message_check = event_obj.message[0]['data']['content']
         #pprint.pprint(message_check)
         #pprint.pprint(event_obj.processed_message)
@@ -146,7 +148,16 @@ def main(bot, config):
                     else: per_result += f"\n[title][emoji]{per_msg['data']['url']}[/emoji][/title]"
                 elif per_msg['type'] == 'forward':
                     per_result += '这里是聊天记录喵'
-            per_message = {'group_id': item['group_id'], 'user_id':item['user_id'], 'nickname':item['sender']['nickname'], 'avatar_img':f"https://q1.qlogo.cn/g?b=qq&nk={item['user_id']}&s=640",
+            user_id = event.self_id
+            if 'user_id' in item and int(item['user_id']) != 1094950020: user_id = item['user_id']
+            else:
+                try:
+                    message_id = item['message_id']
+                    event_obj_user = await bot.get_msg(int(message_id))
+                    #pprint.pprint(event_obj_user)
+                except:pass
+            #print(user_id)
+            per_message = {'group_id': item['group_id'], 'user_id':user_id, 'nickname':item['sender']['nickname'], 'avatar_img':f"https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=640",
                            'time':time.strftime('%Y-%m-%d %H:%M:%S'), 'content':per_result}
             forward_list.append(per_message)
         #pprint.pprint(forward_list)

@@ -29,28 +29,46 @@ async def geminiRequest(ask_prompt,base_url: str,apikey: str,model: str,proxy=No
         models_to_try = [model]
         manager = None
     # print(requests.get(url,verify=False))
-    pay_load={
-        "contents": ask_prompt,
-        "systemInstruction": {
-            "parts": [
-                {
-                    "text": system_instruction,
-                }
-            ]
-        },
-        "safetySettings": [
-            {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', "threshold": "BLOCK_None"},
-            {'category': 'HARM_CATEGORY_HATE_SPEECH', "threshold": "BLOCK_None"},
-            {'category': 'HARM_CATEGORY_HARASSMENT', "threshold": "BLOCK_None"},
-            {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', "threshold": "BLOCK_None"}],
-        "generationConfig": {
-            "temperature": temperature,
-            "topK": 64,
-            "topP": 0.95,
-            "maxOutputTokens": maxOutputTokens,
-            "responseMimeType": "text/plain"
+    if system_instruction:
+        pay_load={
+            "contents": ask_prompt,
+            "systemInstruction": {
+                "parts": [
+                    {
+                        "text": system_instruction,
+                    }
+                ]
+            },
+            "safetySettings": [
+                {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', "threshold": "BLOCK_None"},
+                {'category': 'HARM_CATEGORY_HATE_SPEECH', "threshold": "BLOCK_None"},
+                {'category': 'HARM_CATEGORY_HARASSMENT', "threshold": "BLOCK_None"},
+                {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', "threshold": "BLOCK_None"}],
+            "generationConfig": {
+                "temperature": temperature,
+                "topK": 64,
+                "topP": 0.95,
+                "maxOutputTokens": maxOutputTokens,
+                "responseMimeType": "text/plain"
+            }
         }
-    }
+    else:
+        pay_load={
+            "contents": ask_prompt,
+            "safetySettings": [
+                {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', "threshold": "BLOCK_None"},
+                {'category': 'HARM_CATEGORY_HATE_SPEECH', "threshold": "BLOCK_None"},
+                {'category': 'HARM_CATEGORY_HARASSMENT', "threshold": "BLOCK_None"},
+                {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', "threshold": "BLOCK_None"}],
+            "generationConfig": {
+                "temperature": temperature,
+                "topK": 64,
+                "topP": 0.95,
+                "maxOutputTokens": maxOutputTokens,
+                "responseMimeType": "text/plain"
+            }
+        }
+
     if tools is not None:
         pay_load["tools"] = tools
 
@@ -206,7 +224,7 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                 message = await gemini_prompt_elements_construct(event_obj.processed_message) #
                 prompt_elements.extend(message["parts"])
             except Exception as e:
-                traceback.print_exc()
+                #traceback.print_exc()
                 logger.warning(f"引用消息解析失败:{e}")
                 continue
         else:

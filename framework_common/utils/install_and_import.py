@@ -4,14 +4,12 @@ from pip._internal.cli.main import main as pip_main
 from developTools.utils.logger import get_logger
 
 logger=get_logger()
-"""
-CWS Ps:os.system很好 以后别用了。。。
-"""
+pip_main(['config', 'set', 'global.index-url', 'https://mirrors.aliyun.com/pypi/simple/'])
 def install_and_import(package_name, import_name=None):
     """检测模块是否已安装，若未安装则通过 pip 安装"""
     if import_name is None:
         import_name = package_name
-
+    
     spec = importlib.util.find_spec(import_name)
     if spec is None:
         logger.warning(f"{package_name} 未安装，正在安装...")

@@ -72,7 +72,10 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
     mface_files = None
     user_info = None
     if tools is not None and config.ai_llm.config["llm"]["表情包发送"] and not config.ai_llm.config["llm"]["联网搜索"]:
-        tools = await add_send_mface(tools, config)
+        try:
+            tools = await add_send_mface(tools, config)
+        except:
+            logger.error(f"无法添加func【表情包发送】，建议自己检查设置是不是乱几把改了。\n{tools}")
     if not system_instruction:
         if config.ai_llm.config["llm"]["system"]:
             system_instruction = await read_chara(user_id, config.ai_llm.config["llm"]["system"])
@@ -436,6 +439,7 @@ async def tts_and_send(bot, event, config, reply_message):
             path = await Tts.tts(reply_message, config=config, bot=bot)
             await bot.send(event, Record(file=path))
         except Exception as e:
+            traceback.print_exc()
             bot.logger.error(f"Error occurred when calling tts: {e}")
             if not config.ai_llm.config["llm"]["语音回复附带文本"]:
                 await bot.send(event, reply_message.strip(), config.ai_llm.config["llm"]["Quote"])

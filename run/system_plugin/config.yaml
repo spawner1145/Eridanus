@@ -11,8 +11,11 @@ api_implements: #花里胡哨
     replylist:        #如果开启aiReplyCore，将不使用此处配置回复
     - 戳我干嘛呀！
   send_like: 0     #“赞我”功能所需权限等级
-  recall_level: 3  #撤回？
+  send_like_message: '赞你了喵～'    #赞你后发送的消息
+  recall_level: 2  #撤回？
 user_data:
+  是否启用签到: True
+  是否启用个人信息查询: True
   签到附带原图: true
   with_taro: true     #签到是否附带塔罗图和运势
   with_img_backdrop: true   #签到是否使用图片作为背景
