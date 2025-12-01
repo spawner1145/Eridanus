@@ -1,7 +1,7 @@
 from typing import Union, Optional, Dict, TYPE_CHECKING
 from developTools.utils.logger import get_logger
 logger=get_logger()
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 from ..._version import __version__
 from ...model.common import data_path
