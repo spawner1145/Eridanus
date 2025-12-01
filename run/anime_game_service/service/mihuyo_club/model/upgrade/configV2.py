@@ -9,7 +9,8 @@ from typing import Union, Optional, Tuple, Any, Dict, TYPE_CHECKING
 
 from developTools.utils.logger import get_logger
 logger=get_logger()
-from pydantic import BaseModel, BaseSettings, validator
+from pydantic_settings import BaseSettings
+from pydantic import BaseModel,validator
 
 from ...model.common import data_path
 
