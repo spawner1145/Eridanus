@@ -2,7 +2,9 @@ from typing import List, Optional, Tuple, Literal, Set, Type
 from urllib.parse import urlencode
 
 import httpx
-import tenacity
+from framework_common.utils.install_and_import import install_and_import
+tenacity=install_and_import("tenacity")
+
 
 from ..api.common import ApiResultHandler, HEADERS_API_TAKUMI_MOBILE, is_incorrect_return, \
     device_login, device_save
