@@ -5,7 +5,7 @@ import random
 import re
 import traceback
 from asyncio import sleep
-from datetime import datetime
+from datetime import datetime, timedelta
 import pprint
 import gc
 import httpx
@@ -70,6 +70,7 @@ async def date_get():
     month = f'{current_year}_{current_month}'
     year = f'{current_year}'
     return_json = {'day':day, 'month':month, 'year':year,'today':current_date,'time':timestamp}
+
     return return_json
 
 
@@ -82,7 +83,7 @@ async def data_update(user_info,update_json,day_info=None):
         user_info['length']['data'][f"{day_info['day']}"] = user_info['length']['data'][f"{day_info['day']}"] + length_add
         user_info['collect']['lu_done'], user_info['collect']['length'] = user_info['collect']['lu_done'] + update_json['times'], user_info['collect']['length'] + length_add
         #补🦌次数更新
-        if user_info['lu_supple']['record'] == {}:user_info['lu_supple']['record'] = 0
+        if user_info['lu_supple']['record'] == {} or user_info['lu_supple']['record'] <= 0:user_info['lu_supple']['record'] = 3
         if f"{day_info['day']}" not in user_info['lu_supple']['data']:
             user_info['lu_supple']['record'] += 1
             user_info['lu_supple']['data'].append(f"{day_info['day']}")
@@ -94,8 +95,8 @@ async def data_update(user_info,update_json,day_info=None):
         #user_info['collect']['lu_no'] = user_info['collect']['lu_no'] + update_json['times']
         user_info['lu_done']['data'][f"{day_info['day']}"] = 0
     elif update_json['type'] == 'supple_lu':
-        if user_info['lu_supple']['record'] == {}: user_info['lu_supple']['record'] = 3
-        user_info['lu_supple']['record'] -= 3
+        if user_info['lu_supple']['record'] == {} or user_info['lu_supple']['record'] <= 0: user_info['lu_supple']['record'] = 3
+        if user_info['lu_supple']['record'] >= 3: user_info['lu_supple']['record'] -= 3
         for i in range(day_info['today'].day):
             day = day_info['today'].day - i
             today = f"{day_info['month']}_{day}"
