@@ -110,26 +110,26 @@ async def skland_signin(userid,bot=None,event=None):
             ark_info['error'] = e
             return ark_info
 
-
     user_info =await db.read_user(userid)
     if not (user_info and 'skland' in user_info and 'user_info' in user_info['skland'] and 'character_info' in user_info['skland']):
-        if bot and event:await bot.send(event, '此用户还未绑定，请发送 ‘森空岛帮助’ 查看菜单')
-        else:print('此用户还未绑定，请发送 ‘森空岛帮助’ 查看菜单')
-        return
+        msg = '此用户还未绑定，请发送 ‘森空岛帮助’ 查看菜单'
+        if bot and event:await bot.send(event, msg)
+        else:print(msg)
+        return msg
     user_info_self, character_info_self = user_info['skland']['user_info'], user_info['skland']['character_info']
     sign_result: dict[str, ArkSignResponse] = {}
     sing_info = await sign_in(user_info_self, str(character_info_self['uid']), character_info_self['channel_master_id'])
-    print(sing_info)
+    #print(sing_info)
     if sing_info is  None:
         msg = f"Dr.{character_info_self['nickname']} ，登录已过期，请重新登录"
         if bot and event: await bot.send(event, msg)
         else: print(msg)
-        return
+        return msg
     if sing_info['error'] is not None:
         msg = f"Dr.{character_info_self['nickname']} ，{sing_info['error']}"
         if bot and event: await bot.send(event, msg)
         else: print(msg)
-        return
+        return msg
     sign_result[character_info_self['nickname']] = sing_info['ark_sign_info']
     msg=''
     if sign_result:
@@ -137,11 +137,10 @@ async def skland_signin(userid,bot=None,event=None):
         for nickname, sign in sign_result.items():
             if sign:msg+=f"角色: {nickname} 签到成功，获得了:\n"+ "\n".join(f"{award.resource.name} x {award.count}" for award in sign.awards)
             else: msg+=f'Dr.{nickname} ，您的token可能已失效，请重新登录'
+    if bot and event: await bot.send(event, msg)
+    else: print(msg)
+    return msg
 
-    if bot and event:
-        await bot.send(event, msg)
-    else:
-        print(msg)
 
 
 async def skland_info(userid,bot=None,event=None):
@@ -224,7 +223,7 @@ if __name__ == '__main__':
 
     #asyncio.run(qrcode_get(1667962668))
     #asyncio.run(user_check(3922292124))
-    asyncio.run(skland_info(1270858640))
+    asyncio.run(skland_signin(1270858640))
     #asyncio.run(skland_info(942755190))
     #asyncio.run(rouge_info(1667962668,'水月'))
     #asyncio.run(rouge_detailed_info(1667962668,'界园'))
