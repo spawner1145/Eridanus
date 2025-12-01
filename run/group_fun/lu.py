@@ -83,7 +83,7 @@ def main(bot, config):
             recall_id = await check_lu(userid,bot=bot,event=event)
             if config.group_fun.config["today_wife"]["签🦌撤回"] is True:
                 await sleep(55)
-                await bot.recall(recall_id['data']['message_id'])
+                #await bot.recall(recall_id['data']['message_id'])
 
     @bot.on(GroupMessageEvent)
     async def supple_LU(event: GroupMessageEvent):

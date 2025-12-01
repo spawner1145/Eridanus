@@ -27,26 +27,27 @@ async def lock_lu(userid,status=0,bot=None,event=None):
 
 async def today_lu(userid,times=1,bot=None,event=None,type_check='self'):
     day_info = await date_get()
+    recall_id = None
     #贤者时间相关
     lu_cool_info = await lu_cool(userid, day_info, times)
     #pprint.pprint(lu_cool_info)
     if lu_cool_info['status'] is False:
         if bot and event: recall_id = await bot.send(event, [At(qq=userid), f"{lu_cool_info['message']}"])
-        else:
-            pprint.pprint('今天🦌了！')
-            recall_id = None
+        else: pprint.pprint(f"{lu_cool_info['message']}")
         return recall_id
     #用户信息读取
     user_info =await data_init(userid,day_info)
+    #pprint.pprint(user_info['lu_supple'])
     #贞操锁相关
     if type_check != 'self' and int(user_info['others']['lock_lu']) == 1:
         msg = random.choice(lock_message_select)
-        if bot and event: await bot.send(event, [At(qq=userid), f'{msg}'])
+        if bot and event: await bot.send(event, [At(qq=event.sender.user_id), f'{msg}'])
         else: pprint.pprint(msg)
         return
     #进行数据更新
     update_json = {'type':'lu_done','times':times}
     await data_update(user_info,update_json,day_info)
+
     if bot and event:target_name = (await bot.get_group_member_info(event.group_id, userid))['data']['nickname']
     else:target_name = '您'
     content = [f"{target_name} 的{day_info['today'].strftime('%Y年%m月')}的开🦌计划",
@@ -54,14 +55,15 @@ async def today_lu(userid,times=1,bot=None,event=None,type_check='self'):
                f"今天牛牛一共变长了 {user_info['length']['data'][day_info['day']]} cm",
                f"您一共🦌了 {user_info['collect']['lu_done']} 次，现在牛牛一共 {user_info['collect']['length']} cm!!!"]
     img_path = await lu_img_maker(user_info,content,day_info)
-    #pprint.pprint(user_info)
+    #pprint.pprint(user_info['lu_supple'])
     await db.write_user(userid, {'lu': user_info})
+    if user_info['lu_done']['data'][day_info['day']] in [0,1]:msg = "今天🦌了！"
+    else:msg = f"今天🦌了 {user_info['lu_done']['data'][day_info['day']]} 次！"
     if bot and event:
-        recall_id = await bot.send(event, [At(qq=userid)," 今天🦌了！",Image(file=img_path)])
-        return recall_id
+        recall_id = await bot.send(event, [At(qq=userid),f" {msg}",Image(file=img_path)])
     else:
-        pprint.pprint('今天🦌了！')
-
+        pprint.pprint(msg)
+    return recall_id
 
 async def no_lu(userid,bot=None,event=None,type_check='self'):
     day_info = await date_get()
@@ -83,7 +85,9 @@ async def supple_lu(userid,bot=None,event=None):
     # 贞操锁相关
     # 进行数据更新
     times_record = user_info['lu_supple']['record']
-    if times_record == {} or int(times_record) < 0: times_record = 0
+    if times_record == {} or int(times_record) < 0: times_record = 3
+    #print(times_record)
+    pprint.pprint(user_info['lu_supple'])
     times_record_check = int(times_record) // 3
     if times_record_check == 0 or int(times_record) in [0,1,2]:
         if bot and event:
@@ -158,9 +162,9 @@ if __name__ == '__main__':
     start_time = time.time()
     target_id = 1270858640
     #asyncio.run(rank_lu([1270858640,2191331427,1270858640,2191331427,1270858640,2191331427,1270858640,2191331427,1270858640,2191331427,]))
-    #asyncio.run(today_lu(3941640101))
-    asyncio.run(check_lu(1270858640))
-    #asyncio.run(today_lu(3949214587))
+    asyncio.run(supple_lu(1365012729))
+    #asyncio.run(today_lu(1365012729))
+    #asyncio.run(supple_lu(1270858640))
     end_time = time.time()  # 记录结束时间
     duration = end_time - start_time  # 计算持续时间，单位为秒
 
