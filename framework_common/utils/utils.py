@@ -1,6 +1,6 @@
 import base64
 import random
-
+import string
 import asyncio
 import traceback
 
@@ -91,7 +91,11 @@ def parse_arguments(arg_string, original_dict):
     return original_dict
 
 
-async def download_img(url, path, gray_layer=False, proxy=None):
+async def download_img(url, path=None, gray_layer=False, proxy=None):
+    if path is None:
+        characters = string.ascii_letters + string.digits
+        random_string = ''.join(random.choice(characters) for _ in range(10))
+        path = f'data/pictures/cache/{random_string}.jpg'
     if url.startswith("data:image"):
         match = re.match(r"data:image/(.*?);base64,(.+)", url)
         if not match:
