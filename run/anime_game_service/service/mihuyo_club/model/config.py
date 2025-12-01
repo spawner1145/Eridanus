@@ -7,7 +7,12 @@ from typing import Union, Optional, Tuple, Any, Dict, TYPE_CHECKING, ClassVar
 from developTools.utils.logger import get_logger
 logger=get_logger()
 from pydantic import BaseModel, validator
+
+from framework_common.utils.install_and_import import install_and_import
+pydantic_settings=install_and_import("pydantic-settings","pydantic_settings") 
+#第一个是包名，第二个是导入名。举个例子，PIL=install_and_import("pillow","PIL")
 from pydantic_settings import BaseSettings
+
 from ..model.common import data_path
 
 if TYPE_CHECKING:
