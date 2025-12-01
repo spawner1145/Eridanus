@@ -3,15 +3,17 @@ import re
 import random
 import httpx
 from httpx._urlparse import urlparse
-
+from developTools.message.message_components import Record, Node, Text, Image, At
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Image
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.random_str import random_str
+from run.basic_plugin.service.random_pic import random_img_search
 
 
 def main(bot: ExtendBot, config: YAMLManager):
+
     @bot.on(GroupMessageEvent)
     async def today_husband(event: GroupMessageEvent):
         text = str(event.pure_text)
@@ -21,17 +23,6 @@ def main(bot: ExtendBot, config: YAMLManager):
         url_map = {
             "腿": [
                 "https://api.dwo.cc/api/meizi",
-            ],
-            "黑丝": [
-                "https://api.dwo.cc/api/hs_img",
-                "https://img.sorahub.site/?tag=black%20pantyhose",
-                "https://v2.api-m.com/api/heisi?return=302",
-                ""
-            ],
-            "白丝": [
-                "https://api.dwo.cc/api/bs_img",
-                "https://img.sorahub.site/?tag=white%20socks",
-                "https://v2.api-m.com/api/baisi?return=302",
             ],
             "头像": [
                 "https://api.dwo.cc/api/dmtou",
@@ -122,3 +113,40 @@ def main(bot: ExtendBot, config: YAMLManager):
 
         _scan(data)
         return urls
+
+
+
+
+    @bot.on(GroupMessageEvent)
+    async def random_img(event: GroupMessageEvent):
+        context, userid, nickname, group_id = event.pure_text, str(event.sender.user_id), event.sender.nickname, int(event.group_id)
+        if event.message_chain.has(At) and event.message_chain.has(Text):  context = event.message_chain.get(Text)[0].text
+        Today_random_pic = config.basic_plugin.config["setu"]["today_img_list"]
+        order_list = ["随机", "今日", '来一张', '来一个','来张']
+        target_list =  ['龙图', '神乐七奈', '狗妈', '配色', ] + Today_random_pic
+        if not (any(context.startswith(word) for word in order_list) and any(word in context for word in target_list)):return
+        target = next((t for t in target_list if t in context), None)
+        context = re.compile('|'.join(map(re.escape, order_list + target_list))).sub('', context)
+
+        bot.logger.info(f"开始获取 {target} 喵")
+        if any(word in context for word in ["个", "张"]):
+            number_list = re.search(r'\d+', context)
+            cmList = []
+            if number_list:
+                number = int(number_list.group())
+                if number > 5:
+                    await bot.send(event, '岚岚不干了喵！')
+                    return
+                info = await random_img_search(target,number)
+                if info['status'] is not True:
+                    await bot.send(event, '获取失败了喵')
+                    return
+                for img_path in info['img']:cmList.append(Node(content=[Image(file=img_path)]))
+            if cmList:await bot.send(event, cmList)
+        else:
+            info = await random_img_search(target,1)
+            if info['status'] is not True:
+                await bot.send(event, '获取失败了喵')
+                return
+            img_path = info['img'][0]
+            await bot.send(event, Image(file=img_path))
