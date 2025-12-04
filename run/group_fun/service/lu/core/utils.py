@@ -39,12 +39,12 @@ async def lu_cool(userid,day_info,times=1):
         if lu_list[userid]['times'] < 5:
             return return_json
         #炸膛概率随次数逐渐提高
-        if lu_list[userid]['times'] < 11: boom_chance = lu_list[userid]['times'] * 10
-        elif 11 <= lu_list[userid]['times'] < 15: boom_chance = (lu_list[userid]['times'] - 11) * 5 + 100
-        elif 15 <= lu_list[userid]['times'] < 20: boom_chance = (lu_list[userid]['times'] - 15) * 3 + 120
-        elif 20 <= lu_list[userid]['times'] < 35: boom_chance = (lu_list[userid]['times'] - 20) * 1 + 135
-        else:boom_chance = 150
-        if random.randint(0, boom_chance) > 100:
+        if lu_list[userid]['times'] < 5: boom_chance = lu_list[userid]['times'] * 10
+        elif 5 <= lu_list[userid]['times'] < 10: boom_chance = (lu_list[userid]['times'] - 5) * 5 + 50
+        elif 10 <= lu_list[userid]['times'] < 15: boom_chance = (lu_list[userid]['times'] - 10) * 3 + 75
+        elif 15 <= lu_list[userid]['times'] < 20: boom_chance = (lu_list[userid]['times'] - 15) * 2 + 90
+        else:boom_chance = 300
+        if random.randint(0, boom_chance) > 60:
             boom_time = random.randint(0, times*5)
             if boom_time > 600: boom_time = 600
             return_json['status'] = False

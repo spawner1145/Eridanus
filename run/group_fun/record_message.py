@@ -181,15 +181,17 @@ def main(bot, config):
         # 保证存储文件夹存在
         if not os.path.exists(img_path_save):
             os.makedirs(img_path_save)
-        draw_list, img_width = [], 700
+        draw_list, img_width, total_width, times_width = [], 700, 0, 0
         for item in forward_list:
             parts = re.split(r'\[title\].*?\[/title\]', item['content'])
-            if 200 > len("".join(parts)) > 40: img_width = 1100
-            elif 400 > len("".join(parts)) >= 200: img_width = 1500
-            elif len("".join(parts)) >= 400: img_width = 2000
+            total_width += len("".join(parts))
+            times_width += 1
             draw_list.append(
                 {'type': 'avatar', 'img': [item['avatar_img']],'content': [f"[name]{item['nickname']}[/name]   [time]{item['time']}[/time]"],'padding_up_bottom':8,'padding_up_font':10,'avatar_size':50,'font_name_size':28})
             draw_list.append(f"   {item['content']}")
+        if 200 > total_width/times_width > 40: img_width = 1100
+        elif 400 > total_width/times_width >= 200: img_width = 1500
+        elif total_width/times_width >= 400: img_width = 2000
         #print(f'final img width: {img_width}')；
         #pprint.pprint(draw_list)
         draw_list.append({'type': 'basic_set', 'img_width': img_width, 'font_title_size':125,'img_path_save':img_path_save, 'img_name_save': img_name_save, 'padding_up_layer':10})
