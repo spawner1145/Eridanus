@@ -95,6 +95,11 @@ def get_authorization_token(cookie: str) -> str:
     response = httpx.get(url, headers=headers)
     response.raise_for_status()
     data = response.json()
+
+    session_id = data['response']['sessions'][0]['id']
+    touch_url = f"https://auth.suno.com/v1/client/sessions/{session_id}/touch?__clerk_api_version=2025-11-10&_clerk_js_version=5.111.0"
+    touch_data = "__clerk_api_version=2025-11-10&_clerk_js_version=5.111.0"
+    httpx.post(touch_url, headers=headers, data=touch_data)
     
     jwt = data['response']['sessions'][0]['last_active_token']['jwt']
     return f"Bearer {jwt}"
