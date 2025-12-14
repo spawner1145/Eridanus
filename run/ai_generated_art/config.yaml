@@ -52,3 +52,11 @@ ai绘画:
     - --ns 5
     - --nf 20
     - --overmask 64
+
+suno:
+  # Suno API的Cookie, 需要从浏览器登录Suno官网后，通过开发者工具获取
+  cookie: ""
+  # 权限等级或以上的用户可以无限次使用Suno功能
+  unlimited_permission: 5
+  # 普通用户设置的每日默认使用次数
+  default_user_uses: 3
