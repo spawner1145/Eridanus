@@ -3,6 +3,7 @@ import datetime
 import os
 import random
 import re
+from sre_parse import CATEGORIES
 import threading
 import traceback
 from asyncio import sleep
@@ -24,7 +25,24 @@ from run.group_fun.service.wife_you_want import manage_group_status, manage_grou
     run_async_task, today_check_api, query_group_users, add_or_update_user_collect
 
 
+WORDS_MAPPING = {
+    '今日一言': 'yan',
+    '答案之书': 'yan',
+    '每日一言': 'yan',
+    'emo时刻': 'emo',
+    'emo了': 'emo',
+    '网抑云': 'emo',
+    'wyy评论': 'wyy', 
+    '网易云评论': 'wyy',
+    '舔狗日记': 'dog'
+}
 
+CATEGORIES_MAPPING = {
+    'yan': '今日一言',
+    'emo': 'emo时刻',
+    'wyy': 'wyy评论',
+    'dog': '舔狗日记'
+}
 
 def main(bot, config):
     global last_messages, membercheck, filepath
@@ -144,30 +162,22 @@ def main(bot, config):
         async with httpx.AsyncClient(timeout=30.0) as client:
             flag = 0
             url = None
-
-            if '今日一言' == str(event.pure_text) or '答案之书' == str(event.pure_text) or '每日一言' == str(
-                    event.pure_text):
-                url = 'https://api.dwo.cc/api/yi?api=yan'
+            text = str(event.pure_text)
+            
+            if text in WORDS_MAPPING:
+                category = WORDS_MAPPING[text]
                 flag = 1
-                bot.logger.info("今日一言")
-            elif 'emo时刻' == str(event.pure_text) or 'emo了' == str(event.pure_text) or '网抑云' == str(
-                    event.pure_text):
-                url = 'https://api.dwo.cc/api/yi?api=emo'
-                flag = 1
-                bot.logger.info("emo时刻")
-            elif 'wyy评论' == str(event.pure_text) or '网易云评论' == str(event.pure_text):
-                url = 'https://api.dwo.cc/api/yi?api=wyy'
-                flag = 1
-                bot.logger.info("网易云评论")
-            elif '舔狗日记' == str(event.pure_text):
-                url = 'https://api.dwo.cc/api/dog'
-                flag = 1
-                bot.logger.info("舔狗日记")
-
+                bot.logger.info(CATEGORIES_MAPPING[category])
+                if category == 'dog':
+                    url = 'https://openapi.dwo.cc/api/dog'
+                else:
+                    url = f'https://openapi.dwo.cc/api/yi?api={category}&type=json'
+            
             if flag == 1 and url:
                 try:
                     response = await client.get(url)
-                    context = str(response.text)
+                    data = response.json()
+                    context = data['data'] if 'data' in data else data['text']
                     await bot.send(event, context)
                 except Exception as e:
                     bot.logger.error(f"API请求失败: {e}")
