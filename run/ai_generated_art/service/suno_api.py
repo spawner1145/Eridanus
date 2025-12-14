@@ -196,7 +196,9 @@ async def generate_songs(cookie: str, prompt: str = "", tags: str = "", negative
                         clip_id = clip.get('id')
                         status = clip.get('status')
                         print(f"- Clip ID: {clip_id}, 状态: {status}")
-                        if status == 'complete':
+                        if status == 'error':
+                            raise Exception(f"Clip {clip_id} 生成失败，状态: error")
+                        elif status == 'complete':
                             audio_url = clip.get('audio_url')
                             if audio_url:
                                 filename = await download_audio(client, audio_url, clip_id, download_dir)
