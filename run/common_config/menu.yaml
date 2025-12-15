@@ -264,6 +264,10 @@ help_menu: #如果打开菜单编辑器发现内容为空，请先运行一遍/r
       \n  删除关键词 关键字    [des]删除关键字所有回复[/des]
       \n  *删除关键词 关键字    [des]全局词库删除关键字所有回复[/des]'],'layer':2}
       - '   '
+      - {'type': 'text','content': ['[title]神表情包[/title]
+      \n  神@某人
+      \n  神 {QQ号}'],'layer':2}
+      - '   '
       - {'type': 'text','content': ['[title]火影奥义图[/title]
       \n  /aoyi 文本 【图片】 [des]引用一张图片[/des]'],'layer':2}
       - '   '
