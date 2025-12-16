@@ -279,7 +279,7 @@ def resize_image_keep_ratio(img, scale_factor, min_size=(100, 100)):
     
     return resized_img
 
-async def generate_animation(input_path, output_path, text, duration=2.0, fps=20, black_opacity=0.5, subtitle_opacity=0.85, font_path=DEFAULT_FONT, feather_radius=8, vignette_strength=0.6, noise_amount=0.06, swing_amplitude=14.0, swing_overshoot=1.3, subject_scale=1.04, total_frames=None, min_cycles=2, max_cycles=4, top_dark_opacity=0.35, line_prob=0.12, line_count=6, line_width=1, line_jitter=2, subtitle_padding=12, subtitle_radius=18, subtitle_feather=6, subtitle_bg_alpha=255, font_size=26, fast_freq=10.0, jitter_amp=2.0):
+async def generate_animation(input_path, output_path, text, duration=2.0, fps=20, black_opacity=0.5, subtitle_opacity=0.85, font_path=DEFAULT_FONT, feather_radius=8, vignette_strength=0.6, noise_amount=0.06, swing_amplitude=50.0, swing_overshoot=1.3, subject_scale=1.04, total_frames=None, min_cycles=2, max_cycles=4, top_dark_opacity=0.35, line_prob=0.12, line_count=6, line_width=1, line_jitter=2, subtitle_padding=12, subtitle_radius=18, subtitle_feather=6, subtitle_bg_alpha=255, font_size=26, fast_freq=10.0, jitter_amp=2.0):
     if not os.path.exists(input_path):
         raise FileNotFoundError(input_path)
     
@@ -466,7 +466,7 @@ if __name__ == '__main__':
     p.add_argument('--font', default=DEFAULT_FONT)
     p.add_argument('--vignette', type=float, default=0.6)
     p.add_argument('--noise', type=float, default=0.06, help='噪点强度')
-    p.add_argument('--swing_amp', type=float, default=14.0, help='回弹/抖动幅度（像素）')
+    p.add_argument('--swing_amp', type=float, default=50.0, help='回弹/抖动幅度（像素）')
     p.add_argument('--swing_overshoot', type=float, default=1.3, help='回弹时的 overshoot 倍率，>1 会有更强张力')
     p.add_argument('--frames', type=int, default=None, help='总帧数（优先于 duration/fps）')
     p.add_argument('--subject_scale', type=float, default=1.04, help='主体略微放大比例以避免回弹出现黑框')
