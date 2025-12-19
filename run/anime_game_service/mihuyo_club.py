@@ -31,7 +31,7 @@ def main(bot, config):
     @bot.on(GroupMessageEvent)
     async def sing_sklandid(event: GroupMessageEvent):
         order_list=['签到']
-        target_list = ['原神','崩铁','绝区零','崩坏三','崩三','崩崩崩','未定事件簿','崩坏学园2','未定','崩2','zzz','ZZZ']
+        target_list = ['原神','崩铁','绝区零','崩坏三','崩坏3','崩三','崩崩崩','未定事件簿','崩坏学园2','未定','崩2','zzz','ZZZ']
         context, userid=event.pure_text, str(event.sender.user_id)
         if event.message_chain.has(At) and event.message_chain.has(Text):
             userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
