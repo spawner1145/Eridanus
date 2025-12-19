@@ -2,6 +2,10 @@ import os
 import gc
 from .classic_collection import *
 from .classic_collection.util import *
+from pathlib import Path
+
+import datetime
+timestart = datetime.datetime.now().timestamp()
 
 #basic_img_info：已经初始化的基础模块
 #json_img：需要绘制的模块参数
@@ -38,6 +42,7 @@ async def layer_deal(basic_img_info,json_img,json_img_left,layer=1):
                 continue
             #调试时输出日志，并进行正确性判断
             if per_json_img['type'] not in ['layer_processed', 'backdrop']:
+                printf(f'当前所用时间：{datetime.datetime.now().timestamp() - timestart}')
                 printf(per_json_img)
             #print(layer_img_info.img_height_limit)
             #对每个模块进行判断，分别执行对应的模块
@@ -90,13 +95,16 @@ async def deal_img(json_img): #此函数将逐个解析json文件中的每个字
             basic_img_info = basicimgset(per_json_img)
             break
     if basic_img_info.is_abs_path_convert is True:
-        basic_img_info.img_path_save = get_abs_path(basic_img_info.img_path_save,is_ignore_judge=True)
-        basic_img_info.color_emoji_path = get_abs_path(basic_img_info.color_emoji_path, is_ignore_judge=True)
+        basic_img_info.img_path_save = get_abs_path(basic_img_info.img_path_save,is_dir=True)
+        basic_img_info.color_emoji_path = get_abs_path(basic_img_info.color_emoji_path, is_dir=True)
     if basic_img_info.img_name_save is not None :
         img_path = basic_img_info.img_path_save
         if os.path.isfile(img_path):return img_path
     else:
-        img_path = basic_img_info.img_path_save+"/" + random_str() + ".png"
+        if isinstance(basic_img_info.img_path_save, str):
+            img_path = basic_img_info.img_path_save + f'/{random_str()}.png'
+        elif isinstance(basic_img_info.img_path_save, Path):
+            img_path = basic_img_info.img_path_save / f'{random_str()}.png'
 
 
     canves_layer_list=[]
@@ -114,16 +122,20 @@ async def deal_img(json_img): #此函数将逐个解析json文件中的每个字
 
     #layer_img_canvas.show()
     #将之前的模块粘贴到实现绘制的无色中间层上
+    printf(f'开始粘贴到无色图层上：{datetime.datetime.now().timestamp() - timestart}')
     basic_img = await basic_img_info.creatbasicimgnobackdrop(canves_layer_list)
     basic_img = await basic_img_info.combine_layer_basic(basic_img,canves_layer_list)
+    printf(f'粘贴到无色图层后：{datetime.datetime.now().timestamp() - timestart}')
 
     for per_json_img in basic_json_set:               #处理背景相关
         if 'backdrop' in per_json_img['type']:
             backdrop_class=Backdrop(basic_img_info, per_json_img)
             basic_img=await getattr(backdrop_class, per_json_img['subtype'])(basic_img)
+    printf(f'与背景结合时间：{datetime.datetime.now().timestamp() - timestart}')
 
     basic_img = basic_img.convert("RGB")
     basic_img.save(img_path, "PNG")
+    printf(f'保存图片：{datetime.datetime.now().timestamp() - timestart}')
     if basic_img_info.debug is True:
         basic_img.show()
 

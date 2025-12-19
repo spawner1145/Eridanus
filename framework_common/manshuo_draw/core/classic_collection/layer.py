@@ -6,7 +6,6 @@ class LayerSet:
         for key, value in vars(basic_img_set).items():#继承父类属性，主要是图片基本设置类
             setattr(self, key, value)
         self.img_width,self.img_height = self.img_width - self.padding_left_common  * 2, self.img_height_limit
-
         self.img_height_limit, self.img_height_limit_flag = self.img_height_limit - self.padding_up_common * 2, False
 
 

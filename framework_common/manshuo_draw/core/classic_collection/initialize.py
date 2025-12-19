@@ -4,11 +4,12 @@ global initialize_yaml_set
 version_check=True
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+from pathlib import Path
 
 def version_check_core():
     global version_check
     version_check=False
-    default_config = get_abs_path('framework_common/manshuo_draw/data/config/save_config.yml')
+    default_config = get_abs_path('data/config/save_config.yml')
 
 
 if version_check:
@@ -66,11 +67,18 @@ def initialize_yaml_must_require_core(params):
     yaml.preserve_quotes = True  # 保留 YAML 中的引号
     yaml.indent(sequence=4, offset=2)  # 设置缩进
     yaml.width = 4096  # 设置行宽防止换行
-    default_config = get_abs_path('framework_common/manshuo_draw/data/config/save_config.yml')
+    default_config = get_abs_path('data/config/save_config.yml')
     if 'basic_set' == params['type'] :
         if 'config_path' not in params:
-            params['config_path']=get_abs_path(default_config)
-        config_abs_path = get_abs_path(params['config_path'])
+            with open(default_config, 'r', encoding='utf-8') as file:
+                check = yaml.load(file)
+            params['config_path']=check['basic_set']['config_path']
+        if params['config_path'].startswith('/'):
+            config_abs_path = params['config_path']
+        else:
+            config_abs_path = current_dir / Path(params['config_path'])
+        printf(params['config_path'])
+        printf(config_abs_path)
         if not os.path.exists(config_abs_path):
             with open(default_config, 'r', encoding='utf-8') as file:
                 origin_config_set_yaml = yaml.load(file)
