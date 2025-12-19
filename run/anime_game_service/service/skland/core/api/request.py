@@ -11,7 +11,7 @@ from ..schemas import CRED, ArkCard, RogueData, ArkSignResponse,Topics
 from ..exception import LoginException, RequestException, UnauthorizedException
 
 from developTools.utils.logger import get_logger
-logger=get_logger()
+logger=get_logger('skland')
 
 base_url = "https://zonai.skland.com/api/v1"
 

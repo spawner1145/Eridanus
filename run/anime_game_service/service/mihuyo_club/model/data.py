@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 
 from httpx import Cookies
 from developTools.utils.logger import get_logger
-logger=get_logger()
+logger=get_logger('MiHoYo')
 from pydantic import BaseModel, ValidationError, validator, Field
 
 from .._version import __version__

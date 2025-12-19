@@ -11,7 +11,7 @@ from ..model import BaseApiStatus, MissionStatus, MissionData, \
 from ..utils import  generate_ds, \
     get_async_retry, get_validate
 from developTools.utils.logger import get_logger
-logger=get_logger()
+logger=get_logger('MiHoYo')
 URL_SIGN = "https://bbs-api.mihoyo.com/apihub/app/api/signIn"
 URL_GET_POST = "https://bbs-api.miyoushe.com/post/api/feeds/posts?fresh_action=1&gids={}&is_first_initialize=false" \
                "&last_id="

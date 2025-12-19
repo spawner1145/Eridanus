@@ -10,7 +10,7 @@ from ..model import PluginDataManager, plugin_config, UserAccount, UserData, Com
     QueryGameTokenQrCodeStatus, GetCookieStatus
 from ..utils import read_blacklist, read_whitelist, generate_device_id, generate_qr_img
 from developTools.utils.logger import get_logger
-logger=get_logger()
+logger=get_logger('MiHoYo')
 import base64
 from developTools.message.message_components import Text, Image, At
 from io import BytesIO
