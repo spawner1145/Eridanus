@@ -23,13 +23,15 @@ async def random_img_search(target,num=1):
     else: info = await random_today_pic(num, target)
     return info
 
-async def save_img(resp):
+async def save_img(resp=None,url=None):
     characters = string.ascii_letters + string.digits
     random_string = ''.join(random.choice(characters) for _ in range(10))
     img_path = f'data/pictures/cache/{random_string}.jpg'
-    #print(resp.content)
-    with open(img_path, 'wb') as file:
-        file.write(resp.content)
+    if resp is not None:
+        with open(img_path, 'wb') as file:
+            file.write(resp.content)
+    elif url is not None:
+        pass
     return img_path
 
 async def random_today_pic(num = 1, tag = '贫乳'):
@@ -45,11 +47,13 @@ async def random_today_pic(num = 1, tag = '贫乳'):
             img_url = item['urls']['regular']
             try:
                 proxy_url = img_url.replace("https://i.pixiv.re/", "https://i.yuki.sh/")
-                img_path = await download_img(proxy_url, proxy="http://127.0.0.1:7890")
                 #print(proxy_url)
+                img_path = await download_img(proxy_url)
             except:
-                img_path = await download_img(img_url, proxy="http://127.0.0.1:7890")
                 #print(img_url)
+                img_path = await download_img(img_url, proxy="http://127.0.0.1:7890")
+                pass
+
             info_json['img'].append(img_path)
 
     except Exception as e:

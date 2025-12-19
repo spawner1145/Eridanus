@@ -190,6 +190,10 @@ class LoggerWrapper:
         if self._logger.isEnabledFor(logging.INFO):
             self._log_with_category(logging.INFO, message, None, *args, **kwargs)
 
+    def success(self, message, *args, **kwargs):
+        if self._logger.isEnabledFor(logging.INFO):
+            self._log_with_category(logging.INFO, message, None, *args, **kwargs)
+
     def warning(self, message, *args, **kwargs):
         if self._logger.isEnabledFor(logging.WARNING):
             self._log_with_category(logging.WARNING, message, None, *args, **kwargs)
@@ -284,6 +288,7 @@ if __name__ == "__main__":
 
         for i in range(5):
             logger.info(f"Info message {i}")
+            logger.success(f"success message {i}")
             logger.info_msg(f"MSG message {i}")
             logger.info_func(f"FUNC message {i}")
             logger.server(f"SERVER message {i}")
