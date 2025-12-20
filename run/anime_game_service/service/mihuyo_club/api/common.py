@@ -16,7 +16,7 @@ from ..model import GameRecord, GameInfo, Good, Address, BaseApiStatus, MmtData,
 from ..utils import generate_device_id, generate_ds, \
     get_async_retry, generate_seed_id, generate_fp_locally
 from developTools.utils.logger import get_logger
-logger=get_logger()
+logger=get_logger('MiHoYo')
 URL_LOGIN_TICKET_BY_CAPTCHA = "https://webapi.account.mihoyo.com/Api/login_by_mobilecaptcha"
 URL_LOGIN_TICKET_BY_PASSWORD = "https://webapi.account.mihoyo.com/Api/login_by_password"
 URL_MULTI_TOKEN_BY_LOGIN_TICKET = ("https://api-takumi.mihoyo.com/auth/api/getMultiTokenByLoginTicket?login_ticket={0}"

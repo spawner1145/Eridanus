@@ -3,7 +3,7 @@ from urllib.parse import quote
 from datetime import datetime, timedelta
 
 from developTools.utils.logger import get_logger
-logger=get_logger()
+logger=get_logger('skland')
 
 from .config import CACHE_DIR
 import urllib.request

@@ -358,7 +358,10 @@ async def label_process(params, img, number_count, new_width):
 async def init(params):  # 对模块的参数进行初始化
     # 接下来是对图片进行处理，将其全部转化为pillow的img对象，方便后续处理
     if 'img' in params:
+        #经过处理的图片
         params['processed_img'] = await process_img_download(params['img'], params['is_abs_path_convert'],proxy=params['proxy'])
+        #创建一个列表用来存储处理图片数据
+        params['data_img'], params['temp_img'] = [], []
         # 判断图片的排版方式
         if params['number_per_row'] == 'default':
             if len(params['processed_img']) == 1:params['number_per_row'],params['is_crop'] = 1,False
@@ -380,13 +383,15 @@ async def init(params):  # 对模块的参数进行初始化
             label_list,params['label'] = params['y_des'],[]
             for item in label_list: params['label'].append(f"-Y:{item}")
 
-
+    #根据传入的每行个数确定图片大小
     if 'number_per_row' in params:params['new_width'] = (((params['img_width'] - params['padding'] * 2) - (params['number_per_row'] - 1) * params['padding_with']) // params['number_per_row'])
+    #其他标志位，用于图片是否到底标志位
     if 'draw_limited_height' in params:params['draw_limited_height_remain'] = params['draw_limited_height']
     else:params['draw_limited_height_remain'] = 0
-
+    #初始化参数
     params['per_number_count'], params['number_count'], params['upshift'], params['downshift'], params['current_y'], \
     params['x_offset'], params['max_height'], params['avatar_upshift'] = 0, 0, 0, 0, 0, params['padding'], 0, 0
+    #初始化当前模块限高参数、剩余内容保存以及跳转标志位
     params['img_height_limit_module'], params['json_img_left_module'], params['without_draw_and_jump'], params[
         'draw_limited_height_check'], params['json_img_left_module_flag'] = params[
         'img_height_limit'], [], False, None, False
@@ -395,11 +400,12 @@ async def init(params):  # 对模块的参数进行初始化
     if params['is_shadow_front'] and params['is_shadow_img']:params['upshift'] += params['shadow_offset_img'] * 3
     if 'is_shadow_avatar' in params and 'shadow_offset_avatar' in params:
         if params['is_shadow_front'] and params['is_shadow_avatar']:params['avatar_upshift'] += params['shadow_offset_avatar'] * 2
-    params['pure_backdrop'] = Image.new("RGBA", (
-    params['img_width'], int(params['img_height_limit'] + params['upshift'] + params['padding_up_common'] * 2)),(0, 0, 0, 0))
+    #创建一个透明底作为模块底
+    params['pure_backdrop'] = Image.new("RGBA", (params['img_width'], int(params['img_height_limit'] + params['upshift'] + params['padding_up_common'] * 2)),(0, 0, 0, 0))
 
 
 async def per_img_limit_deal(params, img, type='img'):  # 处理每个模块之间图像的限高关系
+    #每个图片的比例关系，默认为1
     if 'magnification_img' in params:
         if params['magnification_img'] == 'default':
             if img.height / img.width < 9 / 16:params['magnification_img'] = 2
@@ -409,10 +415,13 @@ async def per_img_limit_deal(params, img, type='img'):  # 处理每个模块之�
     img_height = int((params['new_width'] / params['magnification_img']) * img.height / img.width)
     img_width = int(params['new_width'] / params['magnification_img'])
     img = img.resize((img_width, img_height))#这里的不用回收，最后会统一处理
+    #对图片大小划定完后进行限高判断以及裁剪
+    #此处处理超长图片裁切问题，此处为裁切至上一列绘制完的位置
     if params['number_count'] + 1 <= params['number_per_row'] and 'draw_limited_height' in params:
         cropped_img = img.crop((0, params['draw_limited_height'], img_width, img_height))
         img.close()
         img = cropped_img
+    #处理其是否到底
     if img.height > params['img_height_limit_module']:
         final_cropped = img.crop((0, 0, img_width, params['img_height_limit_module']))
         img.close()

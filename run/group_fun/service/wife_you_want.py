@@ -219,9 +219,9 @@ async def today_check_api(today_wife_api, header, num_check=None):
             async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
                 response = await client.get(api_url, headers=headers)
                 content_type = response.headers.get('Content-Type', '').lower()
-                print(f"API: {api_url}, Final URL: {response.url}, Status: {response.status_code}, "
-                      f"Content-Type: {content_type}, Content-Length: {len(response.content)}, "
-                      f"First-Bytes: {response.content[:10]}")
+                #print(f"API: {api_url}, Final URL: {response.url}, Status: {response.status_code}, "
+                #      f"Content-Type: {content_type}, Content-Length: {len(response.content)}, "
+                #      f"First-Bytes: {response.content[:10]}")
                 if (response.status_code == 200 and
                         len(response.content) > 0 and
                         ('image' in content_type or

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Union, Optional, Tuple, Any, Dict, TYPE_CHECKING, ClassVar
 
 from developTools.utils.logger import get_logger
-logger=get_logger()
+logger=get_logger('MiHoYo')
 from pydantic import BaseModel, validator
 
 from framework_common.utils.install_and_import import install_and_import
@@ -254,9 +254,6 @@ class PluginEnv(BaseSettings):
     salt_config: ClassVar[SaltConfig] = SaltConfig()
     device_config: ClassVar[DeviceConfig] = DeviceConfig()
 
-    class Config:
-        env_prefix = "mystool_"
-        env_file = '.env'
 
 
 if plugin_config_path.exists() and plugin_config_path.is_file():
