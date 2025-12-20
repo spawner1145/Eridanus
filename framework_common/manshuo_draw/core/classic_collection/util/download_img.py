@@ -25,15 +25,20 @@ async def download_img(url, gray_layer=False, proxy=None):
         proxies = {"http://": proxy, "https://": proxy}
     else:
         proxies = None
-    #print(proxies)
-    async with httpx.AsyncClient(proxies=proxies) as client:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
+        "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"
+    }
+    #print(f'proxies:{proxies}')
+    async with httpx.AsyncClient(proxies=proxies, headers=headers) as client:
         try:
             response = await client.get(url)
+            #print(response)
             if response.status_code == 302:
                 new_url = response.headers['Location']
                 if new_url: response = await client.get(new_url)
         except Exception as e:
-            #print(f'绘图框架无法获取图片{url}： {type(e)} {repr(e)}')
+            print(f'绘图框架无法获取图片{url}： {type(e)} {repr(e)}')
             #print(proxies)
             #traceback.print_exc()
             #无法获取图片，直接从本地读取占位图

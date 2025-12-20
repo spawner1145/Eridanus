@@ -10,7 +10,7 @@ async def manshuo_draw(json_img):
     )
 
     del json_img
-    printf(img_path)
+    #printf(img_path)
     return str(img_path)
 
 async def test():
