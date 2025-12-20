@@ -4,14 +4,16 @@ import numpy as np
 from framework_common.utils.install_and_import import install_and_import
 
 imageio=install_and_import('imageio')
-
-import math
 import os
+import math
 import random
 import argparse
 import asyncio
+import tempfile
 
 DEFAULT_FONT = "run/memes/service/方正艺黑体.15.9.12.ttf"
+MAX_GIF_SIZE_MB = 20  # 最大GIF大小限制(MB)
+MAX_GIF_SIZE_BYTES = MAX_GIF_SIZE_MB * 1024 * 1024
 
 def create_vignette_mask(size, strength=0.6):
     w, h = size
@@ -97,7 +99,6 @@ def compose_frame(base_img, black_opacity, subtitle_img, subtitle_opacity, subti
     if noise_amount > 0:
         img = add_noise(img.convert('RGB'), amount=noise_amount).convert('RGBA')
     return img
-
 
 def create_static_background(base_img, black_opacity, subtitle_img, subtitle_opacity, subtitle_y, vignette_strength, blur_radius=None):
     w, h = base_img.size
@@ -245,31 +246,84 @@ def draw_vertical_line_noise(img, prob=0.12, count=6, width=1, jitter=2):
             draw.line((xi, y0, xi, y1), fill=col)
     return img
 
-async def generate_animation(input_path, output_path, text, duration=2.0, fps=20, black_opacity=0.5, subtitle_opacity=0.85, font_path=DEFAULT_FONT, feather_radius=8, vignette_strength=0.6, noise_amount=0.06, swing_amplitude=14.0, swing_overshoot=1.3, subject_scale=1.04, total_frames=None, min_cycles=2, max_cycles=4, top_dark_opacity=0.35, line_prob=0.12, line_count=6, line_width=1, line_jitter=2, subtitle_padding=12, subtitle_radius=18, subtitle_feather=6, subtitle_bg_alpha=255, font_size=26, fast_freq=10.0, jitter_amp=2.0):
+def estimate_gif_size(width, height, frames_count, fps, has_subtitle=True):
+    pixel_size_per_frame = width * height * 4
+    compression_ratio = 0.15
+    if has_subtitle:
+        compression_ratio *= 1.15
+    estimated_size = pixel_size_per_frame * frames_count * compression_ratio
+    
+    return estimated_size
+
+def calculate_scaling_factor(original_width, original_height, frames_count, fps, has_subtitle=True, max_size_bytes=MAX_GIF_SIZE_BYTES):
+    original_estimated_size = estimate_gif_size(
+        original_width, original_height, frames_count, fps, has_subtitle
+    )
+    if original_estimated_size <= max_size_bytes:
+        return 1.0
+    area_ratio = max_size_bytes / original_estimated_size
+    scale_factor = math.sqrt(area_ratio)
+    scale_factor = max(0.1, scale_factor)
+    
+    return scale_factor
+
+def resize_image_keep_ratio(img, scale_factor, min_size=(100, 100)):
+    original_width, original_height = img.size
+    new_width = int(original_width * scale_factor)
+    new_height = int(original_height * scale_factor)
+    
+    new_width = max(new_width, min_size[0])
+    new_height = max(new_height, min_size[1])
+    
+    resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+    
+    return resized_img
+
+async def generate_animation(input_path, output_path, text, duration=2.0, fps=20, black_opacity=0.5, subtitle_opacity=0.85, font_path=DEFAULT_FONT, feather_radius=8, vignette_strength=0.6, noise_amount=0.06, swing_amplitude=50.0, swing_overshoot=1.3, subject_scale=1.04, total_frames=None, min_cycles=2, max_cycles=4, top_dark_opacity=0.35, line_prob=0.12, line_count=6, line_width=1, line_jitter=2, subtitle_padding=12, subtitle_radius=18, subtitle_feather=6, subtitle_bg_alpha=255, font_size=26, fast_freq=10.0, jitter_amp=2.0):
     if not os.path.exists(input_path):
         raise FileNotFoundError(input_path)
+    
     base = (await asyncio.to_thread(Image.open, input_path)).convert('RGBA')
+    original_w, original_h = base.size
+    
+    if total_frames is None:
+        total_frames_inner = max(1, int(duration * fps))
+    else:
+        total_frames_inner = max(1, int(total_frames))
+    
+    has_subtitle = bool(text and text.strip())
+    scale_factor = calculate_scaling_factor(
+        original_w, original_h, 
+        total_frames_inner, 
+        fps, 
+        has_subtitle
+    )
+    
+    if scale_factor < 1.0:
+        print(f"检测到GIF可能超过{MAX_GIF_SIZE_MB}MB限制，将图片缩放到{scale_factor:.2f}倍")
+        base = await asyncio.to_thread(resize_image_keep_ratio, base, scale_factor)
+        swing_amplitude *= scale_factor
+        jitter_amp *= scale_factor
+    
     w, h = base.size
+    
     subtitle_img = None
     if text and text.strip():
         text = text.replace('\\n', '\n')
         chosen_font = choose_font_for_text(font_path, text)
-    fs = font_size if font_size is not None else max(18, w//36)
-    subtitle_img = render_subtitle(text, chosen_font, base_width=w, padding=subtitle_padding, font_size=fs)
+        fs = font_size if font_size is not None else max(18, w//36)
+        subtitle_img = render_subtitle(text, chosen_font, base_width=w, padding=subtitle_padding, font_size=fs)
+    
     if subtitle_img:
         sx, sy = subtitle_img.size
         subtitle_y = h - sy - int(h * 0.06)
     else:
         subtitle_y = h
+    
     static_bg = create_static_background(base, black_opacity=max(black_opacity, 0.4), subtitle_img=subtitle_img, subtitle_opacity=subtitle_opacity, subtitle_y=subtitle_y, vignette_strength=vignette_strength)
 
-    # 将帧生成移到线程中运行，避免阻塞事件循环
     def generate_frames():
         frames = []
-        if total_frames is None:
-            total_frames_inner = max(1, int(duration * fps))
-        else:
-            total_frames_inner = max(1, int(total_frames))
         cx = w // 2
         cy = h // 2
         num_cycles = random.randint(min_cycles, max_cycles)
@@ -360,6 +414,44 @@ async def generate_animation(input_path, output_path, text, duration=2.0, fps=20
 
     frames = await asyncio.to_thread(generate_frames)
     await asyncio.to_thread(imageio.mimsave, output_path, frames, format='GIF', duration=1.0/fps)
+    
+    final_size = os.path.getsize(output_path)
+    if final_size > MAX_GIF_SIZE_BYTES:
+        print(f"警告：生成的GIF大小{final_size/1024/1024:.2f}MB超过{MAX_GIF_SIZE_MB}MB限制，正在进行二次压缩...")
+        
+        with tempfile.NamedTemporaryFile(suffix='.gif', delete=False) as temp_file:
+            temp_path = temp_file.name
+        
+        strict_scale_factor = calculate_scaling_factor(
+            original_w, original_h, 
+            total_frames_inner, 
+            fps, 
+            has_subtitle,
+            max_size_bytes=MAX_GIF_SIZE_BYTES * 0.9  # 预留10%余量
+        )
+        base_strict = await asyncio.to_thread(resize_image_keep_ratio, 
+                                             (await asyncio.to_thread(Image.open, input_path)).convert('RGBA'), 
+                                             strict_scale_factor)
+        base = base_strict
+        w, h = base.size
+        if text and text.strip():
+            chosen_font = choose_font_for_text(font_path, text)
+            fs = font_size if font_size is not None else max(18, w//36)
+            subtitle_img = render_subtitle(text, chosen_font, base_width=w, padding=subtitle_padding, font_size=fs)
+            sx, sy = subtitle_img.size
+            subtitle_y = h - sy - int(h * 0.06)
+        
+        static_bg = create_static_background(base, black_opacity=max(black_opacity, 0.4), 
+                                            subtitle_img=subtitle_img, subtitle_opacity=subtitle_opacity, 
+                                            subtitle_y=subtitle_y, vignette_strength=vignette_strength)
+        
+        frames_strict = await asyncio.to_thread(generate_frames)
+        await asyncio.to_thread(imageio.mimsave, temp_path, frames_strict, format='GIF', duration=1.0/fps)
+        
+        os.replace(temp_path, output_path)
+        print(f"二次压缩完成，最终大小{os.path.getsize(output_path)/1024/1024:.2f}MB")
+    
+    print(f"生成完成！最终GIF大小：{os.path.getsize(output_path)/1024/1024:.2f}MB")
     return output_path
 
 if __name__ == '__main__':
@@ -374,7 +466,7 @@ if __name__ == '__main__':
     p.add_argument('--font', default=DEFAULT_FONT)
     p.add_argument('--vignette', type=float, default=0.6)
     p.add_argument('--noise', type=float, default=0.06, help='噪点强度')
-    p.add_argument('--swing_amp', type=float, default=14.0, help='回弹/抖动幅度（像素）')
+    p.add_argument('--swing_amp', type=float, default=50.0, help='回弹/抖动幅度（像素）')
     p.add_argument('--swing_overshoot', type=float, default=1.3, help='回弹时的 overshoot 倍率，>1 会有更强张力')
     p.add_argument('--frames', type=int, default=None, help='总帧数（优先于 duration/fps）')
     p.add_argument('--subject_scale', type=float, default=1.04, help='主体略微放大比例以避免回弹出现黑框')
@@ -390,7 +482,15 @@ if __name__ == '__main__':
     p.add_argument('--font_size', type=int, default=26, help='显式指定字幕字体大小（覆盖自动计算）')
     p.add_argument('--fast_freq', type=float, default=10, help='快速抖动频率（Hz）')
     p.add_argument('--jitter_amp', type=float, default=2.0, help='每帧随机抖动幅度（像素）')
+    p.add_argument('--max_size_mb', type=float, default=MAX_GIF_SIZE_MB, 
+                   help=f'最大GIF文件大小限制（MB），默认{MAX_GIF_SIZE_MB}MB')
+    
     args = p.parse_args()
+    
+    if args.max_size_mb > 0:
+        MAX_GIF_SIZE_MB = args.max_size_mb
+        MAX_GIF_SIZE_BYTES = MAX_GIF_SIZE_MB * 1024 * 1024
+    
     out = asyncio.run(generate_animation(
         args.input, args.output, args.text,
         duration=args.duration, fps=args.fps,
@@ -406,14 +506,13 @@ if __name__ == '__main__':
         line_prob=args.line_prob,
         line_count=args.line_count,
         line_width=args.line_width,
-        line_jitter=args.line_jitter
-        ,subtitle_padding=args.subtitle_padding
-        ,subtitle_radius=args.subtitle_radius
-        ,subtitle_feather=args.subtitle_feather
-        ,subtitle_bg_alpha=args.subtitle_bg_alpha
-        ,font_size=args.font_size
-        ,fast_freq=args.fast_freq
-        ,jitter_amp=args.jitter_amp
+        line_jitter=args.line_jitter,
+        subtitle_padding=args.subtitle_padding,
+        subtitle_radius=args.subtitle_radius,
+        subtitle_feather=args.subtitle_feather,
+        subtitle_bg_alpha=args.subtitle_bg_alpha,
+        font_size=args.font_size,
+        fast_freq=args.fast_freq,
+        jitter_amp=args.jitter_amp
     ))
     print('已保存到:', out)
-

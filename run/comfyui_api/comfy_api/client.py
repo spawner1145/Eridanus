@@ -159,13 +159,18 @@ class ComfyUIClient:
                             message_data = await asyncio.wait_for(ws.recv(), timeout=effective_timeout)
                             if isinstance(message_data, str):
                                 message = json.loads(message_data)
-                                #print(f"监听状态更新：消息类型={message.get('type')}，内容={json.dumps(message.get('data', {}), ensure_ascii=False)}")
                                 if message.get('type') == 'progress':
                                     data = message.get('data', {})
                                     print(f"  - 进度更新: 节点 {data.get('node', 'N/A')} - 步数 {data.get('value', 0)}/{data.get('max', 1)}")
                                 if message.get('type') == 'execution_success' and message.get('data', {}).get('prompt_id') == prompt_id:
                                     print("✅ 任务执行流程结束。")
                                     return True
+                                if message.get('type') == 'execution_interrupted':
+                                    data = message.get('data', {})
+                                    node_id = data.get('node_id', 'N/A')
+                                    node_type = data.get('node_type', 'N/A')
+                                    print(f"❌ 任务执行被中断: 节点 {node_id} ({node_type})")
+                                    return False
                                 if message.get('type') == 'status':
                                     exec_info = message.get('data', {}).get('status', {}).get('exec_info', {})
                                     if exec_info.get('queue_remaining') == 0:
@@ -176,6 +181,9 @@ class ComfyUIClient:
                                             if isinstance(msg, list) and len(msg) > 1 and msg[0] == 'execution_success':
                                                 print("历史记录显示任务已成功！")
                                                 return True
+                                            if isinstance(msg, list) and len(msg) > 1 and msg[0] == 'execution_interrupted':
+                                                print("历史记录显示任务被中断！")
+                                                return False
                                         print("队列空但任务未成功，继续监听...")
                         except asyncio.TimeoutError:
                             print(f"\n监听消息超时 ({effective_timeout}秒)，主动查历史确认任务 {prompt_id} 状态...")
@@ -185,6 +193,9 @@ class ComfyUIClient:
                                 if isinstance(msg, list) and len(msg) > 1 and msg[0] == 'execution_success':
                                     print("超时后确认：历史记录显示任务已成功！")
                                     return True
+                                if isinstance(msg, list) and len(msg) > 1 and msg[0] == 'execution_interrupted':
+                                    print("超时后确认：历史记录显示任务被中断！")
+                                    return False
                             print(f"超时且任务未成功，返回失败。")
                             return False
             
