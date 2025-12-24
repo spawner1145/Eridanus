@@ -281,6 +281,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 temperature=config.ai_llm.config["llm"]["gemini"]["temperature"],
                 maxOutputTokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"],
                 fallback_models=config.ai_llm.config["llm"]["gemini"]["fallback_models"],
+                include_thoughts=config.ai_llm.config["llm"]["gemini"].get("include_thoughts", False),
             )
             logger.info(response_message)
             response_message=response_message['candidates'][0]["content"]
