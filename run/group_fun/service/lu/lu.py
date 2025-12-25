@@ -87,7 +87,7 @@ async def supple_lu(userid,bot=None,event=None):
     times_record = user_info['lu_supple']['record']
     if times_record == {} or int(times_record) < 0: times_record = 3
     #print(times_record)
-    pprint.pprint(user_info['lu_supple'])
+    #pprint.pprint(user_info['lu_supple'])
     times_record_check = int(times_record) // 3
     if times_record_check == 0 or int(times_record) in [0,1,2]:
         if bot and event:
