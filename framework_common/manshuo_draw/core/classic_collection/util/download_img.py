@@ -7,8 +7,10 @@ import re
 from io import BytesIO
 from asyncio import get_event_loop
 from PIL import Image
-from .common import get_abs_path, occupy_chart
+from .common import get_abs_path, occupy_chart, data_dir, printf
 import traceback
+import subprocess
+import os
 
 async def download_img(url, gray_layer=False, proxy=None):
     if url.startswith("data:image"):
@@ -42,13 +44,9 @@ async def download_img(url, gray_layer=False, proxy=None):
             #print(proxies)
             #traceback.print_exc()
             #无法获取图片，直接从本地读取占位图
-            with open(occupy_chart, 'rb') as image_file:
-                image_data = image_file.read()
-            return base64.b64encode(image_data).decode('utf-8')
+            return Image.open(occupy_chart)
         if response.status_code != 200:
-            with open(occupy_chart, 'rb') as image_file:
-                image_data = image_file.read()
-            return base64.b64encode(image_data).decode('utf-8')
+            return Image.open(occupy_chart)
 
         if gray_layer:
             try:
@@ -67,8 +65,33 @@ async def download_img(url, gray_layer=False, proxy=None):
             except Exception as e:
                 base64_img = base64.b64encode(response.content).decode('utf-8')
         else:
-            base64_img = base64.b64encode(response.content).decode('utf-8')
-
+            try:
+                pillow_img = Image.open(BytesIO(response.content))
+            except Exception as e:
+                printf(f'base64图片打开失败，尝试保存后打开')
+                check_path = data_dir / 'cache' / 'img_check.webp'
+                with open(check_path, 'wb') as f:
+                    f.write(response.content)
+                with open(check_path, 'rb') as f:
+                    header = f.read(12)
+                if b'ftypavif' in header:
+                    printf('检测到为不支持的AVIF格式，转换后尝试读取')
+                    check_convert_path = data_dir / 'cache' / 'img_check_convert.webp'
+                    if check_convert_path.exists():
+                        os.remove(check_convert_path)
+                    #应该检测一下是否系统内安装了ffmpg，一般不会遇到此问题
+                    command = [
+                        'ffmpeg',
+                        '-hide_banner',
+                        '-loglevel', 'error',
+                        '-i', check_path,
+                        check_convert_path
+                    ]
+                    subprocess.run(command)
+                    pillow_img = Image.open(check_convert_path)
+                else:
+                    pillow_img = Image.open(check_path)
+            return pillow_img
         return base64_img
 
 #对图像进行批量处理
@@ -80,7 +103,12 @@ async def process_img_download(img_list,is_abs_path_convert=True,gray_layer=Fals
             if is_abs_path_convert is True: content = get_abs_path(content)
             return_img = Image.open(content)
         elif isinstance(content, str) and content.startswith("http"):
-            try:return_img = Image.open(BytesIO(base64.b64decode(await download_img(content,proxy=proxy))))
+            try:
+                content_deal = await download_img(content, proxy=proxy)
+                if isinstance(content_deal, str):
+                    return_img = Image.open(BytesIO(base64.b64decode(content_deal)))
+                elif isinstance(content_deal, Image.Image):
+                    return_img = content_deal
             except Exception as e: print(e)
         elif isinstance(content, Image.Image):
             return_img = content

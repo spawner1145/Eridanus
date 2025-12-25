@@ -7,11 +7,13 @@ import yaml
 import asyncio
 
 from jmcomic import *
-
-
+from PIL import Image
+import os
+import gc
 from framework_common.utils.random_str import random_str
 from run.ai_generated_art.service.antiSFW import process_folder, compress_gifs
 from datetime import date
+import zipfile
 
 jm_save={}
 
@@ -99,8 +101,19 @@ def JM_search_week():
     jm_save[f'{today}_week'] = result
     return result
 
+async def JM_search_id(id):
+    client = JmOption.default().new_jm_client()
+    page: JmSearchPage = client.search_site(search_query=f'{id}', page=1)
+    result = ''
+    for album_id, title in page:
+        result += f'{title}'
+        break
+    return result
 
-def JM_search_comic_id():
+
+
+
+def JM_search_month():
     global jm_save
     op = JmOption.default()
     cl = op.new_jm_client()
@@ -206,3 +219,65 @@ def downloadALLAndToPdf(comic_id, savePath):
     jmcomic.download_album(comic_id, option)
     return f"{savePath}/{comic_id}"
 
+if __name__ == '__main__':
+    pass
+    option = JmOption.default()
+    client = option.new_jm_client()
+
+    aid_list = [1025640,432]
+    aid_list = [
+        9208,143092,214112,237004,247557,289824,297478,302767,315954,320226,369455,377954,378654,
+        382558,389479,400387,403172,403224,405524,414406,415654,431296,441373,469555,495255,496298,507134,509898,521050,536770,558026,578492,579627,620808,1012961,1048493,1061591,1084888
+    ]
+
+    #download_album(aid_list, option)
+    folder_path ='.'
+    subfolders = []
+    for item in os.listdir(folder_path):
+        item_path = os.path.join(folder_path, item)
+        if os.path.isdir(item_path):
+            ctime = os.path.getctime(item_path)
+            subfolders.append((item_path, ctime))
+
+    # 按创建时间排序
+    subfolders_sorted = sorted(subfolders, key=lambda x: x[1])
+    print(f'文件夹读取完成，共 {len(subfolders_sorted)} 个')
+
+    for i in range(len(subfolders_sorted)):
+        dir_path = f'{subfolders_sorted[i][0]}'
+        comic_name = subfolders_sorted[i][0].replace("./","")
+        client = JmOption.default().new_jm_client()
+        page: JmSearchPage = client.search_site(search_query=f'{comic_name}', page=1)
+        aid = None
+        for album_id, title in page:
+            aid = album_id
+            break
+        if aid is None:
+            aid = '未知id'
+        print(aid,comic_name)
+        if os.path.exists(dir_path):
+            image_files = sorted([
+                f for f in os.listdir(dir_path)
+                if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp'))
+            ])
+            images = [Image.open(os.path.join(dir_path, img)).convert('RGB') for img in image_files]
+            pdf_path = f'{aid}_{comic_name}.pdf'  # 输出的PDF文件名
+            images[0].save(pdf_path, save_all=True, append_images=images[1:])
+            for img in images:
+                img.close()
+            images.clear()
+            gc.collect()
+            shutil.rmtree(dir_path)
+        else:
+            print('文件夹不存在，跳过处理')
+
+    print('开始进行压缩处理')
+    zip_path = '/home/manshuo/manshuo/bot/Eridanus/run/resource_collector/service/jmComic/comic.zip'
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        # 遍历文件夹中的所有文件和子文件夹
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                # 将文件写入zip，arcname用于保持相对路径结构
+                arcname = os.path.relpath(file_path, start=folder_path)
+                zipf.write(file_path, arcname)

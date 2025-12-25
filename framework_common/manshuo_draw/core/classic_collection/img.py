@@ -41,7 +41,7 @@ class ImageModule:
             self.pure_backdrop = await img_process(self.__dict__,self.pure_backdrop, img, self.x_offset, self.current_y, self.upshift)#对每个图像进行处理
             await per_img_deal(self.__dict__,img)  # 处理每个图片的位置关系
         await final_img_deal(self.__dict__)  # 处理最后的位置关系
-        print(datetime.datetime.now().timestamp() - timestart)
+        #print(datetime.datetime.now().timestamp() - timestart)
         return {'canvas': self.pure_backdrop, 'canvas_bottom': self.current_y ,'upshift':self.upshift,'downshift':self.downshift,
                 'json_img_left_module':self.json_img_left_module,'without_draw':self.without_draw_and_jump}
 

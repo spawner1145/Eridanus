@@ -26,12 +26,14 @@ class Backdrop:
 
     async def one_color(self,basic_img):
         canvas = Image.new("RGBA", (basic_img.width, basic_img.height), eval(str(self.color)))
-        canvas.paste(basic_img, (0, 0), mask=basic_img)
+        #canvas.paste(basic_img, (0, 0), mask=basic_img)
+        canvas = Image.alpha_composite(canvas, basic_img)
         return canvas
 
     async def no_color(self,basic_img):
         canvas = Image.new("RGBA", (basic_img.width, basic_img.height), (0, 0, 0, 0))
-        canvas.paste(basic_img, (0, 0), mask=basic_img)
+        #canvas.paste(basic_img, (0, 0), mask=basic_img)
+        canvas = Image.alpha_composite(canvas, basic_img)
         return canvas
 
     async def gradient(self,basic_img):
@@ -50,12 +52,14 @@ class Backdrop:
                 g = int(color1[1] * (1 - t) + color2[1] * t)
                 b = int(color1[2] * (1 - t) + color2[2] * t)
                 draw[x, y] = (r, g, b)
-
+        #gradient = gradient.convert("RGBA")
         gradient.paste(basic_img, (0, 0), mask=basic_img)
+        #gradient = Image.alpha_composite(gradient, basic_img)
         return gradient
 
     async def img(self,basic_img):
         canvas = Image.new("RGBA", (basic_img.width, basic_img.height), (0,0,0,0))
         canvas = await backdrop_process(self.__dict__, canvas,(canvas.width, canvas.height))
-        canvas.paste(basic_img, (0, 0), mask=basic_img)
+        #canvas.paste(basic_img, (0, 0), mask=basic_img)
+        canvas = Image.alpha_composite(canvas, basic_img)
         return canvas

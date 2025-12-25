@@ -8,14 +8,12 @@ from ..api import BaseMission, get_missions_state
 from ..api.common import genshin_note, get_game_record, starrail_note
 from ..model import (MissionStatus, PluginDataManager, plugin_config, UserData, CommandUsage, GenshinNoteNotice,
                      StarRailNoteNotice)
-from ..utils import get_file, get_all_bind, get_unique_users, get_validate, read_admin_list
 import pprint
 from developTools.utils.logger import get_logger
 logger=get_logger('MiHoYo')
-import base64
 from developTools.message.message_components import Text, Image, At
 import traceback
-target_list = {'原神':['原神'],'崩坏：星穹铁道':['崩铁'],'绝区零':['绝区零','zzz','ZZZ'],'崩坏3':['崩坏三','崩三','崩崩崩','崩坏3'],'崩坏学园2':['崩2','崩坏学园2'],'未定事件簿':['未定事件簿','未定']}
+from .config import game_name_list, game_all_list
 
 async def change_default_sign_game(user_id,target,bot=None,event=None):
     user = PluginDataManager.plugin_data.users[str(user_id)]
@@ -24,8 +22,8 @@ async def change_default_sign_game(user_id,target,bot=None,event=None):
         if bot and event: await bot.send(event, msg)
         else: print(msg)
     #print(user.target_sign_game)
-    for item in target_list:
-        if target in target_list[item]:
+    for item in game_name_list:
+        if target in game_name_list[item]:
             target = item
             break
     user.target_sign_game = target
@@ -46,8 +44,8 @@ async def mys_game_sign(user_id,bot=None,event=None,target='all'):
     recall_id = None
     if bot and target == 'all': recall_id = await bot.send(event, '签到时间较长，请耐心等待喵')
     try:
-        for item in target_list:
-            if target in target_list[item]:
+        for item in game_name_list:
+            if target in game_name_list[item]:
                 target = [item]
                 break
         img_list,text_list = await perform_game_sign(user_id=user_id,bot=bot, user=user, event=event, target=target)
@@ -71,14 +69,14 @@ async def mys_game_sign(user_id,bot=None,event=None,target='all'):
 
 
 
-async def perform_game_sign(user: UserData,user_id=None, target='all', bot = None, event = None):
+async def perform_game_sign(user, user_id=None, bot = None, event = None, target='all'):
     """
     执行游戏签到函数，并发送给用户签到消息。
     target = [原神,崩坏：星穹铁道,绝区零,崩坏3]
     :param user: 用户数据
     :param event: 事件
     """
-    if target in ['all']:target_list = ['崩坏：星穹铁道','绝区零','崩坏3','原神','未定事件簿','崩坏学园2']
+    if target in ['all']:target_list = game_all_list
     elif target in ['daily_sign']:
         if not user.target_sign_game: target_list = ['崩坏：星穹铁道']
         else:
@@ -210,5 +208,7 @@ async def perform_game_sign(user: UserData,user_id=None, target='all', bot = Non
     else:
         if bot and event and pure_text_list:
             await bot.send(event,pure_text_list[0])
+        else:
+            pprint.pprint(pure_text_list[0])
     return img_list,text_list
 

@@ -10,7 +10,7 @@ async def manshuo_draw(json_img):
     )
 
     del json_img
-    #printf(img_path)
+    printf(img_path)
     return str(img_path)
 
 async def test():
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     ]
 
     contents2=[
-        {'type': 'basic_set', 'debug': True,'img_width':1500,'img_height':1000,},
+        {'type': 'basic_set', 'debug': False,'img_width':1500,'img_height':1000,},
         {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift_extra':25,'layer':1,
          'content':[ f"[name]今日发言排行榜[/name]\n[time]2025年 05月27日 20:32[/time]"] },
         {'type': 'img', 'subtype': 'common_with_des_right', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk=1280433782&s=640",],
@@ -45,59 +45,20 @@ if __name__ == '__main__':
     ]
 
     content_test=[
-        {'type': 'basic_set', 'debug': True},
+        {'type': 'basic_set', 'debug': True, 'img_width':[400,1200]},
         {'type': 'backdrop', 'subtype': 'one_color'},
-        {'type': 'img', 'subtype': 'common_test', 'jump_next_page': True,
-         'img':
-            ['data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg',
-             'data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg',
-             'data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg',],
-         'label':['manshuo','manshuo','manshuo','manshuo','manshuo','manshuo','manshuo',
-                  'manshuo','manshuo','manshuo','manshuo','manshuo','manshuo','manshuo',
-                  'manshuo','manshuo','manshuo','manshuo','manshuo','manshuo','manshuo',]},
-        {'type': 'img', 'subtype': 'common_test', 'jump_next_page': True,
-         'img':
-             ['data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
-              'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
-              'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
-              'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
-              'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
-              'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', ],
-         'label': ['manshuo1', 'manshuo2', 'manshuo3', 'manshuo', 'manshuo', 'manshuo', 'manshuo',
-                   'manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo',
-                   'manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo1', 'manshuo2', 'manshuo3', ]},
-        {'type': 'img', 'subtype': 'common_test', 'jump_next_page': True,
-         'img':
-             ['data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
-              'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
-              'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
-              'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
-              'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
-              'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', ],
-         'label': ['manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo',
-                   'manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo',
-                   'manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo', ]},
+        {'type': 'img', 'subtype': 'common', 'jump_next_page': True,
+         'img':['data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg',]},
+        {'type': 'img', 'subtype': 'common_with_des_right', 'jump_next_page': True, 'layer': 4,
+         'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',
+                 '/home/manshuo/manshuo/bot/Eridanus/framework_common/manshuo_draw/data/cache/manshuo.jpg'],
+         'content': ['这里是manshuo[title]！这部分是测manshuo！[/title]这manshuo！[des]这里是介绍[/des]', 'hello'],
+          },
+        {'type': 'img', 'subtype': 'common','layer': 3,
+         'img': ['data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
+                 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', ]},
     ]
 
-    content_test2=[
-        {'type': 'basic_set', 'debug': True},
-        {'type': 'backdrop', 'subtype': 'one_color'},
-        {'type': 'img', 'subtype': 'common_test', 'jump_next_page': True,
-         'img':
-            ['data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg',],
-         'label':['manshuo','manshuo','manshuo','manshuo','manshuo','manshuo','manshuo',]},
-        {'type': 'img', 'subtype': 'common_test', 'jump_next_page': True,
-         'img':
-             ['data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
-              'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', ],
-         'label': ['manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo', ]},
-        {'type': 'img', 'subtype': 'common_test', 'jump_next_page': True,
-         'img':
-             ['data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
-              'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', ],
-         'label': ['manshuo', 'manshuo', 'manshuo', 'manshuo', 'manshuo','manshuo','manshuo',]},
-
-    ]
 
     asyncio.run(manshuo_draw(content_test))
     #asyncio.run(test())

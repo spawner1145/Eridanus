@@ -1,6 +1,7 @@
 from PIL import Image
 from .initialize import initialize_yaml_must_require
 from .util import *
+import ast
 
 class basicimgset:
     def __init__(self, params):
@@ -26,12 +27,29 @@ class basicimgset:
         if self.is_abs_path_convert is True:
             for key, value in vars(self).items():
                 setattr(self, key, get_abs_path(value))
+        #检测其图片宽度是否为列表
+        self.columns = 0
+        if isinstance(self.img_width, str):
+            if self.img_width.startswith('['):
+                self.img_width = ast.literal_eval(self.img_width)
+            else:
+                self.img_width = [self.img_width]
+        elif isinstance(self.img_width, int):
+            self.img_width = [self.img_width]
+        elif isinstance(self.img_width, list):
+            pass
 
 
     async def creatbasicimgnobackdrop(self,img_list):
         """创建一个同名空白画布并返回。"""
         # 创建一个指定大小和颜色的画布
-        width=len(img_list)*(self.img_width - self.padding_left_common) + self.padding_left_common
+        width = self.padding_left_common
+        for i in range(self.columns):
+            if len(self.img_width) - 1 >= i:
+                width += self.img_width[i] - self.padding_left_common
+            else:
+                width += self.img_width[len(self.img_width) - 1] - self.padding_left_common
+        #width = len(img_list) * (self.img_width - self.padding_left_common) + self.padding_left_common
         canvas = Image.new("RGBA", (width, self.img_height), (0, 0, 0, 0))
         #canvas = Image.new("RGBA", (self.img_width, self.img_height), (255, 0, 0, 255))
         return canvas
@@ -47,7 +65,7 @@ class basicimgset:
                 height = self.img_height
                 layer_img_canvas = layer_img_canvas.crop((0, 0, width, height + self.stroke_img_width / 2))
                 basic_img.paste(layer_img_canvas, (0, -int(self.padding_up_common ) ,width,height - int(self.padding_up_common - self.stroke_img_width / 2)), mask=layer_img_canvas)
-                basic_img = basic_img.crop((0, 0, self.img_width, height))
+                basic_img = basic_img.crop((0, 0, self.img_width[0], height))
             else:
                 basic_img.paste(layer_img_canvas, (0, -int(self.padding_up_common), width, height - int(self.padding_up_common)),mask=layer_img_canvas)
                 basic_img = basic_img.crop((0, 0, width, height - int(self.padding_up_common) ))

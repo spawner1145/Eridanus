@@ -87,8 +87,6 @@ async def deal_img(json_img): #此函数将逐个解析json文件中的每个字
     printf_check(json_img)
     printf('开始处理图片')
 
-
-
     basic_json_set= json_img.copy()
     for per_json_img in basic_json_set:               #优先将图片的基本信息创建好，以免出错
         if 'basic_set' in per_json_img['type']:
@@ -106,13 +104,14 @@ async def deal_img(json_img): #此函数将逐个解析json文件中的每个字
         elif isinstance(basic_img_info.img_path_save, Path):
             img_path = basic_img_info.img_path_save / f'{random_str()}.png'
 
-
     canves_layer_list=[]
     for item in range(basic_img_info.max_num_of_columns):
-        printf(item)
-        if item == 0 : json_img_deal = json_img
+        if basic_img_info.columns == 0 : json_img_deal = json_img
         else: json_img_deal = json_img_left
         json_img_left=[]
+        printf(basic_img_info.columns)
+        #printf(f'outside: {basic_img_info.img_width}')
+        basic_img_info.columns += 1
         layer_img_canvas=(await layer_deal(basic_img_info,json_img_deal,json_img_left))['layer_img_canvas']
         #pprint.pprint(json_img_left)
         #printf('------------------------------------------------------------------')
