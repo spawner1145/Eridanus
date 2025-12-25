@@ -366,21 +366,21 @@ class GenshinNote(BaseModel):
     """
     原神实时便笺数据 (从米游社内相关页面API的返回数据初始化)
     """
-    current_resin: Optional[int]
+    current_resin: Optional[int] = None
     """当前树脂数量"""
-    finished_task_num: Optional[int]
+    finished_task_num: Optional[int] = None
     """每日委托完成数"""
-    current_expedition_num: Optional[int]
+    current_expedition_num: Optional[int] = None
     """探索派遣 进行中的数量"""
-    max_expedition_num: Optional[int]
+    max_expedition_num: Optional[int] = None
     """探索派遣 最多派遣数"""
-    current_home_coin: Optional[int]
+    current_home_coin: Optional[int] = None
     """洞天财瓮 未收取的宝钱数"""
-    max_home_coin: Optional[int]
+    max_home_coin: Optional[int] = None
     """洞天财瓮 最多可容纳宝钱数"""
-    transformer: Optional[Dict[str, Any]]
+    transformer: Optional[Dict[str, Any]] = None
     """参量质变仪相关数据"""
-    resin_recovery_time: Optional[int]
+    resin_recovery_time: Optional[int] = None
     """剩余树脂恢复时间"""
 
     @property
