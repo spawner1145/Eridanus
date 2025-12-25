@@ -33,7 +33,7 @@ async def get_steam_users_info(
         result = {"response": {"players": []}}
         for i in range(0, len(steam_ids), 100):
             batch_result = await get_steam_users_info(
-                steam_ids[i : i + 100], steam_api_key, proxy
+                steam_ids[i : i + 100], steam_api_key, bot=bot, proxy=proxy
             )
             result["response"]["players"].extend(batch_result["response"]["players"])
         return result
@@ -47,11 +47,13 @@ async def get_steam_users_info(
                 if response.status_code == 200:
                     return response.json()
                 else:
-                    bot.logger.error(f"API key {api_key} failed to get steam users info.")
+                    if bot:
+                        bot.logger.error(f"API key {api_key} failed to get steam users info.")
         except httpx.RequestError as exc:
-            bot.logger.error(f"API key {api_key} encountered an error: {exc}")
-
-    bot.logger.error("All API keys failed to get steam users info.")
+            if bot:
+                bot.logger.error(f"API key {api_key} encountered an error: {exc}")
+    if bot:
+        bot.logger.error("All API keys failed to get steam users info.")
     return {"response": {"players": []}}
 
 
