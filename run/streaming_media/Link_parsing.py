@@ -35,7 +35,8 @@ async def call_bili_download_video(bot, event, config,type_download='video'):
             video_json = await download_video_link_prising(json_linking, filepath='data/pictures/cache/', proxy=proxy)
             if 'video' in video_json['type']:
                 if video_json['type'] == 'video_bigger':recall_id =await bot.send(event, f'视频有些大，请耐心等待喵~~')
-                await bot.send(event, Video(file=video_json['video_path']))
+                #await bot.send(event, Video(file=video_json['video_path']))
+                await bot.send(event, File(file=video_json['video_path']))
                 if video_json['type'] == 'video_bigger':await bot.recall(recall_id['data']['message_id'])
             elif video_json['type'] == 'file':
                 recall_id =await bot.send(event, f'好大的视频，小的将发送至群文件喵~')
