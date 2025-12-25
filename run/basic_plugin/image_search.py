@@ -19,7 +19,7 @@ async def call_image_search(bot, event, config, image_url=None):
     if not config.basic_plugin.config["搜图"]["聚合搜图"] and not config.basic_plugin.config["搜图"]["soutu_bot"]:
         await bot.send(event, "没有开启搜图功能")
         return
-    await bot.send(event, "正在搜索图片，请等待结果返回.....")
+    recall_id = await bot.send(event, "正在搜索图片，请等待结果返回.....")
     if user_info.permission >= config.basic_plugin.config["搜图"]["search_image_resource_operate_level"]:
         if not image_url:
             img_url = event.get("image")[0]["url"]
@@ -39,7 +39,7 @@ async def call_image_search(bot, event, config, image_url=None):
             except Exception as e:
                 bot.logger.error(f"Error in image_search: {e}")
 
-
+        await bot.recall(recall_id['data']['message_id'])
     else:
         await bot.send(event, "权限不够呢.....")
 
@@ -114,17 +114,19 @@ def main(bot: ExtendBot,config:YAMLManager):
         try:
             if str(event.pure_text) == "搜图" or (
                     event.get("at") and event.get("at")[0]["qq"] == str(bot.id) and event.get("text")[0] == "搜图"):
-                await bot.send(event, "请发送要搜索的图片")
-                image_search[event.sender.user_id] = []
+                if not event.get('image'):
+                    recall_id = await bot.send(event, "请发送要搜索的图片")
+                    image_search[event.sender.user_id] = recall_id
         except Exception as e:
             pass
         if ("搜图" in str(event.pure_text) or event.sender.user_id in image_search) and event.get('image'):
-            try:
+            if event.sender.user_id in image_search:
+                recall_id = image_search[event.sender.user_id]
                 image_search.pop(event.sender.user_id)
-            except:
-                pass
+                await bot.recall(recall_id['data']['message_id'])
             try:
                 await call_image_search(bot, event, config)
+                img_url = event.get("image")[0]["url"]
             finally:
                 try:
                     image_search.pop(event.sender.user_id)
