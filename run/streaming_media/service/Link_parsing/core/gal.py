@@ -23,8 +23,14 @@ import os
 import time
 from .common import name_qq_list,card_url_list
 from urllib.parse import unquote
+import subprocess
+import os
+from PIL import Image
+from pathlib import Path
 
-
+current_file = Path(__file__)
+plugin_dir = current_file.parent.parent
+data_dir = plugin_dir / 'data' / 'cache'
 
 URL_PATTERN = re.compile(r"https?://[^\s\]\)]+")
 BRACKET_PATTERN = re.compile(r"\[(.*?)\]")
@@ -97,6 +103,7 @@ async def Galgame_manshuo(url, filepath=None):
         #analyze_objects(1.1)
         # 主要解析循环
         for i, context_check in enumerate(context_lines):
+            print(context_check)
             # 定期清理已处理的行（每100行清理一次）
             if i > 0 and i % 100 == 0:
                 # 将已处理的行设置为None以释放内存
@@ -182,7 +189,7 @@ async def Galgame_manshuo(url, filepath=None):
                                 del paren_matches
                         if not 'https://gal.manshuo.ink/usr/uploads/galgame/wechat.png' in potential_url:
                             links_url = potential_url
-                            hikarinagi_flag = 1
+                            #hikarinagi_flag = 1
                         # 清理临时变量
                         del url_matches, potential_url
             elif 'https://img-static.hikarinagi.com/uploads/' in context_check and hikarinagi_flag == 0:
@@ -195,7 +202,7 @@ async def Galgame_manshuo(url, filepath=None):
                     del url_matches
 
         #analyze_objects(2)  #占用略微增加，删除context_lines后即可
-        #print(links_url)
+        print(links_url)
         # 清理context_lines
         del context_lines
         # 强制垃圾回收
@@ -227,7 +234,7 @@ async def Galgame_manshuo(url, filepath=None):
                 gc.collect()
             except Exception:
                 pass
-            print(links_url)
+            #print(links_url)
             # 设置默认链接
             if links_url is None or links_url == 'https://gal.manshuo.ink/usr/uploads/galgame/wechat.png':
                 links_url = 'https://gal.manshuo.ink/usr/uploads/galgame/zatan.png'
@@ -256,11 +263,41 @@ async def Galgame_manshuo(url, filepath=None):
         #analyze_objects(3) #此时占用已经正常
         #print(links_url)
         # 生成图片
-        json_check['pic_path'] = await manshuo_draw([
+        img_type = 'common_with_des_right'
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(links_url)
+            check_path = data_dir / 'img_check.webp'
+            with open(check_path, 'wb') as f:
+                f.write(response.content)
+            with open(check_path, 'rb') as f:
+                header = f.read(12)
+            if b'ftypavif' in header:
+                print('检测到为不支持的AVIF格式，转换后尝试读取')
+                check_convert_path = data_dir /  'img_check_convert.webp'
+                if check_convert_path.exists():
+                    os.remove(check_convert_path)
+                command = [
+                    'ffmpeg',
+                    '-hide_banner',
+                    '-loglevel', 'error',
+                    '-i', check_path,
+                    check_convert_path
+                ]
+                subprocess.run(command)
+                pillow_img = Image.open(check_convert_path)
+            else:
+                pillow_img = Image.open(check_path)
+            if float(pillow_img.width / pillow_img.height) >= 0.75:
+                img_type = 'common_with_des'
+        except:
+            pass
+        img_list = [
             {'type': 'avatar', 'subtype': 'common', 'img': [avatar_path_url], 'upshift_extra': 20,
              'content': [f"[name]{avatar_name}[/name]\n[time]{time_gal}[/time]"]},
-            {'type': 'img', 'subtype': 'common_with_des_right', 'img': [links_url], 'content': [context_final]}
-        ])
+            {'type': 'img', 'subtype': img_type, 'img': [links_url], 'content': [context_final], 'max_des_length': 1000}
+        ]
+        json_check['pic_path'] = await manshuo_draw(img_list)
 
         # 在返回前进行最终的垃圾回收
         # 清理所有局部变量
