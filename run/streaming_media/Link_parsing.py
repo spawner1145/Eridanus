@@ -17,6 +17,7 @@ teamlist = defaultdict(lambda: {'data': None, 'expire_at': 0})
 global Cachecleaner
 Cachecleaner=False
 
+
 async def call_bili_download_video(bot, event, config,type_download='video'):
     if event.group_id in teamlist:
         json_linking = teamlist[event.group_id]['data']
