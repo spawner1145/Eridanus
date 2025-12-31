@@ -7,6 +7,7 @@ import traceback
 from developTools.utils.logger import get_logger
 from run.streaming_media.service.Link_parsing.core.common import json_init
 from run.streaming_media.service.Link_parsing.core import *
+import os
 try:
     from bilibili_api import select_client
     select_client("httpx")
@@ -14,8 +15,8 @@ except ImportError:
     #旧版本兼容问题，整合包更新后删除此部分代码
     pass
 logger=get_logger("Link_parsing")
-
-
+linking_cache = {}
+import time
 
 async def link_prising(url,filepath=None,proxy=None,type=None):
     json_check = copy.deepcopy(json_init)
@@ -30,6 +31,14 @@ async def link_prising(url,filepath=None,proxy=None,type=None):
         json_check['status'] = False
         return json_check
     #print(f'json_init:{json_init}\njson_check:{json_check}\nlink_prising_json:{link_prising_json}\n\n')
+    #为链接解析添加缓存
+    url = str(url)
+    global linking_cache
+    if url in linking_cache:
+        #代表有缓存，开始判断返回
+        if os.path.exists(linking_cache[url]['path']):
+            return linking_cache[url]['info']
+        linking_cache.pop(url)
     try:
         match url:
             case url if 'bili' in url or 'b23' in url:
@@ -55,6 +64,8 @@ async def link_prising(url,filepath=None,proxy=None,type=None):
                 pass
             case _:
                 pass
+        if link_prising_json is not None and 'pic_path' in link_prising_json:
+            linking_cache[url] = {'info':link_prising_json, 'time':time.time(), 'path':link_prising_json['pic_path']}
 
     except Exception as e:
         json_check['status'] = False
@@ -119,10 +130,11 @@ if __name__ == "__main__":#测试用，不用管
     url='【【绫地宁宁 / 手书预告】恋爱裁判】https://www.bilibili.com/video/BV1JBMVzVEZr?vd_source=5e640b2c90e55f7151f23234cae319ec'
     url='https://live.bilibili.com/1947172143'
     url='https://t.bilibili.com/1082791822623768624?share_source=pc_native'
-    url='https://t.bilibili.com/1148323074301493264'
     url = 'https://gal.manshuo.ink/archives/746/'
-    url = 'https://gal.manshuo.ink/archives/748/'
-
+    url = 'https://weibo.com/6625787085/5245617985290482'
+    url = 'https://x.com/hn_luotianyi712/status/2003787316100509941?s=46'
+    url = 'https://x.com/h_ta6_h_h_ta6_h/status/2004134080229908552?s=46'
+    url = 'https://t.bilibili.com/1150887906322153510?share_source=pc_native'
     asyncio.run(link_prising(url))
     #asyncio.run(youxi_pil_new_text())
 

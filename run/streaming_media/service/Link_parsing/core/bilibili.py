@@ -14,6 +14,7 @@ import asyncio
 import sys
 import time
 from bilibili_api import video, live, article
+import pprint
 from bilibili_api import dynamic
 from bilibili_api.opus import Opus
 from bilibili_api.video import VideoDownloadURLDataDetecter
@@ -133,12 +134,12 @@ async def bilibili(url,filepath=None,is_twice=None,type=None):
 
 
                     if len(image_list) != 1:
-                        manshuo_draw_json=[
+                        manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
                             {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                              'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
                              'type_software': 'bilibili', 'label': label_list}, {'type': 'text','content': [context]},{'type': 'img','img': image_list}]
                     else:
-                        manshuo_draw_json=[
+                        manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
                             {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                              'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
                              'type_software': 'bilibili', },
@@ -227,25 +228,25 @@ async def bilibili(url,filepath=None,is_twice=None,type=None):
                         context += f"[title]{title}[/title]\n[des]{desc}[/des]"
                         type_software = 'BiliBili 投稿'
                     if len(image_list) == 1 and type_software in {'直播',}:
-                        manshuo_draw_json=[
+                        manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
                                 {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                                  'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
                                  'type_software': 'bilibili', },
                                 {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list, 'label': [type_software],
                                  'content': [context]}]
                     elif len(image_list) == 1 and type_software in {'BiliBili 投稿'}:
-                        manshuo_draw_json=[
+                        manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
                                 {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                                  'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
                                  'type_software': 'bilibili', },
                                 {'type': 'img', 'subtype': 'common_with_des', 'img': image_list, 'label': [type_software],
                                  'content': [context]}]
                     else:
-                        manshuo_draw_json=[
+                        manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
                             {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                              'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
                              'type_software': 'bilibili'},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
-
+                    #pprint.pprint(manshuo_draw_json)
                     if is_twice is not True:
                         json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
                         json_check['time'] = pub_time
@@ -290,12 +291,12 @@ async def bilibili(url,filepath=None,is_twice=None,type=None):
                     if is_twice is True:
                         if orig_pub_time == '': orig_pub_time = pub_time
                         if len(image_list) != 1:
-                            manshuo_draw_json = [
+                            manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
                                 {'type': 'avatar', 'subtype': 'common', 'img': [orig_owner_cover], 'upshift_extra': 20,
                                  'content': [f"[name]{orig_owner_name}[/name]\n[time]{orig_pub_time}[/time]"],
                                  'type_software': 'bilibili', 'label': label_list},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
                         else:
-                            manshuo_draw_json = [
+                            manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
                                 {'type': 'avatar', 'subtype': 'common', 'img': [orig_owner_cover], 'upshift_extra': 20,
                                  'content': [f"[name]{orig_owner_name}[/name]\n[time]{orig_pub_time}[/time]"],
                                  'type_software': 'bilibili', },
@@ -306,7 +307,7 @@ async def bilibili(url,filepath=None,is_twice=None,type=None):
                     orig_url= 'orig_url:'+'https://t.bilibili.com/' + orig_context['id_str']
                     manshuo_draw_json2=await bilibili(orig_url,f'{filepath}orig_',is_twice=True)
 
-                    manshuo_draw_json = [
+                    manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
                         {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                          'content': [f"[name]{owner_name}[/name]  [time]{pub_time}[/time]"],'avatar_size':50,
                          'label': label_list}, {'type': 'text','content': [text_list_check]}]
@@ -338,7 +339,7 @@ async def bilibili(url,filepath=None,is_twice=None,type=None):
             live_status, live_start_time = room_info['live_status'], room_info['live_start_time']
             pub_time = datetime.fromtimestamp(live_start_time).astimezone().strftime("%Y-%m-%d %H:%M:%S")
         else:pub_time='暂未开启直播'
-        manshuo_draw_json = [
+        manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
             {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
              'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
              'type_software': 'bilibili', },
@@ -421,7 +422,7 @@ async def bilibili(url,filepath=None,is_twice=None,type=None):
     except Exception as e:
         json_check['video_url'] = False
     context += f'[title]{video_title}[/title]\n[des]{video_desc} [/des]'
-    manshuo_draw_json = [
+    manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
         {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover_url], 'upshift_extra': 20,
          'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
          'type_software': 'bilibili', },
@@ -450,7 +451,7 @@ async def download_video_link_prising(json,filepath=None,proxy=None):
                 "referer": "https://weibo.com/"
             })
     elif json['soft_type'] == 'x':
-        video_path = await download_video(json['video_url'], filepath=filepath,proxy=proxy)
+        video_path = await download_b(json['video_url'], json['audio_url'], int(time.time()),filepath=filepath,proxy=proxy)
     elif json['soft_type'] == 'xhs':
         video_path = await download_video(json['video_url'], filepath=filepath)
     video_json['video_path'] = video_path

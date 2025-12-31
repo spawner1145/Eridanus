@@ -12,6 +12,10 @@ logger=get_logger()
 import json
 from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 import asyncio
+import pprint
+from time import time
+from framework_common.utils.utils import download_img
+from framework_common.utils.random_str import random_str
 
 # 定义 base62 编码字符表
 ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -97,14 +101,23 @@ async def wb(url,filepath=None):
     weibo_id = weibo_id.split("/")[1] if "/" in weibo_id else weibo_id
     json_check['url'] = f"https://m.weibo.cn/detail/{weibo_id}"
     # 请求数据
+    ts = int(time() * 1000)
     #print(WEIBO_SINGLE_INFO.replace('{}', weibo_id))
-    resp = httpx.get(WEIBO_SINGLE_INFO.replace('{}', weibo_id), headers={
-                                                                            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-                                                                            "cookie": "_T_WM=40835919903; WEIBOCN_FROM=1110006030; MLOGIN=0; XSRF-TOKEN=4399c8",
-                                                                            "Referer": f"https://m.weibo.cn/detail/{id}",
-                                                                        } | COMMON_HEADER)
+    headers = {
+                  "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+                  "cookie": "_T_WM=40835919903; WEIBOCN_FROM=1110006030; MLOGIN=0; XSRF-TOKEN=4399c8",
+                  "referer": f"https://m.weibo.cn/detail/{weibo_id}",
+                  "origin": "https://m.weibo.cn",
+                  "x-requested-with": "XMLHttpRequest",
+                  "mweibo-pwa": "1",
+                  "sec-fetch-site": "same-origin",
+                  "sec-fetch-mode": "cors",
+                  "sec-fetch-dest": "empty",
+              } | COMMON_HEADER
+    resp = httpx.get(WEIBO_SINGLE_INFO.replace('{}', weibo_id),headers=headers )
     #print(resp)
     resp = resp.json()
+    #pprint.pprint(resp)
     weibo_data = resp['data']
     formatted_json = json.dumps(weibo_data, indent=4)
     #logger.info(formatted_json)
@@ -120,8 +133,10 @@ async def wb(url,filepath=None):
         #logger.info(formatted_json)
         pics = map(lambda x: x['url'], pics)
         img_context = [f'{item}' for item in pics]
-
-
+    else:
+        img_context = []
+    img_context_path = []
+    #开始进行图片绘制
     if page_info:
         #logger.info(page_info)
         formatted_json = json.dumps(page_info, indent=4)
@@ -134,14 +149,24 @@ async def wb(url,filepath=None):
             if page_info.get('type') != 'topic' and page_info.get('type') != 'place':
                 page_pic=page_info.get('page_pic').get('url')
                 img_context=[page_pic]
-    if len(img_context) != 1:
-        json_check['pic_path'] = await manshuo_draw([
-            {'type': 'avatar', 'subtype': 'common', 'img': [avatar_hd], 'upshift_extra': 20,
-             'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]"], 'type_software': 'wb', }, img_context, [context]])
+
+    #微博图片必须单独下载，不能传入url，会被ban
+    avatar_path = "data/pictures/cache/" + random_str() + ".png"
+    await download_img(avatar_hd, avatar_path,headers=headers)
+    for img_url in img_context:
+        img_path = "data/pictures/cache/" + random_str() + ".png"
+        await download_img(img_url, img_path, headers=headers)
+        img_context_path.append(img_path)
+
+
+    if len(img_context_path) != 1:
+        json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
+            {'type': 'avatar', 'subtype': 'common', 'img': [avatar_path], 'upshift_extra': 20,
+             'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]"], 'type_software': 'wb',}, img_context_path, [context]])
     else:
-        json_check['pic_path'] = await manshuo_draw([
-            {'type': 'avatar', 'subtype': 'common', 'img': [avatar_hd], 'upshift_extra': 20,
-             'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]"], 'type_software': 'wb', },
-            {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': [context]}])
+        json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
+            {'type': 'avatar', 'subtype': 'common', 'img': [avatar_path], 'upshift_extra': 20,
+             'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]"], 'type_software': 'wb',},
+            {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context_path, 'content': [context]}])
     json_check['pic_url_list'] = img_context
     return json_check

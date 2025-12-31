@@ -32,7 +32,7 @@ async def download_img(url, gray_layer=False, proxy=None):
         "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"
     }
     #print(f'proxies:{proxies}')
-    async with httpx.AsyncClient(proxies=proxies, headers=headers) as client:
+    async with httpx.AsyncClient(proxies=proxies, headers=headers, timeout=30.0) as client:
         try:
             response = await client.get(url)
             #print(response)
@@ -40,11 +40,21 @@ async def download_img(url, gray_layer=False, proxy=None):
                 new_url = response.headers['Location']
                 if new_url: response = await client.get(new_url)
         except Exception as e:
-            print(f'绘图框架无法获取图片{url}： {type(e)} {repr(e)}')
+            print(f'绘图框架无法获取图片{url} ： {type(e)} {repr(e)}')
             #print(proxies)
             #traceback.print_exc()
-            #无法获取图片，直接从本地读取占位图
-            return Image.open(occupy_chart)
+            #重试一次
+            await asyncio.sleep(2)
+            try:
+                response = await client.get(url)
+                # print(response)
+                if response.status_code == 302:
+                    new_url = response.headers['Location']
+                    if new_url: response = await client.get(new_url)
+            except Exception as e:
+                print(f'绘图框架无法获取图片{url} ： {type(e)} {repr(e)}')
+                #无法获取图片，直接从本地读取占位图
+                return Image.open(occupy_chart)
         if response.status_code != 200:
             return Image.open(occupy_chart)
 

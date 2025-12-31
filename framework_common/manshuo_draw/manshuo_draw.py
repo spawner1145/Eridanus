@@ -3,6 +3,7 @@ import asyncio
 import pprint
 
 async def manshuo_draw(json_img):
+    #pprint.pprint(json_img)
     json_img = json_check(json_img)
     #pprint.pprint(json_img)
     img_path = await asyncio.to_thread(
@@ -10,7 +11,7 @@ async def manshuo_draw(json_img):
     )
 
     del json_img
-    printf(img_path)
+    #print(img_path)
     return str(img_path)
 
 async def test():
