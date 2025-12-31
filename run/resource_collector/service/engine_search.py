@@ -148,7 +148,7 @@ async def searx_search(query):
             return f"请求错误: {exc}"
 
 
-async def html_read(url, config=None):
+async def html_read(url, config=None,proxies=None):
     """内存优化版本的html_read函数"""
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -168,10 +168,10 @@ async def html_read(url, config=None):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0"
     }
 
-    proxies = None
-    if config and config.common_config.basic_config["proxy"]["http_proxy"]:
-        proxies = {"http://": config.common_config.basic_config["proxy"]["http_proxy"],
-                   "https://": config.common_config.basic_config["proxy"]["http_proxy"]}
+    if proxies is None:
+        if config and config.common_config.basic_config["proxy"]["http_proxy"]:
+            proxies = {"http://": config.common_config.basic_config["proxy"]["http_proxy"],
+                       "https://": config.common_config.basic_config["proxy"]["http_proxy"]}
 
     decoded_url = unquote(url)
     parsed_url = httpx.URL(decoded_url)
