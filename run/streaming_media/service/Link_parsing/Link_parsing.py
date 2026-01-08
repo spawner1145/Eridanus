@@ -36,7 +36,9 @@ async def link_prising(url,filepath=None,proxy=None,type=None):
     global linking_cache
     if url in linking_cache:
         #代表有缓存，开始判断返回
-        if os.path.exists(linking_cache[url]['path']):
+        if type != 'QQ_Check' and os.path.exists(linking_cache[url]['path']):
+            return linking_cache[url]['info']
+        if type == 'QQ_Check':
             return linking_cache[url]['info']
         linking_cache.pop(url)
     try:

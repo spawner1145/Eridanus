@@ -309,15 +309,12 @@ async def download_b(video_url,audio_url,video_id,filepath=None,proxy=None):
     if video_id is None or not video_id:video_id='default'
     path = filepath  + str(video_id)
     #print('start video downloading')
-    try:
-        await asyncio.gather(
-            download_b_file(video_url, f"{path}-video.m4s",proxy=proxy),
-            download_b_file(audio_url, f"{path}-audio.m4s",proxy=proxy))
-        await merge_file_to_mp4(f"{path}-video.m4s", f"{path}-audio.m4s", f"{path}-res.mp4")
-        return f"{path}-res.mp4"
-    except Exception as e:
-        print(f'Blibili视频下载失败：{e}')
-        traceback.print_exc()
+    await asyncio.gather(
+        download_b_file(video_url, f"{path}-video.m4s",proxy=proxy),
+        download_b_file(audio_url, f"{path}-audio.m4s",proxy=proxy))
+    await merge_file_to_mp4(f"{path}-video.m4s", f"{path}-audio.m4s", f"{path}-res.mp4")
+    return f"{path}-res.mp4"
+
 
 async def download_img(url: str, path: str = '', proxy: str = None, session=None, headers=None,len=None) -> str:
     """

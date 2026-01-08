@@ -3,6 +3,7 @@ import gc
 import re
 import shutil
 import os
+import pprint
 import json as json_handle
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Image, File, Video, Node, Text, Image, Music, Json
@@ -35,9 +36,10 @@ async def call_bili_download_video(bot, event, config,type_download='video'):
         try:
             video_json = await download_video_link_prising(json_linking, filepath='data/pictures/cache/', proxy=proxy)
             if 'video' in video_json['type']:
-                if video_json['type'] == 'video_bigger':recall_id =await bot.send(event, f'视频有些大，请耐心等待喵~~')
-                #await bot.send(event, Video(file=video_json['video_path']))
-                await bot.send(event, File(file=video_json['video_path']))
+                if video_json['type'] == 'video_bigger':recall_id = await bot.send(event, f'视频有些大，请耐心等待喵~~')
+                msg_info = await bot.send(event, Video(file=video_json['video_path']))
+                if not (msg_info and msg_info['status'] == 'ok'):
+                    await bot.send(event, File(file=video_json['video_path']))
                 if video_json['type'] == 'video_bigger':await bot.recall(recall_id['data']['message_id'])
             elif video_json['type'] == 'file':
                 recall_id =await bot.send(event, f'好大的视频，小的将发送至群文件喵~')
@@ -47,7 +49,7 @@ async def call_bili_download_video(bot, event, config,type_download='video'):
                 await bot.send(event, f'太大了，罢工！')
         except Exception as e:
             traceback.print_exc()
-            await bot.send(event, f'下载失败，如已排除其他问题\n 请尝试安装ffmpeg')
+            await bot.send(event, f'下载失败\n {e}')
     elif type_download == 'img' and json_linking['pic_url_list'] != []:
         node_list = [Node(
             content=[Text("小的找的图片如下，请君过目喵")])]
