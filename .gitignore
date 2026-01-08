@@ -3,6 +3,7 @@ __pycache__/
 user_info.yaml
 log/
 .idea/
+.trae/
 chat_files/
 
 merge-to-main.sh
