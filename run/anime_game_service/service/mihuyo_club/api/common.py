@@ -5,6 +5,7 @@ from urllib.parse import urlencode, urlparse, parse_qs
 import traceback
 import httpx
 import tenacity
+import pprint
 from pydantic import ValidationError, BaseModel
 from requests.utils import dict_from_cookiejar
 
@@ -16,7 +17,7 @@ from ..model import GameRecord, GameInfo, Good, Address, BaseApiStatus, MmtData,
 from ..utils import generate_device_id, generate_ds, \
     get_async_retry, generate_seed_id, generate_fp_locally
 from developTools.utils.logger import get_logger
-logger=get_logger()
+logger=get_logger('MiHoYo')
 URL_LOGIN_TICKET_BY_CAPTCHA = "https://webapi.account.mihoyo.com/Api/login_by_mobilecaptcha"
 URL_LOGIN_TICKET_BY_PASSWORD = "https://webapi.account.mihoyo.com/Api/login_by_password"
 URL_MULTI_TOKEN_BY_LOGIN_TICKET = ("https://api-takumi.mihoyo.com/auth/api/getMultiTokenByLoginTicket?login_ticket={0}"
@@ -1527,7 +1528,8 @@ async def genshin_note(account: UserAccount) -> Tuple[
             except tenacity.RetryError as e:
                 if is_incorrect_return(e):
                     logger.error(f"原神实时便笺: 服务器没有正确返回")
-                    logger.debug(f"网络请求返回: {res.text}")
+                    traceback.print_exc()
+                    logger.info(f"网络请求返回: {res.text}")
                     return GenshinNoteStatus(incorrect_return=True), None
                 else:
                     logger.error(f"原神实时便笺: 请求失败")
@@ -1573,25 +1575,25 @@ async def starrail_note(account: UserAccount) -> Tuple[
                                                    cookies=cookies,
                                                    timeout=plugin_config.preference.timeout)
                         api_result = ApiResultHandler(res.json())
+                        #pprint.pprint(res.json())
                         if api_result.login_expired:
                             logger.info(
                                 f"崩铁实时便笺: 用户 {account.display_name} 登录失效")
-                            logger.debug(f"网络请求返回: {res.text}")
+                            logger.info(f"网络请求返回: {res.text}")
                             return StarRailNoteStatus(login_expired=True), None
-
                         if api_result.invalid_ds:
                             logger.info(
                                 f"崩铁实时便笺: 用户 {account.display_name} DS 校验失败")
-                            logger.debug(f"网络请求返回: {res.text}")
+                            logger.info(f"网络请求返回: {res.text}")
                         if api_result.retcode == 1034:
                             logger.info(
                                 f"崩铁实时便笺: 用户 {account.display_name} 可能被验证码阻拦")
-                            logger.debug(f"网络请求返回: {res.text}")
+                            logger.info(f"网络请求返回: {res.text}")
                         return StarRailNoteStatus(success=True), StarRailNote.parse_obj(api_result.data)
             except tenacity.RetryError as e:
                 if is_incorrect_return(e):
                     logger.error("崩铁实时便笺: 服务器没有正确返回")
-                    logger.debug(f"网络请求返回: {res.text}")
+                    logger.info(f"网络请求返回: {res.text}")
                     return StarRailNoteStatus(incorrect_return=True), None
                 else:
                     logger.error("崩铁实时便笺: 请求失败")

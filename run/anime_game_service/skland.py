@@ -17,7 +17,6 @@ def main(bot, config):
         if context in order_list:
             await qrcode_get(userid, bot, event)
 
-
     #森空岛签到
     @bot.on(GroupMessageEvent)
     async def sing_sklandid(event: GroupMessageEvent):

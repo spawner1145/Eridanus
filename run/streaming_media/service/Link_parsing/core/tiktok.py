@@ -163,12 +163,12 @@ async def dy(url,filepath=None):
             if '#' in title: title += '[/tag]'
 
             if len(img_context) != 1:
-                json_check['pic_path'] = await manshuo_draw([
+                json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
                     {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url], 'upshift_extra': 20,
                      'content': [f"[name]{author}[/name]\n[time]{video_time}[/time]"], 'type_software': 'dy'},
                     img_context, [title]])
             else:
-                json_check['pic_path'] = await manshuo_draw([
+                json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
                     {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url], 'upshift_extra': 20,
                      'content': [f"[name]{author}[/name]\n[time]{video_time}[/time]"], 'type_software': 'dy', },
                     {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': [title]}])
@@ -243,11 +243,11 @@ async def dy(url,filepath=None):
             if '#' in context: context += '[/tag]'
         context += f"\n--------------\n作者简介：\n{detail['author']['signature']}"
         if len(img_context) != 1:
-            json_check['pic_path'] = await manshuo_draw([
+            json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
                             {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url],'upshift_extra': 20,
                              'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]" ], 'type_software': 'dy'},img_context,[context]])
         else:
-            json_check['pic_path'] = await manshuo_draw([
+            json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
                             {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url],'upshift_extra': 20,
                              'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]" ], 'type_software': 'dy', },
                             {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': [context]}])

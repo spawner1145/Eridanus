@@ -95,8 +95,6 @@ def json_check(json_img: List[Any]) -> List[Dict[str, Any]]:
                     item['is_rounded_corners_front'] = False
                     item['is_stroke_front'] = False
                     item['is_shadow_front'] = False
-                if 'config_path' not in item:
-                    item['config_path'] = 'framework_common/manshuo_draw/data/config/manshuodraw_config.yaml'
     except Exception:
         pass
     finally:

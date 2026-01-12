@@ -13,7 +13,7 @@ from framework_common.utils.random_str import random_str
 from run.ai_llm.service.aiReplyHandler.ModelFallBackManager import ModelFallbackManager
 
 logger=get_logger("Gemini Prompt Construct and Request")
-async def geminiRequest(ask_prompt,base_url: str,apikey: str,model: str,proxy=None,tools=None,system_instruction=None,temperature=0.7,maxOutputTokens=2048,fallback_models: list[str] = None):
+async def geminiRequest(ask_prompt,base_url: str,apikey: str,model: str,proxy=None,tools=None,system_instruction=None,temperature=0.7,maxOutputTokens=2048,fallback_models: list[str] = None,include_thoughts: bool = False):
     if proxy is not None and proxy !="":
         proxies={"http://": proxy, "https://": proxy}
     else:
@@ -49,7 +49,10 @@ async def geminiRequest(ask_prompt,base_url: str,apikey: str,model: str,proxy=No
                 "topK": 64,
                 "topP": 0.95,
                 "maxOutputTokens": maxOutputTokens,
-                "responseMimeType": "text/plain"
+                "responseMimeType": "text/plain",
+                "thinkingConfig": {
+                    "includeThoughts": include_thoughts
+                }
             }
         }
     else:
@@ -65,7 +68,10 @@ async def geminiRequest(ask_prompt,base_url: str,apikey: str,model: str,proxy=No
                 "topK": 64,
                 "topP": 0.95,
                 "maxOutputTokens": maxOutputTokens,
-                "responseMimeType": "text/plain"
+                "responseMimeType": "text/plain",
+                "thinkingConfig": {
+                    "includeThoughts": include_thoughts
+                }
             }
         }
 

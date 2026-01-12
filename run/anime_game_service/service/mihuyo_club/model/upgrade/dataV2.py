@@ -442,8 +442,6 @@ class PluginData(BaseModel):
         super().__init__(**data)
         self.do_user_bind(write=True)
 
-    class Config:
-        json_encoders = UserAccount.Config.json_encoders
 
 
 class PluginDataManager:

@@ -7,10 +7,12 @@ import re
 from io import BytesIO
 from asyncio import get_event_loop
 from PIL import Image
-from .common import get_abs_path
+from .common import get_abs_path, occupy_chart, data_dir, printf
 import traceback
+import subprocess
+import os
 
-async def download_img(url, gray_layer=False, proxy="http://127.0.0.1:7890"):
+async def download_img(url, gray_layer=False, proxy=None):
     if url.startswith("data:image"):
         match = re.match(r"data:image/(.*?);base64,(.+)", url)
         if not match:
@@ -25,24 +27,37 @@ async def download_img(url, gray_layer=False, proxy="http://127.0.0.1:7890"):
         proxies = {"http://": proxy, "https://": proxy}
     else:
         proxies = None
-    async with httpx.AsyncClient(proxies=proxies) as client:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
+        "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"
+    }
+    #print(f'proxies:{proxies}')
+    async with httpx.AsyncClient(proxies=proxies, headers=headers, timeout=30.0) as client:
         try:
             response = await client.get(url)
+            #print(response)
             if response.status_code == 302:
                 new_url = response.headers['Location']
                 if new_url: response = await client.get(new_url)
         except Exception as e:
-            print(f'绘图框架无法获取图片{url}： {type(e)} {repr(e)}')
+            print(f'绘图框架无法获取图片{url} ： {type(e)} {repr(e)}')
             #print(proxies)
             #traceback.print_exc()
+            #重试一次
+            await asyncio.sleep(2)
             try:
-                response = await client.get('https://gal.manshuo.ink/usr/uploads/galgame/zatan.png')
-            except Exception:
-                response = await client.get(
-                    'https://gal.manshuo.ink/usr/uploads/galgame/img/%E4%B8%96%E4%BC%8AGalgame.png')
+                response = await client.get(url)
+                # print(response)
+                if response.status_code == 302:
+                    new_url = response.headers['Location']
+                    if new_url: response = await client.get(new_url)
+            except Exception as e:
+                print(f'绘图框架无法获取图片{url} ： {type(e)} {repr(e)}')
+                #无法获取图片，直接从本地读取占位图
+                return Image.open(occupy_chart)
         if response.status_code != 200:
-            try:response = await client.get('https://gal.manshuo.ink/usr/uploads/galgame/img/%E4%B8%96%E4%BC%8AGalgame.png')
-            except Exception as e: return None
+            return Image.open(occupy_chart)
+
         if gray_layer:
             try:
                 with BytesIO(response.content) as img_buffer:
@@ -60,38 +75,70 @@ async def download_img(url, gray_layer=False, proxy="http://127.0.0.1:7890"):
             except Exception as e:
                 base64_img = base64.b64encode(response.content).decode('utf-8')
         else:
-            base64_img = base64.b64encode(response.content).decode('utf-8')
-
+            try:
+                pillow_img = Image.open(BytesIO(response.content))
+            except Exception as e:
+                printf(f'base64图片打开失败，尝试保存后打开')
+                check_path = data_dir / 'cache' / 'img_check.webp'
+                with open(check_path, 'wb') as f:
+                    f.write(response.content)
+                with open(check_path, 'rb') as f:
+                    header = f.read(12)
+                if b'ftypavif' in header:
+                    printf('检测到为不支持的AVIF格式，转换后尝试读取')
+                    check_convert_path = data_dir / 'cache' / 'img_check_convert.webp'
+                    if check_convert_path.exists():
+                        os.remove(check_convert_path)
+                    #应该检测一下是否系统内安装了ffmpg，一般不会遇到此问题
+                    command = [
+                        'ffmpeg',
+                        '-hide_banner',
+                        '-loglevel', 'error',
+                        '-i', check_path,
+                        check_convert_path
+                    ]
+                    subprocess.run(command)
+                    pillow_img = Image.open(check_convert_path)
+                else:
+                    pillow_img = Image.open(check_path)
+            return pillow_img
         return base64_img
 
 #对图像进行批量处理
 async def process_img_download(img_list,is_abs_path_convert=True,gray_layer=False,proxy=None):
-    if not isinstance(img_list, list):
-        img_list = [img_list]
-    processed_img=[]
-    bio = None
-    img_data = None
-    temp_path = None
-    for content in img_list:
+    #函数内部定义一个函数用于并发调用
+    async def img_deal(content):
+        return_img = None
         if isinstance(content, str) and os.path.splitext(content)[1].lower() in [".jpg", ".png", ".jpeg",'.webp'] and not content.startswith("http"):  # 若图片为本地文件，则转化为img对象
             if is_abs_path_convert is True: content = get_abs_path(content)
-            processed_img.append(Image.open(content))
+            return_img = Image.open(content)
         elif isinstance(content, str) and content.startswith("http"):
-            try:processed_img.append(Image.open(BytesIO(base64.b64decode(await download_img(content,proxy=proxy)))))
+            try:
+                content_deal = await download_img(content, proxy=proxy)
+                if isinstance(content_deal, str):
+                    return_img = Image.open(BytesIO(base64.b64decode(content_deal)))
+                elif isinstance(content_deal, Image.Image):
+                    return_img = content_deal
             except Exception as e: print(e)
         elif isinstance(content, Image.Image):
-            processed_img.append(content)
+            return_img = content
         else:  # 最后判断是否为base64，若不是，则不添加本次图像
             bio = None
             img_data = None
             try:
                 img_data = base64.b64decode(content)
                 bio = BytesIO(img_data)
-                processed_img.append(Image.open(bio))
-            except:
-                pass
+                return_img = Image.open(bio)
+            except: pass
             finally:
                 # 清理资源
                 if img_data is not None:
                     del img_data
+        return return_img
+
+    if not isinstance(img_list, list):
+        img_list = [img_list]
+    tasks = [img_deal(content) for content in img_list]  # 生成任务列表（协程对象列表）
+    processed_img = await asyncio.gather(*tasks)    # 并发执行所有任务
     return processed_img
+

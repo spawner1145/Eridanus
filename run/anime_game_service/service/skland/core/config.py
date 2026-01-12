@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from developTools.utils.logger import get_logger
-logger=get_logger()
+logger=get_logger('skland')
 from pydantic import Field
 from pydantic import BaseModel
 from pydantic import AnyUrl as Url

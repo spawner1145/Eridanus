@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from .base import Equip
 from ...config import RES_DIR, CACHE_DIR
 from developTools.utils.logger import get_logger
-logger=get_logger()
+logger=get_logger('skland')
 import os
 def download_file(url, save_path):
     try:

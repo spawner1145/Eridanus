@@ -118,7 +118,7 @@ def draw_video_thumbnail():
     template.save(output_path)
     #template.show()
 
-async def download_b_file(url, full_file_name, progress_callback=None):
+async def download_b_file(url, full_file_name, progress_callback=None,proxy=None):
     """
         下载视频文件和音频文件
     :param url:
@@ -132,7 +132,7 @@ async def download_b_file(url, full_file_name, progress_callback=None):
             'Safari/537.36',
         'referer': 'https://www.bilibili.com',
     }
-    async with httpx.AsyncClient(transport=httpx.AsyncHTTPTransport(local_address="0.0.0.0")) as client:
+    async with httpx.AsyncClient(transport=httpx.AsyncHTTPTransport(local_address="0.0.0.0"),proxy=proxy) as client:
         async with client.stream("GET", url, headers=BILIBILI_HEADER) as resp:
             current_len = 0
             total_len = int(resp.headers.get('content-length', 0))
@@ -305,19 +305,16 @@ async def fetch_latest_dynamic_id_api(uid):
     return dy_id_1,dy_id_2
 
 
-async def download_b(video_url,audio_url,video_id,filepath=None):
-    if video_id is None:video_id='default'
+async def download_b(video_url,audio_url,video_id,filepath=None,proxy=None):
+    if video_id is None or not video_id:video_id='default'
     path = filepath  + str(video_id)
     #print('start video downloading')
-    try:
-        await asyncio.gather(
-            download_b_file(video_url, f"{path}-video.m4s"),
-            download_b_file(audio_url, f"{path}-audio.m4s"))
-        await merge_file_to_mp4(f"{path}-video.m4s", f"{path}-audio.m4s", f"{path}-res.mp4")
-        return f"{path}-res.mp4"
-    except Exception as e:
-        print(f'Blibili视频下载失败：{e}')
-        traceback.print_exc()
+    await asyncio.gather(
+        download_b_file(video_url, f"{path}-video.m4s",proxy=proxy),
+        download_b_file(audio_url, f"{path}-audio.m4s",proxy=proxy))
+    await merge_file_to_mp4(f"{path}-video.m4s", f"{path}-audio.m4s", f"{path}-res.mp4")
+    return f"{path}-res.mp4"
+
 
 async def download_img(url: str, path: str = '', proxy: str = None, session=None, headers=None,len=None) -> str:
     """

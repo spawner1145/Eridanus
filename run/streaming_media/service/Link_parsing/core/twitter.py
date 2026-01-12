@@ -1,6 +1,7 @@
 import httpx
 import re
 import copy
+import asyncio
 from .login_core import ini_login_Link_Prising
 from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME,GENERAL_REQ_LINK
 from urllib.parse import urlparse
@@ -10,8 +11,12 @@ from developTools.utils.logger import get_logger
 logger=get_logger()
 import json
 from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
-
-
+from httpx import AsyncClient
+import pprint
+from framework_common.utils.utils import download_img
+from framework_common.utils.random_str import random_str
+from playwright.async_api import async_playwright
+from run.resource_collector.service.engine_search import html_read
 
 async def twitter(url,filepath=None,proxy=None):
     """
@@ -29,43 +34,99 @@ async def twitter(url,filepath=None,proxy=None):
     if filepath is None: filepath = filepath_init
     x_url = re.search(r"https?:\/\/x.com\/[0-9-a-zA-Z_]{1,20}\/status\/([0-9]*)", msg)[0]
 
-    x_url = GENERAL_REQ_LINK.replace("{}", x_url)
+    #x_url = GENERAL_REQ_LINK.replace("{}", x_url)
+
+
+
+
+
+
 
     # 内联一个请求
-    def x_req(url):
-        return httpx.get(url, headers={
-            'Accept': 'ext/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,'
-                      'application/signed-exchange;v=b3;q=0.7',
-            'Accept-Encoding': 'gzip, deflate',
-            'Accept-Language': 'zh-CN,zh;q=0.9',
-            'Host': '47.99.158.118',
-            'Proxy-Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Sec-Fetch-User': '?1',
-            **COMMON_HEADER
-        })
-    #print(x_req(x_url).json())
-    x_data: object = x_req(x_url).json()['data']
+    async def x_req(x_url):
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Origin": "https://xdown.app",
+            "Referer": "https://xdown.app/",
+        }
+        data = {"q": x_url, "lang": "zh-cn"}
+        async with AsyncClient(headers=headers) as client:
+            url = "https://xdown.app/api/ajaxSearch"
+            response = await client.post(url, data=data)
 
-    if x_data is None:
-        x_url = x_url + '/photo/1'
-        x_data = x_req(x_url).json()['data']
-    #print(x_data)
+            return response.json()
 
-    x_url_res = x_data['url']
-    #print(x_url_res)
-    #await twit.send(Message(f"{GLOBAL_NICKNAME}识别：小蓝鸟学习版"))
-
-    # 海外服务器判断
-    #proxy = None if IS_OVERSEA else resolver_proxy
-    logger.info(x_url_res)
-    # 图片
-    if x_url_res.endswith(".jpg") or x_url_res.endswith(".png"):
-        contents = [x_url_res]
-        json_check['pic_path'] = await manshuo_draw(contents)
-        return json_check
+    rsq_data = (await x_req(x_url))
+    #pprint.pprint(rsq_data)
+    match = re.search(r'src="([^"]+)"', rsq_data['data'])
+    if match:
+        img_url = match.group(1)
+        json_check['pic_url_list'] = [img_url]
     else:
-        # 视频
-        json_check['video_url'] = x_url_res
         return json_check
-        #res = await download_video(x_url_res, proxy)
+    #print(img_url)
+
+    match = re.search(r'href="([^"]+)"', rsq_data['data'])
+    if match:
+        video_url = match.group(1)
+        match = re.search(r'data-audioUrl="([^"]+)"', rsq_data['data'])
+        if match:
+            audio_url = match.group(1)
+            json_check['audio_url'] = audio_url
+            json_check['video_url'] = video_url
+
+
+
+    logger.info(img_url)
+    img_path = "data/pictures/cache/" + random_str() + ".png"
+    await download_img(img_url, img_path, proxy="http://127.0.0.1:7890" )
+
+    #使用浏览器获取文本
+    title = ''
+    match = re.search(r'<h3>(.*?)</h3>', rsq_data['data'])
+    if match:
+        title = f'[title]{match.group(1)}[/title]'
+    else:
+        try:
+            async with async_playwright() as p:
+                # 启动浏览器
+                browser = await p.chromium.launch(headless=True, proxy={"server":"http://127.0.0.1:7890"})
+                page = await browser.new_page()
+                await page.route("**/*", lambda route, request: asyncio.create_task(
+                    route.abort() if request.resource_type in ["image", "stylesheet", "font"] else route.continue_()
+                ))
+                # 访问网页
+                await page.goto(x_url)
+
+                # 获取网页body中的纯文本内容
+                body_handle = await page.query_selector("body")
+                text_content = await body_handle.inner_text()
+                #print(text_content)
+                await browser.close()
+                text_content = text_content.split("\n")
+                #print(text_content)
+                num,X_id,X_name,X_content = 0,None,None,None
+                for item in text_content:
+                    if item.startswith('@'):
+                        X_id = text_content[num]
+                        X_name = text_content[num - 1]
+                        break
+                    num += 1
+                if X_id is not None:
+                    content_num = 0
+                    for item in text_content:
+                        if item.strip() == '·' or item.strip() == 'Views':
+                            break
+                        content_num += 1
+                    X_content = "\n".join(text_content[num+1:content_num])
+                #print(X_id,X_name,X_content)
+                if X_id is not None:
+                    title = f'[title]{X_name} [/title]{X_id}\n{X_content}'
+        except:pass
+    if title:
+        contents = [title,img_path]
+    else:
+        contents = [img_path]
+    json_check['pic_path'] = await manshuo_draw(contents)
+    return json_check

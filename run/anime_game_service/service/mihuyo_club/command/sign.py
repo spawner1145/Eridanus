@@ -8,14 +8,12 @@ from ..api import BaseMission, get_missions_state
 from ..api.common import genshin_note, get_game_record, starrail_note
 from ..model import (MissionStatus, PluginDataManager, plugin_config, UserData, CommandUsage, GenshinNoteNotice,
                      StarRailNoteNotice)
-from ..utils import get_file, get_all_bind, get_unique_users, get_validate, read_admin_list
 import pprint
 from developTools.utils.logger import get_logger
-logger=get_logger()
-import base64
+logger=get_logger('MiHoYo')
 from developTools.message.message_components import Text, Image, At
 import traceback
-target_list = {'原神':['原神'],'崩坏：星穹铁道':['崩铁'],'绝区零':['绝区零','zzz','ZZZ'],'崩坏3':['崩坏三','崩三','崩崩崩'],'崩坏学园2':['崩2','崩坏学园2'],'未定事件簿':['未定事件簿','未定']}
+from .config import game_name_list, game_all_list
 
 async def change_default_sign_game(user_id,target,bot=None,event=None):
     user = PluginDataManager.plugin_data.users[str(user_id)]
@@ -24,8 +22,8 @@ async def change_default_sign_game(user_id,target,bot=None,event=None):
         if bot and event: await bot.send(event, msg)
         else: print(msg)
     #print(user.target_sign_game)
-    for item in target_list:
-        if target in target_list[item]:
+    for item in game_name_list:
+        if target in game_name_list[item]:
             target = item
             break
     user.target_sign_game = target
@@ -46,8 +44,8 @@ async def mys_game_sign(user_id,bot=None,event=None,target='all'):
     recall_id = None
     if bot and target == 'all': recall_id = await bot.send(event, '签到时间较长，请耐心等待喵')
     try:
-        for item in target_list:
-            if target in target_list[item]:
+        for item in game_name_list:
+            if target in game_name_list[item]:
                 target = [item]
                 break
         img_list,text_list = await perform_game_sign(user_id=user_id,bot=bot, user=user, event=event, target=target)
@@ -71,14 +69,14 @@ async def mys_game_sign(user_id,bot=None,event=None,target='all'):
 
 
 
-async def perform_game_sign(user: UserData,user_id=None, target='all', bot = None, event = None):
+async def perform_game_sign(user, user_id=None, bot = None, event = None, target='all'):
     """
     执行游戏签到函数，并发送给用户签到消息。
     target = [原神,崩坏：星穹铁道,绝区零,崩坏3]
     :param user: 用户数据
     :param event: 事件
     """
-    if target in ['all']:target_list = ['崩坏：星穹铁道','绝区零','崩坏3','原神','未定事件簿','崩坏学园2']
+    if target in ['all']:target_list = game_all_list
     elif target in ['daily_sign']:
         if not user.target_sign_game: target_list = ['崩坏：星穹铁道']
         else:
@@ -125,7 +123,11 @@ async def perform_game_sign(user: UserData,user_id=None, target='all', bot = Non
                     if not (sign_status.login_expired or sign_status.need_verify):
                         logger.info('第一次签到失败，延迟后第二次签到')
                         await asyncio.sleep(plugin_config.preference.sleep_time)
+                        game_record_status, records = await get_game_record(account)
+                        signer = class_type(account, records)
                         sign_status, mmt_data = await signer.sign(account.platform)
+
+
                 #第二次签后获取不到数据则继续
                 if not sign_status and user.enable_notice:
                     if sign_status.login_expired:
@@ -135,6 +137,7 @@ async def perform_game_sign(user: UserData,user_id=None, target='all', bot = Non
                                    "请尝试使用命令『/账号设置』更改设备平台，若仍失败请手动前往米游社签到")
                     else:
                         message = f" 『{signer.name}』签到失败，请稍后再试"
+
                     if bot: await bot.send(event, [At(qq=user_id), message])
                     else: print(message)
                     #await asyncio.sleep(plugin_config.preference.sleep_time)
@@ -148,10 +151,10 @@ async def perform_game_sign(user: UserData,user_id=None, target='all', bot = Non
                 get_award_status, awards = await signer.get_rewards()
                 if not get_info_status or not get_award_status:
                     msg = f"⚠️账户 {account.display_name} 🎮『{signer.name}』获取签到结果失败！请手动前往米游社查看"
-                    logger.error(msg)
+                    #logger.error(msg)
                 else:
                     award = awards[info.total_sign_day - 1]
-                    logger.info(f'{account.display_name} {signer.name} 访问成功！')
+                    #logger.info(f'{account.display_name} {signer.name} 访问成功！')
                     if info.is_sign:
                         status = "签到成功！" if not signed else "已签到"
                         msg = f"🪪账户 {account.display_name}" \
@@ -175,7 +178,7 @@ async def perform_game_sign(user: UserData,user_id=None, target='all', bot = Non
                                "若多次失败请尝试重新登录绑定账户")
                     #print(msg)
 
-            await asyncio.sleep(plugin_config.preference.sleep_time)
+            #await asyncio.sleep(plugin_config.preference.sleep_time)
 
         if not games_has_record:
             msg = f"⚠️您的米游社账户 {account.display_name} 下不存在任何游戏账号，已跳过签到"
@@ -203,7 +206,9 @@ async def perform_game_sign(user: UserData,user_id=None, target='all', bot = Non
         else:
             print(img_path)
     else:
-        if bot and event:
+        if bot and event and pure_text_list:
             await bot.send(event,pure_text_list[0])
+        else:
+            pprint.pprint(pure_text_list[0])
     return img_list,text_list
 

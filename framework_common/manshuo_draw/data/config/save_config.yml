@@ -1,7 +1,7 @@
 #此配置文件为默认存储回滚文件，非专业人员请勿乱动！！！！
 basic_set:
   version: 1.0                      #绘图版本
-  img_width: 1000                   #图像默认宽度
+  img_width: 1000                   #图像默认宽度，可写成列表实现每列单独控制宽度，可以写为列表，单独控制每列的宽度
   img_height: 2500                  #图像默认最大长度
   max_num_of_columns: 3             #框架支持多列绘制，此处为最大列数，以免出现无限递归
   proxy: None                       #绘图框架从网络获取图片所用的代理端口
@@ -11,18 +11,19 @@ basic_set:
   is_stroke_front: true             #是否对模块进行描边处理（此处为前置条件，必要不充分）
   is_shadow_front: true             #是否对模块进行阴影处理（此处为前置条件，必要不充分）
   img_path_save: data/pictures/cache  #若有图片保存需求，则会将文件保存在此处，基于‘Eridanus’文件夹
-  color_emoji_path: framework_common/manshuo_draw/data/cache
+  color_emoji_path: data/cache
   img_name_save: None
   debug: false                      #是否开启debug，开启后控制台会输出相应处理过程
-  config_path: framework_common/manshuo_draw/data/config/save_config.yml  #默认配置文件地址
-  is_abs_path_convert: true        #将文件路径转换为绝对路径（默认关闭，可能会有bug，但建议开发者打开以便于测试）
+  config_path: framework_common/manshuo_draw/data/config/manshuodraw_config.yml  #默认配置文件地址,基于你的工作目录
+  is_abs_path_convert: true         #将文件路径转换为绝对路径（默认关闭，可能会有bug，但建议开发者打开以便于测试）
                                     #注意：此处同时对传入的img路径进行转换，绝对路径初始值为‘Eridanus’，即bot所在文件夹
-  jump_next_page: False             #再本模块绘制完成后呕是否强制在下一页绘制
+  jump_next_page: false             #再本模块绘制完成后呕是否强制在下一页绘制
 
   #以下为层级的部分处理
   layer: 1
   padding_up_layer: 20              #层级中各模块间的间隔
 
+  #此处为层级背景颜色，其图片背景另有模块单独确定
   backdrop_mode: one_color          #可选模式为单色：one_color、无色：no_color、渐变色：gradient
   backdrop_color:                   #单色时颜色为color1，渐变色则读取两种颜色进行渐变
     'color1': (235, 239, 253)
@@ -62,23 +63,23 @@ basic_set:
   blur_radius_img: 10                   #阴影模糊半径
 
   #以下为字体的的前置设置
-  font_common: framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf  #字体路径
+  font_common: data/fort/LXGWWenKai-Regular.ttf  #字体路径
   font_common_size: 24                     #字体大小
   font_common_color: (0,0,0)               #字体颜色
 
-  font_des: framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf
+  font_des: data/fort/LXGWWenKai-Regular.ttf
   font_des_size: 19
   font_des_color: (148,148,148)
 
-  font_title: framework_common/manshuo_draw/data/fort/LXGWWenKai-Bold.ttf
+  font_title: data/fort/LXGWWenKai-Bold.ttf
   font_title_size: 34
   font_title_color: (0,0,0)
 
-  font_tag: framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf  #字体路径
+  font_tag: data/fort/LXGWWenKai-Regular.ttf  #字体路径
   font_tag_size: 24                     #字体大小
   font_tag_color: (9, 132, 204)               #字体颜色
 
-  font_label: framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf
+  font_label: data/fort/LXGWWenKai-Regular.ttf
   font_label_size: 34
   font_label_color: (255,255,255)
   label: []                             #默认的label内容
@@ -120,7 +121,7 @@ text:
 img:
   must_required_keys: {'img': null}
 
-  number_per_row: default           #每行图片个数，默认即为九宫格，可自定义
+  number_per_row: default             #每行图片个数，默认即为九宫格，可自定义
   is_crop: default                    #是否裁剪
 
   common:
@@ -141,10 +142,10 @@ img:
 
 avatar:
   #以下为字体的相关处理
-  font_name: framework_common/manshuo_draw/data/fort/LXGWWenKaiMono-Medium.ttf
+  font_name: data/fort/LXGWWenKaiMono-Medium.ttf
   font_name_size: 34
   font_name_color: (251,114,153)
-  font_time: framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf
+  font_time: data/fort/LXGWWenKai-Regular.ttf
   font_time_size: 24
   font_time_color: (148,148,148)
 
@@ -167,7 +168,7 @@ avatar:
   right_icon: None
   type_software: None
   is_shadow_font: false
-  shadow_font_width : 2
+  shadow_font_width: 2
   shadow_font_color: (148, 148, 148)   #字体阴影的颜色
   padding_up_font: 10  #头像右侧文字距离上部的距离
 
@@ -177,12 +178,12 @@ avatar:
   is_shadow: true
 
   software_list:
-    - {'type': 'bilibili', 'background': framework_common/manshuo_draw/data/img/type_software/bili.png, 'right_icon': framework_common/manshuo_draw/data/img/type_software/bili_icon.png}
-    - {'type': 'dy', 'background': framework_common/manshuo_draw/data/img/type_software/dy.jpeg, 'right_icon': framework_common/manshuo_draw/data/img/type_software/dy_icon.png}
-    - {'type': 'lu', 'background': framework_common/manshuo_draw/data/img/type_software/lu.jpg, 'right_icon': framework_common/manshuo_draw/data/img/type_software/lu_icon.png}
-    - {'type': 'bangumi', 'background': framework_common/manshuo_draw/data/img/type_software/bangumi.jpeg, 'right_icon': framework_common/manshuo_draw/data/img/type_software/bangumi_icon.png}
-    - {'type': 'xhs', 'background': framework_common/manshuo_draw/data/img/type_software/xhs.jpeg, 'right_icon': framework_common/manshuo_draw/data/img/type_software/xhs_icon.png}
-    - {'type': 'wb', 'background': null, 'right_icon': framework_common/manshuo_draw/data/img/type_software/wb_icon.png}
+    - {'type': 'bilibili', 'background': data/img/type_software/bili.png, 'right_icon': data/img/type_software/bili_icon.png}
+    - {'type': 'dy', 'background': data/img/type_software/dy.jpeg, 'right_icon': data/img/type_software/dy_icon.png}
+    - {'type': 'lu', 'background': data/img/type_software/lu.jpg, 'right_icon': data/img/type_software/lu_icon.png}
+    - {'type': 'bangumi', 'background': data/img/type_software/bangumi.jpeg, 'right_icon': data/img/type_software/bangumi_icon.png}
+    - {'type': 'xhs', 'background': data/img/type_software/xhs.jpeg, 'right_icon': data/img/type_software/xhs_icon.png}
+    - {'type': 'wb', 'background': null, 'right_icon': data/img/type_software/wb_icon.png}
 
 
   common:
@@ -201,17 +202,17 @@ avatar:
 games:
   LuRecordMake:
     img_height: 1500
-    is_stroke_layer: False
-    is_shadow_layer: False
-    is_rounded_corners_layer: False
-    font_lu: framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf
+    is_stroke_layer: false
+    is_shadow_layer: false
+    is_rounded_corners_layer: false
+    font_lu: data/fort/LXGWWenKai-Regular.ttf
     font_lu_size: 24
     font_lu_color: (255,0,0)
-    font_date: framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf
+    font_date: data/fort/LXGWWenKai-Regular.ttf
     font_date_size: 40
     font_date_color: (0,0,0)
     number_per_row: 7           #每行图片个数，默认即为九宫格，可自定义
-    background: framework_common/manshuo_draw/data/img/games/lu/background_LU.jpg
+    background: data/img/games/lu/background_LU.jpg
     img: false
     is_shadow_img: false
     is_rounded_corners_img: true      #是否对模块进行圆角处理
@@ -221,7 +222,7 @@ games:
 
 math:
   number_per_row: default           #每行图片个数，默认即为九宫格，可自定义
-  is_crop: True
+  is_crop: true
   backdrop_color: (255,255,255,255)
   chart_color: (194, 228, 255)
   chart_width: default
@@ -264,12 +265,12 @@ math:
   upshift_label: -15
 
   bar_chart:
-    must_required_keys: { 'content': null}
+    must_required_keys: {'content': null}
     max: false
     chart_height: 25
 
   bar_chart_vertical:
-    must_required_keys: { 'content': null}
+    must_required_keys: {'content': null}
     max: false
     chart_height: 200
     padding_up: 30

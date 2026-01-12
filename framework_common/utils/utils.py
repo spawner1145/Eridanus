@@ -91,7 +91,7 @@ def parse_arguments(arg_string, original_dict):
     return original_dict
 
 
-async def download_img(url, path=None, gray_layer=False, proxy=None):
+async def download_img(url, path=None, gray_layer=False, proxy=None, headers=None):
     if path is None:
         characters = string.ascii_letters + string.digits
         random_string = ''.join(random.choice(characters) for _ in range(10))
@@ -114,7 +114,7 @@ async def download_img(url, path=None, gray_layer=False, proxy=None):
     else:
         proxies = None
 
-    async with httpx.AsyncClient(proxies=proxies) as client:
+    async with httpx.AsyncClient(proxies=proxies,headers=headers) as client:
         response = await client.get(url)
 
         if gray_layer:

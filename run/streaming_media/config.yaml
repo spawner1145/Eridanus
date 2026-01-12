@@ -10,7 +10,8 @@ bili_dynamic:     #下面的设置暂不可用，请暂时不要修改
   enable: false
   解析自带音频下载url: false #涉及付费音乐版权问题，只能以文件形式发送了,不允许进行传播、销售等商业活动!!
 网易云解析:
-  enable_proxy: true  #使用common_config/basic_config中填写的代理。
+  enable_proxy: False  #使用common_config/basic_config中填写的代理。
+  wyy_prase_url: 'http://nas.manshuo.ink:5000/wyy'      #网易云解析用url，原url已被废弃，请参考https://github.com/Suxiaoqinx/Netease_url
 流媒体:
   youtube:
     download_audio_level: 0  #下载音频所需权限等级

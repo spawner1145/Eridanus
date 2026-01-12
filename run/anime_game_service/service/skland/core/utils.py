@@ -1,6 +1,6 @@
 import httpx
 from developTools.utils.logger import get_logger
-logger=get_logger()
+logger=get_logger('skland')
 from pydantic import AnyUrl as Url
 import pprint
 import traceback

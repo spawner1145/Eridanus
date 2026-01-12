@@ -13,7 +13,7 @@ from ..model import GameRecord, BaseApiStatus, Award, GameSignInfo, GeetestResul
 from ..utils import  generate_ds, \
     get_async_retry
 from developTools.utils.logger import get_logger
-logger=get_logger()
+logger=get_logger('MiHoYo')
 __all__ = ["BaseGameSign", "GenshinImpactSign", "HonkaiImpact3Sign", "HoukaiGakuen2Sign", "TearsOfThemisSign",
            "StarRailSign", "ZenlessZoneZeroSign"]
 
@@ -211,14 +211,14 @@ class BaseGameSign:
                         logger.debug(f"{plugin_config.preference.log_head}网络请求返回: {res.text}")
                         return BaseApiStatus(need_verify=True), MmtData.parse_obj(api_result.data)
                     else:
-                        logger.success(f"游戏签到 - 用户 {self.account.display_name} 签到成功")
+                        logger.debug(f"游戏签到 - 用户 {self.account.display_name} 签到成功")
                         logger.debug(f"网络请求返回: {res.text}")
                         return BaseApiStatus(success=True), None
 
         except tenacity.RetryError as e:
             if is_incorrect_return(e):
                 logger.error(f"游戏签到 - 服务器没有正确返回")
-                logger.debug(f"网络请求返回: {res.text}")
+                logger.error(f"网络请求返回: {res.text}")
                 return BaseApiStatus(incorrect_return=True), None
             else:
                 logger.error(f"游戏签到 - 请求失败")

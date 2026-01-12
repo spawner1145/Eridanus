@@ -1,17 +1,17 @@
 """
 仅供从 V1 版本转换用，不应包含 V1 版本中不存在的字段
 """
-
+from typing import Annotated
+from pydantic import Field
 import os
 from datetime import time, timedelta, datetime
-from pathlib import Path
+from pathlib import Path, PosixPath
 from typing import Union, Optional, Tuple, Any, Dict, TYPE_CHECKING
 
 from developTools.utils.logger import get_logger
 logger=get_logger()
+from pydantic import BaseModel, validator
 from pydantic_settings import BaseSettings
-from pydantic import BaseModel,validator
-
 from ...model.common import data_path
 
 if TYPE_CHECKING:
@@ -163,8 +163,7 @@ class SaltConfig(BaseModel):
     SALT_PROD: str = "JwYDpKvLj6MrMqqYU6jTKF17KNO2PXoS"
     '''PROD - 账号相关'''
 
-    class Config(Preference.Config):
-        pass
+
 
 
 class DeviceConfig(BaseModel):
@@ -222,19 +221,4 @@ class DeviceConfig(BaseModel):
     UA_PLATFORM: str = "\"macOS\""
     '''Headers所用的 sec-ch-ua-platform'''
 
-    class Config(Preference.Config):
-        pass
 
-
-class PluginConfig(BaseSettings):
-    preference = Preference()
-    good_list_image_config = GoodListImageConfig()
-
-
-class PluginEnv(BaseSettings):
-    salt_config = SaltConfig()
-    device_config = DeviceConfig()
-
-    class Config(BaseSettings.Config):
-        env_prefix = "mystool_"
-        env_file = '.env'

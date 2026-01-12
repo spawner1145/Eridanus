@@ -12,12 +12,13 @@ from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.PDFEncrypt import AsyncPDFEncryptor
 from run.resource_collector.service.asmr.asmr100 import random_asmr_100, latest_asmr_100, choose_from_latest_asmr_100, \
     choose_from_hotest_asmr_100
-from run.resource_collector.service.jmComic.jmComic import JM_search, JM_search_week, JM_search_comic_id, downloadComic, \
-    downloadALLAndToPdf
+from run.resource_collector.service.jmComic.jmComic import JM_search, JM_search_week, JM_search_month, downloadComic, \
+    downloadALLAndToPdf, JM_search_id
 from run.resource_collector.service.zLibrary.zLib import search_book, download_book
 from run.resource_collector.service.zLibrary.zLibrary import Zlibrary
 from framework_common.utils.random_str import random_str
 from framework_common.utils.utils import download_file, merge_audio_files, download_img, delay_recall
+import os
 
 logger=get_logger()
 module_config=YAMLManager.get_instance()
@@ -282,13 +283,24 @@ async def call_jm(bot,event,config,mode="preview",comic_id=607279,serach_topic=N
                             traceback.print_exc()
                             pdf_path=f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}.pdf"
                     else:
-                        pdf_path=f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}.pdf"
+                        pdf_path = f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}.pdf"
+
+                    msg_pdf = f"加密成功喵，密码：{comic_id}"
+                    #下面这部分漫朔专用（
+                    if os.path.exists('/mnt/video_disk/temp/JM'):
+                        pdf_path_org = f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}.pdf"
+                        JM_name = await JM_search_id(comic_id)
+                        copy_path = f'/mnt/video_disk/temp/JM/{comic_id}_{JM_name}.pdf'
+                        pdf_url = f"http://bangumi.manshuo.ink:8095/JM"
+                        shutil.copy(pdf_path_org, copy_path)
+                        msg_pdf = f"加密成功({comic_id})\n可移步至此网址查看非加密版本：\n{pdf_url}"
+
                     for group_id in operating[comic_id]:
-                        event.group_id = group_id  # 修改数据实现切换群聊，懒狗实现
+                        event.group_id = group_id  # 修改数据实现切换群聊，懒狗实现，ps：那确实懒狗
                         msg = await bot.send(event, "下载完成了( >ρ< ”)。请等待上传完成。")
                         await bot.send(event, File(file=pdf_path))
                         if config.resource_collector.config["JMComic"]["autoEncrypt"]:
-                            await bot.send(event, f"加密成功，请注意查收。\n密码为：{comic_id}")
+                            await bot.send(event, msg_pdf)
                         await delay_recall(bot, msg)
                     bot.logger.info("移除预览缓存")
                     operating.pop(comic_id)
@@ -433,7 +445,7 @@ def main(bot,config):
                     context = ['正在随机ing，请稍等喵~~', '正在翻找好看的本子喵~', '嘿嘿，JM，启动！！！！', '正在翻找JM.jpg',
                                '有色色！我来了', 'hero来了喵~~', '了解~', '全力色色ing~']
                     await bot.send(event, random.choice(context))
-                    context = JM_search_comic_id()
+                    context = JM_search_month()
                     comic_id = context[random.randint(1, len(context)) - 1]
             except Exception as e:
                 logger.error(e)
@@ -475,3 +487,5 @@ async def wait_and_delete_file(bot,file_path, interval=60):
             bot.logger.error(f"删除文件时出现错误: {e}")
             return
 
+if __name__ == '__main__':
+    asyncio.run(call_jm())
