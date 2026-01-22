@@ -4,7 +4,7 @@ plugin_description="群管理"
 dynamic_imports={
     "run.groupManager.self_Manager": [
         "call_operate_blandwhite", "garbage_collection",
-        "report_to_master","send_contract" #,"send"
+        "report_to_master","send_contract","send"
     ]
 }
 function_declarations=[
@@ -42,7 +42,7 @@ function_declarations=[
         "name": "send_contract",
         "description": "发送管理员的联系方式"
     },
-    '''{
+    {
         "name": "send",
         "description": "根据要求发送消息，参数从上下文中获取。",
         "parameters": {
@@ -82,5 +82,5 @@ function_declarations=[
                 "message"
             ]
         }
-    },'''
+    },
 ]
