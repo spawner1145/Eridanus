@@ -4,7 +4,7 @@ plugin_description="群管理"
 dynamic_imports={
     "run.groupManager.self_Manager": [
         "call_operate_blandwhite", "garbage_collection",
-        "report_to_master", "send_contract"
+        "report_to_master","send", "send_contract"
     ]
 }
 function_declarations=[
