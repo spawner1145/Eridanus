@@ -50,9 +50,6 @@ async def geminiRequest(ask_prompt,base_url: str,apikey: str,model: str,proxy=No
                 "topP": 0.95,
                 "maxOutputTokens": maxOutputTokens,
                 "responseMimeType": "text/plain",
-                "thinkingConfig": {
-                    "includeThoughts": include_thoughts
-                }
             }
         }
     else:
@@ -69,12 +66,12 @@ async def geminiRequest(ask_prompt,base_url: str,apikey: str,model: str,proxy=No
                 "topP": 0.95,
                 "maxOutputTokens": maxOutputTokens,
                 "responseMimeType": "text/plain",
-                "thinkingConfig": {
-                    "includeThoughts": include_thoughts
-                }
             }
         }
-
+    if include_thoughts:
+        pay_load["generationConfig"]["thinkingConfig"]={
+                    "includeThoughts": include_thoughts
+                }
     if tools is not None:
         pay_load["tools"] = tools
 
