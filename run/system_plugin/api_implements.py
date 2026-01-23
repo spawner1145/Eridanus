@@ -6,7 +6,7 @@ from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, st
     ProfileLikeEvent, PokeNotifyEvent, GroupBanNoticeEvent, Sender
 from developTools.message.message_chain import MessageChain
 from developTools.message.message_components import Record, Node, Text, Image
-from framework_common.framework_util.func_map_loader import gemini_func_map, openai_func_map
+from framework_common.framework_util.func_map_loader import build_tool_map
 from run.ai_llm.service.aiReplyCore import aiReplyCore
 from framework_common.database_util.User import update_user, add_user, get_user
 from framework_common.utils.utils import download_img
@@ -20,34 +20,9 @@ def main(bot, config):
     avatar = False
     nudge_list = []
     if config.ai_llm.config["llm"]["func_calling"]:
-        if config.ai_llm.config["llm"]["model"] == "gemini":
-            tools = gemini_func_map()
-        else:
-            tools = openai_func_map()
-
+        tools = build_tool_map()
     else:
         tools = None
-
-    if config.ai_llm.config["llm"]["联网搜索"]:
-        if config.ai_llm.config["llm"]["model"] == "gemini":
-            if tools is None:
-                tools = [
-
-                    {"googleSearch": {}},
-                ]
-            else:
-                tools = [
-                    {"googleSearch": {}},
-                    tools
-                ]
-        else:
-            if tools is None:
-                tools = [{"type": "function", "function": {"name": "googleSearch"}}]
-            else:
-                tools = [
-                    {"type": "function", "function": {"name": "googleSearch"}},
-                    tools
-                ]
 
     @bot.on(GroupMessageEvent)
     async def sendLike(event: GroupMessageEvent):

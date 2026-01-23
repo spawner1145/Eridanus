@@ -113,6 +113,9 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
         if "text" in i:
             prompt_elements.append({"text": i["text"]})
         elif "image" in i or "mface" in i:
+            image = None
+            img_byte_arr = None
+            res = None
             try:
                 if "mface" in i:
                     url=i["mface"]["url"]
@@ -130,8 +133,6 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                 # 下载图片转base64
                 async with httpx.AsyncClient(timeout=60) as client:
                     res = await client.get(url)
-                    image = None
-                    img_byte_arr = None
                     # res.raise_for_status()  # Check for HTTP errors
                     try:
                         image = Image.open(io.BytesIO(res.content))
@@ -161,7 +162,8 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                     image.close()
                 if img_byte_arr is not None:
                     img_byte_arr.close()
-                del res
+                if res is not None:
+                    del res
 
         elif "record" in i and bot is not None:
             origin_voice_url=i["record"]["file"]
@@ -172,6 +174,7 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                 prompt_elements.append({"inline_data": {"mime_type": "audio/mp3", "data": img_base64}})
                 continue
             mp3_data=None
+            base64_encoded_data=None
             try:
                 r = await bot.get_record(origin_voice_url)
                 logger.info(f"下载语音成功:{r}")
@@ -187,12 +190,14 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
             finally:
                 if mp3_data is not None:
                     del mp3_data
+                if base64_encoded_data is not None:
+                    del base64_encoded_data
         elif "video" in i and bot is not None:
             mp4_data=None
             base64_encoded_data=None
             try:
                 video_url=i["video"]["url"]
-            except:
+            except (KeyError, TypeError):
                 video_url=i["video"]["file"]
             base64_match = BASE64_PATTERN.match(video_url)
             if base64_match:

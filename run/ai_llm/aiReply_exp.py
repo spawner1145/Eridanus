@@ -13,7 +13,7 @@ from framework_common.database_util.User import get_user, update_user
 from framework_common.database_util.llmDB import delete_latest2_history, read_chara, use_folder_chara
 from framework_common.utils.GeminiKeyManager import GeminiKeyManager
 from run.ai_llm.service.aiReplyCore import aiReplyCore, send_text, count_tokens_approximate
-from run.ai_llm.service.aiReplyHandler.gemini import geminiRequest
+from run.ai_llm.clients.gemini_client import GeminiAPI
 from run.ai_llm.service.schemaReplyCore import schemaReplyCore
 
 
@@ -47,29 +47,36 @@ async def gemma_reply(config,prompt,group_messages_bg=None,recursion_times=0):
     if group_messages_bg:
         copy_history.insert(0, group_messages_bg[0])
         copy_history.insert(1, group_messages_bg[1])
-    #print(copy_history)
+
+    proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"]["enable_proxy"] else None
+    proxies = {"http://": proxy, "https://": proxy} if proxy else None
+
+    api = GeminiAPI(
+        apikey=await GeminiKeyManager.get_gemini_apikey(),
+        baseurl=config.ai_llm.config["llm"]["gemini"]["base_url"],
+        model=config.ai_llm.config["llm"]["gemini"]["model"],
+        proxies=proxies
+    )
+
     try:
-        response_message = await geminiRequest(
+        response_text = ""
+        async for part in api.chat(
             copy_history,
-            config.ai_llm.config["llm"]["gemini"]["base_url"],
-            await GeminiKeyManager.get_gemini_apikey(),
-            config.ai_llm.config["llm"]["gemini"]["model"],
-            config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"][
-                "enable_proxy"] else None,
-            tools=None,
-            system_instruction=None,
+            stream=False,
             temperature=config.ai_llm.config["llm"]["gemini"]["temperature"],
-            maxOutputTokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"],
-            fallback_models=["gemma-3-27b-it"],
-        )
-        print(response_message)
-        return response_message['candidates'][0]["content"]["parts"][0]["text"]
+            max_output_tokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"],
+        ):
+            if isinstance(part, str):
+                response_text += part
+        print(response_text)
+        return response_text.strip() if response_text else None
     except Exception as e:
         traceback.print_exc()
-        recursion_times+=1
+        recursion_times += 1
         print(f"Recursion times: {recursion_times}")
         if recursion_times > config.ai_llm.config["llm"]["recursion_limit"]:
             return None
+        return await gemma_reply(config, prompt, group_messages_bg, recursion_times)
 def main(bot, config):
     """
     此插件代码参考了https://github.com/advent259141/Astrbot_plugin_Heartflow
@@ -79,23 +86,9 @@ def main(bot, config):
     # 获取tools配置（从原框架复制）
     tools = None
     if config.ai_llm.config["llm"]["func_calling"]:
-        from framework_common.framework_util.func_map_loader import gemini_func_map, openai_func_map
-        if config.ai_llm.config["llm"]["model"] == "gemini":
-            tools = gemini_func_map()
-        else:
-            tools = openai_func_map()
+        from framework_common.framework_util.func_map_loader import build_tool_map
+        tools = build_tool_map()
 
-    if config.ai_llm.config["llm"]["联网搜索"]:
-        if config.ai_llm.config["llm"]["model"] == "gemini":
-            if tools is None:
-                tools = [{"googleSearch": {}}]
-            else:
-                tools = [{"googleSearch": {}}, tools]
-        else:
-            if tools is None:
-                tools = [{"type": "function", "function": {"name": "googleSearch"}}]
-            else:
-                tools = [{"type": "function", "function": {"name": "googleSearch"}}, tools]
     # ============ 配置读取 ============
 
 

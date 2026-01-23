@@ -34,7 +34,11 @@ def main(bot: ExtendBot,config: YAMLManager):
         ]
         await asyncio.gather(*tasks)
 
-    asyncio.run(setup_users())
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(setup_users())
+    except RuntimeError:
+        asyncio.run(setup_users())
 
     if master_id not in config.common_config.censor_user["whitelist"]:
         config.common_config.censor_user["whitelist"].append(master_id)

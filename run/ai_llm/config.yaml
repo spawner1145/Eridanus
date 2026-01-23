@@ -5,9 +5,14 @@ llm:
   func_calling: True  #开启函数调用功能
   表情包发送: true      #记录master发送的表情包并在回复时根据上下文发送。
   单次发送表情包数量: 1  #单次发送最大表情包数量
-  联网搜索: false      #官方版本联网搜索，与函数调用不可同时开启
-  联网搜索显示原始数据: True   #此处联网搜索基于函数调用实现(非官方)，与上面的联网搜索不同，所以可以同时开启函数调用和实现联网搜索。
-  读取群聊上下文: true  #开启上下文读取功能，可读取群聊历史消息，并根据上下文进行回复。
+  google_search: false       #Gemini官方版本联网搜索功能，开启后会禁用自定义联网函数(search_net, read_html)
+  url_context: false         #Gemini官方URL上下文功能，可以自动抓取URL内容，开启后会禁用自定义联网函数(search_net, read_html)
+  联网搜索显示原始数据: true   #显示搜索来源和grounding metadata
+  search_client:            #搜索专用client配置（google_search或url_context开启时使用）
+    api_key: "" #搜索专用API Key，留空则使用gemini的api_keys
+    base_url: "https://generativelanguage.googleapis.com" #搜索专用Base URL，留空则使用gemini的base_url
+    model: "gemini-2.0-flash" #搜索专用模型名，留空则使用gemini的fallback_models第一个
+  读取群聊上下文: false #开启上下文读取功能，可读取群聊历史消息，并根据上下文进行回复。
   可获取的群聊上下文长度: 10 # 仁济模式开算法回复务必开上下文
   长期记忆: True   #ai总结用户特征，某种程度上也算中长期记忆
   记忆更新间隔: 360  #单位秒

@@ -10,6 +10,7 @@ import httpx
 from PIL import Image
 
 from developTools.utils.logger import get_logger
+from run.ai_llm.service.aiReplyHandler.gemini import gemini_prompt_elements_construct
 
 logger=get_logger(__name__)
 

@@ -9,7 +9,7 @@ from framework_common.database_util.Group import get_group_messages
 from framework_common.database_util.User import get_user, update_user
 from framework_common.database_util.llmDB import delete_user_history, clear_all_history, change_folder_chara, \
     get_folder_chara, set_all_users_chara, clear_all_users_chara, clear_user_chara, delete_latest2_history
-from framework_common.framework_util.func_map_loader import gemini_func_map, openai_func_map
+from framework_common.framework_util.func_map_loader import build_tool_map
 from framework_common.utils.GeminiKeyManager import GeminiKeyManager
 from run.ai_llm.service.aiReplyCore import aiReplyCore, send_text, count_tokens_approximate
 from run.ai_llm.service.auto_talk import check_message_similarity
@@ -21,34 +21,10 @@ def main(bot, config):
     removed_keys=[]
     cleanup_tasks = {}
     if config.ai_llm.config["llm"]["func_calling"]:
-        if config.ai_llm.config["llm"]["model"] == "gemini":
-            tools = gemini_func_map()
-        else:
-            tools = openai_func_map()
-
+        tools = build_tool_map()
     else:
         tools = None
 
-    if config.ai_llm.config["llm"]["联网搜索"]:
-        if config.ai_llm.config["llm"]["model"] == "gemini":
-            if tools is None:
-                tools = [
-
-                    {"googleSearch": {}},
-                ]
-            else:
-                tools = [
-                    {"googleSearch": {}},
-                    tools
-                ]
-        else:
-            if tools is None:
-                tools = [{"type": "function", "function": {"name": "googleSearch"}}]
-            else:
-                tools = [
-                    {"type": "function", "function": {"name": "googleSearch"}},
-                    tools
-                ]
 
     global user_state, recent_interactions
     user_state = {}
@@ -229,7 +205,7 @@ def main(bot, config):
                 if not user_info.permission >= config.ai_llm.config["core"]["ai_token_limt"]:
                     if user_info.ai_token_record >= config.ai_llm.config["core"]["ai_token_limt_token"]:
                         return
-                await handle_message(event)
+                await handle_message(event, user_info)
 
     async def handle_message(event,user_info=None):
         global user_state,recent_interactions
