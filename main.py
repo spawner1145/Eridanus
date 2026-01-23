@@ -17,6 +17,7 @@ from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.framework_util.websocket_fix import ExtendBot
 from developTools.adapters.websocket_adapter import WebSocketBot
 from framework_common.framework_util.DualBotManager import DualBotManager
+from framework_common.framework_util.bot_info import bot_info_collect
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, LifecycleMetaEvent
 
 # 全局插件管理器实例
@@ -207,6 +208,7 @@ def main_sync():
 
     try:
         # 运行异步主函数
+        asyncio.run(bot_info_collect(config.common_config.basic_config["bot"]))
         asyncio.run(async_main())
 
     except KeyboardInterrupt:
