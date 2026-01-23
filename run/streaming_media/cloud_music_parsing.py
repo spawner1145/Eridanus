@@ -47,8 +47,8 @@ async def parse_cloud_music(bot:ExtendBot,event,config,url,level):
         await bot.send(event, [Image(file=(await manshuo_draw([{'type': 'basic_set', 'img_width': 750},
                                                               {'type': 'img', 'subtype': 'common_with_des_right',
                                                                'img': [f"data/voice/cache/{music_name.replace('/','_')}.jpg"],
-                                                               'content': [f"[title]{detail_result["al_name"]}\n[/title]"
-                                                                           f"歌手：{detail_result["ar_name"]}\n"
+                                                               'content': [f"[title]{detail_result['al_name']}\n[/title]"
+                                                                           f"歌手：{detail_result['ar_name']}\n"
                                                                            f"歌曲品质：{level}"]}])))])
     except Exception as e:
         bot.logger.error(f"音乐解析失败，请联系管理员:{e}")

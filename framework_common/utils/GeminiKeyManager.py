@@ -46,9 +46,14 @@ async def _check_single_gemini_key_status(
         return api_key, True, f"未知错误: {exc} 但暂时保留"
 
 
+import threading
+
+
 class GeminiKeyManager:
     _instance: Optional['GeminiKeyManager'] = None
     _initialized: bool = False
+    _init_lock: asyncio.Lock = None  # 用于保护单例初始化的锁
+    _class_lock: threading.Lock = threading.Lock()  # 用于保护锁初始化的线程锁
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -183,17 +188,23 @@ class GeminiKeyManager:
         Raises:
             NoAvailableAPIKeyError: 如果没有可用的API Key
         """
-        if cls._instance is None:
-            try:
-                config = YAMLManager.get_instance()
-                initial_keys_from_config = config.ai_llm.config["llm"]["gemini"]["api_keys"]
-                cls._instance = cls(initial_keys_from_config)
-                # 等待初始检测完成
-                await asyncio.sleep(3)
-                logger.info("自动初始化GeminiKeyManager完成")
-            except Exception as e:
-                logger.error(f"自动初始化失败: {e}")
-                raise RuntimeError("无法自动初始化GeminiKeyManager") from e
+        # 使用线程锁保护异步锁的初始化，防止竞态条件
+        with cls._class_lock:
+            if cls._init_lock is None:
+                cls._init_lock = asyncio.Lock()
+        
+        async with cls._init_lock:
+            if cls._instance is None:
+                try:
+                    config = YAMLManager.get_instance()
+                    initial_keys_from_config = config.ai_llm.config["llm"]["gemini"]["api_keys"]
+                    cls._instance = cls(initial_keys_from_config)
+                    # 等待初始检测完成
+                    await asyncio.sleep(3)
+                    logger.info("自动初始化GeminiKeyManager完成")
+                except Exception as e:
+                    logger.error(f"自动初始化失败: {e}")
+                    raise RuntimeError("无法自动初始化GeminiKeyManager") from e
 
         return await cls._instance.get_apikey()
 

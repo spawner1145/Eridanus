@@ -102,12 +102,12 @@ async def prompt_elements_construct(precessed_message,bot=None,func_result=False
             if "mface" in i:
                 try:
                     url = i["mface"]["url"]
-                except:
+                except (KeyError, TypeError):
                     url = i["mface"]["file"]
             else:
                 try:
                     url = i["image"]["url"]
-                except:
+                except (KeyError, TypeError):
                     url = i["image"]["file"]
             base64_match = BASE64_PATTERN.match(url)
             if base64_match:
