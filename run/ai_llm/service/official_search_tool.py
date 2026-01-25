@@ -27,11 +27,16 @@ async def search_with_official_api(bot, event, config, query: str, urls: Optiona
         search_base_url = search_config.get("base_url", "").strip()
         if not search_base_url:
             search_base_url = config.ai_llm.config["llm"]["gemini"]["base_url"]
+        
+        # 模型选择逻辑：指定模型 + fallback_models 列表
         search_model = search_config.get("model", "").strip()
+        gemini_fallback_models = config.ai_llm.config["llm"]["gemini"].get("fallback_models", [])
         if search_model:
-            fallback_models = [search_model]
+            # 如果指定了模型，则该模型作为首选，后面跟着 fallback_models
+            fallback_models = [search_model] + [m for m in gemini_fallback_models if m != search_model]
         else:
-            fallback_models = config.ai_llm.config["llm"]["gemini"].get("fallback_models", [])
+            # 如果没有指定模型，则直接使用 fallback_models
+            fallback_models = gemini_fallback_models
         
         api = GeminiAPI(
             apikey=search_api_key,
