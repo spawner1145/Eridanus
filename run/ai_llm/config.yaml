@@ -81,7 +81,7 @@ heartflow:     #心流模式，自动根据群聊内容回复，需完成gemini�
   enabled: false
   api_key: ""              #心流专用API Key，留空则使用gemini的api_keys
   base_url: ""             #心流专用Base URL，留空则使用gemini的base_url
-  model: ""                #心流专用模型名，留空则使用gemini的fallback_models列表
+  model: "gemma-3-27b-it"                #心流专用模型名，留空则使用gemini的fallback_models列表
   reply_threshold: 0.6
   energy_decay_rate: 0.1
   energy_recovery_rate: 0.02
