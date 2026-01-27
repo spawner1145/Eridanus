@@ -13,22 +13,42 @@ config_default, config_default_rouge='default', 'rogue'
 async def get_characters_and_bind(user, userid, db):
     cred = CRED(cred=user['cred'], token=user['cred_token'])
     binding_app_list = await SklandAPI.get_binding(cred)
+    #pprint.pprint(binding_app_list)
+    character_dict = {'arknights':{} ,'endfield':{}}
     for app in binding_app_list:
-        if 'appCode' not in app or app['appCode'] != 'arknights': continue
+        if 'appCode' not in app or app['appCode'] not in ['arknights','endfield']: continue
         for character in app["bindingList"]:
-            character_dict = {
-                'id':user['id'],
-                'uid':character["uid"],
-                'nickname':character["nickName"],
-                'app_code':app["appCode"],
-                'channel_master_id':character["channelMasterId"],
-                'isdefault':character["isDefault"],
-            }
-            #pprint.pprint(character_dict)
-            if len(app["bindingList"]) == 1:character_dict['isdefault'] = True
-            if character_dict['isdefault'] is True:
-                await db.write_user(userid, {'skland': {'character_info': character_dict}})
-                return character_dict
+            isdefault = character["isDefault"]
+            if len(app["bindingList"]) == 1: isdefault = True
+            if isdefault is not True:continue
+            if app['appCode'] == 'arknights':
+                character_dict[app["appCode"]] = {
+                    'id':user['id'],
+                    'uid':character["uid"],
+                    'nickname':character["nickName"],
+                    'app_code':app["appCode"],
+                    'channel_master_id':character["channelMasterId"],
+                    'gameid':character["gameId"],
+                }
+            elif app['appCode'] == 'endfield':
+                for role_per in character['roles']:
+                    isdefault_role = role_per["isDefault"]
+                    if len(character['roles']) == 1: isdefault_role = True
+                    if isdefault_role is not True: continue
+                    character_dict[app["appCode"]] = {
+                        'id':user['id'],
+                        'uid':character["uid"],
+                        'nickname':role_per["nickname"],
+                        'level':role_per["level"],
+                        'roleid': role_per["roleId"],
+                        'app_code':app["appCode"],
+                        'channel_master_id':character["channelMasterId"],
+                        'serverid': role_per["serverId"],
+                        'gameid':character["gameId"],
+                    }
+    #pprint.pprint(character_dict)
+    await db.write_user(userid, {'skland': {'character_info': character_dict}})
+    return character_dict
 
 
 
