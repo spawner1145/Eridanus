@@ -71,10 +71,10 @@ async def qrcode_get(userid,bot=None,event=None):
         await db.write_user(userid, {'skland':{'user_info':user_dict}})
         character_dict=await get_characters_and_bind(user_dict, userid, db)
         msg = '绑定成功，\n'
-        if 'arknights' in character_dict:
-            msg += f'欢迎 博士：{character_dict['arknights'].get("nickname")}\n'
-        if 'endfield' in character_dict:
-            msg += f'欢迎 管理员：{character_dict['endfield'].get("nickname")}'
+        if 'arknights' in character_dict and character_dict['arknights'].get("nickname") is not None:
+            msg += f'欢迎 博士：{character_dict["arknights"].get("nickname")}\n'
+        if 'endfield' in character_dict and character_dict['endfield'].get("nickname") is not None:
+            msg += f'欢迎 管理员：{character_dict["endfield"].get("nickname")}'
         if 'arknights' not in character_dict and 'endfield' not in character_dict:
             msg ='未查询到您账户下的游戏，给你一拳喵'
         if bot and event:await bot.send(event, msg)
