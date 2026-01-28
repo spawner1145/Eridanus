@@ -47,6 +47,8 @@ async def get_characters_and_bind(user, userid, db):
                         'gameid':character["gameId"],
                     }
     #pprint.pprint(character_dict)
+    #保存前先清理多余键值
+    await db.delete_user_field(userid, f'skland.character_info')
     await db.write_user(userid, {'skland': {'character_info': character_dict}})
     return character_dict
 
