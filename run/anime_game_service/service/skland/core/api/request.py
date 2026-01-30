@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 import pprint
 import httpx
 
-from ..schemas import CRED, ArkCard, RogueData, ArkSignResponse,Topics
+from ..schemas import CRED, ArkCard, RogueData, ArkSignResponse,Topics,EndfieldSignResponse
 from ..exception import LoginException, RequestException, UnauthorizedException
 
 from developTools.utils.logger import get_logger
@@ -69,7 +69,7 @@ class SklandAPI:
         return {"cred": cred.cred, **cls._headers, "sign": signature, **header_ca}
 
     @classmethod
-    async def ark_sign(cls, cred: CRED, uid: str, channel_master_id: str):
+    async def ark_sign(cls, cred: CRED, uid, channel_master_id):
         """进行明日方舟签到"""
         body = {"uid": uid, "gameId": channel_master_id}
         json_body = json.dumps(body, ensure_ascii=False, separators=(", ", ": "), allow_nan=False)
@@ -88,7 +88,8 @@ class SklandAPI:
                     headers={**headers, "Content-Type": "application/json"},
                     content=json_body,
                 )
-                #logger.info(f"签到回复：{response.json()}")
+                #logger.info(f"明日方舟签到回复：{response.json()}")
+                #pprint.pprint(response.json())
                 if status := response.json().get("code"):
                     if status == 10000:
                         raise UnauthorizedException(f"角色 {uid} 签到失败：{response.json().get('message')}")
@@ -195,3 +196,40 @@ class SklandAPI:
                 return RogueData(**response.json()["data"])
             except httpx.HTTPError as e:
                 raise RequestException(f"获取肉鸽数据失败: {e}") from e
+
+    @classmethod
+    async def endfield_sign(cls, cred: CRED, uid: str, server_id: str):
+        """进行明日方舟：终末地签到"""
+        sign_url = "https://zonai.skland.com/web/v1/game/endfield/attendance"
+        body = {"uid": uid, "gameId": server_id}
+        json_body = json.dumps(body, ensure_ascii=False, separators=(", ", ": "), allow_nan=False)
+        headers = cls.get_sign_header(
+            cred,
+            sign_url,
+            method="post",
+            query_body=body,
+        )
+        game_role = f"3_{uid}_{server_id}"
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(
+                    sign_url,
+                    headers={
+                        **headers,
+                        "Content-Type": "application/json",
+                        "sk-game-role": game_role,
+                    },
+                    content=json_body,
+                )
+                #logger.info(f"终末地签到回复：{response.json()}")
+                #pprint.pprint(response.json())
+                if status := response.json().get("code"):
+                    if status == 10000:
+                        raise UnauthorizedException(f"角色 {uid} 终末地签到失败：{response.json().get('message')}")
+                    elif status == 10002:
+                        raise LoginException(f"角色 {uid} 终末地签到失败：{response.json().get('message')}")
+                    elif status != 0:
+                        raise RequestException(f"{response.json().get('message')}")
+            except httpx.HTTPError as e:
+                raise RequestException(f"角色 {uid} 终末地签到失败: {e}") from e
+            return response.json()["data"]

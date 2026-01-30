@@ -20,7 +20,7 @@ def main(bot, config):
     #森空岛签到
     @bot.on(GroupMessageEvent)
     async def sing_sklandid(event: GroupMessageEvent):
-        order_list=['sklandsign','森空岛签到']
+        order_list=['sklandsign','森空岛签到','方舟签到','终末地签到','明日方舟签到']
         context, userid=event.pure_text, str(event.sender.user_id)
         if event.message_chain.has(At) and event.message_chain.has(Text):
             userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text

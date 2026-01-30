@@ -31,10 +31,10 @@ async def change_default_sign_game(user_id,target,bot=None,event=None):
     if bot: await bot.send(event, f'您的默认签到游戏已更改为 {target}')
 
 
-async def mys_game_sign(user_id,bot=None,event=None,target='all'):
+async def mys_game_sign(user_id,bot=None,event=None,target='all',type='game'):
     #pprint.pprint(PluginDataManager.plugin_data.users)
     user = PluginDataManager.plugin_data.users.get(str(user_id))
-    return_json = {'message':'test','img_list':[],'text_list':[],'status':False,'text':''}
+    return_json = {'message':'test','img_list':[],'text_list':[],'status':False,'text':'','manshuo_draw':[]}
     if not user or not user.accounts:
         msg = '此用户还未绑定，请发送 ‘米游社帮助’ 查看菜单'
         if bot and event: await bot.send(event, msg)
@@ -48,15 +48,16 @@ async def mys_game_sign(user_id,bot=None,event=None,target='all'):
             if target in game_name_list[item]:
                 target = [item]
                 break
-        img_list,text_list = await perform_game_sign(user_id=user_id,bot=bot, user=user, event=event, target=target)
-        return_json['img_list'], return_json['text_list'] = img_list, text_list
-        if text_list:
-            for item in text_list:
+        sign_info = await perform_game_sign(user_id=user_id,bot=bot, user=user, event=event, target=target, type=type)
+        return_json['img_list'], return_json['text_list'] = sign_info['img_list'], sign_info['text_list']
+        if sign_info['text_list']:
+            for item in sign_info['text_list']:
                 return_json['text'] += f'{item}\n'
         else:
             return_json['text'] = '已尝试签到，但未获得签到数据，可自行前往米游社查看'
         return_json['text'] += '[des]ps:为避签到时间过长，签到模块只会签到一个游戏\n请在菜单中自行更换默认签到游戏的说[/des]'
         return_json['status'] = True
+        return_json['manshuo_draw'] = sign_info['manshuo_draw']
     except Exception as e:
         print(e)
         traceback.print_exc()
@@ -69,13 +70,14 @@ async def mys_game_sign(user_id,bot=None,event=None,target='all'):
 
 
 
-async def perform_game_sign(user, user_id=None, bot = None, event = None, target='all'):
+async def perform_game_sign(user, user_id=None, bot = None, event = None, target='all',type='game'):
     """
     执行游戏签到函数，并发送给用户签到消息。
     target = [原神,崩坏：星穹铁道,绝区零,崩坏3]
     :param user: 用户数据
     :param event: 事件
     """
+    return_json = {'status':False,'img_list':[],'text_list':[],'manshuo_draw':[]}
     if target in ['all']:target_list = game_all_list
     elif target in ['daily_sign']:
         if not user.target_sign_game: target_list = ['崩坏：星穹铁道']
@@ -131,17 +133,27 @@ async def perform_game_sign(user, user_id=None, bot = None, event = None, target
                 #第二次签后获取不到数据则继续
                 if not sign_status and user.enable_notice:
                     if sign_status.login_expired:
-                        message = f" {signer.name}』签到时服务器返回登录失效，请尝试重新登录绑定账户"
+                        message = f" 签到时服务器返回登录失效，请尝试重新登录绑定账户"
+                        per_msg = f'{signer.record.nickname} 签到时服务器返回登录失效，请尝试重新登录绑定账户'
                     elif sign_status.need_verify:
                         message = (f" 『{signer.name}』签到时可能遇到验证码拦截，"
                                    "请尝试使用命令『/账号设置』更改设备平台，若仍失败请手动前往米游社签到")
+                        per_msg = f'{signer.record.nickname} 签到时可能遇到验证码拦截'
                     else:
-                        message = f" 『{signer.name}』签到失败，请稍后再试"
-
+                        message = f" 签到失败，请稍后再试"
+                        per_msg = f'{signer.record.nickname} 签到失败，请稍后再试'
                     if bot: await bot.send(event, [At(qq=user_id), message])
                     else: print(message)
                     #await asyncio.sleep(plugin_config.preference.sleep_time)
-                    continue
+                    return_json['text_list'].append(per_msg)
+                    return_json['manshuo_draw'] = [
+                       {'type': 'avatar', 'subtype': 'common',
+                        'img': [f"https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=640"],
+                        'upshift_extra': 15,'background':'run/manshuo_test/data/img/米游社.png',
+                        'content': [f"[name]米游社签到[/name]\n[time]米游社id: {UID}[/time]"]},
+                       {'type': 'text','content': [per_msg]}
+                   ]
+                    return return_json
 
                 # asyncio.sleep(plugin_config.preference.sleep_time)
 
@@ -198,17 +210,26 @@ async def perform_game_sign(user, user_id=None, bot = None, event = None, target
          {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_list, 'content': text_list,'number_per_row':2}
          ]
     #pprint.pprint(draw_list)
-
-    if len(img_list) not in [0,1]:
-        img_path = await manshuo_draw(draw_list)
-        if bot and event:
-            await bot.send(event, [At(qq=user_id),f" 您当天的米游社签到如下", Image(file=img_path)])
+    return_json = {'status':True,'img_list':img_list,'text_list':text_list,
+                   'manshuo_draw':[
+                       {'type': 'avatar', 'subtype': 'common',
+                        'img': [f"https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=640"],
+                        'upshift_extra': 15,'background':'run/manshuo_test/data/img/米游社.png',
+                        'content': [f"[name]米游社签到[/name]\n[time]米游社id: {UID}[/time]"]},
+                       {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_list, 'content': text_list,
+                        'number_per_row': 1}
+                   ]}
+    if type == 'game':
+        if len(img_list) not in [0,1]:
+            img_path = await manshuo_draw(draw_list)
+            if bot and event:
+                await bot.send(event, [At(qq=user_id),f" 您当天的米游社签到如下", Image(file=img_path)])
+            else:
+                print(img_path)
         else:
-            print(img_path)
-    else:
-        if bot and event and pure_text_list:
-            await bot.send(event,pure_text_list[0])
-        else:
-            pprint.pprint(pure_text_list[0])
-    return img_list,text_list
+            if bot and event and pure_text_list:
+                await bot.send(event,pure_text_list[0])
+            else:
+                pprint.pprint(pure_text_list[0])
+    return return_json
 

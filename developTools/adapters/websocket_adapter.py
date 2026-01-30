@@ -243,7 +243,7 @@ class WebSocketBot:
             await asyncio.sleep(5)
             await self._connect_and_run()
 
-    async def _call_api(self, action: str, params: dict, timeout: int = 5) -> dict:
+    async def _call_api(self, action: str, params: dict, timeout: int = 10) -> dict:
         if self.websocket is None:
             self.logger.warning("WebSocket 未连接，无法调用 API。")
             return {"status": "failed", "retcode": -1, "data": None, "echo": str(uuid.uuid4())}
