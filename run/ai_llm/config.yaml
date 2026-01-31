@@ -82,6 +82,7 @@ llm:
     token: ""
 heartflow:     #心流模式，自动根据群聊内容回复，需完成相关client配置。
   enabled: false
+  listen_image: false   #是否监听图片，开启后判断是否回复时会读取图片内容
   client:                    #心流专用client配置，类似utility_client
     type: "gemini"           #可选 "openai" 或 "gemini"
     api_key: ""              #专用API Key，留空则根据type使用对应的api_keys

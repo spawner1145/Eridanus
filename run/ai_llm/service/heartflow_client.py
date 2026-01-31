@@ -156,12 +156,12 @@ def _build_gemini_messages(
             "parts": [{"text": "好的，我已了解指令。"}]
         })
     
+    user_parts = []
     for msg in messages:
         if "text" in msg:
-            result.append({
-                "role": "user",
-                "parts": [{"text": msg["text"]}]
-            })
+            user_parts.append({"text": msg["text"]})
+        elif "inlineData" in msg:
+            user_parts.append({"inlineData": msg["inlineData"]})
         elif "parts" in msg:
             result.append(msg)
         elif "content" in msg:
@@ -176,6 +176,12 @@ def _build_gemini_messages(
                 "role": "user" if msg.get("role") in ["user", "system"] else "model",
                 "parts": [{"text": text}]
             })
+    
+    if user_parts:
+        result.append({
+            "role": "user",
+            "parts": user_parts
+        })
     
     return result
 
@@ -204,12 +210,12 @@ def _build_openai_messages(
             elif "content" in ctx:
                 result.append(ctx)
 
+    user_content = []
     for msg in messages:
         if "text" in msg:
-            result.append({
-                "role": "user",
-                "content": [{"type": "text", "text": msg["text"]}]
-            })
+            user_content.append({"type": "text", "text": msg["text"]})
+        elif "input_image" in msg:
+            user_content.append(msg)
         elif "content" in msg:
             result.append(msg)
         elif "parts" in msg:
@@ -219,5 +225,11 @@ def _build_openai_messages(
                 "role": role,
                 "content": [{"type": "text", "text": text}]
             })
+    
+    if user_content:
+        result.append({
+            "role": "user",
+            "content": user_content
+        })
     
     return result
