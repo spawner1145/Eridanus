@@ -55,7 +55,7 @@ llm:
     - YOUR_API_KEY_1
     model: deepseek-reasoner
     quest_url: https://api.deepseek.com   #如使用官方sdk，则只填base_url，否则填完整url。
-    temperature: 1.3
+    temperature: 1.0
     max_tokens: 2048
     CoT: true               #显示思维链
     使用旧版prompt结构: false  #部分模型需要使用旧版prompt结构
@@ -77,15 +77,19 @@ llm:
   腾讯元器:     #极其不建议用，腾子搞得玩意稀烂，而且不支持函数调用。
     智能体ID: ""
     token: ""
-heartflow:     #心流模式，自动根据群聊内容回复，需完成gemini相关配置。
+heartflow:     #心流模式，自动根据群聊内容回复，需完成相关client配置。
   enabled: false
-  api_key: ""              #心流专用API Key，留空则使用gemini的api_keys
-  base_url: ""             #心流专用Base URL，留空则使用gemini的base_url
-  model: "gemma-3-27b-it"                #心流专用模型名，留空则使用gemini的fallback_models列表
+  client:                    #心流专用client配置，类似utility_client
+    type: "gemini"           #可选 "openai" 或 "gemini"
+    api_key: ""              #专用API Key，留空则根据type使用对应的api_keys
+    base_url: "https://generativelanguage.googleapis.com"             #专用Base URL，留空则根据type使用对应的base_url
+    model: "gemma-3-27b-it"  #专用模型名，留空则根据type使用对应的默认模型/fallback_models
+    temperature: 0.7         #温度参数，留空则使用对应type的默认值
+    max_tokens: 2048         #最大输出token数
   reply_threshold: 0.6
   energy_decay_rate: 0.1
   energy_recovery_rate: 0.02
-  context_messages_count: 10
+  context_messages_count: 10 # 读取的消息条数
   interaction_timeout: 300
   whitelist_enabled: true  #关闭则所有群都启用
   chat_whitelist:   #白名单群
