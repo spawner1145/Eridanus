@@ -11,9 +11,8 @@ from developTools.message.message_components import At
 from framework_common.database_util.Group import get_last_20_and_convert_to_prompt
 from framework_common.database_util.User import get_user, update_user
 from framework_common.database_util.llmDB import delete_latest2_history, read_chara, use_folder_chara
-from framework_common.utils.GeminiKeyManager import GeminiKeyManager
 from run.ai_llm.service.aiReplyCore import aiReplyCore, send_text, count_tokens_approximate
-from run.ai_llm.clients.gemini_client import GeminiAPI
+from run.ai_llm.service.heartflow_client import heartflow_request
 from run.ai_llm.service.schemaReplyCore import schemaReplyCore
 
 
@@ -41,59 +40,30 @@ class ChatState:
     total_replies: int = 0
     recent_interactions: Dict[int, float] = field(default_factory=dict)
 
-async def gemma_reply(config,prompt,group_messages_bg=None,recursion_times=0):
-    copy_history = []
-    copy_history.append({"role": "user", "parts": [{"text": prompt}]})
-    if group_messages_bg:
-        copy_history.insert(0, group_messages_bg[0])
-        copy_history.insert(1, group_messages_bg[1])
 
-    proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"]["enable_proxy"] else None
-    proxies = {"http://": proxy, "https://": proxy} if proxy else None
-
-    # heartflow 独立配置，留空则 fallback 到 gemini 配置
-    heartflow_config = config.ai_llm.config.get("heartflow", {})
-    hf_api_key = heartflow_config.get("api_key", "").strip()
-    if not hf_api_key:
-        hf_api_key = await GeminiKeyManager.get_gemini_apikey()
-    hf_base_url = heartflow_config.get("base_url", "").strip()
-    if not hf_base_url:
-        hf_base_url = config.ai_llm.config["llm"]["gemini"]["base_url"]
-    
-    # 模型选择逻辑：指定模型 + fallback_models 列表
-    hf_model = heartflow_config.get("model", "").strip()
-    gemini_fallback_models = config.ai_llm.config["llm"]["gemini"].get("fallback_models", [])
-    if hf_model:
-        fallback_models = [hf_model] + [m for m in gemini_fallback_models if m != hf_model]
-    else:
-        fallback_models = gemini_fallback_models
-
-    api = GeminiAPI(
-        apikey=hf_api_key,
-        baseurl=hf_base_url,
-        fallback_models=fallback_models,
-        proxies=proxies
-    )
-
+async def heartflow_reply(config, prompt, group_messages_bg=None, recursion_times=0):
     try:
-        response_text = ""
-        async for part in api.chat(
-            copy_history,
-            stream=False,
-            temperature=config.ai_llm.config["llm"]["gemini"]["temperature"],
-            max_output_tokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"],
-        ):
-            if isinstance(part, str):
-                response_text += part
-        print(response_text)
-        return response_text.strip() if response_text else None
+        messages = [{"text": prompt}]
+        
+        result = await heartflow_request(
+            config,
+            messages,
+            system_instruction=None,
+            group_context=group_messages_bg,
+        )
+        
+        if result:
+            print(result)
+        return result
+        
     except Exception as e:
         traceback.print_exc()
         recursion_times += 1
         print(f"Recursion times: {recursion_times}")
-        if recursion_times > config.ai_llm.config["llm"]["recursion_limit"]:
+        recursion_limit = config.ai_llm.config["llm"].get("retries", 3)
+        if recursion_times > recursion_limit:
             return None
-        return await gemma_reply(config, prompt, group_messages_bg, recursion_times)
+        return await heartflow_reply(config, prompt, group_messages_bg, recursion_times)
 def main(bot, config):
     """
     此插件代码参考了https://github.com/advent259141/Astrbot_plugin_Heartflow
@@ -228,7 +198,7 @@ def main(bot, config):
             原始角色设定：
             {original_persona}"""
 
-            result = await gemma_reply(
+            result = await heartflow_reply(
                 config,
                 prompt,
                 recursion_times=7
@@ -250,8 +220,17 @@ def main(bot, config):
             chat_state = get_chat_state(event.group_id)
             persona = await get_persona_prompt(event.user_id)
 
+            heartflow_config = config.ai_llm.config.get("heartflow", {})
+            client_config = heartflow_config.get("client", {})
+            client_type = client_config.get("type", "gemini").strip().lower()
+            
+            if client_type == "openai":
+                prompt_format = "new_openai"
+            else:
+                prompt_format = "gemini"
+            
             group_messages_bg = await get_last_20_and_convert_to_prompt(
-                event.group_id, config.ai_llm.config["heartflow"]["context_messages_count"], "gemini", bot
+                event.group_id, config.ai_llm.config["heartflow"]["context_messages_count"], prompt_format, bot
             )
 
 
@@ -295,8 +274,7 @@ def main(bot, config):
             ⚠️ 请严格保持该格式，每个分数字只能写一个纯数字。
             """
 
-            # 替换 schemaReplyCore → gemma_reply
-            result_text = await gemma_reply(
+            result_text = await heartflow_reply(
                 config,
                 prompt,
                 group_messages_bg=group_messages_bg
