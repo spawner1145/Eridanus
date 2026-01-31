@@ -15,8 +15,11 @@ help_menu: #如果打开菜单编辑器发现内容为空，请先运行一遍/r
       - {'type': 'text','content': ['[title]AI对话[/title]
       \n  @触发/前缀触发/智能判断
       \n  /clear
+      \n  /clear@某人   [des]管理员神权(bushi[/des]
       \n  /clearall
       \n  /clear group  [des]清除指定群聊的聊天记录[/des]
+      \n  /群总结  [des]发送当前群内消息总结，可通过/clear group清空[/des]
+      \n  /群总结 刷新  [des]调用ai立刻对群消息进行总结(llm相关配置中有多少条消息总结一次的配置)[/des]
       \n  /查人设    [des]返回所有可用人设[/des]
       \n  /切人设 {角色文件名} [des]/切人设 派蒙.txt[/des]
       \n  /全切人设 {角色文件名}  [des]/全切人设 派蒙.txt  管理员命令[/des]
