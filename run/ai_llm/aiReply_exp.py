@@ -1,9 +1,16 @@
 
 import asyncio
+import base64
 import datetime
+import io
+import os
+import re
 import time
 import traceback
 from typing import Dict
+
+import httpx
+from PIL import Image
 from dataclasses import dataclass, field
 
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
@@ -14,6 +21,79 @@ from framework_common.database_util.llmDB import delete_latest2_history, read_ch
 from run.ai_llm.service.aiReplyCore import aiReplyCore, send_text, count_tokens_approximate
 from run.ai_llm.service.heartflow_client import heartflow_request
 from run.ai_llm.service.schemaReplyCore import schemaReplyCore
+
+# 用于匹配 base64 数据URI的正则
+BASE64_PATTERN = re.compile(r'^data:([^;]+);base64,(.+)$', re.DOTALL)
+
+
+def is_local_file_path(url: str) -> bool:
+    """检查是否是本地文件路径"""
+    if url.startswith("file://"):
+        return True
+    if len(url) >= 2 and url[1] == ':' and url[0].isalpha():
+        return True
+    if url.startswith("/") and not url.startswith("//"):
+        return True
+    return False
+
+
+def get_local_file_path(url: str) -> str:
+    """获取本地文件的实际路径"""
+    if url.startswith("file://"):
+        return url[7:]
+    return url
+
+
+async def _process_image_for_heartflow(url: str, client_type: str) -> dict:
+    try:
+        img_base64 = None
+        base64_match = BASE64_PATTERN.match(url)
+        if base64_match:
+            img_base64 = base64_match.group(2)
+        elif is_local_file_path(url):
+            actual_path = get_local_file_path(url)
+            if os.path.exists(actual_path):
+                image = Image.open(actual_path)
+                image = image.convert("RGB")
+                img_byte_arr = io.BytesIO()
+                quality = 85
+                while True:
+                    img_byte_arr.seek(0)
+                    img_byte_arr.truncate()
+                    image.save(img_byte_arr, format='JPEG', quality=quality)
+                    if img_byte_arr.tell() / 1024 <= 400 or quality <= 10:
+                        break
+                    quality -= 5
+                img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+                image.close()
+        else:
+            async with httpx.AsyncClient(timeout=30) as client:
+                res = await client.get(url)
+                if res.status_code == 200:
+                    image = Image.open(io.BytesIO(res.content))
+                    image = image.convert("RGB")
+                    img_byte_arr = io.BytesIO()
+                    quality = 85
+                    while True:
+                        img_byte_arr.seek(0)
+                        img_byte_arr.truncate()
+                        image.save(img_byte_arr, format='JPEG', quality=quality)
+                        if img_byte_arr.tell() / 1024 <= 400 or quality <= 10:
+                            break
+                        quality -= 5
+                    img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+                    image.close()
+        
+        if not img_base64:
+            return None
+        if client_type == "openai":
+            return {"input_image": {"image_url": f"data:image/jpeg;base64,{img_base64}", "detail": "auto"}}
+        else:
+            return {"inlineData": {"mimeType": "image/jpeg", "data": img_base64}}
+    
+    except Exception as e:
+        print(f"处理图片失败: {e}")
+        return None
 
 
 @dataclass
@@ -41,9 +121,11 @@ class ChatState:
     recent_interactions: Dict[int, float] = field(default_factory=dict)
 
 
-async def heartflow_reply(config, prompt, group_messages_bg=None, recursion_times=0):
+async def heartflow_reply(config, prompt, group_messages_bg=None, recursion_times=0, image_parts=None):
     try:
         messages = [{"text": prompt}]
+        if image_parts:
+            messages.extend(image_parts)
         
         result = await heartflow_request(
             config,
@@ -63,7 +145,7 @@ async def heartflow_reply(config, prompt, group_messages_bg=None, recursion_time
         recursion_limit = config.ai_llm.config["llm"].get("retries", 3)
         if recursion_times > recursion_limit:
             return None
-        return await heartflow_reply(config, prompt, group_messages_bg, recursion_times)
+        return await heartflow_reply(config, prompt, group_messages_bg, recursion_times, image_parts)
 def main(bot, config):
     """
     此插件代码参考了https://github.com/advent259141/Astrbot_plugin_Heartflow
@@ -223,6 +305,7 @@ def main(bot, config):
             heartflow_config = config.ai_llm.config.get("heartflow", {})
             client_config = heartflow_config.get("client", {})
             client_type = client_config.get("type", "gemini").strip().lower()
+            listen_image = heartflow_config.get("listen_image", False)
             
             if client_type == "openai":
                 prompt_format = "new_openai"
@@ -233,12 +316,70 @@ def main(bot, config):
                 event.group_id, config.ai_llm.config["heartflow"]["context_messages_count"], prompt_format, bot
             )
 
+            # 处理图片（如果启用了listen_image）
+            image_parts = []
+            if listen_image and hasattr(event, 'processed_message'):
+                for item in event.processed_message:
+                    if "image" in item or "mface" in item:
+                        try:
+                            if "mface" in item:
+                                url = item["mface"].get("url") or item["mface"].get("file")
+                            else:
+                                url = item["image"].get("url") or item["image"].get("file")
+                            
+                            if url:
+                                img_data = await _process_image_for_heartflow(url, client_type)
+                                if img_data:
+                                    image_parts.append(img_data)
+                        except Exception as e:
+                            bot.logger.warning(f"心流插件: 处理图片失败: {e}")
 
-            recent_messages = "\n---\n".join([
-                msg.get("text", "") for msg in group_messages_bg[-5:]
-                if msg.get("role") in ["user", "model"]
-            ]) if group_messages_bg else "暂无对话历史"
+            def extract_text_from_message(msg):
+                """从Gemini/OpenAI格式的消息中提取文本"""
+                role = msg.get("role", "")
+                if role not in ["user", "model", "assistant"]:
+                    return None
+                
+                # Gemini 格式: {"role": "user", "parts": [{"text": "..."}, ...]}
+                if "parts" in msg:
+                    texts = []
+                    for part in msg["parts"]:
+                        if isinstance(part, dict) and "text" in part:
+                            texts.append(part["text"])
+                    return "\n".join(texts) if texts else None
+                
+                # OpenAI 格式: {"role": "user", "content": [{"type": "text", "text": "..."}, ...]}
+                if "content" in msg:
+                    content = msg["content"]
+                    if isinstance(content, str):
+                        return content
+                    elif isinstance(content, list):
+                        texts = []
+                        for item in content:
+                            if isinstance(item, dict) and item.get("type") == "text":
+                                texts.append(item.get("text", ""))
+                        return "\n".join(texts) if texts else None
+                
+                return None
+            
+            if group_messages_bg:
+                recent_texts = []
+                for msg in group_messages_bg[-5:]:
+                    text = extract_text_from_message(msg)
+                    if text:
+                        recent_texts.append(text)
+                recent_messages = "\n---\n".join(recent_texts) if recent_texts else "暂无对话历史"
+            else:
+                recent_messages = "暂无对话历史"
+            
             reply_threshold = config.ai_llm.config['heartflow']['reply_threshold']
+            message_content_desc = event.pure_text if event.pure_text else "(无文字内容)"
+            if image_parts:
+                message_content_desc += f"\n(附带{len(image_parts)}张图片，见下方)"
+            image_prefix_text = ""
+            if image_parts and not event.pure_text:
+                image_prefix_text = f"以下是用户{event.sender.nickname}发送的图片:\n"
+            
             prompt = f"""你是群聊机器人的决策系统，判断是否应该主动回复。
 
                 ## 机器人角色设定
@@ -255,11 +396,13 @@ def main(bot, config):
                 
                 ## 待判断消息
                 发送者: {event.sender.nickname}
-                内容: {event.pure_text}
+                内容: {message_content_desc}
                 时间: {datetime.datetime.now().strftime('%H:%M:%S')}
                 
                 回复阈值: {reply_threshold}
-                请从5个维度评估（0-10分）。"""
+                请从5个维度评估（0-10分）。
+                
+                {image_prefix_text}"""
             prompt += """
 
             请根据上述信息做出判断，并按以下格式输出：
@@ -277,7 +420,8 @@ def main(bot, config):
             result_text = await heartflow_reply(
                 config,
                 prompt,
-                group_messages_bg=group_messages_bg
+                group_messages_bg=group_messages_bg,
+                image_parts=image_parts if image_parts else None
             )
             #print(result_text)
             #print(type(result_text))
@@ -399,12 +543,23 @@ def main(bot, config):
         """心流主动回复处理"""
 
         # 跳过命令和bot自己的消息
-        if event.pure_text and event.pure_text.startswith("/"):
+        if event.pure_text and (event.pure_text.startswith("/") or event.pure_text.startswith("#")):
             return
         if event.user_id == bot.id:
             return
-        if not event.pure_text or not event.pure_text.strip():
+
+        listen_image = config.ai_llm.config.get("heartflow", {}).get("listen_image", False)
+        has_text = event.pure_text and event.pure_text.strip()
+        has_image = False
+        if listen_image and hasattr(event, 'processed_message'):
+            for item in event.processed_message:
+                if "image" in item or "mface" in item:
+                    has_image = True
+                    break
+
+        if not has_text and not has_image:
             return
+        
         if event.message_chain.has(At):
             if event.message_chain.get(At)[0].qq in [bot.id, 1000000]:
                 bot.logger.info(f"心流插件：跳过@机器人消息")
