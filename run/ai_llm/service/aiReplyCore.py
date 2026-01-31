@@ -353,25 +353,38 @@ async def prompt_length_check(user_id, config):
 def inject_user_portrait(prompt, user_portrait, model_type):
     """
     将用户画像注入到主 prompt 中（不保存到历史记录）
-    插入位置：在用户最新消息之前
+    测试发现插入在用户最新消息之前效果最好（倒数第二个位置）
     """
     if not user_portrait or user_portrait in ["", "默认用户"]:
         return prompt
     
+    portrait_text = (
+        "================== 用户画像 开始 ==================\n"
+        f"【系统提示】以下为当前正在与你对话的用户的画像特征：\n{user_portrait}\n"
+        "================== 用户画像 结束 =================="
+    )
+    
     if model_type == "gemini":
         portrait_message = {
             "role": "user",
-            "parts": [{"text": f"[系统提示] 以下为当前对话用户的用户画像：{user_portrait}"}]
+            "parts": [{"text": portrait_text}]
+        }
+        confirm_message = {
+            "role": "model", 
+            "parts": [{"text": "好的，我已经了解了这些信息。"}]
         }
     else:  # openai
         portrait_message = {
-            "role": "system",
-            "content": [{"type": "text", "text": f"以下为当前对话用户的用户画像：{user_portrait}"}]
+            "role": "user",
+            "content": [{"type": "text", "text": portrait_text}]
+        }
+        confirm_message = {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "好的，我已经了解了这些信息。"}]
         }
     
-    # 插入到倒数第二个位置（用户最新消息之前）
     insert_pos = max(len(prompt) - 1, 0)
-    prompt = prompt[:insert_pos] + [portrait_message] + prompt[insert_pos:]
+    prompt = prompt[:insert_pos] + [portrait_message, confirm_message] + prompt[insert_pos:]
     return prompt
 
 
@@ -398,54 +411,38 @@ async def read_context(bot, event, config, prompt):
                                                                             "new_openai", bot)
         else:
             return None
+        
+        if not group_messages_bg:
+            return None
+            
         bot.logger.info(f"群聊上下文消息：已读取")
-        insert_pos = max(len(prompt) - 2, 0)  # 保证插入位置始终在倒数第二个元素之前
-        if config.ai_llm.config["llm"]["model"] == "openai":  # 必须交替出现
-            # 添加边界检查，防止索引越界和无限循环
-            max_attempts = len(prompt)
-            attempts = 0
-            while insert_pos > 0 and insert_pos < len(prompt) and attempts < max_attempts:
-                if prompt[insert_pos - 1].get("role") == "assistant":
-                    break
-                insert_pos += 1
-                attempts += 1
         
-        # 在群聊上下文末尾添加提示消息
-        context_notice = "【注意】以上是群聊的部分历史记录，仅供参考了解上下文，不是当前这次对话的内容！请不要把历史记录当作当前请求来回复。"
-        if config.ai_llm.config["llm"]["model"] == "gemini":
-            notice_message = {
-                "role": "user",
-                "parts": [{"text": context_notice}]
-            }
-        else:
-            notice_message = {
-                "role": "user",
-                "content": [{"type": "text", "text": context_notice}]
-            }
-        group_messages_bg = group_messages_bg + [notice_message]
-        
-        prompt = prompt[:insert_pos] + group_messages_bg + prompt[insert_pos:]
-        
-        # 如果启用了"聊天带总结"，则注入群总结
+        insert_pos = max(len(prompt) - 1, 0)
+        context_to_insert = []
         if config.ai_llm.config["llm"].get("群聊总结", {}).get("聊天带总结", False):
             group_info = await get_group_summary(event.group_id)
             group_summary = group_info.get("summary", "")
             if group_summary:
-                # 构建群总结消息
+                summary_text = (
+                    "================== 群聊历史总结 开始 ==================\n"
+                    f"以下是本群之前的聊天总结，供你参考：\n{group_summary}\n"
+                    "================== 群聊历史总结 结束 =================="
+                )
                 if config.ai_llm.config["llm"]["model"] == "gemini":
                     summary_message = {
                         "role": "user",
-                        "parts": [{"text": f"【群聊历史总结】以下是本群之前的聊天总结，供你参考了解群内话题和氛围：\n{group_summary}"}]
+                        "parts": [{"text": summary_text}]
                     }
                 else:
                     summary_message = {
                         "role": "user",
-                        "content": [{"type": "text", "text": f"【群聊历史总结】以下是本群之前的聊天总结，供你参考了解群内话题和氛围：\n{group_summary}"}]
+                        "content": [{"type": "text", "text": summary_text}]
                     }
-                # 在群聊上下文之前插入群总结
-                summary_insert_pos = max(len(prompt) - len(group_messages_bg) - 1, 0)
-                prompt = prompt[:summary_insert_pos] + [summary_message] + prompt[summary_insert_pos:]
+                context_to_insert.append(summary_message)
                 bot.logger.info(f"群聊总结已注入到prompt中")
+        
+        context_to_insert.extend(group_messages_bg)
+        prompt = prompt[:insert_pos] + context_to_insert + prompt[insert_pos:]
         
         return prompt
     except Exception as e:

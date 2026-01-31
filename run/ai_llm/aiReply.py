@@ -337,14 +337,16 @@ def main(bot, config):
                                 if user_messages:
                                     # 构建用户画像总结的 prompt
                                     messages_text = "\n".join(user_messages[-20:])  # 取最近 20 条消息
+                                    bot_name = config.common_config.basic_config.get("bot", "Bot")
+                                    user_nickname = user_info.nickname if user_info and user_info.nickname else f"用户{event.user_id}"
                                     portrait_prompt = [{
-                                        "text": f"以下是用户发送的消息历史：\n{messages_text}\n\n请根据以上内容总结该用户的用户画像，包括人物性格特征、兴趣爱好、语言风格等。直接给出结果，不要回复。"
+                                        "text": f"以下是用户「{user_nickname}」发送的消息历史（注意：你是「{bot_name}」，请勿将bot的特征混入用户画像）：\n{messages_text}\n\n请根据以上内容总结该用户「{user_nickname}」的用户画像，包括人物性格特征、兴趣爱好、语言风格等。直接给出结果，不要回复。"
                                     }]
                                     
                                     reply_message = await utility_request(
                                         config,
                                         portrait_prompt,
-                                        system_instruction="你是一个用户画像分析助手，请根据用户的消息历史总结其特征。",
+                                        system_instruction=f"你是一个用户画像分析助手。你需要分析的是用户「{user_nickname}」，而不是bot「{bot_name}」。请根据用户的消息历史总结其特征，不要把bot的特征混入用户画像。",
                                         user_id=current_event.user_id,
                                     )
                                     

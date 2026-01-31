@@ -274,11 +274,14 @@ class GroupMessageManager:
         activities = list(set(context_info['activities'])) if context_info['activities'] else ['正常聊天']
 
         group_summary = (
+            "================== 群聊上下文 开始 ==================\n"
             f"【群聊概况】参与人数：{len(participants_list)}人 | "
             f"消息总数：{context_info['message_count']}条 | "
             f"主要参与者：{', '.join(participants_list[:3])} | "
             f"活动类型：{', '.join(activities[:2])}"
         )
+        
+        context_end = "================== 群聊上下文 结束 =================="
 
         if standard == "gemini":
             all_parts = []
@@ -286,12 +289,14 @@ class GroupMessageManager:
                 if entry.get('role') == 'user':
                     all_parts.extend(entry.get('parts', []))
 
-            summary_part = {"text": f"{group_summary}\n以上是群聊历史消息上下文。"}
+            summary_part = {"text": f"{group_summary}"}
+            end_part = {"text": f"{context_end}\n以上是群聊历史消息上下文，仅供参考，请根据之后的用户消息进行回复。"}
             all_parts.insert(0, summary_part)
+            all_parts.append(end_part)
 
             return [
                 {"role": "user", "parts": all_parts},
-                {"role": "model", "parts": [{"text": "我已了解群聊上下文，会结合这些信息回应对话。"}]}
+                {"role": "model", "parts": [{"text": "好的，我已了解群聊上下文，会根据之后的用户消息进行回复。"}]}
             ]
         else:
             all_parts = []
@@ -300,16 +305,18 @@ class GroupMessageManager:
                     all_parts.extend(entry['content'])
 
             if all_parts:
-                summary_part = {"type": "text", "text": f"{group_summary}\n以上是群聊历史消息上下文："}
+                summary_part = {"type": "text", "text": f"{group_summary}"}
+                end_part = {"type": "text", "text": f"{context_end}\n以上是群聊历史消息上下文，仅供参考，请根据之后的用户消息进行回复。"}
                 all_parts.insert(0, summary_part)
+                all_parts.append(end_part)
                 return [
                     {"role": "user", "content": all_parts},
-                    {"role": "assistant", "content": "我已了解群聊上下文，会结合这些信息回应对话。"}
+                    {"role": "assistant", "content": "好的，我已了解群聊上下文，会根据之后的用户消息进行回复。"}
                 ]
             else:
                 return [
-                    {"role": "user", "content": f"{group_summary}\n以上是群聊历史消息上下文。"},
-                    {"role": "assistant", "content": "我已了解群聊上下文，会结合这些信息回应对话。"}
+                    {"role": "user", "content": f"{group_summary}\n{context_end}\n以上是群聊历史消息上下文。"},
+                    {"role": "assistant", "content": "好的，我已了解群聊上下文，会根据之后的用户消息进行回复。"}
                 ]
 
 
