@@ -376,9 +376,7 @@ class OpenAIAPI:
                                             "arguments": arguments
                                         }
                                     })
-                                    logger.info(f"工具调用: {tool_call.function.name}, 参数: {arguments}, ID: {tool_call_id}")
                                 except json.JSONDecodeError:
-                                    logger.error(f"工具调用 {tool_call.function.name} 的 arguments 无效: {arguments}")
                                     continue
                         if chunk.choices[0].finish_reason == "tool_calls" and tool_calls_buffer:
                             assistant_message = {
