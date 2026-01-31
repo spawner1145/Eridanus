@@ -51,7 +51,11 @@ def main(bot, config):
             await increment_group_message_count(event.group_id)
             summary_interval = config.ai_llm.config["llm"]["群聊总结"].get("总结间隔消息数", 50)
             if await should_generate_summary(event.group_id, summary_interval):
-                if event.group_id not in summary_updating:
+                summary_whitelist_enabled = config.ai_llm.config["llm"]["群聊总结"].get("whitelist_enabled", False)
+                summary_chat_whitelist = config.ai_llm.config["llm"]["群聊总结"].get("chat_whitelist", [])
+                if summary_whitelist_enabled and event.group_id not in summary_chat_whitelist:
+                    pass
+                elif event.group_id not in summary_updating:
                     summary_updating.add(event.group_id)
                     asyncio.create_task(auto_generate_group_summary(event.group_id, bot, config))
         
