@@ -2,6 +2,7 @@
 通用任务 Client - 用于用户画像总结等辅助任务
 支持 openai 和 gemini 两种类型
 """
+import json
 import random
 from typing import Optional, List, Dict, Any
 
@@ -165,14 +166,22 @@ def _convert_to_gemini_format(messages: List[Dict[str, Any]], system_instruction
             if not first_user_message_processed and msg.get("role") == "user" and prefix_text:
                 # 将 system_instruction 合并到第一条用户消息
                 new_parts = []
+                prefix_added = False
                 for part in msg["parts"]:
-                    if isinstance(part, dict) and "text" in part:
+                    if isinstance(part, dict) and "text" in part and not prefix_added:
                         new_parts.append({"text": prefix_text + part["text"]})
-                        prefix_text = ""  # 只添加一次
+                        prefix_added = True
+                    elif isinstance(part, dict) and "inlineData" in part:
+                        # 保留图片数据
+                        new_parts.append(part)
                     else:
                         new_parts.append(part)
+                if not prefix_added and prefix_text:
+                    # 如果没有文本部分，在开头添加前缀
+                    new_parts.insert(0, {"text": prefix_text})
                 result.append({"role": msg["role"], "parts": new_parts})
                 first_user_message_processed = True
+                prefix_text = ""
             else:
                 result.append(msg)
         elif "content" in msg:
@@ -192,23 +201,46 @@ def _convert_to_gemini_format(messages: List[Dict[str, Any]], system_instruction
                     prefix_text = ""
             elif isinstance(content, list):
                 parts = []
+                prefix_added = False
                 for i, item in enumerate(content):
                     if isinstance(item, dict) and "text" in item:
                         text = item["text"]
-                        if not first_user_message_processed and role == "user" and i == 0:
+                        if not first_user_message_processed and role == "user" and not prefix_added:
                             text = prefix_text + text
-                            prefix_text = ""
+                            prefix_added = True
                             first_user_message_processed = True
                         parts.append({"text": text})
                     elif isinstance(item, dict) and "type" in item and item["type"] == "text":
                         text = item.get("text", "")
-                        if not first_user_message_processed and role == "user" and i == 0:
+                        if not first_user_message_processed and role == "user" and not prefix_added:
                             text = prefix_text + text
-                            prefix_text = ""
+                            prefix_added = True
                             first_user_message_processed = True
                         parts.append({"text": text})
+                    elif isinstance(item, dict) and "type" in item and item["type"] == "image_url":
+                        # 将 OpenAI 图片格式转换为 Gemini 格式
+                        image_url = item.get("image_url", {})
+                        url = image_url.get("url", "") if isinstance(image_url, dict) else image_url
+                        if url.startswith("data:"):
+                            # 解析 base64 数据
+                            import re
+                            match = re.match(r'data:(image/\w+);base64,(.+)', url)
+                            if match:
+                                mime_type = match.group(1)
+                                data = match.group(2)
+                                parts.append({"inlineData": {"mimeType": mime_type, "data": data}})
+                        else:
+                            # URL 格式，暂不支持直接转换
+                            parts.append({"text": f"[图片: {url}]"})
+                    elif isinstance(item, dict) and "inlineData" in item:
+                        # 已经是 Gemini 图片格式
+                        parts.append(item)
                     else:
                         parts.append({"text": str(item)})
+                if not prefix_added and prefix_text and role == "user":
+                    parts.insert(0, {"text": prefix_text})
+                    first_user_message_processed = True
+                prefix_text = ""
             else:
                 text = prefix_text + str(content) if not first_user_message_processed and role == "user" else str(content)
                 parts = [{"text": text}]
@@ -248,12 +280,17 @@ def _convert_to_openai_format(messages: List[Dict[str, Any]], system_instruction
                     new_content = [{"type": "text", "text": prefix_text + content}]
                 elif isinstance(content, list):
                     new_content = []
+                    prefix_added = False
                     for i, item in enumerate(content):
-                        if isinstance(item, dict) and item.get("type") == "text" and i == 0:
+                        if isinstance(item, dict) and item.get("type") == "text" and not prefix_added:
                             new_content.append({"type": "text", "text": prefix_text + item.get("text", "")})
-                            prefix_text = ""
+                            prefix_added = True
+                        elif isinstance(item, dict) and item.get("type") == "image_url":
+                            new_content.append(item)
                         else:
                             new_content.append(item)
+                    if not prefix_added:
+                        new_content.insert(0, {"type": "text", "text": prefix_text})
                 else:
                     new_content = [{"type": "text", "text": prefix_text + str(content)}]
                 result.append({"role": role, "content": new_content})
@@ -269,16 +306,31 @@ def _convert_to_openai_format(messages: List[Dict[str, Any]], system_instruction
             
             parts = msg["parts"]
             content = []
+            prefix_added = False
             for i, part in enumerate(parts):
                 if isinstance(part, dict) and "text" in part:
                     text = part["text"]
-                    if not first_user_message_processed and role == "user" and i == 0:
+                    if not first_user_message_processed and role == "user" and not prefix_added:
                         text = prefix_text + text
-                        prefix_text = ""
+                        prefix_added = True
                         first_user_message_processed = True
                     content.append({"type": "text", "text": text})
+                elif isinstance(part, dict) and "inlineData" in part:
+                    # 将 Gemini 图片格式转换为 OpenAI 格式
+                    inline_data = part["inlineData"]
+                    mime_type = inline_data.get("mimeType", "image/jpeg")
+                    data = inline_data.get("data", "")
+                    content.append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{mime_type};base64,{data}", "detail": "auto"}
+                    })
                 else:
                     content.append({"type": "text", "text": str(part)})
+            
+            if not prefix_added and prefix_text and role == "user":
+                content.insert(0, {"type": "text", "text": prefix_text})
+                first_user_message_processed = True
+            prefix_text = ""
             
             result.append({"role": role, "content": content})
         elif "text" in msg:

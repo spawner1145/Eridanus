@@ -2,6 +2,12 @@ import asyncio
 import datetime
 import random
 import traceback
+import base64
+import io
+import os
+import re
+import httpx
+from PIL import Image as PILImage
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Text, At, Image
 from framework_common.database_util.Group import clear_group_messages, get_last_20_and_convert_to_prompt, \
@@ -22,6 +28,117 @@ from run.ai_llm.service.aiReplyCore import aiReplyCore, send_text, count_tokens_
 from run.ai_llm.service.auto_talk import check_message_similarity
 from run.ai_llm.service.schemaReplyCore import schemaReplyCore
 from run.ai_llm.service.utility_client import utility_request
+
+# 图片处理相关常量和函数
+BASE64_PATTERN = re.compile(r'^data:(image/\w+);base64,(.+)$')
+
+def is_local_file_path(url: str) -> bool:
+    """判断是否为本地文件路径"""
+    if url.startswith("file://"):
+        return True
+    if os.path.isabs(url) and os.path.exists(url):
+        return True
+    return False
+
+def get_local_file_path(url: str) -> str:
+    """获取本地文件的实际路径"""
+    if url.startswith("file://"):
+        return url[7:]
+    return url
+
+async def _process_image_for_summary(url: str, client_type: str) -> dict:
+    """处理图片并转换为对应client格式"""
+    try:
+        img_base64 = None
+        base64_match = BASE64_PATTERN.match(url)
+        if base64_match:
+            img_base64 = base64_match.group(2)
+        elif is_local_file_path(url):
+            actual_path = get_local_file_path(url)
+            if os.path.exists(actual_path):
+                image = PILImage.open(actual_path)
+                image = image.convert("RGB")
+                img_byte_arr = io.BytesIO()
+                quality = 85
+                while True:
+                    img_byte_arr.seek(0)
+                    img_byte_arr.truncate()
+                    image.save(img_byte_arr, format='JPEG', quality=quality)
+                    if img_byte_arr.tell() / 1024 <= 400 or quality <= 10:
+                        break
+                    quality -= 5
+                img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+                image.close()
+        else:
+            async with httpx.AsyncClient(timeout=30) as client:
+                res = await client.get(url)
+                if res.status_code == 200:
+                    image = PILImage.open(io.BytesIO(res.content))
+                    image = image.convert("RGB")
+                    img_byte_arr = io.BytesIO()
+                    quality = 85
+                    while True:
+                        img_byte_arr.seek(0)
+                        img_byte_arr.truncate()
+                        image.save(img_byte_arr, format='JPEG', quality=quality)
+                        if img_byte_arr.tell() / 1024 <= 400 or quality <= 10:
+                            break
+                        quality -= 5
+                    img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+                    image.close()
+        
+        if not img_base64:
+            return None
+        if client_type == "openai":
+            return {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_base64}", "detail": "auto"}}
+        else:
+            return {"inlineData": {"mimeType": "image/jpeg", "data": img_base64}}
+    
+    except Exception as e:
+        print(f"处理图片失败: {e}")
+        return None
+
+async def _extract_images_from_messages(group_messages, client_type: str, max_images: int = 10):
+    """从群消息中提取图片并转换为对应格式"""
+    image_parts = []
+    image_count = 0
+    
+    for msg in group_messages:
+        if image_count >= max_images:
+            break
+        message_parts = msg.get('message', [])
+        for part in message_parts:
+            if image_count >= max_images:
+                break
+            if isinstance(part, dict):
+                url = None
+                # 处理 image 类型
+                if part.get('type') == 'image' or 'image' in part:
+                    img_data = part.get('image', part)
+                    if isinstance(img_data, dict):
+                        url = img_data.get('url') or img_data.get('file')
+                    elif isinstance(img_data, str):
+                        url = img_data
+                # 处理 mface 类型（表情包）
+                elif part.get('type') == 'mface' or 'mface' in part:
+                    mface_data = part.get('mface', part)
+                    if isinstance(mface_data, dict):
+                        url = mface_data.get('url') or mface_data.get('file')
+                
+                if url:
+                    try:
+                        img_data = await _process_image_for_summary(url, client_type)
+                        if img_data:
+                            user_name = msg.get('user_name', '未知用户')
+                            image_parts.append({
+                                'user_name': user_name,
+                                'image_data': img_data
+                            })
+                            image_count += 1
+                    except Exception as e:
+                        print(f"处理图片时出错: {e}")
+    
+    return image_parts
 
 
 def main(bot, config):
@@ -376,6 +493,13 @@ def main(bot, config):
             if not group_messages:
                 bot.logger.info(f"群 {group_id} 没有足够的消息来生成总结")
                 return
+            
+            # 读取图片配置
+            read_images = config.ai_llm.config["llm"]["群聊总结"].get("读取图片", False)
+            utility_config = config.ai_llm.config["llm"].get("utility_client", {})
+            client_type = utility_config.get("type", "gemini").strip().lower()
+            
+            # 提取文本内容
             messages_text = []
             for msg in group_messages:
                 user_name = msg.get('user_name', '未知用户')
@@ -389,24 +513,62 @@ def main(bot, config):
                 if text_content.strip():
                     messages_text.append(f"{user_name}: {text_content.strip()}")
             
-            if not messages_text:
-                bot.logger.info(f"群 {group_id} 消息中没有文本内容")
+            # 处理图片（如果启用）- 移到前面，先提取图片再判断是否有内容
+            image_parts = []
+            if read_images:
+                try:
+                    image_parts = await _extract_images_from_messages(group_messages, client_type, max_images=10)
+                    bot.logger.info(f"群 {group_id} 总结：提取到 {len(image_parts)} 张图片")
+                except Exception as e:
+                    bot.logger.warning(f"提取群消息图片失败: {e}")
+            
+            # 检查是否既没有文本也没有图片
+            if not messages_text and not image_parts:
+                bot.logger.info(f"群 {group_id} 消息中没有文本内容" + ("也没有图片" if read_images else ""))
                 return
+            
+            # 构建提示词
             group_info = await get_group_summary(group_id)
             existing_summary = group_info.get("summary", "")
-            if existing_summary:
-                summary_prompt = [{
-                    "text": f"以下是本群之前的总结：\n{existing_summary}\n\n以下是最近的新消息记录：\n{chr(10).join(messages_text)}\n\n请结合之前的总结和新消息，生成一个更新后的群聊总结，包括：\n1. 主要讨论的话题\n2. 活跃的参与者\n3. 重要的信息点\n\n请用简洁的语言总结，不超过300字。"
-                }]
+            
+            # 根据是否有图片构建不同的提示词格式
+            if image_parts:
+                # 有图片时，构建多模态消息
+                image_desc = "\n".join([f"- {img['user_name']} 发送了一张图片" for img in image_parts])
+                if messages_text:
+                    base_text = f"以下是群聊的最近消息记录：\n{chr(10).join(messages_text)}\n\n群成员分享的图片：\n{image_desc}\n\n"
+                else:
+                    base_text = f"群成员分享的图片：\n{image_desc}\n\n"
+                
+                if existing_summary:
+                    prompt_text = f"以下是本群之前的总结：\n{existing_summary}\n\n{base_text}请结合之前的总结、新消息和图片内容，生成一个更新后的群聊总结，包括：\n1. 主要讨论的话题\n2. 活跃的参与者\n3. 重要的信息点\n4. 图片内容描述（如有意义）\n\n请用简洁的语言总结，不超过300字。"
+                else:
+                    prompt_text = f"{base_text}请对以上群聊内容和图片进行总结，包括：\n1. 主要讨论的话题\n2. 活跃的参与者\n3. 重要的信息点\n4. 图片内容描述（如有意义）\n\n请用简洁的语言总结，不超过200字。"
+                
+                # 构建多模态消息格式
+                if client_type == "openai":
+                    summary_prompt = [{
+                        "role": "user",
+                        "content": [{"type": "text", "text": prompt_text}] + [img['image_data'] for img in image_parts]
+                    }]
+                else:  # gemini
+                    parts = [{"text": prompt_text}] + [img['image_data'] for img in image_parts]
+                    summary_prompt = [{"role": "user", "parts": parts}]
             else:
-                summary_prompt = [{
-                    "text": f"以下是群聊的最近消息记录：\n{chr(10).join(messages_text)}\n\n请对以上群聊内容进行总结，包括：\n1. 主要讨论的话题\n2. 活跃的参与者\n3. 重要的信息点\n\n请用简洁的语言总结，不超过200字。"
-                }]
+                # 无图片时，使用原有的简单文本格式
+                if existing_summary:
+                    summary_prompt = [{
+                        "text": f"以下是本群之前的总结：\n{existing_summary}\n\n以下是最近的新消息记录：\n{chr(10).join(messages_text)}\n\n请结合之前的总结和新消息，生成一个更新后的群聊总结，包括：\n1. 主要讨论的话题\n2. 活跃的参与者\n3. 重要的信息点\n\n请用简洁的语言总结，不超过300字。"
+                    }]
+                else:
+                    summary_prompt = [{
+                        "text": f"以下是群聊的最近消息记录：\n{chr(10).join(messages_text)}\n\n请对以上群聊内容进行总结，包括：\n1. 主要讨论的话题\n2. 活跃的参与者\n3. 重要的信息点\n\n请用简洁的语言总结，不超过200字。"
+                    }]
             
             summary = await utility_request(
                 config,
                 summary_prompt,
-                system_instruction="你是一个群聊总结助手，请根据群聊消息生成简洁的总结。",
+                system_instruction="你是一个群聊总结助手，请根据群聊消息生成简洁的总结。" + ("消息中包含图片，请描述图片中的重要内容。" if image_parts else ""),
                 user_id=0,
             )
             
@@ -443,6 +605,12 @@ def main(bot, config):
                     await bot.send(event, "本群暂无足够的消息记录来生成总结", True)
                     return
 
+                # 读取图片配置
+                read_images = config.ai_llm.config["llm"]["群聊总结"].get("读取图片", False)
+                utility_config = config.ai_llm.config["llm"].get("utility_client", {})
+                client_type = utility_config.get("type", "gemini").strip().lower()
+
+                # 提取文本内容
                 messages_text = []
                 for msg in group_messages:
                     user_name = msg.get('user_name', '未知用户')
@@ -456,23 +624,58 @@ def main(bot, config):
                     if text_content.strip():
                         messages_text.append(f"{user_name}: {text_content.strip()}")
                 
-                if not messages_text:
-                    await bot.send(event, "本群消息中没有可供总结的文本内容", True)
+                # 处理图片（如果启用）- 移到前面，先提取图片再判断是否有内容
+                image_parts = []
+                if read_images:
+                    try:
+                        image_parts = await _extract_images_from_messages(group_messages, client_type, max_images=10)
+                        bot.logger.info(f"群 {group_id} 总结刷新：提取到 {len(image_parts)} 张图片")
+                    except Exception as e:
+                        bot.logger.warning(f"提取群消息图片失败: {e}")
+                
+                # 检查是否既没有文本也没有图片
+                if not messages_text and not image_parts:
+                    await bot.send(event, "本群消息中没有可供总结的内容" + ("（文本和图片均为空）" if read_images else "（无文本内容）"), True)
                     return
                 
-                if existing_summary:
-                    summary_prompt = [{
-                        "text": f"以下是本群之前的总结：\n{existing_summary}\n\n以下是最近的新消息记录：\n{chr(10).join(messages_text)}\n\n请结合之前的总结和新消息，生成一个更新后的群聊总结，包括：\n1. 主要讨论的话题（按重要性列出）\n2. 活跃的参与者及其特点\n3. 重要的信息点和结论\n4. 群聊氛围和互动情况\n\n请用清晰的格式总结，便于阅读。"
-                    }]
+                # 根据是否有图片构建不同的提示词格式
+                if image_parts:
+                    # 有图片时，构建多模态消息
+                    image_desc = "\n".join([f"- {img['user_name']} 发送了一张图片" for img in image_parts])
+                    if messages_text:
+                        base_text = f"以下是群聊的最近消息记录：\n{chr(10).join(messages_text)}\n\n群成员分享的图片：\n{image_desc}\n\n"
+                    else:
+                        base_text = f"群成员分享的图片：\n{image_desc}\n\n"
+                    
+                    if existing_summary:
+                        prompt_text = f"以下是本群之前的总结：\n{existing_summary}\n\n{base_text}请结合之前的总结、新消息和图片内容，生成一个更新后的群聊总结，包括：\n1. 主要讨论的话题（按重要性列出）\n2. 活跃的参与者及其特点\n3. 重要的信息点和结论\n4. 群聊氛围和互动情况\n5. 图片内容描述（如有意义）\n\n请用清晰的格式总结，便于阅读。"
+                    else:
+                        prompt_text = f"{base_text}请对以上群聊内容和图片进行详细总结，包括：\n1. 主要讨论的话题（按重要性列出）\n2. 活跃的参与者及其特点\n3. 重要的信息点和结论\n4. 群聊氛围和互动情况\n5. 图片内容描述（如有意义）\n\n请用清晰的格式总结，便于阅读。"
+                    
+                    # 构建多模态消息格式
+                    if client_type == "openai":
+                        summary_prompt = [{
+                            "role": "user",
+                            "content": [{"type": "text", "text": prompt_text}] + [img['image_data'] for img in image_parts]
+                        }]
+                    else:  # gemini
+                        parts = [{"text": prompt_text}] + [img['image_data'] for img in image_parts]
+                        summary_prompt = [{"role": "user", "parts": parts}]
                 else:
-                    summary_prompt = [{
-                        "text": f"以下是群聊的最近消息记录：\n{chr(10).join(messages_text)}\n\n请对以上群聊内容进行详细总结，包括：\n1. 主要讨论的话题（按重要性列出）\n2. 活跃的参与者及其特点\n3. 重要的信息点和结论\n4. 群聊氛围和互动情况\n\n请用清晰的格式总结，便于阅读。"
-                    }]
+                    # 无图片时，使用原有的简单文本格式
+                    if existing_summary:
+                        summary_prompt = [{
+                            "text": f"以下是本群之前的总结：\n{existing_summary}\n\n以下是最近的新消息记录：\n{chr(10).join(messages_text)}\n\n请结合之前的总结和新消息，生成一个更新后的群聊总结，包括：\n1. 主要讨论的话题（按重要性列出）\n2. 活跃的参与者及其特点\n3. 重要的信息点和结论\n4. 群聊氛围和互动情况\n\n请用清晰的格式总结，便于阅读。"
+                        }]
+                    else:
+                        summary_prompt = [{
+                            "text": f"以下是群聊的最近消息记录：\n{chr(10).join(messages_text)}\n\n请对以上群聊内容进行详细总结，包括：\n1. 主要讨论的话题（按重要性列出）\n2. 活跃的参与者及其特点\n3. 重要的信息点和结论\n4. 群聊氛围和互动情况\n\n请用清晰的格式总结，便于阅读。"
+                        }]
                 
                 summary = await utility_request(
                     config,
                     summary_prompt,
-                    system_instruction="你是一个群聊总结助手，请根据群聊消息生成详细且有条理的总结。",
+                    system_instruction="你是一个群聊总结助手，请根据群聊消息生成详细且有条理的总结。" + ("消息中包含图片，请描述图片中的重要内容。" if image_parts else ""),
                     user_id=event.user_id,
                 )
                 

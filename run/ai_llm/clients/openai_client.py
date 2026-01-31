@@ -242,6 +242,8 @@ class OpenAIAPI:
                                 "detail": part["input_image"].get("detail", "auto")
                             }
                         })
+                    elif part.get("type") == "image_url" and "image_url" in part:
+                        api_content.append(part)
             else:
                 raise ValueError(f"无效的消息内容格式: {content}")
             api_msg = {
@@ -349,6 +351,8 @@ class OpenAIAPI:
                         }
                     })
                 request_params["tools"] = tool_definitions
+
+        #print(f"[DEBUG] OpenAI request params: {json.dumps(request_params, ensure_ascii=False, indent=2, default=str)}")
 
         if stream:
             assistant_content = ""
