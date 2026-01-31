@@ -1,4 +1,5 @@
 import random
+import re
 from typing import Optional, List, Dict, Any
 
 from developTools.utils.logger import get_logger
@@ -162,20 +163,42 @@ def _build_gemini_messages(
             user_parts.append({"text": msg["text"]})
         elif "inlineData" in msg:
             user_parts.append({"inlineData": msg["inlineData"]})
+        elif "image_url" in msg:
+            # 转换 OpenAI 格式图片为 Gemini 格式
+            url = msg["image_url"].get("url", "")
+            if url.startswith("data:"):
+                # 解析 data URI
+                match = re.match(r"data:([^;]+);base64,(.+)", url)
+                if match:
+                    mime_type = match.group(1)
+                    base64_data = match.group(2)
+                    user_parts.append({"inlineData": {"mimeType": mime_type, "data": base64_data}})
         elif "parts" in msg:
             result.append(msg)
         elif "content" in msg:
+            # OpenAI 格式转 Gemini 格式，包含图片支持
             content = msg["content"]
+            parts = []
             if isinstance(content, str):
-                text = content
+                parts.append({"text": content})
             elif isinstance(content, list):
-                text = " ".join([c.get("text", "") for c in content if c.get("type") == "text"])
-            else:
-                text = str(content)
-            result.append({
-                "role": "user" if msg.get("role") in ["user", "system"] else "model",
-                "parts": [{"text": text}]
-            })
+                for c in content:
+                    if isinstance(c, dict):
+                        if c.get("type") == "text":
+                            parts.append({"text": c.get("text", "")})
+                        elif c.get("type") == "image_url":
+                            url = c.get("image_url", {}).get("url", "")
+                            if url.startswith("data:"):
+                                match = re.match(r"data:([^;]+);base64,(.+)", url)
+                                if match:
+                                    mime_type = match.group(1)
+                                    base64_data = match.group(2)
+                                    parts.append({"inlineData": {"mimeType": mime_type, "data": base64_data}})
+            if parts:
+                result.append({
+                    "role": "user" if msg.get("role") in ["user", "system"] else "model",
+                    "parts": parts
+                })
     
     if user_parts:
         result.append({
@@ -201,12 +224,30 @@ def _build_openai_messages(
     if group_context:
         for ctx in group_context:
             if "parts" in ctx:
-                text = " ".join([p.get("text", "") for p in ctx["parts"] if isinstance(p, dict) and "text" in p])
-                role = "assistant" if ctx.get("role") == "model" else "user"
-                result.append({
-                    "role": role,
-                    "content": [{"type": "text", "text": text}]
-                })
+                # Gemini 格式转 OpenAI 格式，包含图片支持
+                content_parts = []
+                for p in ctx["parts"]:
+                    if isinstance(p, dict):
+                        if "text" in p:
+                            content_parts.append({"type": "text", "text": p["text"]})
+                        elif "inlineData" in p:
+                            # 转换 Gemini 的 inlineData 为 OpenAI 的 image_url 格式
+                            inline_data = p["inlineData"]
+                            mime_type = inline_data.get("mimeType", "image/jpeg")
+                            base64_data = inline_data.get("data", "")
+                            content_parts.append({
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{mime_type};base64,{base64_data}",
+                                    "detail": "auto"
+                                }
+                            })
+                if content_parts:
+                    role = "assistant" if ctx.get("role") == "model" else "user"
+                    result.append({
+                        "role": role,
+                        "content": content_parts
+                    })
             elif "content" in ctx:
                 result.append(ctx)
 
@@ -216,15 +257,47 @@ def _build_openai_messages(
             user_content.append({"type": "text", "text": msg["text"]})
         elif "input_image" in msg:
             user_content.append(msg)
+        elif "image_url" in msg:
+            # 直接支持 OpenAI 格式的图片
+            user_content.append({"type": "image_url", "image_url": msg["image_url"]})
+        elif "inlineData" in msg:
+            # 转换 Gemini 格式图片为 OpenAI 格式
+            inline_data = msg["inlineData"]
+            mime_type = inline_data.get("mimeType", "image/jpeg")
+            base64_data = inline_data.get("data", "")
+            user_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{mime_type};base64,{base64_data}",
+                    "detail": "auto"
+                }
+            })
         elif "content" in msg:
             result.append(msg)
         elif "parts" in msg:
-            text = " ".join([p.get("text", "") for p in msg["parts"] if isinstance(p, dict) and "text" in p])
-            role = "assistant" if msg.get("role") == "model" else "user"
-            result.append({
-                "role": role,
-                "content": [{"type": "text", "text": text}]
-            })
+            # Gemini 格式的完整消息
+            content_parts = []
+            for p in msg["parts"]:
+                if isinstance(p, dict):
+                    if "text" in p:
+                        content_parts.append({"type": "text", "text": p["text"]})
+                    elif "inlineData" in p:
+                        inline_data = p["inlineData"]
+                        mime_type = inline_data.get("mimeType", "image/jpeg")
+                        base64_data = inline_data.get("data", "")
+                        content_parts.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{base64_data}",
+                                "detail": "auto"
+                            }
+                        })
+            if content_parts:
+                role = "assistant" if msg.get("role") == "model" else "user"
+                result.append({
+                    "role": role,
+                    "content": content_parts
+                })
     
     if user_content:
         result.append({

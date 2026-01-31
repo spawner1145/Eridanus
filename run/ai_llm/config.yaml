@@ -2,56 +2,6 @@ llm:
   model: gemini  #选择使用的模型大类。default为自带免费模型，可选openai、gemini。
   system: "" #建议用chara_file_name，而不是在此处填写，此配置即将被弃用
   chara_file_name: 猫娘.txt   #system为""时生效,默认启动的人设文件名，在data/system/chara文件夹内(目前支持txt,json,酒馆角色卡(图片))
-  func_calling: true  #开启函数调用功能
-  表情包发送: true      #记录master发送的表情包并在回复时根据上下文发送。
-  单次发送表情包数量: 1  #单次发送最大表情包数量
-  google_search: false       #Gemini官方版本联网搜索功能，开启后会禁用自定义联网函数(search_net, read_html)
-  url_context: false         #Gemini官方URL上下文功能，可以自动抓取URL内容，开启后会禁用自定义联网函数(search_net, read_html)
-  联网搜索显示原始数据: true   #显示搜索来源和grounding metadata
-  search_client:            #搜索专用client配置（google_search或url_context开启时使用，仅支持gemini）
-    api_key: "" #搜索专用API Key，留空则使用gemini的api_keys
-    base_url: "https://generativelanguage.googleapis.com" #搜索专用Base URL，留空则使用gemini的base_url
-    model: "" #搜索专用模型名，留空则使用gemini的fallback_models列表
-  utility_client:           #通用任务client配置（用于用户画像总结等任务）
-    type: "gemini"          #可选 "openai" 或 "gemini"
-    api_key: ""             #专用API Key，留空则根据type使用对应的api_keys
-    base_url: ""            #专用Base URL，留空则根据type使用对应的base_url
-    model: ""                 #专用模型名，留空则根据type使用对应的默认模型/fallback_models
-  读取群聊上下文: true  # 开启后记录群聊消息到数据库，供群总结、仁济模式等功能使用
-  群消息保留数量: 100     # 每个群保留的最大消息数量
-  上下文带原文: true  # 在AI请求中附带群聊上下文原文消息（需先开启读取群聊上下文）
-  可获取的群聊上下文长度: 10 # 附带原文时读取的消息条数，仁济模式算法回复也会用到
-  用户画像: true   #ai总结用户特征，构建用户画像
-  用户画像更新间隔: 360  #单位秒
-  群聊总结: # 需先开启读取群聊上下文
-    enable: true            #开启群聊总结功能
-    总结间隔消息数: 10      #每隔多少条消息自动生成总结，同时也是读取用于总结的消息数量
-    聊天带总结: true        #是否在AI回复时注入群聊总结到prompt中
-    whitelist_enabled: true  #关闭则所有群都启用
-    chat_whitelist:          #白名单群配置项，如果开了白名单模式而且不在白名单的群只有主动发送/群总结 刷新才会触发群总结，而不会自动触发群总结
-    - 1050663831
-  prefix: #可以用于触发bot的指令前缀
-  - 测试机
-  aiReplyCore: true   #ai回复核心，将优化其他功能回复表现
-  enable_proxy: false
-  max_history_length: 40 #最大上下文长度
-  仁济模式:
-    随机回复概率: 0  #随机回复概率，0-100，0为不随机。
-    算法回复:     #数值越大越不易触发
-      enable: false
-      相似度阈值: 30
-      频率阈值: 15
-      消息列表最小长度: 10
-      信息熵阈值: 2
-    延时相关性:   #一定时间内自动判断话题是否相关并回复。
-      enable: false
-      置信度阈值: 0.9   #越高越难触发。0-1，可以是0.92这种两位小数
-      有效延时: 100      #单位秒
-  Quote: false     #回复时引用
-  语音回复几率: 30
-  语音回复附带文本: true
-  自动清理无效apikey: false
-  retries: 3                           #LLM请求重试次数，每个模型重试次数
   openai:          #兼容所有openai标准接口。https://platform.openai.com/docs/overview
     enable_official_sdk: true   #是否使用官方sdk，如果不使用，则为直接发送post请求。
     api_keys:   #继续像这样添加apikey
@@ -80,6 +30,57 @@ llm:
   腾讯元器:     #极其不建议用，腾子搞得玩意稀烂，而且不支持函数调用。
     智能体ID: ""
     token: ""
+  func_calling: true  #开启函数调用功能
+  表情包发送: true      #记录master发送的表情包并在回复时根据上下文发送。
+  单次发送表情包数量: 1  #单次发送最大表情包数量
+  google_search: false       #Gemini官方版本联网搜索功能，开启后会禁用自定义联网函数(search_net, read_html)
+  url_context: false         #Gemini官方URL上下文功能，可以自动抓取URL内容，开启后会禁用自定义联网函数(search_net, read_html)
+  联网搜索显示原始数据: true   #显示搜索来源和grounding metadata
+  search_client:            #搜索专用client配置（google_search或url_context开启时使用，仅支持gemini）
+    api_key: "" #搜索专用API Key，留空则使用gemini的api_keys
+    base_url: "https://generativelanguage.googleapis.com" #搜索专用Base URL，留空则使用gemini的base_url
+    model: "" #搜索专用模型名，留空则使用gemini的fallback_models列表
+  utility_client:           #通用任务client配置（用于用户画像总结等任务）
+    type: "gemini"          #可选 "openai" 或 "gemini"
+    api_key: ""             #专用API Key，留空则根据type使用对应的api_keys
+    base_url: ""            #专用Base URL，留空则根据type使用对应的base_url
+    model: ""                 #专用模型名，留空则根据type使用对应的默认模型/fallback_models
+  读取群聊上下文: true  # 开启后记录群聊消息到数据库，供群总结、仁济模式等功能使用
+  群消息保留数量: 30     # 每个群保留的最大消息数量
+  上下文带原文: true  # 在AI请求中附带群聊上下文原文消息（需先开启读取群聊上下文）
+  可获取的群聊上下文长度: 10 # 附带原文时读取的消息条数，仁济模式算法回复也会用到
+  用户画像: true   #ai总结用户特征，构建用户画像
+  用户画像更新间隔: 360  #单位秒
+  群聊总结: # 需先开启读取群聊上下文
+    enable: true            #开启群聊总结功能
+    总结间隔消息数: 10      #每隔多少条消息自动生成总结，同时也是读取用于总结的消息数量
+    聊天带总结: true        #是否在AI回复时注入群聊总结到prompt中
+    读取图片: false          #是否在总结时读取图片内容（需要视觉模型支持，会增加token消耗）
+    whitelist_enabled: true  #关闭则所有群都启用
+    chat_whitelist:          #白名单群配置项，如果开了白名单模式而且不在白名单的群只有主动发送/群总结 刷新才会触发群总结，而不会自动触发群总结
+    - 1050663831
+  prefix: #可以用于触发bot的指令前缀
+  - 测试机
+  aiReplyCore: true   #ai回复核心，将优化其他功能回复表现
+  enable_proxy: false
+  max_history_length: 40 #最大上下文长度
+  仁济模式:
+    随机回复概率: 0  #随机回复概率，0-100，0为不随机。
+    算法回复:     #数值越大越不易触发
+      enable: false
+      相似度阈值: 30
+      频率阈值: 15
+      消息列表最小长度: 10
+      信息熵阈值: 2
+    延时相关性:   #一定时间内自动判断话题是否相关并回复。
+      enable: false
+      置信度阈值: 0.9   #越高越难触发。0-1，可以是0.92这种两位小数
+      有效延时: 100      #单位秒
+  Quote: false     #回复时引用
+  语音回复几率: 30
+  语音回复附带文本: true
+  自动清理无效apikey: false
+  retries: 3                           #LLM请求重试次数，每个模型重试次数
 heartflow:     #心流模式，自动根据群聊内容回复，需完成相关client配置。
   enabled: false
   listen_image: false   #是否监听图片，开启后判断是否回复时会读取图片内容

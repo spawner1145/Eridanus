@@ -451,6 +451,8 @@ class GeminiAPI:
         if generation_config:
             body["generationConfig"] = generation_config
 
+        #print(f"[DEBUG] Gemini request body: {json.dumps(body, ensure_ascii=False, indent=2)}")
+
         if stream:
             # 流式请求支持模型降级
             stream_attempt = 0
