@@ -395,20 +395,22 @@ async def read_context(bot, event, config, prompt):
         # 检查是否开启上下文带原文功能（需要同时开启读取群聊上下文总开关）
         if not config.ai_llm.config["llm"].get("上下文带原文", False) or not hasattr(event, "group_id"):
             return None
+        include_images = config.ai_llm.config["llm"].get("上下文带图片原文", False)
+        
         if config.ai_llm.config["llm"]["model"] == "gemini":
             group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id, config.ai_llm.config["llm"][
-                "可获取的群聊上下文长度"], "gemini", bot)
+                "可获取的群聊上下文长度"], "gemini", bot, include_images=include_images)
         elif config.ai_llm.config["llm"]["model"] == "openai":
             if config.ai_llm.config["llm"]["openai"]["使用旧版prompt结构"]:
                 group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id,
                                                                             config.ai_llm.config["llm"][
                                                                                 "可获取的群聊上下文长度"],
-                                                                            "old_openai", bot)
+                                                                            "old_openai", bot, include_images=include_images)
             else:
                 group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id,
                                                                             config.ai_llm.config["llm"][
                                                                                 "可获取的群聊上下文长度"],
-                                                                            "new_openai", bot)
+                                                                            "new_openai", bot, include_images=include_images)
         else:
             return None
         
