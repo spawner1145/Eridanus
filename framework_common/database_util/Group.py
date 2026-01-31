@@ -243,8 +243,12 @@ class GroupMessageManager:
 
         return context_info
 
-    async def _process_single_message(self, raw_message, index, context_info, standard, bot, event):
-        """处理单条消息"""
+    async def _process_single_message(self, raw_message, index, context_info, standard, bot, event, include_images=True):
+        """处理单条消息
+        
+        Args:
+            include_images: 是否包含图片，False时会过滤掉图片消息
+        """
         user_name = raw_message.get('user_name', '未知用户')
         user_id = raw_message.get('user_id', '')
         timestamp = raw_message.get('timestamp', time.strftime('%Y-%m-%d %H:%M:%S'))
@@ -257,6 +261,22 @@ class GroupMessageManager:
         )
 
         message_copy = json.loads(json.dumps(raw_message))
+        
+        # 如果不包含图片，过滤掉图片消息
+        if not include_images:
+            filtered_message = []
+            for item in message_copy["message"]:
+                if isinstance(item, dict):
+                    # 跳过图片和表情
+                    if "image" in item or "mface" in item:
+                        # 添加占位文本表示有图片
+                        filtered_message.append({"text": "[图片]"})
+                    else:
+                        filtered_message.append(item)
+                else:
+                    filtered_message.append(item)
+            message_copy["message"] = filtered_message
+        
         message_copy["message"].insert(0, {
             "text": f"{context_prompt}\n这是群聊历史消息，用于理解当前对话上下文。"
         })
@@ -408,8 +428,12 @@ class GroupMessageManager:
         return await self.get_group_messages(group_id, limit)
 
     async def _preprocess_group_messages(self, group_id: int, standard: str = "gemini",
-                                         data_length: int = 20, bot=None, event=None):
-        """预处理群组消息为prompt格式"""
+                                         data_length: int = 20, bot=None, event=None, include_images=True):
+        """预处理群组消息为prompt格式
+        
+        Args:
+            include_images: 是否包含图片，False时会跳过图片消息内容
+        """
         try:
             messages = await self.get_group_messages(group_id, data_length)
 
@@ -427,7 +451,7 @@ class GroupMessageManager:
             for i, raw_message in enumerate(messages):
                 try:
                     processed_msg = await self._process_single_message(
-                        raw_message, i, context_info, standard, bot, event
+                        raw_message, i, context_info, standard, bot, event, include_images
                     )
                     if processed_msg:
                         processed_list.append(processed_msg)
@@ -443,9 +467,13 @@ class GroupMessageManager:
             return []
 
     async def get_last_20_and_convert_to_prompt(self, group_id: int, data_length=20,
-                                                prompt_standard="gemini", bot=None, event=None):
-        """获取转换后的prompt（缓存优先）"""
-        cache_key = (group_id, prompt_standard, data_length)
+                                                prompt_standard="gemini", bot=None, event=None, include_images=True):
+        """获取转换后的prompt（缓存优先）
+        
+        Args:
+            include_images: 是否包含图片，False时会跳过图片消息内容
+        """
+        cache_key = (group_id, prompt_standard, data_length, include_images)
 
         with self._lock:
             if cache_key in self._processed_cache:
@@ -456,7 +484,7 @@ class GroupMessageManager:
                     self._cache_order.append(cache_key)
                 return self._processed_cache[cache_key]
 
-        result = await self._preprocess_group_messages(group_id, prompt_standard, data_length, bot, event)
+        result = await self._preprocess_group_messages(group_id, prompt_standard, data_length, bot, event, include_images)
 
         if result:
             with self._lock:
@@ -599,10 +627,14 @@ async def get_group_messages(group_id: int, limit: int = 50):
 
 
 async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, prompt_standard="gemini",
-                                            bot=None, event=None):
-    """获取转换后的prompt"""
+                                            bot=None, event=None, include_images=True):
+    """获取转换后的prompt
+    
+    Args:
+        include_images: 是否包含图片，False时会跳过图片消息内容
+    """
     manager = get_manager()
-    return await manager.get_last_20_and_convert_to_prompt(group_id, data_length, prompt_standard, bot, event)
+    return await manager.get_last_20_and_convert_to_prompt(group_id, data_length, prompt_standard, bot, event, include_images)
 
 
 async def clear_group_messages(group_id: int):

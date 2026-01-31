@@ -312,8 +312,10 @@ def main(bot, config):
             else:
                 prompt_format = "gemini"
             
+            # 根据 listen_image 配置决定是否在群聊上下文中包含图片
             group_messages_bg = await get_last_20_and_convert_to_prompt(
-                event.group_id, config.ai_llm.config["heartflow"]["context_messages_count"], prompt_format, bot
+                event.group_id, config.ai_llm.config["heartflow"]["context_messages_count"], prompt_format, bot,
+                include_images=listen_image
             )
 
             # 处理图片（如果启用了listen_image）
