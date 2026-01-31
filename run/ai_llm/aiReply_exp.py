@@ -51,10 +51,27 @@ async def gemma_reply(config,prompt,group_messages_bg=None,recursion_times=0):
     proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"]["enable_proxy"] else None
     proxies = {"http://": proxy, "https://": proxy} if proxy else None
 
+    # heartflow 独立配置，留空则 fallback 到 gemini 配置
+    heartflow_config = config.ai_llm.config.get("heartflow", {})
+    hf_api_key = heartflow_config.get("api_key", "").strip()
+    if not hf_api_key:
+        hf_api_key = await GeminiKeyManager.get_gemini_apikey()
+    hf_base_url = heartflow_config.get("base_url", "").strip()
+    if not hf_base_url:
+        hf_base_url = config.ai_llm.config["llm"]["gemini"]["base_url"]
+    
+    # 模型选择逻辑：指定模型 + fallback_models 列表
+    hf_model = heartflow_config.get("model", "").strip()
+    gemini_fallback_models = config.ai_llm.config["llm"]["gemini"].get("fallback_models", [])
+    if hf_model:
+        fallback_models = [hf_model] + [m for m in gemini_fallback_models if m != hf_model]
+    else:
+        fallback_models = gemini_fallback_models
+
     api = GeminiAPI(
-        apikey=await GeminiKeyManager.get_gemini_apikey(),
-        baseurl=config.ai_llm.config["llm"]["gemini"]["base_url"],
-        model=config.ai_llm.config["llm"]["gemini"]["model"],
+        apikey=hf_api_key,
+        baseurl=hf_base_url,
+        fallback_models=fallback_models,
         proxies=proxies
     )
 

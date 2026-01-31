@@ -153,6 +153,11 @@ class OpenAIAPI:
                 fixed_params = tool_fixed_params.get(name, tool_fixed_params.get("all", {})) if tool_fixed_params else {}
                 combined_args = {**fixed_params, **args}
                 
+                if args:
+                    logger.info(f"[Tool Call] {name} | 参数: {args}")
+                else:
+                    logger.info(f"[Tool Call] {name} | 无自由参数")
+                
                 if asyncio.iscoroutinefunction(func):
                     result = await func(**combined_args)
                 else:

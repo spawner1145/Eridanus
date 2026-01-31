@@ -3,17 +3,25 @@ import datetime
 import random
 import traceback
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, LifecycleMetaEvent
-from developTools.message.message_components import Text, At
-from framework_common.database_util.Group import clear_group_messages, get_last_20_and_convert_to_prompt
+from developTools.message.message_components import Text, At, Image
+from framework_common.database_util.Group import clear_group_messages, get_last_20_and_convert_to_prompt, \
+    GroupMessageManager
 from framework_common.database_util.Group import get_group_messages
-from framework_common.database_util.User import get_user, update_user
+from framework_common.database_util.User import get_user, update_user, clear_all_user_portraits
 from framework_common.database_util.llmDB import delete_user_history, clear_all_history, change_folder_chara, \
-    get_folder_chara, set_all_users_chara, clear_all_users_chara, clear_user_chara, delete_latest2_history
+    get_folder_chara, set_all_users_chara, clear_all_users_chara, clear_user_chara, delete_latest2_history, \
+    get_user_history
+from framework_common.database_util.GroupSummary import (
+    get_group_summary, update_group_summary, increment_group_message_count,
+    clear_group_summary, should_generate_summary
+)
 from framework_common.framework_util.func_map_loader import build_tool_map
 from framework_common.utils.GeminiKeyManager import GeminiKeyManager
+from framework_common.manshuo_draw import manshuo_draw
 from run.ai_llm.service.aiReplyCore import aiReplyCore, send_text, count_tokens_approximate
 from run.ai_llm.service.auto_talk import check_message_similarity
 from run.ai_llm.service.schemaReplyCore import schemaReplyCore
+from run.ai_llm.service.utility_client import utility_request
 
 
 def main(bot, config):
@@ -25,18 +33,28 @@ def main(bot, config):
     else:
         tools = None
 
+    # 设置群消息保留数量
+    group_cache_size = config.ai_llm.config["llm"].get("群消息保留数量", 100)
+    GroupMessageManager().set_max_messages(group_cache_size)
 
     global user_state, recent_interactions
     user_state = {}
     recent_interactions = {}  # 记录最近交互的用户 {user_id: group_id}
     portrait_updating = set()  # 正在更新画像的用户集合
+    summary_updating = set()  # 正在更新群总结的群组集合
 
     @bot.on(GroupMessageEvent)
     async def aiReply(event: GroupMessageEvent):
-        """
-        以免和第二套回复模式产生冲突
-        """
         await check_commands(event)
+
+        if config.ai_llm.config["llm"].get("群聊总结", {}).get("enable", False):
+            await increment_group_message_count(event.group_id)
+            summary_interval = config.ai_llm.config["llm"]["群聊总结"].get("总结间隔消息数", 50)
+            if await should_generate_summary(event.group_id, summary_interval):
+                if event.group_id not in summary_updating:
+                    summary_updating.add(event.group_id)
+                    asyncio.create_task(auto_generate_group_summary(event.group_id, bot, config))
+        
         if config.ai_llm.config["heartflow"]["whitelist_enabled"]:
             if event.group_id in config.ai_llm.config["heartflow"]["chat_whitelist"]:
                 if event.message_chain.has(At):
@@ -278,7 +296,7 @@ def main(bot, config):
                     """
                     总结用户特征，伪长期记忆人格
                     """
-                    if config.ai_llm.config["llm"]["长期记忆"] and event.user_id not in portrait_updating:
+                    if config.ai_llm.config["llm"]["用户画像"] and event.user_id not in portrait_updating:
                         should_update = False
                         if user_info.portrait_update_time == "":
                             should_update = True
@@ -286,7 +304,7 @@ def main(bot, config):
                             try:
                                 time_diff = (datetime.datetime.now() - datetime.datetime.fromisoformat(
                                     user_info.portrait_update_time)).total_seconds()
-                                should_update = time_diff > config.ai_llm.config["llm"]["记忆更新间隔"]
+                                should_update = time_diff > config.ai_llm.config["llm"]["用户画像更新间隔"]
                             except:
                                 should_update = True
 
@@ -296,17 +314,47 @@ def main(bot, config):
                                 bot.logger.info(f"更新用户 {event.user_id} 设定")
                                 await update_user(event.user_id,
                                                   portrait_update_time=datetime.datetime.now().isoformat())
-                                reply_message = await aiReplyCore(
-                                    [{
-                                        'text': 'system: 对以上聊天内容做出总结，描绘出当前对话的用户画像，总结出当前用户的人物性格特征以及偏好。不要回复，直接给出结果'}],
-                                    current_event.user_id,
-                                    config,
-                                    system_instruction="请总结上下文",
-                                    bot=bot,
-                                    event=current_event,
-                                )
-                                await update_user(event.user_id, user_portrait=reply_message.strip())
-                                await delete_latest2_history(event.user_id)
+                                
+                                # 从用户历史记录中提取该用户发送的消息
+                                user_history = await get_user_history(current_event.user_id)
+                                user_messages = []
+                                for msg in user_history:
+                                    if msg.get("role") == "user":
+                                        # 提取文本内容
+                                        if "parts" in msg:  # Gemini 格式
+                                            for part in msg["parts"]:
+                                                if isinstance(part, dict) and "text" in part:
+                                                    user_messages.append(part["text"])
+                                        elif "content" in msg:  # OpenAI 格式
+                                            content = msg["content"]
+                                            if isinstance(content, str):
+                                                user_messages.append(content)
+                                            elif isinstance(content, list):
+                                                for item in content:
+                                                    if isinstance(item, dict) and item.get("type") == "text":
+                                                        user_messages.append(item.get("text", ""))
+                                
+                                if user_messages:
+                                    # 构建用户画像总结的 prompt
+                                    messages_text = "\n".join(user_messages[-20:])  # 取最近 20 条消息
+                                    bot_name = config.common_config.basic_config.get("bot", "Bot")
+                                    user_nickname = user_info.nickname if user_info and user_info.nickname else f"用户{event.user_id}"
+                                    portrait_prompt = [{
+                                        "text": f"以下是用户「{user_nickname}」发送的消息历史（注意：你是「{bot_name}」，请勿将bot的特征混入用户画像）：\n{messages_text}\n\n请根据以上内容总结该用户「{user_nickname}」的用户画像，包括人物性格特征、兴趣爱好、语言风格等。直接给出结果，不要回复。"
+                                    }]
+                                    
+                                    reply_message = await utility_request(
+                                        config,
+                                        portrait_prompt,
+                                        system_instruction=f"你是一个用户画像分析助手。你需要分析的是用户「{user_nickname}」，而不是bot「{bot_name}」。请根据用户的消息历史总结其特征，不要把bot的特征混入用户画像。",
+                                        user_id=current_event.user_id,
+                                    )
+                                    
+                                    if reply_message:
+                                        await update_user(event.user_id, user_portrait=reply_message.strip())
+                                        bot.logger.info(f"用户 {event.user_id} 画像更新成功")
+                                else:
+                                    bot.logger.info(f"用户 {event.user_id} 没有足够的消息历史来生成画像")
                             finally:
                                 portrait_updating.discard(event.user_id)
                     if not user_state[uid]["queue"].empty():
@@ -315,6 +363,163 @@ def main(bot, config):
                 user_state[uid]["running"] = False
 
         asyncio.create_task(process_user_queue(uid))
+
+    async def auto_generate_group_summary(group_id, bot, config):
+        """自动生成群聊总结"""
+        try:
+            summary_interval = config.ai_llm.config["llm"]["群聊总结"].get("总结间隔消息数", 50)
+            group_messages = await get_group_messages(group_id, summary_interval)
+            if not group_messages:
+                bot.logger.info(f"群 {group_id} 没有足够的消息来生成总结")
+                return
+            messages_text = []
+            for msg in group_messages:
+                user_name = msg.get('user_name', '未知用户')
+                message_parts = msg.get('message', [])
+                text_content = ""
+                for part in message_parts:
+                    if isinstance(part, dict) and part.get('type') == 'text':
+                        text_content += part.get('text', '')
+                    elif isinstance(part, dict) and 'text' in part:
+                        text_content += part.get('text', '')
+                if text_content.strip():
+                    messages_text.append(f"{user_name}: {text_content.strip()}")
+            
+            if not messages_text:
+                bot.logger.info(f"群 {group_id} 消息中没有文本内容")
+                return
+            group_info = await get_group_summary(group_id)
+            existing_summary = group_info.get("summary", "")
+            if existing_summary:
+                summary_prompt = [{
+                    "text": f"以下是本群之前的总结：\n{existing_summary}\n\n以下是最近的新消息记录：\n{chr(10).join(messages_text)}\n\n请结合之前的总结和新消息，生成一个更新后的群聊总结，包括：\n1. 主要讨论的话题\n2. 活跃的参与者\n3. 重要的信息点\n\n请用简洁的语言总结，不超过300字。"
+                }]
+            else:
+                summary_prompt = [{
+                    "text": f"以下是群聊的最近消息记录：\n{chr(10).join(messages_text)}\n\n请对以上群聊内容进行总结，包括：\n1. 主要讨论的话题\n2. 活跃的参与者\n3. 重要的信息点\n\n请用简洁的语言总结，不超过200字。"
+                }]
+            
+            summary = await utility_request(
+                config,
+                summary_prompt,
+                system_instruction="你是一个群聊总结助手，请根据群聊消息生成简洁的总结。",
+                user_id=0,
+            )
+            
+            if summary:
+                current_count = group_info.get("message_count", 0)
+                
+                await update_group_summary(
+                    group_id,
+                    summary=summary.strip(),
+                    last_summarized_count=current_count
+                )
+                bot.logger.info(f"群 {group_id} 总结自动更新成功")
+        except Exception as e:
+            bot.logger.error(f"自动生成群总结失败: {e}")
+        finally:
+            summary_updating.discard(group_id)
+
+    async def generate_and_send_group_summary(event, bot, config):
+        """生成群总结并以图片形式发送"""
+        try:
+            group_id = event.group_id
+            group_info = await get_group_summary(group_id)
+            existing_summary = group_info.get("summary", "")
+            update_time = group_info.get("update_time", "")
+            is_refresh = event.pure_text == "/群总结 刷新"
+            
+            # /群总结，只查看现有总结，不生成
+            # /群总结 刷新，重新生成总结
+            if is_refresh:
+                await bot.send(event, "正在生成群聊总结，请稍候...", True)
+                summary_interval = config.ai_llm.config["llm"]["群聊总结"].get("总结间隔消息数", 50)
+                group_messages = await get_group_messages(group_id, summary_interval)
+                if not group_messages:
+                    await bot.send(event, "本群暂无足够的消息记录来生成总结", True)
+                    return
+
+                messages_text = []
+                for msg in group_messages:
+                    user_name = msg.get('user_name', '未知用户')
+                    message_parts = msg.get('message', [])
+                    text_content = ""
+                    for part in message_parts:
+                        if isinstance(part, dict) and part.get('type') == 'text':
+                            text_content += part.get('text', '')
+                        elif isinstance(part, dict) and 'text' in part:
+                            text_content += part.get('text', '')
+                    if text_content.strip():
+                        messages_text.append(f"{user_name}: {text_content.strip()}")
+                
+                if not messages_text:
+                    await bot.send(event, "本群消息中没有可供总结的文本内容", True)
+                    return
+                
+                if existing_summary:
+                    summary_prompt = [{
+                        "text": f"以下是本群之前的总结：\n{existing_summary}\n\n以下是最近的新消息记录：\n{chr(10).join(messages_text)}\n\n请结合之前的总结和新消息，生成一个更新后的群聊总结，包括：\n1. 主要讨论的话题（按重要性列出）\n2. 活跃的参与者及其特点\n3. 重要的信息点和结论\n4. 群聊氛围和互动情况\n\n请用清晰的格式总结，便于阅读。"
+                    }]
+                else:
+                    summary_prompt = [{
+                        "text": f"以下是群聊的最近消息记录：\n{chr(10).join(messages_text)}\n\n请对以上群聊内容进行详细总结，包括：\n1. 主要讨论的话题（按重要性列出）\n2. 活跃的参与者及其特点\n3. 重要的信息点和结论\n4. 群聊氛围和互动情况\n\n请用清晰的格式总结，便于阅读。"
+                    }]
+                
+                summary = await utility_request(
+                    config,
+                    summary_prompt,
+                    system_instruction="你是一个群聊总结助手，请根据群聊消息生成详细且有条理的总结。",
+                    user_id=event.user_id,
+                )
+                
+                if summary:
+                    existing_summary = summary.strip()
+                    current_count = group_info.get("message_count", 0)
+                    await update_group_summary(
+                        group_id,
+                        summary=existing_summary,
+                        last_summarized_count=current_count
+                    )
+                    update_time = datetime.datetime.now().strftime("%Y年%m月%d日 %H:%M:%S")
+                else:
+                    await bot.send(event, "生成群聊总结失败，请稍后重试", True)
+                    return
+            else:
+                if not existing_summary:
+                    await bot.send(event, "本群暂无总结记录，请使用 /群总结 刷新 来生成总结", True)
+                    return
+
+            formatted_date = datetime.datetime.now().strftime("%Y年%m月%d日")
+            summary_lines = existing_summary.split('\n')
+            
+            draw_list = [
+                {'type': 'basic_set', 'img_width': 800},
+                {'type': 'avatar', 'img': [f"https://p.qlogo.cn/gh/{group_id}/{group_id}/640"], 'upshift_extra': 15,
+                 'avatar_backdrop_color': (235, 239, 253, 0),
+                 'content': [f"[name]群聊总结[/name]\n[time]生成时间：{formatted_date}[/time]"]},
+                f'[title]群 {group_id} 的聊天总结[/title]',
+            ]
+            for line in summary_lines:
+                if line.strip():
+                    draw_list.append(line.strip())
+            
+            if update_time:
+                try:
+                    if 'T' in update_time:
+                        update_time_obj = datetime.datetime.fromisoformat(update_time)
+                        update_time_str = update_time_obj.strftime("%Y年%m月%d日 %H:%M:%S")
+                    else:
+                        update_time_str = update_time
+                except:
+                    update_time_str = update_time
+                draw_list.append(f'\n[des]上次更新时间：{update_time_str}[/des]')
+            
+            bot.logger.info('开始制作群聊总结图片')
+            await bot.send(event, Image(file=(await manshuo_draw(draw_list))))
+            
+        except Exception as e:
+            bot.logger.error(f"生成群总结失败: {e}")
+            await bot.send(event, f"生成群聊总结失败: {str(e)}", True)
 
     async def check_commands(event):
         if event.message_chain.has(Text):
@@ -332,14 +537,18 @@ def main(bot, config):
             await bot.send(event, "历史记录已清除", True)
         elif event.pure_text == "/clear group":
             await clear_group_messages(event.group_id)
-            await bot.send(event, "本群消息已清除", True)
+            await clear_group_summary(event.group_id)
+            await bot.send(event, "本群消息和群总结已清除", True)
         elif event.pure_text == "/clearall" and event.user_id == config.common_config.basic_config["master"]["id"]:
             await clear_all_history()
-            await bot.send(event, "已清理所有用户的对话记录")
+            await clear_all_user_portraits()
+            await bot.send(event, "已清理所有用户的对话记录和用户画像")
         elif event.pure_text.startswith("/clear") and event.user_id == config.common_config.basic_config["master"][
             "id"] and event.get("at"):
-            await delete_user_history(event.get("at")[0]["qq"])
-            await bot.send(event, [Text("已清理与目标用户的对话记录")])
+            target_user_id = event.get("at")[0]["qq"]
+            await delete_user_history(target_user_id)
+            await update_user(target_user_id, user_portrait="默认用户", portrait_update_time="")
+            await bot.send(event, [Text("已清理与目标用户的对话记录和用户画像")])
         elif event.pure_text.startswith("/切人设 "):
             user_info = await get_user(event.user_id)
             if user_info.permission >= config.ai_llm.config["core"]["ai_change_character"]:
@@ -363,6 +572,8 @@ def main(bot, config):
             chara_file = str(event.pure_text).replace("/查人设", "")
             all_chara = await get_folder_chara()
             await bot.send(event, all_chara)
+        elif event.pure_text == "/群总结" or event.pure_text == "/群总结 刷新":
+            await generate_and_send_group_summary(event, bot, config)
 
     def prefix_check(message: str, prefix: list):
         for p in prefix:

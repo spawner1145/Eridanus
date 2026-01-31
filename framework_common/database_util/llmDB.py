@@ -258,10 +258,27 @@ async def delete_latest2_history(user_id):
     await update_user_history(user_id, user_history)
 
 async def update_user_history(user_id, history):
-    """更新用户历史对话"""
+    """更新用户历史对话，自动过滤掉思维链(thought)内容"""
+    # 过滤掉 thought 内容
+    filtered_history = []
+    for msg in history:
+        if isinstance(msg, dict) and "parts" in msg:
+            # 过滤掉 thought: true 的部分
+            filtered_parts = [
+                part for part in msg["parts"]
+                if not (isinstance(part, dict) and part.get("thought") is True)
+            ]
+            if filtered_parts:  # 只有在有内容时才添加
+                filtered_history.append({
+                    "role": msg.get("role", "user"),
+                    "parts": filtered_parts
+                })
+        else:
+            filtered_history.append(msg)
+    
     async with aiosqlite.connect(DATABASE_FILE) as db:
         await db.execute("INSERT OR REPLACE INTO conversation_history (user_id, history) VALUES (?, ?)",
-                         (user_id, json.dumps(history)))
+                         (user_id, json.dumps(filtered_history)))
         await db.commit()
 
 

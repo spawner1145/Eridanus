@@ -12,6 +12,7 @@ import asyncio
 from developTools.message.message_components import Record, Text, Node, Image
 from developTools.utils.logger import get_logger
 from framework_common.database_util.Group import get_last_20_and_convert_to_prompt, add_to_group
+from framework_common.database_util.GroupSummary import get_group_summary
 from framework_common.utils.GeminiKeyManager import GeminiKeyManager
 from run.ai_llm.service.aiReplyHandler.default import defaultModelRequest
 from run.ai_llm.service.aiReplyHandler.gemini import construct_gemini_standard_prompt, \
@@ -39,7 +40,7 @@ logger = get_logger("aiReplyCore")
 
 
 async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, event=None, system_instruction=None,
-                      func_result=False, recursion_times=0, do_not_read_context=False):  # 后面几个函数都是供函数调用的场景使用的
+                      func_result=False):  # 后面几个函数都是供函数调用的场景使用的
     logger.info(f"aiReplyCore called with message: {processed_message}")
     # 防止开头@影响人设，只在bot或event存在时处理
     if (bot or event) and isinstance(processed_message, list):
@@ -53,12 +54,6 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                         'text': config.common_config.basic_config["bot"] + ','
                     }
                     logger.info(f"Replaced self at element with text: {processed_message[i]}")
-    """
-    递归深度约束
-    """
-    if recursion_times > config.ai_llm.config["llm"]["recursion_limit"]:
-        logger.warning(f"roll back to original history, recursion times: {recursion_times}")
-        return "Maximum recursion depth exceeded.Please try again later."
     """
     初始值
     """
@@ -94,14 +89,11 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
         system_instruction = (f"{formatted_datetime} {system_instruction}").replace("{用户}", user_info.nickname).replace("{bot_name}",
                                                                                               config.common_config.basic_config["bot"])
     """
-    用户设定读取
+    用户画像读取（保存 user_info 供后续注入主 prompt 使用）
     """
-    if config.ai_llm.config["llm"]["长期记忆"]:
+    if config.ai_llm.config["llm"]["用户画像"]:
         if not user_info:
-            temp_user = await get_user(user_id)
-        else:
-            temp_user=user_info
-        system_instruction+=f"\n以下为当前用户的用户画像：{temp_user.user_portrait}"
+            user_info = await get_user(user_id)
 
     try:
         if config.ai_llm.config["llm"]["model"] == "default":
@@ -130,10 +122,14 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             if processed_message is None:
                 tools = None
 
-            if not do_not_read_context:
-                p = await read_context(bot, event, config, prompt)
-                if p:
-                    prompt = p
+            # 先注入用户画像到主 prompt
+            if config.ai_llm.config["llm"]["用户画像"] and user_info and user_info.user_portrait:
+                prompt = inject_user_portrait(prompt, user_info.user_portrait, "openai")
+
+            # 再注入群聊上下文
+            p = await read_context(bot, event, config, prompt)
+            if p:
+                prompt = p
 
             proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"][
                 "enable_proxy"] else None
@@ -149,7 +145,9 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
 
             tool_fixed_params = build_tool_fixed_params(bot, event, config) if tools else None
             tool_declarations = get_tool_declarations(config) if tools else None
+            retries = config.ai_llm.config["llm"].get("retries", 3)
             response_text = ""
+            thought_text = ""  # 累积思维链内容
             async for part in api.chat(
                 prompt,
                 stream=True,
@@ -158,18 +156,23 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 tool_declarations=tool_declarations,
                 max_output_tokens=config.ai_llm.config["llm"]["openai"]["max_tokens"],
                 temperature=config.ai_llm.config["llm"]["openai"]["temperature"],
+                retries=retries,
             ):
                 if isinstance(part, dict) and "thought" in part:
-                    if bot and event and config.ai_llm.config["llm"]["openai"]["CoT"]:
-                        await bot.send(event, [Node(content=[Text(part["thought"])])])
+                    # 流式累积思维链
+                    thought_text += str(part["thought"])
                 elif isinstance(part, str):
                     response_text += part
+            
+            # 思维链累积完成后一次性发送
+            if thought_text and bot and event and config.ai_llm.config["llm"]["openai"]["CoT"]:
+                await bot.send(event, [Node(content=[Text(thought_text)])])
 
             reply_message = response_text.strip() if response_text else None
             if reply_message is not None:
                 reply_message, mface_files = remove_mface_filenames(reply_message, config)
 
-            await update_user_history(user_id, prompt)
+            # 注意：不在此处保存历史记录，construct_openai_standard_prompt 已经保存了不含群聊上下文的历史
 
             if mface_files:
                 for mface_file in mface_files:
@@ -179,16 +182,22 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 prompt, original_history = await construct_gemini_standard_prompt(
                     processed_message, user_id, bot, func_result, event
                 )
-                if not do_not_read_context:
-                    p = await read_context(bot, event, config, prompt)
-                    if p:
-                        prompt = p
+                # 先注入用户画像到主 prompt
+                if config.ai_llm.config["llm"]["用户画像"] and user_info and user_info.user_portrait:
+                    prompt = inject_user_portrait(prompt, user_info.user_portrait, "gemini")
+                # 再注入群聊上下文
+                p = await read_context(bot, event, config, prompt)
+                if p:
+                    prompt = p
             else:
                 prompt = await get_current_gemini_prompt(user_id)
-                if not do_not_read_context:
-                    p = await read_context(bot, event, config, prompt)
-                    if p:
-                        prompt = p
+                # 先注入用户画像到主 prompt
+                if config.ai_llm.config["llm"]["用户画像"] and user_info and user_info.user_portrait:
+                    prompt = inject_user_portrait(prompt, user_info.user_portrait, "gemini")
+                # 再注入群聊上下文
+                p = await read_context(bot, event, config, prompt)
+                if p:
+                    prompt = p
 
             if processed_message is None:
                 tools = None
@@ -207,9 +216,11 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             tool_fixed_params = build_tool_fixed_params(bot, event, config) if tools else None
             tool_declarations = get_tool_declarations(config) if tools else None
             show_grounding_metadata = config.ai_llm.config["llm"].get("联网搜索显示原始数据", True)
+            retries = config.ai_llm.config["llm"].get("retries", 3)
             
             response_text = ""
             grounding_metadata = None
+            thought_text = ""  # 累积思维链内容
             async for part in api.chat(
                 prompt,
                 stream=True,
@@ -222,14 +233,19 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 include_thoughts=config.ai_llm.config["llm"]["gemini"].get("include_thoughts", False),
                 google_search=False,
                 url_context=False,
+                retries=retries,
             ):
                 if isinstance(part, dict) and part.get("thought"):
-                    if bot and event and config.ai_llm.config["llm"]["gemini"].get("include_thoughts", False):
-                        await bot.send(event, [Node(content=[Text(str(part["thought"]))])])
+                    # 流式累积思维链
+                    thought_text += str(part["thought"])
                 elif isinstance(part, dict) and part.get("grounding_metadata"):
                     grounding_metadata = part["grounding_metadata"]
                 elif isinstance(part, str):
                     response_text += part
+            
+            # 思维链累积完成后一次性发送
+            if thought_text and bot and event and config.ai_llm.config["llm"]["gemini"].get("include_thoughts", False):
+                await bot.send(event, [Node(content=[Text(thought_text)])])
             
             # 如果配置了显示联网搜索原始数据，则发送 grounding metadata
             if grounding_metadata and show_grounding_metadata and bot and event:
@@ -243,7 +259,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 if reply_message in ["", "\n", " "]:
                     raise Exception("Empty response。Gemini API返回的文本为空。")
 
-            await update_user_history(user_id, prompt)
+            # 注意：不在此处保存历史记录，construct_gemini_standard_prompt 已经保存了不含群聊上下文的历史
 
             if mface_files:
                 for mface_file in mface_files:
@@ -273,24 +289,12 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
     except Exception as e:
         logger.error(f"Error occurred: {e}")
         logger.error(traceback.format_exc())
-        logger.warning(f"roll back to original history, recursion times: {recursion_times}")
-        await update_user_history(user_id, original_history)
-        if recursion_times <= config.ai_llm.config["llm"]["recursion_limit"]:
-
-            logger.warning(f"Recursion times: {recursion_times}")
-            if recursion_times + 2 == config.ai_llm.config["llm"]["recursion_limit"] and config.ai_llm.config["llm"][
-                "auto_clear_when_recursion_failed"]:
-                logger.warning(f"clear ai reply history for user: {user_id}")
-                await delete_user_history(user_id)
-            if recursion_times+2 == config.ai_llm.config["llm"]["recursion_limit"]:
-                logger.warning(f"update user portrait for user: {user_id}")
-                await update_user(user_id, user_portrait="normal_user")
-                await update_user(user_id, portrait_update_time=datetime.datetime.now().isoformat())
-            return await aiReplyCore(processed_message, user_id, config, tools=tools, bot=bot, event=event,
-                                     system_instruction=system_instruction, func_result=func_result,
-                                     recursion_times=recursion_times + 1, do_not_read_context=True)
-        else:
-            return "Maximum recursion depth exceeded.Please try again later."
+        # 回滚历史记录
+        if original_history:
+            logger.warning("Rolling back to original history")
+            await update_user_history(user_id, original_history)
+        # 返回None让上层处理，不再递归重试（依赖client内部的重试机制）
+        return None
 
 
 async def send_text(bot, event, config, text):
@@ -346,11 +350,50 @@ async def prompt_length_check(user_id, config):
     await update_user_history(user_id, history)
 
 
+def inject_user_portrait(prompt, user_portrait, model_type):
+    """
+    将用户画像注入到主 prompt 中（不保存到历史记录）
+    测试发现插入在用户最新消息之前效果最好（倒数第二个位置）
+    """
+    if not user_portrait or user_portrait in ["", "默认用户"]:
+        return prompt
+    
+    portrait_text = (
+        "================== 用户画像 开始 ==================\n"
+        f"【系统提示】以下为当前正在与你对话的用户的画像特征：\n{user_portrait}\n"
+        "================== 用户画像 结束 =================="
+    )
+    
+    if model_type == "gemini":
+        portrait_message = {
+            "role": "user",
+            "parts": [{"text": portrait_text}]
+        }
+        confirm_message = {
+            "role": "model", 
+            "parts": [{"text": "好的，我已经了解了这些信息。"}]
+        }
+    else:  # openai
+        portrait_message = {
+            "role": "user",
+            "content": [{"type": "text", "text": portrait_text}]
+        }
+        confirm_message = {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "好的，我已经了解了这些信息。"}]
+        }
+    
+    insert_pos = max(len(prompt) - 1, 0)
+    prompt = prompt[:insert_pos] + [portrait_message, confirm_message] + prompt[insert_pos:]
+    return prompt
+
+
 async def read_context(bot, event, config, prompt):
     try:
         if event is None:
             return None
-        if config.ai_llm.config["llm"]["读取群聊上下文"] == False or not hasattr(event, "group_id"):
+        # 检查是否开启上下文带原文功能（需要同时开启读取群聊上下文总开关）
+        if not config.ai_llm.config["llm"].get("上下文带原文", False) or not hasattr(event, "group_id"):
             return None
         if config.ai_llm.config["llm"]["model"] == "gemini":
             group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id, config.ai_llm.config["llm"][
@@ -368,18 +411,39 @@ async def read_context(bot, event, config, prompt):
                                                                             "new_openai", bot)
         else:
             return None
+        
+        if not group_messages_bg:
+            return None
+            
         bot.logger.info(f"群聊上下文消息：已读取")
-        insert_pos = max(len(prompt) - 2, 0)  # 保证插入位置始终在倒数第二个元素之前
-        if config.ai_llm.config["llm"]["model"] == "openai":  # 必须交替出现
-            # 添加边界检查，防止索引越界和无限循环
-            max_attempts = len(prompt)
-            attempts = 0
-            while insert_pos > 0 and insert_pos < len(prompt) and attempts < max_attempts:
-                if prompt[insert_pos - 1].get("role") == "assistant":
-                    break
-                insert_pos += 1
-                attempts += 1
-        prompt = prompt[:insert_pos] + group_messages_bg + prompt[insert_pos:]
+        
+        insert_pos = max(len(prompt) - 1, 0)
+        context_to_insert = []
+        if config.ai_llm.config["llm"].get("群聊总结", {}).get("聊天带总结", False):
+            group_info = await get_group_summary(event.group_id)
+            group_summary = group_info.get("summary", "")
+            if group_summary:
+                summary_text = (
+                    "================== 群聊历史总结 开始 ==================\n"
+                    f"以下是本群之前的聊天总结，供你参考：\n{group_summary}\n"
+                    "================== 群聊历史总结 结束 =================="
+                )
+                if config.ai_llm.config["llm"]["model"] == "gemini":
+                    summary_message = {
+                        "role": "user",
+                        "parts": [{"text": summary_text}]
+                    }
+                else:
+                    summary_message = {
+                        "role": "user",
+                        "content": [{"type": "text", "text": summary_text}]
+                    }
+                context_to_insert.append(summary_message)
+                bot.logger.info(f"群聊总结已注入到prompt中")
+        
+        context_to_insert.extend(group_messages_bg)
+        prompt = prompt[:insert_pos] + context_to_insert + prompt[insert_pos:]
+        
         return prompt
     except Exception as e:
         logger.warning(f"读取群聊上下文时发生错误: {e}")
@@ -389,7 +453,8 @@ async def read_context(bot, event, config, prompt):
 async def add_self_rep(bot, event, config, reply_message):
     if event is None or reply_message is None:
         return None
-    if not config.ai_llm.config["llm"]["读取群聊上下文"] and not hasattr(event, "group_id"):
+    # 只要开启了读取群聊上下文总开关，就记录bot的回复
+    if not config.ai_llm.config["llm"].get("读取群聊上下文", False) or not hasattr(event, "group_id"):
         return None
     try:
         self_rep = [{"text": reply_message.strip()}]

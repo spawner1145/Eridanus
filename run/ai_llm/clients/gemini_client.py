@@ -15,6 +15,23 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _is_valid_part(part: Dict) -> bool:
+    """检查 part 是否有效（过滤空 text）"""
+    if not isinstance(part, dict):
+        return True
+    # 如果是 text 类型，检查是否为空
+    if "text" in part:
+        # 空字符串的 text 是无效的
+        return bool(part.get("text", ""))
+    # 其他类型（functionCall, functionResponse, inlineData 等）都视为有效
+    return True
+
+
+def _filter_empty_text_parts(parts: List[Dict]) -> List[Dict]:
+    """过滤掉空 text 的 parts"""
+    return [p for p in parts if _is_valid_part(p)]
+
+
 def format_grounding_metadata(grounding_metadata: Dict) -> str:
     if not grounding_metadata:
         return ""
@@ -262,6 +279,11 @@ class GeminiAPI:
                 fixed_params = tool_fixed_params.get(name, tool_fixed_params.get("all", {})) if tool_fixed_params else {}
                 combined_args = {**fixed_params, **args}
                 
+                if args:
+                    logger.info(f"[Tool Call] {name} | 参数: {args}")
+                else:
+                    logger.info(f"[Tool Call] {name} | 无自由参数")
+                
                 if asyncio.iscoroutinefunction(func):
                     result = await func(**combined_args)
                 else:
@@ -507,7 +529,10 @@ class GeminiAPI:
                                                 yield {"grounding_metadata": candidate["groundingMetadata"]}
                                     except json.JSONDecodeError as e:
                                         logger.error(f"流式 JSON 解析错误: {e}")
-                        if model_message["parts"] and not any("functionCall" in part for part in model_message["parts"]):
+                        # 过滤空 text parts 后再添加
+                        filtered_parts = _filter_empty_text_parts(model_message["parts"])
+                        if filtered_parts and not any("functionCall" in part for part in filtered_parts):
+                            model_message["parts"] = filtered_parts
                             api_contents.append(model_message)
                         break  # 成功完成，跳出重试循环
                 except httpx.HTTPStatusError as e:
@@ -542,8 +567,11 @@ class GeminiAPI:
                     result = response.json()
                     #print("debug:", result)
                     candidate = result["candidates"][0]
-                    model_message = candidate["content"] 
-                    api_contents.append(model_message)
+                    model_message = candidate["content"]
+                    # 过滤空 text parts
+                    model_message["parts"] = _filter_empty_text_parts(model_message.get("parts", []))
+                    if model_message["parts"]:  # 只有有效 parts 时才添加
+                        api_contents.append(model_message)
                     parts = model_message.get("parts", [])
                     for part in parts:
                         if part.get("thought") is True:
@@ -655,7 +683,8 @@ class GeminiAPI:
             parts = []
             for p in msg["parts"]:
                 if isinstance(p, str):
-                    parts.append({"text": p})
+                    if p.strip() != "":
+                        parts.append({"text": p})
                 elif isinstance(p, dict) and ("fileData" in p or "inlineData" in p or "functionCall" in p or "functionResponse" in p):
                     parts.append(p)
                 else:
