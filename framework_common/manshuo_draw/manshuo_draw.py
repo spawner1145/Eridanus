@@ -47,6 +47,9 @@ if __name__ == '__main__':
 
     content_test=[
         {'type': 'basic_set', 'debug': True, 'img_width':[400,1200]},
+        {'type': 'text','layer':2,
+         'content': ['这里是manshuo[title]！这部分是测manshuo！[/title]这manshuo！[des]这里是介绍[/des]', 'hello'],
+         },
         {'type': 'backdrop', 'subtype': 'one_color'},
         {'type': 'img', 'subtype': 'common', 'jump_next_page': True,
          'img':['data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg',]},

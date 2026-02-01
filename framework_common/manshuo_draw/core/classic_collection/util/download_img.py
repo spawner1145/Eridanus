@@ -134,6 +134,9 @@ async def process_img_download(img_list,is_abs_path_convert=True,gray_layer=Fals
                 # 清理资源
                 if img_data is not None:
                     del img_data
+        #判断其是否为None
+        if return_img is None:
+            return_img = Image.open(occupy_chart)
         return return_img
 
     if not isinstance(img_list, list):

@@ -23,16 +23,17 @@ async def mys_coin_sign(user_id,bot=None,event=None):
         msg = '此用户还未绑定，请发送 ‘米游社帮助’ 查看菜单'
         if bot and event: await bot.send(event, msg)
         else: print(msg)
-        return
+        return msg
     #开始进行米游币签到
     try:
-        await perform_bbs_sign(user, user_id, bot=bot, event=event)
+        msg = await perform_bbs_sign(user, user_id, bot=bot, event=event)
     except Exception as e:
         print(e)
         traceback.print_exc()
         msg = '签到失败，请稍后重试喵'
         if bot: await bot.send(event, msg)
         else:print(msg)
+    return msg
 
 
 
@@ -45,6 +46,7 @@ async def perform_bbs_sign(user, user_id, bot = None,event = None):
     :param user_ids: 发送通知的所有用户ID
     """
     failed_accounts = []
+    msg = '签到失败喵'
     for account in user.accounts.values():
         missions_state_status, missions_state = await get_missions_state(account)
         if not missions_state_status:
@@ -109,3 +111,4 @@ async def perform_bbs_sign(user, user_id, bot = None,event = None):
                     await bot.recall(recall_id['data']['message_id'])
                 else:
                     print(msg)
+    return msg
