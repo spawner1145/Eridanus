@@ -1,4 +1,3 @@
-
 import asyncio
 import base64
 import datetime
@@ -245,6 +244,18 @@ def main(bot, config):
             if cache_key in persona_cache:
                 return persona_cache[cache_key]
 
+            heartflow_system = config.ai_llm.config.get("heartflow", {}).get("system", "")
+            
+            if heartflow_system:
+                try:
+                    persona = await read_chara(user_id, await use_folder_chara(heartflow_system))
+                    persona = persona.replace("{bot_name}", config.common_config.basic_config["bot"])
+                    persona_cache[cache_key] = persona
+                    bot.logger.info(f"心流插件：使用专用角色文件 {heartflow_system}")
+                    return persona
+                except FileNotFoundError:
+                    bot.logger.warning(f"心流插件：未找到专用角色文件 {heartflow_system}，回退到主llm角色")
+            
             user_info = await get_user(user_id)
             chara_file = getattr(user_info, 'chara_file', None)
 
@@ -427,12 +438,6 @@ def main(bot, config):
             )
             #print(result_text)
             #print(type(result_text))
-            
-            # 检查 result_text 是否为空
-            if not result_text:
-                bot.logger.warning("心流判断：AI 返回为空，默认不回复")
-                return JudgeResult(should_reply=False, reasoning="AI 返回为空")
-            
             # 使用正则解析分数
             import re
 
@@ -670,5 +675,3 @@ def main(bot, config):
             await bot.send(event, f"✅ 已清除 {count} 个缓存")
 
     bot.logger.info("心流插件已加载")
-
-
