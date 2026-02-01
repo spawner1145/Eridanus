@@ -742,7 +742,7 @@ def main(bot, config):
             await update_user(event.user_id, user_portrait="默认用户")
             await update_user(event.user_id, portrait_update_time=datetime.datetime.now().isoformat())
             await bot.send(event, "历史记录已清除", True)
-        elif event.pure_text == "/clear group":
+        elif event.pure_text == "/clear group" and event.user_id == config.common_config.basic_config["master"]["id"]:
             await clear_group_messages(event.group_id)
             await clear_group_summary(event.group_id)
             await bot.send(event, "本群消息和群总结已清除", True)
