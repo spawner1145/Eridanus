@@ -427,6 +427,12 @@ def main(bot, config):
             )
             #print(result_text)
             #print(type(result_text))
+            
+            # 检查 result_text 是否为空
+            if not result_text:
+                bot.logger.warning("心流判断：AI 返回为空，默认不回复")
+                return JudgeResult(should_reply=False, reasoning="AI 返回为空")
+            
             # 使用正则解析分数
             import re
 
