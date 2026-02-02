@@ -195,7 +195,7 @@ async def clear_group_summary(group_id: int):
     try:
         async with aiosqlite.connect(dbpath) as db:
             await db.execute(
-                "UPDATE group_summaries SET summary = '', update_time = '', last_summarized_count = 0 WHERE group_id = ?",
+                "UPDATE group_summaries SET summary = '', update_time = '', last_summarized_count = 0, message_count = 0 WHERE group_id = ?",
                 (group_id,)
             )
             await db.commit()
