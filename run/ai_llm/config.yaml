@@ -1,5 +1,5 @@
 llm:
-  model: gemini  #选择使用的模型大类。default为自带免费模型，可选openai、gemini。
+  model: default  #选择使用的模型大类。default为自带免费模型，可选openai、gemini。
   system: "" #建议用chara_file_name，而不是在此处填写，此配置即将被弃用
   chara_file_name: 猫娘.txt   #system为""时生效,默认启动的人设文件名，在data/system/chara文件夹内(目前支持txt,json,酒馆角色卡(图片))
   openai:          #兼容所有openai标准接口。https://platform.openai.com/docs/overview
