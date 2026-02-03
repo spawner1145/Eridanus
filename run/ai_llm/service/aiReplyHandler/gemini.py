@@ -3,6 +3,7 @@ import io
 import os
 import re
 import traceback
+import mimetypes
 
 import httpx
 from PIL import Image
@@ -13,6 +14,46 @@ from framework_common.utils.random_str import random_str
 from run.ai_llm.service.aiReplyHandler.ModelFallBackManager import ModelFallbackManager
 
 logger=get_logger("Gemini Prompt Construct and Request")
+
+def is_local_file_path(url: str) -> bool:
+    if url.startswith("file://"):
+        return True
+    if len(url) >= 2 and url[1] == ':' and url[0].isalpha():
+        return True
+    if url.startswith("/") and not url.startswith("//"):
+        return True
+    return False
+
+def get_local_file_path(url: str) -> str:
+    if url.startswith("file://"):
+        return url[7:]
+    return url
+
+async def read_local_file_as_base64(file_path: str, mime_type: str = None) -> tuple:
+    actual_path = get_local_file_path(file_path)
+    
+    if not os.path.exists(actual_path):
+        raise FileNotFoundError(f"本地文件不存在: {actual_path}")
+
+    if mime_type is None:
+        mime_type, _ = mimetypes.guess_type(actual_path)
+        if mime_type is None:
+            ext = os.path.splitext(actual_path)[1].lower()
+            mime_map = {
+                '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+                '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp',
+                '.mp3': 'audio/mp3', '.wav': 'audio/wav', '.ogg': 'audio/ogg',
+                '.m4a': 'audio/m4a', '.flac': 'audio/flac', '.amr': 'audio/amr',
+                '.mp4': 'video/mp4', '.webm': 'video/webm', '.avi': 'video/avi',
+                '.mov': 'video/quicktime', '.mkv': 'video/x-matroska',
+            }
+            mime_type = mime_map.get(ext, 'application/octet-stream')
+    
+    with open(actual_path, "rb") as f:
+        file_data = f.read()
+        base64_data = base64.b64encode(file_data).decode('utf-8')
+    
+    return base64_data, mime_type
 async def geminiRequest(ask_prompt,base_url: str,apikey: str,model: str,proxy=None,tools=None,system_instruction=None,temperature=0.7,maxOutputTokens=2048,fallback_models: list[str] = None,include_thoughts: bool = False):
     if proxy is not None and proxy !="":
         proxies={"http://": proxy, "https://": proxy}
@@ -113,6 +154,9 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
         if "text" in i:
             prompt_elements.append({"text": i["text"]})
         elif "image" in i or "mface" in i:
+            image = None
+            img_byte_arr = None
+            res = None
             try:
                 if "mface" in i:
                     url=i["mface"]["url"]
@@ -124,14 +168,43 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                 base64_match = BASE64_PATTERN.match(url)
                 if base64_match:
                     img_base64 = base64_match.group(2)
-                    prompt_elements.append({"inline_data": {"mime_type": "image/jpeg", "data": img_base64}})
+                    prompt_elements.append({"inlineData": {"mimeType": "image/jpeg", "data": img_base64}})
                     continue
+                
+                # 检查是否是本地文件路径（包括 file:// 前缀）
+                if is_local_file_path(url):
+                    try:
+                        actual_path = get_local_file_path(url)
+                        prompt_elements.append({"text": f"system提示: 当前图片的本地路径为{actual_path}"})
+                        image = Image.open(actual_path)
+                        image = image.convert("RGB")
+                        
+                        quality = 85
+                        while True:
+                            img_byte_arr = io.BytesIO()
+                            image.save(img_byte_arr, format='JPEG', quality=quality)
+                            size_kb = img_byte_arr.tell() / 1024
+                            if size_kb <= 400 or quality <= 10:
+                                break
+                            quality -= 5
+                            img_byte_arr.close()
+                        img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+                        prompt_elements.append({"inlineData": {"mimeType": "image/jpeg", "data": img_base64}})
+                        continue
+                    except Exception as e:
+                        logger.warning(f"读取本地图片失败:{url} 原因:{e}")
+                        prompt_elements.append({"text": f"系统提示：读取本地图片失败"})
+                        continue
+                    finally:
+                        if image is not None:
+                            image.close()
+                        if img_byte_arr is not None:
+                            img_byte_arr.close()
+                
                 prompt_elements.append({"text": f"system提示: 当前图片的url为{url}"})
                 # 下载图片转base64
                 async with httpx.AsyncClient(timeout=60) as client:
                     res = await client.get(url)
-                    image = None
-                    img_byte_arr = None
                     # res.raise_for_status()  # Check for HTTP errors
                     try:
                         image = Image.open(io.BytesIO(res.content))
@@ -150,7 +223,7 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                         quality -= 5
                         img_byte_arr.close()  # 添加这行，关闭之前的BytesIO
                     img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
-                prompt_elements.append({"inline_data": {"mime_type": "image/jpeg", "data": img_base64}})
+                prompt_elements.append({"inlineData": {"mimeType": "image/jpeg", "data": img_base64}})
                 #prompt_elements.append({"type":"image_url","image_url":i["image"]["url"]})
             except Exception as e:
                 traceback.print_exc()
@@ -161,17 +234,35 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                     image.close()
                 if img_byte_arr is not None:
                     img_byte_arr.close()
-                del res
+                if res is not None:
+                    del res
 
-        elif "record" in i and bot is not None:
+        elif "record" in i:
             origin_voice_url=i["record"]["file"]
             base64_match = BASE64_PATTERN.match(origin_voice_url)
             if base64_match:
                 mime_type = base64_match.group(1)
                 img_base64 = base64_match.group(2)
-                prompt_elements.append({"inline_data": {"mime_type": "audio/mp3", "data": img_base64}})
+                prompt_elements.append({"inlineData": {"mimeType": "audio/mp3", "data": img_base64}})
                 continue
+            
+            # 检查是否是本地文件路径（包括 file:// 前缀）
+            if is_local_file_path(origin_voice_url):
+                try:
+                    base64_data, mime_type = await read_local_file_as_base64(origin_voice_url, "audio/mp3")
+                    prompt_elements.append({"inlineData": {"mimeType": mime_type, "data": base64_data}})
+                    continue
+                except Exception as e:
+                    logger.warning(f"读取本地音频失败:{origin_voice_url} 原因:{e}")
+                    continue
+            
+            # 需要bot对象来下载远程音频
+            if bot is None:
+                logger.warning(f"无法下载远程音频（bot对象为空）:{origin_voice_url}")
+                continue
+                
             mp3_data=None
+            base64_encoded_data=None
             try:
                 r = await bot.get_record(origin_voice_url)
                 logger.info(f"下载语音成功:{r}")
@@ -180,26 +271,52 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                     mp3_data = mp3_file.read()
                     base64_encoded_data = base64.b64encode(mp3_data)
                     base64_message = base64_encoded_data.decode('utf-8')
-                    prompt_elements.append({"inline_data": {"mime_type": "audio/mp3", "data": base64_message}})
+                    prompt_elements.append({"inlineData": {"mimeType": "audio/mp3", "data": base64_message}})
                 #prompt_elements.append({"type":"voice","voice":i["voice"]})
             except Exception as e:
                 logger.warning(f"下载语音失败:{origin_voice_url} 原因:{e}")
             finally:
                 if mp3_data is not None:
                     del mp3_data
-        elif "video" in i and bot is not None:
+                if base64_encoded_data is not None:
+                    del base64_encoded_data
+        elif "video" in i:
             mp4_data=None
             base64_encoded_data=None
             try:
                 video_url=i["video"]["url"]
-            except:
+            except (KeyError, TypeError):
                 video_url=i["video"]["file"]
             base64_match = BASE64_PATTERN.match(video_url)
             if base64_match:
                 mime_type = base64_match.group(1)
                 img_base64 = base64_match.group(2)
-                prompt_elements.append({"inline_data": {"mime_type": "video/mp4", "data": img_base64}})
+                prompt_elements.append({"inlineData": {"mimeType": "video/mp4", "data": img_base64}})
                 continue
+            
+            # 检查是否是本地文件路径（包括 file:// 前缀）
+            if is_local_file_path(video_url):
+                try:
+                    actual_path = get_local_file_path(video_url)
+                    # 视频文件大小限制(15MB)
+                    file_size = os.path.getsize(actual_path)
+                    if file_size > 15 * 1024 * 1024:
+                        raise Exception(f"视频文件大小超出限制: {file_size / (1024 * 1024):.2f}MB，最大允许 15MB")
+                    
+                    base64_data, mime_type = await read_local_file_as_base64(video_url, "video/mp4")
+                    prompt_elements.append({"inlineData": {"mimeType": mime_type, "data": base64_data}})
+                    continue
+                except Exception as e:
+                    logger.warning(f"读取本地视频失败:{video_url} 原因:{e}")
+                    prompt_elements.append({"text": str(i)})
+                    continue
+            
+            # 需要bot对象来下载远程视频
+            if bot is None:
+                logger.warning(f"无法下载远程视频（bot对象为空）:{video_url}")
+                prompt_elements.append({"text": str(i)})
+                continue
+                
             try:
                 video=await bot.get_video(video_url,f"data/pictures/cache/{random_str()}.mp4")
 
@@ -212,7 +329,7 @@ async def gemini_prompt_elements_construct(precessed_message,bot=None,func_resul
                     mp4_data = mp4_file.read()
                     base64_encoded_data = base64.b64encode(mp4_data)
                     base64_message = base64_encoded_data.decode('utf-8')
-                    prompt_elements.append({"inline_data": {"mime_type": "video/mp4", "data": base64_message}})
+                    prompt_elements.append({"inlineData": {"mimeType": "video/mp4", "data": base64_message}})
             except Exception as e:
                 logger.warning(f"下载视频失败:{video_url} 原因:{e}")
                 prompt_elements.append({"text": str(i)})

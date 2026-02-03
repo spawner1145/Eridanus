@@ -410,3 +410,16 @@ async def warm_up_cache(user_ids: list = None):
                     await get_user(result[0])
 
     logger.info("缓存预热完成")
+
+
+async def clear_all_user_portraits():
+    """清除所有用户的用户画像"""
+    await ensure_db_initialized()
+
+    async with aiosqlite.connect(dbpath) as db:
+        await db.execute("UPDATE users SET user_portrait = '', portrait_update_time = ''")
+        await db.commit()
+
+    # 清除所有用户缓存
+    redis_cache_manager.delete_pattern("user:*")
+    logger.info("已清除所有用户的用户画像")

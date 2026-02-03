@@ -1,9 +1,11 @@
-import httpx
 import json
 from typing import Dict, Any, List, Union
 
+from run.ai_llm.clients.gemini_client import GeminiAPI
+
+
 class AiChatbot:
-    def __init__(self, model, api_key,proxy,base_url):
+    def __init__(self, model, api_key, proxy, base_url):
         self.ai_model = model
         self.api_key = api_key
         self.proxy = proxy
@@ -26,58 +28,30 @@ class AiChatbot:
             },
         ]
 
-        r = await self.geminiRequest(
-            ask_prompt=contents,
-            base_url=self.base_url,
+        proxies = {"http://": self.proxy, "https://": self.proxy} if self.proxy else None
+
+        api = GeminiAPI(
             apikey=self.api_key,
+            baseurl=self.base_url,
             model=self.ai_model,
-            proxy=self.proxy,
-            tools=tools,
-            temperature=temperature,
-            maxOutputTokens=maxOutputTokens,
-            response_schema=response_schema # 将schema传递下去
+            proxies=proxies
         )
-        return r
 
-    async def geminiRequest(self, ask_prompt: List[Dict[str, Any]], base_url: str, apikey: str, model: str,
-                            proxy: Union[str, None] = None, tools: Union[List, None] = None,
-                            temperature: float = 0.7, maxOutputTokens: int = 2048,
-                            response_schema: Union[Dict, None] = None) -> Dict[str, Any]:
-        """
-        发送请求到Gemini API，支持结构化输出。
-        """
-        if proxy is not None and proxy != "":
-            proxies = {"http://": proxy, "https://": proxy}
-        else:
-            proxies = None
-        url = f"{base_url}/v1beta/models/{model}:generateContent?key={apikey}"
-        #print(url)
-        generation_config = {
-            "temperature": temperature,
-            "topK": 64,
-            "topP": 0.95,
-            "maxOutputTokens": maxOutputTokens,
-            "responseMimeType": "application/json"
-        }
+        response_text = ""
+        async for part in api.chat(
+            contents,
+            stream=False,
+            temperature=temperature,
+            max_output_tokens=maxOutputTokens,
+            response_schema=response_schema,
+        ):
+            if isinstance(part, str):
+                response_text += part
 
-        if response_schema:
-            generation_config["responseSchema"] = response_schema
+        # 尝试解析为 JSON
+        try:
+            result = json.loads(response_text) if response_text else {}
+        except json.JSONDecodeError:
+            result = {"text": response_text}
 
-        pay_load = {
-            "contents": ask_prompt,
-            "safetySettings": [
-                {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', "threshold": "BLOCK_NONE"},
-                {'category': 'HARM_CATEGORY_HATE_SPEECH', "threshold": "BLOCK_NONE"},
-                {'category': 'HARM_CATEGORY_HARASSMENT', "threshold": "BLOCK_NONE"},
-                {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', "threshold": "BLOCK_NONE"}
-            ],
-            "generationConfig": generation_config
-        }
-        if tools is not None:
-            pay_load["tools"] = tools
-
-        async with httpx.AsyncClient(proxies=proxies, timeout=100) as client:
-            r = await client.post(url, json=pay_load)
-            r.raise_for_status()
-            print(r.json())
-            return r.json()
+        return result

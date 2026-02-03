@@ -18,7 +18,6 @@ from ruamel.yaml.scalarint import ScalarInt
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString, SingleQuotedScalarString
 import traceback
 
-from run.acg_infromation.service.majsoul.majsoul_info.processData import convertTime
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from developTools.utils.logger import get_logger
