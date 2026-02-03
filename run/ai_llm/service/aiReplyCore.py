@@ -18,7 +18,7 @@ from run.ai_llm.service.aiReplyHandler.default import defaultModelRequest
 from run.ai_llm.service.aiReplyHandler.gemini import construct_gemini_standard_prompt, \
     get_current_gemini_prompt
 from run.ai_llm.service.aiReplyHandler.openai import construct_openai_standard_prompt, \
-    get_current_openai_prompt
+    get_current_openai_prompt, construct_openai_standard_prompt_old_version
 from run.ai_llm.service.aiReplyHandler.tecentYuanQi import construct_tecent_standard_prompt, YuanQiTencent
 from framework_common.database_util.llmDB import get_user_history, update_user_history, delete_user_history, read_chara, \
     use_folder_chara
@@ -84,10 +84,9 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             system_instruction = await read_chara(user_id, await use_folder_chara(
                 config.ai_llm.config["llm"]["chara_file_name"]))
         user_info = await get_user(user_id)
-        current_datetime = datetime.datetime.now()
-        formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
-        system_instruction = (f"{formatted_datetime} {system_instruction}").replace("{用户}", user_info.nickname).replace("{bot_name}",
-                                                                                              config.common_config.basic_config["bot"])
+        #current_datetime = datetime.datetime.now()
+        #formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+        #system_instruction = (f"{formatted_datetime} {system_instruction}").replace("{用户}", user_info.nickname).replace("{bot_name}",config.common_config.basic_config["bot"])
     """
     用户画像读取（保存 user_info 供后续注入主 prompt 使用）
     """
@@ -97,12 +96,12 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
 
     try:
         if config.ai_llm.config["llm"]["model"] == "default":
-            prompt, original_history = await construct_openai_standard_prompt(processed_message, system_instruction,
+            prompt, original_history = await construct_openai_standard_prompt_old_version(processed_message, system_instruction,
                                                                               user_id)
+            print(prompt)
             response_message = await defaultModelRequest(
                 prompt,
-                config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"][
-                    "enable_proxy"] else None,
+                None,
                 config.ai_llm.config["llm"]["default"]["model"],
             )
             if not response_message:
