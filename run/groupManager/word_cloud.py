@@ -10,7 +10,7 @@ def main(bot,config):
     asyncio.run(add_to_group(000000, message))
     @bot.on(GroupMessageEvent)
     async def add_message_to_db(event: GroupMessageEvent):
-        if not config.ai_llm.config["llm"]["读取群聊上下文"]:
+        if not config.ai_llm.config["llm"].get("读取群聊上下文", False):
             return
         try:
             user_name=event.sender.nickname

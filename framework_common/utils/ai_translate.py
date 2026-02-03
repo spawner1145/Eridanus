@@ -4,9 +4,10 @@ import traceback
 from developTools.utils.logger import get_logger
 from framework_common.framework_util.yamlLoader import YAMLManager
 from run.ai_llm.service.aiReplyHandler.default import defaultModelRequest
-from run.ai_llm.service.aiReplyHandler.gemini import geminiRequest
-from run.ai_llm.service.aiReplyHandler.openai import openaiRequest_official, openaiRequest
 from run.ai_llm.service.aiReplyHandler.tecentYuanQi import YuanQiTencent
+from run.ai_llm.clients.gemini_client import GeminiAPI
+from run.ai_llm.clients.openai_client import OpenAIAPI
+from framework_common.utils.GeminiKeyManager import GeminiKeyManager
 
 
 class Translator:
@@ -40,61 +41,59 @@ class Translator:
 
 
             elif config.ai_llm.config["llm"]["model"] == "openai":
+                prompt = [{"role": "user", "content": system_instruction + text}]
 
-                if config.ai_llm.config["llm"]["openai"]["使用旧版prompt结构"]:
-                    prompt = [
-                        {"role": "user", "content": system_instruction + text},
-                    ]
-                else:
-                    prompt=[{"role": "system", "content": [{"type": "text", "text": system_instruction+text}]}]
+                proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"]["enable_proxy"] else None
+                proxies = {"http://": proxy, "https://": proxy} if proxy else None
 
-                kwargs = {
-                    "ask_prompt": prompt,
-                    "url": config.ai_llm.config["llm"]["openai"].get("quest_url") or config.ai_llm.config["llm"]["openai"].get("base_url"),
-                    "apikey": random.choice(config.ai_llm.config["llm"]["openai"]["api_keys"]),
-                    "model": config.ai_llm.config["llm"]["openai"]["model"],
-                    "stream": False,
-                    "proxy": config.common_config.basic_config["proxy"]["http_proxy"] if
-                    config.ai_llm.config["llm"][
-                        "enable_proxy"] else None,
-                    "tools": None,
-                    "temperature": config.ai_llm.config["llm"]["openai"]["temperature"],
-                    "max_tokens": config.ai_llm.config["llm"]["openai"]["max_tokens"]
-                }
-                if config.ai_llm.config["llm"]["openai"]["enable_official_sdk"]:
-                    response_message = await openaiRequest_official(**kwargs)
-                else:
-                    response_message = await openaiRequest(**kwargs)
-                response_message = response_message["choices"][0]["message"]
-                reply_message = response_message["content"]
+                api = OpenAIAPI(
+                    apikey=random.choice(config.ai_llm.config["llm"]["openai"]["api_keys"]),
+                    baseurl=(config.ai_llm.config["llm"]["openai"].get("quest_url")
+                             or config.ai_llm.config["llm"]["openai"].get("base_url")),
+                    model=config.ai_llm.config["llm"]["openai"]["model"],
+                    proxies=proxies
+                )
+
+                response_text = ""
+                async for part in api.chat(
+                    prompt,
+                    stream=False,
+                    max_output_tokens=config.ai_llm.config["llm"]["openai"]["max_tokens"],
+                    temperature=config.ai_llm.config["llm"]["openai"]["temperature"],
+                ):
+                    if isinstance(part, str):
+                        response_text += part
+                reply_message = response_text.strip() if response_text else None
             elif config.ai_llm.config["llm"]["model"] == "gemini":
                 prompt = [
                     {
-                        "parts": [
-                            {
-                                "text": system_instruction+text,
-                            }
-                        ],
+                        "parts": [{"text": system_instruction + text}],
                         "role": "user"
                     },
                 ]
 
-                # 这里是需要完整报错的，不用try catch，否则会影响自动重试。
-                response_message = await geminiRequest(
+                proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"]["enable_proxy"] else None
+                proxies = {"http://": proxy, "https://": proxy} if proxy else None
+
+                # 使用 GeminiKeyManager 获取 API key，与主回复逻辑保持一致
+                api = GeminiAPI(
+                    apikey=await GeminiKeyManager.get_gemini_apikey(),
+                    baseurl=config.ai_llm.config["llm"]["gemini"]["base_url"],
+                    model=config.ai_llm.config["llm"]["gemini"]["model"],
+                    proxies=proxies
+                )
+
+                response_text = ""
+                async for part in api.chat(
                     prompt,
-                    config.ai_llm.config["llm"]["gemini"]["base_url"],
-                    random.choice(config.ai_llm.config["llm"]["gemini"]["api_keys"]),
-                    config.ai_llm.config["llm"]["gemini"]["model"],
-                    config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"][
-                        "enable_proxy"] else None,
-                    tools=None,
+                    stream=False,
                     system_instruction="请你扮演翻译官，我给你要翻译的文本，你直接给我结果，不需要回应。",
                     temperature=config.ai_llm.config["llm"]["gemini"]["temperature"],
-                    maxOutputTokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"]
-                )
-                response_message = response_message['candidates'][0]["content"]
-                # print(response_message)
-                reply_message = response_message["parts"][0]["text"]  # 函数调用可能不给你返回提示文本，只给你整一个调用函数。
+                    max_output_tokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"],
+                ):
+                    if isinstance(part, str):
+                        response_text += part
+                reply_message = response_text.strip() if response_text else None
 
             elif config.ai_llm.config["llm"]["model"] == "腾讯元器":
                 prompt=[{"role": "user", "content": [{"type": "text", "text": system_instruction+text}]}]

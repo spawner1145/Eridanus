@@ -1,19 +1,77 @@
+"""
+群组消息管理器 - 数据库持久化版本
+支持 SQLite 持久化存储 + 内存缓存
+"""
 import json
 import asyncio
+import os
 import time
 import threading
 from collections import defaultdict, deque
 from threading import RLock
-import weakref
+import aiosqlite
 from developTools.utils.logger import get_logger
 from run.ai_llm.service.aiReplyHandler.gemini import gemini_prompt_elements_construct
 from run.ai_llm.service.aiReplyHandler.openai import prompt_elements_construct, prompt_elements_construct_old_version
 
 logger = get_logger()
 
+# 数据库路径
+DB_PATH = "data/dataBase/group_messages.db"
+
+# 全局数据库初始化状态
+_db_initialized: bool = False
+
+
+async def ensure_db_initialized():
+    """确保数据库已初始化"""
+    global _db_initialized
+    if not _db_initialized:
+        await initialize_db()
+        _db_initialized = True
+
+
+async def initialize_db():
+    """初始化群消息数据库"""
+    try:
+        db_dir = os.path.dirname(DB_PATH)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir)
+
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute("PRAGMA journal_mode=WAL;")
+            await db.execute("PRAGMA synchronous=NORMAL;")
+            await db.execute("PRAGMA cache_size=10000;")
+            await db.execute("PRAGMA temp_store=MEMORY;")
+            await db.execute("PRAGMA busy_timeout=5000;")
+
+            # 创建群消息表
+            await db.execute("""
+            CREATE TABLE IF NOT EXISTS group_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_id INTEGER NOT NULL,
+                user_id INTEGER,
+                user_name TEXT,
+                message TEXT,
+                timestamp TEXT,
+                created_at REAL DEFAULT (strftime('%s', 'now'))
+            )
+            """)
+
+            # 创建索引
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_group_id ON group_messages(group_id);")
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_group_created ON group_messages(group_id, created_at);")
+
+            await db.commit()
+            #logger.info("群消息数据库初始化完成")
+
+    except Exception as e:
+        logger.error(f"群消息数据库初始化失败: {e}")
+        raise
+
 
 class GroupMessageManager:
-    """群组消息管理器 - 高性能优化版"""
+    """群组消息管理器"""
 
     _instance = None
     _lock = threading.Lock()
@@ -29,52 +87,100 @@ class GroupMessageManager:
         if hasattr(self, '_initialized'):
             return
 
-        # 配置参数
-        self.MAX_MESSAGES = 50
+        # 配置参数（默认值，可通过 set_max_messages 修改）
+        self.MAX_MESSAGES = 100
         self.MAX_GROUPS = 1000
         self.MAX_CACHE_ITEMS = 500
 
         # 批量处理配置
-        self.BATCH_SIZE = 10  # 批量处理大小
-        self.CACHE_CLEANUP_THRESHOLD = 20  # 缓存清理阈值
+        self.BATCH_SIZE = 10
+        self.CACHE_CLEANUP_THRESHOLD = 20
 
-        # 数据存储
+        # 内存缓存（用于快速访问）
         self._lock = RLock()
-        self._messages = defaultdict(lambda: deque(maxlen=self.MAX_MESSAGES))
+        self._messages_cache = defaultdict(lambda: deque(maxlen=self.MAX_MESSAGES))
         self._group_order = deque(maxlen=self.MAX_GROUPS)
-        self._group_order_set = set()  # 优化LRU查找
+        self._group_order_set = set()
 
         # 预处理缓存
         self._processed_cache = {}
         self._cache_order = deque(maxlen=self.MAX_CACHE_ITEMS)
 
         # 延迟清理相关
-        self._dirty_groups = set()  # 需要清理缓存的群组
-        self._pending_messages = defaultdict(list)  # 待批量处理的消息
+        self._dirty_groups = set()
+        self._pending_messages = []  # 待写入数据库的消息
         self._batch_lock = threading.Lock()
 
-        # 后台清理任务
-        self._cleanup_task = None
+        # 后台任务
         self._running = True
+        self._db_initialized = False
 
         self._initialized = True
 
         # 启动后台任务
         self._start_background_tasks()
 
-    def _start_background_tasks(self):
-        """启动后台清理任务"""
+    def set_max_messages(self, max_messages: int):
+        """设置每个群的最大消息数量"""
+        with self._lock:
+            self.MAX_MESSAGES = max_messages
+            old_messages = dict(self._messages_cache)
+            self._messages_cache = defaultdict(lambda: deque(maxlen=self.MAX_MESSAGES))
+            for group_id, msgs in old_messages.items():
+                new_deque = deque(maxlen=self.MAX_MESSAGES)
+                new_deque.extend(msgs)
+                self._messages_cache[group_id] = new_deque
+            logger.info(f"群消息保留数量已更新为 {max_messages}")
 
-        def background_cleanup():
+    def _start_background_tasks(self):
+        """启动后台任务"""
+        def background_worker():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
             while self._running:
                 try:
+                    # 批量写入待处理的消息到数据库
+                    loop.run_until_complete(self._flush_pending_messages())
+                    # 清理缓存
                     self._batch_cleanup_cache()
-                    time.sleep(0.1)  # 100ms清理一次
+                    time.sleep(0.5)  # 500ms处理一次
                 except Exception as e:
-                    logger.error(f"后台清理任务错误: {e}")
+                    logger.error(f"后台任务错误: {e}")
+                    time.sleep(1)
+            
+            loop.close()
 
-        self._cleanup_thread = threading.Thread(target=background_cleanup, daemon=True)
-        self._cleanup_thread.start()
+        self._worker_thread = threading.Thread(target=background_worker, daemon=True)
+        self._worker_thread.start()
+
+    async def _flush_pending_messages(self):
+        """将待处理消息写入数据库"""
+        if not self._pending_messages:
+            return
+
+        with self._batch_lock:
+            messages_to_write = self._pending_messages.copy()
+            self._pending_messages.clear()
+
+        if not messages_to_write:
+            return
+
+        try:
+            await ensure_db_initialized()
+            async with aiosqlite.connect(DB_PATH) as db:
+                await db.executemany(
+                    """INSERT INTO group_messages (group_id, user_id, user_name, message, timestamp)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    messages_to_write
+                )
+                await db.commit()
+                logger.debug(f"批量写入 {len(messages_to_write)} 条消息到数据库")
+        except Exception as e:
+            logger.error(f"写入数据库失败: {e}")
+            # 失败的消息放回队列
+            with self._batch_lock:
+                self._pending_messages.extend(messages_to_write)
 
     def _batch_cleanup_cache(self):
         """批量清理缓存"""
@@ -82,13 +188,10 @@ class GroupMessageManager:
             return
 
         with self._lock:
-            # 批量获取需要清理的群组
             groups_to_clean = list(self._dirty_groups)[:self.CACHE_CLEANUP_THRESHOLD]
-
             if not groups_to_clean:
                 return
 
-            # 批量清理
             keys_to_remove = []
             for group_id in groups_to_clean:
                 keys_to_remove.extend(
@@ -97,7 +200,6 @@ class GroupMessageManager:
                 )
                 self._dirty_groups.discard(group_id)
 
-            # 执行清理
             for key in keys_to_remove:
                 self._processed_cache.pop(key, None)
                 try:
@@ -105,25 +207,16 @@ class GroupMessageManager:
                 except ValueError:
                     pass
 
-            if keys_to_remove:
-                logger.debug(f"批量清理了 {len(keys_to_remove)} 个缓存项")
-
     def _update_group_lru_fast(self, group_id: int):
-        """快速更新群组LRU（避免O(n)查找）"""
+        """快速更新群组LRU"""
         if group_id not in self._group_order_set:
-            # 新群组，直接添加
             self._group_order.append(group_id)
             self._group_order_set.add(group_id)
 
-            # 如果超出限制，移除最老的
             if len(self._group_order_set) > self.MAX_GROUPS:
                 if self._group_order:
                     oldest = self._group_order.popleft()
                     self._group_order_set.discard(oldest)
-        else:
-            # 已存在的群组，标记为最近使用但不立即移动
-            # 使用延迟更新策略，避免频繁的deque操作
-            pass
 
     def _build_context_info(self, messages):
         """构建上下文信息"""
@@ -142,7 +235,7 @@ class GroupMessageManager:
 
             message_content = msg.get("message", [])
             for msg_part in message_content:
-                if msg_part.get('type') == 'text':
+                if isinstance(msg_part, dict) and msg_part.get('type') == 'text':
                     text = msg_part.get('text', '').strip()
                     if '?' in text or '？' in text:
                         context_info['activities'].append('提问')
@@ -150,8 +243,12 @@ class GroupMessageManager:
 
         return context_info
 
-    async def _process_single_message(self, raw_message, index, context_info, standard, bot, event):
-        """处理单条消息"""
+    async def _process_single_message(self, raw_message, index, context_info, standard, bot, event, include_images=True):
+        """处理单条消息
+        
+        Args:
+            include_images: 是否包含图片，False时会过滤掉图片消息
+        """
         user_name = raw_message.get('user_name', '未知用户')
         user_id = raw_message.get('user_id', '')
         timestamp = raw_message.get('timestamp', time.strftime('%Y-%m-%d %H:%M:%S'))
@@ -164,6 +261,22 @@ class GroupMessageManager:
         )
 
         message_copy = json.loads(json.dumps(raw_message))
+        
+        # 如果不包含图片，过滤掉图片消息
+        if not include_images:
+            filtered_message = []
+            for item in message_copy["message"]:
+                if isinstance(item, dict):
+                    # 跳过图片和表情
+                    if "image" in item or "mface" in item:
+                        # 添加占位文本表示有图片
+                        filtered_message.append({"text": "[图片]"})
+                    else:
+                        filtered_message.append(item)
+                else:
+                    filtered_message.append(item)
+            message_copy["message"] = filtered_message
+        
         message_copy["message"].insert(0, {
             "text": f"{context_prompt}\n这是群聊历史消息，用于理解当前对话上下文。"
         })
@@ -181,11 +294,14 @@ class GroupMessageManager:
         activities = list(set(context_info['activities'])) if context_info['activities'] else ['正常聊天']
 
         group_summary = (
+            "================== 群聊上下文 开始 ==================\n"
             f"【群聊概况】参与人数：{len(participants_list)}人 | "
             f"消息总数：{context_info['message_count']}条 | "
             f"主要参与者：{', '.join(participants_list[:3])} | "
             f"活动类型：{', '.join(activities[:2])}"
         )
+        
+        context_end = "================== 群聊上下文 结束 =================="
 
         if standard == "gemini":
             all_parts = []
@@ -193,12 +309,14 @@ class GroupMessageManager:
                 if entry.get('role') == 'user':
                     all_parts.extend(entry.get('parts', []))
 
-            summary_part = {"text": f"{group_summary}\n以上是群聊历史消息上下文。"}
+            summary_part = {"text": f"{group_summary}"}
+            end_part = {"text": f"{context_end}\n以上是群聊历史消息上下文，仅供参考，请根据之后的用户消息进行回复。"}
             all_parts.insert(0, summary_part)
+            all_parts.append(end_part)
 
             return [
                 {"role": "user", "parts": all_parts},
-                {"role": "model", "parts": [{"text": "我已了解群聊上下文，会结合这些信息回应对话。"}]}
+                {"role": "model", "parts": [{"text": "好的，我已了解群聊上下文，会根据之后的用户消息进行回复。"}]}
             ]
         else:
             all_parts = []
@@ -207,35 +325,123 @@ class GroupMessageManager:
                     all_parts.extend(entry['content'])
 
             if all_parts:
-                summary_part = {"type": "text", "text": f"{group_summary}\n以上是群聊历史消息上下文："}
+                summary_part = {"type": "text", "text": f"{group_summary}"}
+                end_part = {"type": "text", "text": f"{context_end}\n以上是群聊历史消息上下文，仅供参考，请根据之后的用户消息进行回复。"}
                 all_parts.insert(0, summary_part)
+                all_parts.append(end_part)
                 return [
                     {"role": "user", "content": all_parts},
-                    {"role": "assistant", "content": "我已了解群聊上下文，会结合这些信息回应对话。"}
+                    {"role": "assistant", "content": "好的，我已了解群聊上下文，会根据之后的用户消息进行回复。"}
                 ]
             else:
                 return [
-                    {"role": "user", "content": f"{group_summary}\n以上是群聊历史消息上下文。"},
-                    {"role": "assistant", "content": "我已了解群聊上下文，会结合这些信息回应对话。"}
+                    {"role": "user", "content": f"{group_summary}\n{context_end}\n以上是群聊历史消息上下文。"},
+                    {"role": "assistant", "content": "好的，我已了解群聊上下文，会根据之后的用户消息进行回复。"}
                 ]
 
+
+    def add_to_group_fast(self, group_id: int, message):
+        """快速添加消息（写入内存缓存 + 异步写入数据库）"""
+        with self._lock:
+            # 添加到内存缓存
+            self._messages_cache[group_id].append(message)
+            self._update_group_lru_fast(group_id)
+            self._dirty_groups.add(group_id)
+
+        # 准备写入数据库的数据
+        user_id = message.get('user_id', 0)
+        user_name = message.get('user_name', '未知用户')
+        msg_content = json.dumps(message.get('message', []), ensure_ascii=False)
+        timestamp = message.get('timestamp', time.strftime('%Y-%m-%d %H:%M:%S'))
+
+        with self._batch_lock:
+            self._pending_messages.append((group_id, user_id, user_name, msg_content, timestamp))
+
+    def add_to_group_sync(self, group_id: int, message):
+        """同步添加消息"""
+        self.add_to_group_fast(group_id, message)
+
+    async def add_to_group(self, group_id: int, message, delete_after: int = 50):
+        """添加消息到群组"""
+        self.add_to_group_fast(group_id, message)
+        logger.debug(f"消息已添加到群组 {group_id}")
+
+    async def get_group_messages(self, group_id: int, limit: int = 50):
+        """获取群组消息（优先从内存，不足时从数据库补充并加载到缓存）"""
+        messages = []
+        
+        # 从内存缓存获取
+        with self._lock:
+            if group_id in self._messages_cache:
+                messages = list(self._messages_cache[group_id])
+
+        # 如果内存中的消息不足，从数据库补充
+        if len(messages) < limit:
+            try:
+                await ensure_db_initialized()
+                async with aiosqlite.connect(DB_PATH) as db:
+                    async with db.execute(
+                        """SELECT user_id, user_name, message, timestamp 
+                           FROM group_messages 
+                           WHERE group_id = ? 
+                           ORDER BY created_at DESC 
+                           LIMIT ?""",
+                        (group_id, limit)
+                    ) as cursor:
+                        rows = await cursor.fetchall()
+                        
+                        # 转换数据库记录为消息格式
+                        db_messages = []
+                        for row in rows:
+                            try:
+                                msg_content = json.loads(row[2]) if row[2] else []
+                                db_messages.append({
+                                    'user_id': row[0],
+                                    'user_name': row[1],
+                                    'message': msg_content,
+                                    'timestamp': row[3]
+                                })
+                            except:
+                                continue
+                        
+                        # 如果数据库有消息且内存缓存为空，将数据库消息加载到内存缓存
+                        if db_messages and len(messages) == 0:
+                            with self._lock:
+                                # 按时间顺序加载（旧的在前）
+                                for msg in reversed(db_messages):
+                                    self._messages_cache[group_id].append(msg)
+                                self._update_group_lru_fast(group_id)
+                            logger.debug(f"从数据库加载 {len(db_messages)} 条消息到群 {group_id} 的内存缓存")
+                        
+                        # 使用数据库消息
+                        if db_messages:
+                            messages = list(reversed(db_messages))[:limit]
+            except Exception as e:
+                logger.error(f"从数据库读取消息失败: {e}")
+
+        # 返回消息列表
+        messages = list(reversed(messages))[:limit]
+        return messages
+
+    async def get_group_messages_raw(self, group_id: int, limit: int = 50):
+        """获取群组原始消息对象列表"""
+        return await self.get_group_messages(group_id, limit)
+
     async def _preprocess_group_messages(self, group_id: int, standard: str = "gemini",
-                                         data_length: int = 20, bot=None, event=None):
-        """预处理群组消息为prompt格式"""
+                                         data_length: int = 20, bot=None, event=None, include_images=True):
+        """预处理群组消息为prompt格式
+        
+        Args:
+            include_images: 是否包含图片，False时会跳过图片消息内容
+        """
         try:
-            with self._lock:
-                if group_id not in self._messages:
-                    logger.debug(f"群组 {group_id} 不存在消息")
-                    return []
-                messages = list(self._messages[group_id])
+            messages = await self.get_group_messages(group_id, data_length)
 
             if not messages:
                 logger.debug(f"群组 {group_id} 消息为空")
                 return []
 
             actual_length = min(data_length, len(messages))
-            logger.debug(f"群组 {group_id}: 请求长度={data_length}, 实际处理长度={actual_length}")
-
             messages = messages[-actual_length:] if len(messages) > actual_length else messages
             messages = list(reversed(messages))
 
@@ -245,7 +451,7 @@ class GroupMessageManager:
             for i, raw_message in enumerate(messages):
                 try:
                     processed_msg = await self._process_single_message(
-                        raw_message, i, context_info, standard, bot, event
+                        raw_message, i, context_info, standard, bot, event, include_images
                     )
                     if processed_msg:
                         processed_list.append(processed_msg)
@@ -254,64 +460,21 @@ class GroupMessageManager:
                     continue
 
             final_result = self._format_final_result(processed_list, context_info, standard)
-            logger.debug(f"预处理完成: group_id={group_id}, 处理消息数={len(processed_list)}")
             return final_result
 
         except Exception as e:
             logger.error(f"预处理失败: {e}")
             return []
 
-    # ======================= 高性能接口 =======================
-
-    def add_to_group_fast(self, group_id: int, message):
-        """超高速添加消息（无阻塞，延迟清理）"""
-        with self._lock:
-            # 1. 快速添加消息（O(1)）
-            self._messages[group_id].append(message)
-
-            # 2. 快速更新LRU（避免O(n)操作）
-            self._update_group_lru_fast(group_id)
-
-            # 3. 标记为需要清理（延迟处理）
-            self._dirty_groups.add(group_id)
-
-    def add_to_group_sync(self, group_id: int, message):
-        """同步添加消息（保持兼容性）"""
-        self.add_to_group_fast(group_id, message)
-
-    async def add_to_group(self, group_id: int, message, delete_after: int = 50):
-        """添加消息到群组（使用快速版本）"""
-        self.add_to_group_fast(group_id, message)
-        logger.debug(f"消息已快速添加到群组 {group_id}")
-
-    async def get_group_messages(self, group_id: int, limit: int = 50):
-        """获取群组消息文本列表"""
-        with self._lock:
-            if group_id not in self._messages:
-                return []
-            messages = list(self._messages[group_id])
-            messages = list(reversed(messages))
-            if limit:
-                messages = messages[:limit]
-
-        text_list = []
-        for msg in messages:
-            try:
-                if "message" in msg and isinstance(msg["message"], list):
-                    for msg_obj in msg["message"]:
-                        if isinstance(msg_obj, dict) and "text" in msg_obj:
-                            text_list.append(msg_obj["text"])
-            except Exception:
-                pass
-
-        return text_list
-
     async def get_last_20_and_convert_to_prompt(self, group_id: int, data_length=20,
-                                                prompt_standard="gemini", bot=None, event=None):
-        """获取转换后的prompt（缓存优先）"""
-        cache_key = (group_id, prompt_standard, data_length)
+                                                prompt_standard="gemini", bot=None, event=None, include_images=True):
+        """获取转换后的prompt（缓存优先）
+        
+        Args:
+            include_images: 是否包含图片，False时会跳过图片消息内容
+        """
+        cache_key = (group_id, prompt_standard, data_length, include_images)
 
-        # 检查缓存
         with self._lock:
             if cache_key in self._processed_cache:
                 try:
@@ -319,14 +482,10 @@ class GroupMessageManager:
                     self._cache_order.append(cache_key)
                 except ValueError:
                     self._cache_order.append(cache_key)
-                logger.debug(f"缓存命中: {cache_key}")
                 return self._processed_cache[cache_key]
 
-        # 缓存未命中，实时处理
-        logger.debug(f"缓存未命中，实时处理: {cache_key}")
-        result = await self._preprocess_group_messages(group_id, prompt_standard, data_length, bot, event)
+        result = await self._preprocess_group_messages(group_id, prompt_standard, data_length, bot, event, include_images)
 
-        # 缓存结果
         if result:
             with self._lock:
                 if len(self._processed_cache) >= self.MAX_CACHE_ITEMS:
@@ -336,20 +495,18 @@ class GroupMessageManager:
 
                 self._processed_cache[cache_key] = result
                 self._cache_order.append(cache_key)
-                logger.debug(f"结果已缓存: {cache_key}")
 
         return result
 
     async def clear_group_messages(self, group_id: int):
-        """清除群组消息"""
+        """清除群组消息（内存 + 数据库）"""
+        # 清除内存缓存
         with self._lock:
-            if group_id in self._messages:
-                self._messages[group_id].clear()
+            if group_id in self._messages_cache:
+                self._messages_cache[group_id].clear()
 
-            # 从LRU中移除
             self._group_order_set.discard(group_id)
 
-            # 清理相关缓存
             expired_keys = [k for k in self._processed_cache.keys() if k[0] == group_id]
             for k in expired_keys:
                 self._processed_cache.pop(k, None)
@@ -358,42 +515,90 @@ class GroupMessageManager:
                 except ValueError:
                     pass
 
-            # 从脏群组集合中移除
             self._dirty_groups.discard(group_id)
 
-        logger.info(f"✅ 已清除 group_id={group_id} 的所有数据")
+        # 清除数据库记录
+        try:
+            await ensure_db_initialized()
+            async with aiosqlite.connect(DB_PATH) as db:
+                await db.execute("DELETE FROM group_messages WHERE group_id = ?", (group_id,))
+                await db.commit()
+        except Exception as e:
+            logger.error(f"清除数据库消息失败: {e}")
+
+        logger.info(f"已清除 group_id={group_id} 的所有消息")
 
     async def clear_all_group_cache(self):
-        """清除所有数据"""
+        """清除所有数据（内存 + 数据库）"""
         with self._lock:
-            self._messages.clear()
+            self._messages_cache.clear()
             self._group_order.clear()
             self._group_order_set.clear()
             self._processed_cache.clear()
             self._cache_order.clear()
             self._dirty_groups.clear()
 
-        logger.info("✅ 所有群组数据已清除")
+        # 清除数据库
+        try:
+            await ensure_db_initialized()
+            async with aiosqlite.connect(DB_PATH) as db:
+                await db.execute("DELETE FROM group_messages")
+                await db.commit()
+        except Exception as e:
+            logger.error(f"清除数据库失败: {e}")
+
+        logger.info("所有群组数据已清除")
         return True
+
+    async def cleanup_old_messages(self):
+        """清理超出限制的旧消息"""
+        try:
+            await ensure_db_initialized()
+            async with aiosqlite.connect(DB_PATH) as db:
+                # 获取所有群组
+                async with db.execute("SELECT DISTINCT group_id FROM group_messages") as cursor:
+                    groups = await cursor.fetchall()
+
+                for (group_id,) in groups:
+                    # 保留每个群最新的 MAX_MESSAGES 条消息
+                    await db.execute("""
+                        DELETE FROM group_messages 
+                        WHERE group_id = ? AND id NOT IN (
+                            SELECT id FROM group_messages 
+                            WHERE group_id = ? 
+                            ORDER BY created_at DESC 
+                            LIMIT ?
+                        )
+                    """, (group_id, group_id, self.MAX_MESSAGES))
+
+                await db.commit()
+                logger.debug("已清理超出限制的旧消息")
+        except Exception as e:
+            logger.error(f"清理旧消息失败: {e}")
 
     def get_cache_stats(self):
         """获取统计信息"""
         with self._lock:
-            total_messages = sum(len(msgs) for msgs in self._messages.values())
+            total_messages = sum(len(msgs) for msgs in self._messages_cache.values())
             return {
-                "total_groups": len(self._messages),
-                "total_messages": total_messages,
+                "total_groups": len(self._messages_cache),
+                "total_messages_in_cache": total_messages,
                 "cached_prompts": len(self._processed_cache),
                 "dirty_groups": len(self._dirty_groups),
-                "memory_estimate_kb": total_messages * 0.5 + len(self._processed_cache) * 2,
-                "max_cache_items": self.MAX_CACHE_ITEMS
+                "pending_writes": len(self._pending_messages),
+                "max_messages_per_group": self.MAX_MESSAGES
             }
 
     def shutdown(self):
         """关闭管理器"""
         self._running = False
-        if hasattr(self, '_cleanup_thread'):
-            self._cleanup_thread.join(timeout=1.0)
+        # 同步写入剩余消息
+        if self._pending_messages:
+            loop = asyncio.new_event_loop()
+            loop.run_until_complete(self._flush_pending_messages())
+            loop.close()
+        if hasattr(self, '_worker_thread'):
+            self._worker_thread.join(timeout=2.0)
 
 
 # ======================= 全局单例实例 =======================
@@ -410,7 +615,7 @@ def get_manager():
 
 # ======================= 外部接口函数（保持兼容） =======================
 async def add_to_group(group_id: int, message, delete_after: int = 50):
-    """向群组添加消息（高性能版本）"""
+    """向群组添加消息"""
     manager = get_manager()
     await manager.add_to_group(group_id, message, delete_after)
 
@@ -422,10 +627,14 @@ async def get_group_messages(group_id: int, limit: int = 50):
 
 
 async def get_last_20_and_convert_to_prompt(group_id: int, data_length=20, prompt_standard="gemini",
-                                            bot=None, event=None):
-    """获取转换后的prompt"""
+                                            bot=None, event=None, include_images=True):
+    """获取转换后的prompt
+    
+    Args:
+        include_images: 是否包含图片，False时会跳过图片消息内容
+    """
     manager = get_manager()
-    return await manager.get_last_20_and_convert_to_prompt(group_id, data_length, prompt_standard, bot, event)
+    return await manager.get_last_20_and_convert_to_prompt(group_id, data_length, prompt_standard, bot, event, include_images)
 
 
 async def clear_group_messages(group_id: int):

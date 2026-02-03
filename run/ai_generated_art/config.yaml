@@ -29,6 +29,7 @@ ai绘画:
   -  ""   #可继续添加更多apikey
   nano_banana_config:
     model: gemini-3-pro-image-preview  #用第三方接口的自己翻第三方文档去，不接代看文档谢谢
+    base_url: "https://generativelanguage.googleapis.com"          #留空则使用ai_llm中的gemini反代(这边只影响gemini格式)
     原生gemini接口: false  #如果用gemini官方apikey，则打开此项，使用openrouter或其他openai标准的中转api则无需打开。
     quest_url: "http://fku.com/v1/chat/completions" #第三方中转，完整调用地址，gemini官方key不用管
     nano_banana不限制次数所需权限: 1  #超过此权限不受次数限制

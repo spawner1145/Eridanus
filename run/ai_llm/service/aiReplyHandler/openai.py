@@ -1,6 +1,7 @@
 import re
-
+import os
 import base64
+import mimetypes
 
 import httpx
 
@@ -18,6 +19,35 @@ openai = install_and_import('openai')
 
 if openai:
     from openai import AsyncOpenAI
+
+
+def is_local_file_path(url: str) -> bool:
+    if url.startswith("file://"):
+        return True
+    if len(url) >= 2 and url[1] == ':' and url[0].isalpha():
+        return True
+    if url.startswith("/") and not url.startswith("//"):
+        return True
+    return False
+
+def get_local_file_path(url: str) -> str:
+    """从URL获取本地文件的实际路径"""
+    if url.startswith("file://"):
+        return url[7:]
+    return url
+
+def read_local_file_as_base64(file_path: str) -> str:
+    """读取本地文件并转换为base64"""
+    actual_path = get_local_file_path(file_path)
+    
+    if not os.path.exists(actual_path):
+        raise FileNotFoundError(f"本地文件不存在: {actual_path}")
+    
+    with open(actual_path, "rb") as f:
+        file_data = f.read()
+        base64_data = base64.b64encode(file_data).decode('utf-8')
+    
+    return base64_data
 
 
 
@@ -102,21 +132,34 @@ async def prompt_elements_construct(precessed_message,bot=None,func_result=False
             if "mface" in i:
                 try:
                     url = i["mface"]["url"]
-                except:
+                except (KeyError, TypeError):
                     url = i["mface"]["file"]
             else:
                 try:
                     url = i["image"]["url"]
-                except:
+                except (KeyError, TypeError):
                     url = i["image"]["file"]
             base64_match = BASE64_PATTERN.match(url)
             if base64_match:
                 img_base64 = base64_match.group(2)
                 prompt_elements.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{img_base64}"}
+                    "input_image": {"image_url": f"data:image/jpeg;base64,{img_base64}", "detail": "auto"}
                 })
                 continue
+            
+            if is_local_file_path(url):
+                try:
+                    img_base64 = read_local_file_as_base64(url)
+                    prompt_elements.append({"type":"text","text": f"system提示: 当前图片的本地路径为{get_local_file_path(url)}"})
+                    prompt_elements.append({
+                        "input_image": {"image_url": f"data:image/jpeg;base64,{img_base64}", "detail": "auto"}
+                    })
+                    continue
+                except Exception as e:
+                    logger.warning(f"读取本地图片失败:{url} 原因:{e}")
+                    prompt_elements.append({"type":"text","text": f"系统提示：读取本地图片失败"})
+                    continue
+            
             prompt_elements.append({"type":"text","text": f"system提示: 当前图片的url为{url}"})
             # 下载图片转base64
             async with httpx.AsyncClient(timeout=60) as client:
@@ -124,9 +167,7 @@ async def prompt_elements_construct(precessed_message,bot=None,func_result=False
                 img_base64 =base64.b64encode(res.content).decode("utf-8")
 
             prompt_elements.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{img_base64}"}
-                })
+                "input_image": {"image_url": f"data:image/jpeg;base64,{img_base64}", "detail": "auto"}})
         elif "reply" in i:
             try:
                 event_obj=await bot.get_msg(int(event.get("reply")[0]["id"]))

@@ -4,7 +4,7 @@ from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.GeminiKeyManager import GeminiKeyManager
 from run.ai_llm.service.aiReplyCore import aiReplyCore
-from run.ai_llm.service.aiReplyHandler.gemini import geminiRequest
+from run.ai_llm.clients.gemini_client import GeminiAPI
 from run.group_msg_analyze.service.prompt_constructer import gemini_prompt_construct_vGroup
 
 
@@ -25,21 +25,30 @@ def main(bot: ExtendBot,config: YAMLManager):
                     if full_msg["status"]=="ok":
                         try:
                             role_set=config.group_msg_analyze.config["role_set"]
-                            response_message = await geminiRequest(
+
+                            proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"]["enable_proxy"] else None
+                            proxies = {"http://": proxy, "https://": proxy} if proxy else None
+
+                            api = GeminiAPI(
+                                apikey=await GeminiKeyManager.get_gemini_apikey(),
+                                baseurl=config.ai_llm.config["llm"]["gemini"]["base_url"],
+                                model=config.ai_llm.config["llm"]["gemini"]["model"],
+                                proxies=proxies
+                            )
+
+                            response_text = ""
+                            async for part in api.chat(
                                 await gemini_prompt_construct_vGroup(full_msg),
-                                config.ai_llm.config["llm"]["gemini"]["base_url"],
-                                await GeminiKeyManager.get_gemini_apikey(),
-                                config.ai_llm.config["llm"]["gemini"]["model"],
-                                config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"][
-                                    "enable_proxy"] else None,
-                                tools=None,
+                                stream=False,
                                 system_instruction=role_set,
                                 temperature=config.ai_llm.config["llm"]["gemini"]["temperature"],
-                                maxOutputTokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"],
-                                fallback_models=config.ai_llm.config["llm"]["gemini"]["fallback_models"],
-                            )
-                            bot.logger.info(response_message)
-                            await bot.send(event, response_message['candidates'][0]["content"]["parts"][0]["text"])
+                                max_output_tokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"],
+                            ):
+                                if isinstance(part, str):
+                                    response_text += part
+
+                            bot.logger.info(response_text)
+                            await bot.send(event, response_text.strip() if response_text else "")
                             break
                         except Exception as e:
                             bot.logger.error(e)
