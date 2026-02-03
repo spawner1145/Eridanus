@@ -67,6 +67,7 @@ async def initialize_db():
 
     except Exception as e:
         logger.error(f"群消息数据库初始化失败: {e}")
+        os.remove(DB_PATH)
         raise
 
 
