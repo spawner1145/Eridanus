@@ -698,7 +698,7 @@ def draw_adaptive_graphic_and_textual(contents, canvas_width=1000, padding=25, f
 
 
     try:
-        filepath_fort=f'{os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(draw_adaptive_graphic_and_textual))))}/data/fort/'
+        filepath_fort='framework_common/manshuo_draw/data/fort/'
         font = ImageFont.truetype(f"{filepath_fort}LXGWWenKai-Regular.ttf", font_size)
         font_tx = ImageFont.truetype(f"{filepath_fort}LXGWWenKai-Regular.ttf", font_size)
         font_tx_introduce = ImageFont.truetype(f"{filepath_fort}LXGWWenKai-Regular.ttf", font_size-5)

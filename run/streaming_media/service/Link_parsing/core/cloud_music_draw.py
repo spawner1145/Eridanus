@@ -22,8 +22,8 @@ def draw_netease_music_card(data, filepath, song_id):
 
     #设置字体
     font_size = 60
-    font_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "fort", "LXGWWenKai-Regular.ttf"))
-    font_bold_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "fort", "LXGWWenKai-Bold.ttf")) # 加粗字体
+    font_path = 'framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf'
+    font_bold_path = 'framework_common/manshuo_draw/data/fort/LXGWWenKai-Bold.ttf'
     print(f"字体文件路径: {font_path}")
     try:
         font = ImageFont.truetype(font_path, font_size)

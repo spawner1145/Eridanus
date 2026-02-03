@@ -37,7 +37,7 @@ async def img_text_draw(canvas,font,size,text,box):
 async def lu_img_maker(user_info,content='枫与岚',day_info=None):
     if day_info is None: day_info = await date_get()
     canvas = Image.new("RGBA", (960, 960), (235, 239, 253, 255))
-    font_path = 'run/group_fun/service/lu/core/data/LXGWWenKai-Regular.ttf'
+    font_path = 'framework_common/manshuo_draw/data/fort/LXGWWenKai-Regular.ttf'
     font = ImageFont.truetype(font_path, 24)
     font_title = ImageFont.truetype(font_path, 34)
 
