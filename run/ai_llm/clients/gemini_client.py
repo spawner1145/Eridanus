@@ -9,7 +9,14 @@ import os
 from typing import AsyncGenerator, Dict, List, Optional, Union, Callable
 import aiofiles
 import logging
-from framework_common.utils.GeminiKeyManager import GeminiKeyManager
+
+# 尝试导入 GeminiKeyManager，如果不存在则使用简单的 fallback
+try:
+    from framework_common.utils.GeminiKeyManager import GeminiKeyManager
+    _HAS_KEY_MANAGER = True
+except ImportError:
+    _HAS_KEY_MANAGER = False
+    GeminiKeyManager = None
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -30,8 +37,41 @@ def _is_valid_part(part: Dict) -> bool:
 
 def _filter_empty_text_parts(parts: List[Dict]) -> List[Dict]:
     """过滤掉空 text 的 parts"""
-    #return parts
     return [p for p in parts if _is_valid_part(p)]
+
+
+# Gemini 官方推荐的跳过验证签名（用于处理缺失 thoughtSignature 的情况）
+# 参考: https://ai.google.dev/gemini-api/docs/thought-signatures#faqs
+DUMMY_THOUGHT_SIGNATURE = "skip_thought_signature_validator"
+
+
+def _ensure_thought_signature_for_function_calls(parts: List[Dict]) -> List[Dict]:
+    """
+    确保 functionCall parts 中第一个有 thoughtSignature
+    
+    Gemini 3 的规范（阴的没边了）：
+    顺序函数调用：每个 step 的第一个 functionCall 必须有 thoughtSignature(fc1 + sig + fr1 + fc2 + sig + fr2...)
+    并行函数调用：只有第一个 functionCall 需要 thoughtSignature(fc1 + sig, fc2, fc3... + fr1, fr2, fr3...)
+    """
+    if not parts:
+        return parts
+    
+    # 首先检查响应中是否有任何 part 包含 thoughtSignature
+    # 如果整个响应都没有 thoughtSignature，说明模型屁事少, 不用加
+    has_any_signature = any("thoughtSignature" in part for part in parts)
+    if not has_any_signature:
+        return parts
+
+    first_fc_found = False
+    for part in parts:
+        if "functionCall" in part:
+            if not first_fc_found:
+                if "thoughtSignature" not in part:
+                    part["thoughtSignature"] = DUMMY_THOUGHT_SIGNATURE
+                    logger.warning(f"为缺失 thoughtSignature 的 functionCall 添加跳过验证签名")
+                first_fc_found = True
+    
+    return parts
 
 
 def format_grounding_metadata(grounding_metadata: Dict) -> str:
@@ -115,6 +155,14 @@ class GeminiAPI:
         self.current_model_index = 0
         if self.fallback_models:
             self.model = self.fallback_models[0]
+
+    async def _get_next_apikey(self) -> str:
+        """获取下一个 API key，如果有 GeminiKeyManager 则使用它，否则返回原始 apikey"""
+        if _HAS_KEY_MANAGER and GeminiKeyManager is not None:
+            return await GeminiKeyManager.get_gemini_apikey()
+        else:
+            logger.warning("GeminiKeyManager 不可用，继续使用原始 apikey")
+            return self.apikey
 
     async def upload_file(self, file_path: str, display_name: Optional[str] = None) -> Dict[str, Union[str, None]]:
         """上传单个文件到 Gemini File API，并检查 ACTIVE 状态"""
@@ -268,16 +316,20 @@ class GeminiAPI:
         tools: Dict[str, Callable],
         tool_fixed_params: Optional[Dict[str, Dict]] = None
     ) -> List[Dict]:
+        """
+        gemini3真脑残啊，阴的没边了
+        
+        对于并行函数调用，所有 functionResponse 必须放在同一个 user 消息中，
+        格式为：model: [FC1+sig, FC2] -> user: [FR1, FR2]
+        不能交错为：FC1+sig, FR1, FC2, FR2（这会导致 400 错误）
+        """
         async def run_single_tool(function_call):
             name = function_call["name"]
             args = function_call.get("args", {})
             func = tools.get(name)
             
             if not func:
-                return {
-                    "role": "user",
-                    "parts": [{"functionResponse": {"name": name, "response": {"error": f"工具 {name} 未定义"}}}]
-                }
+                return {"functionResponse": {"name": name, "response": {"error": f"工具 {name} 未定义"}}}
             try:
                 fixed_params = tool_fixed_params.get(name, tool_fixed_params.get("all", {})) if tool_fixed_params else {}
                 combined_args = {**fixed_params, **args}
@@ -292,19 +344,17 @@ class GeminiAPI:
                 else:
                     result = await asyncio.to_thread(func, **combined_args)
                     
-                return {
-                    "role": "user",
-                    "parts": [{"functionResponse": {"name": name, "response": {"result": str(result)}}}]
-                }
+                return {"functionResponse": {"name": name, "response": {"result": str(result)}}}
             except Exception as e:
-                return {
-                    "role": "user",
-                    "parts": [{"functionResponse": {"name": name, "response": {"error": str(e)}}}]
-                }
-        tasks = [run_single_tool(call) for call in function_calls]
-        function_responses = await asyncio.gather(*tasks)
+                return {"functionResponse": {"name": name, "response": {"error": str(e)}}}
         
-        return list(function_responses)
+        tasks = [run_single_tool(call) for call in function_calls]
+        function_response_parts = await asyncio.gather(*tasks)
+        
+        return [{
+            "role": "user",
+            "parts": list(function_response_parts)
+        }]
 
     async def _chat_api(
         self,
@@ -479,7 +529,7 @@ class GeminiAPI:
                                 logger.error("所有模型配额均已耗尽。切换下一个apikey")
                                 self.client = httpx.AsyncClient(
                                                 base_url=self.baseurl,
-                                                params={'key': await GeminiKeyManager.get_gemini_apikey()},
+                                                params={'key': await self._get_next_apikey()},
                                                 proxies=self.proxies,
                                                 timeout=60.0
                                             )
@@ -496,6 +546,7 @@ class GeminiAPI:
                             logger.error(f"服务器响应: {await response.aread()}")
                             raise
                         model_message = {"role": "model", "parts": []}
+                        grounding_metadata_to_yield = None
                         async for line in response.aiter_lines():
                             if line.startswith("data: "):
                                 data = line[len("data: "):].strip()
@@ -510,45 +561,53 @@ class GeminiAPI:
                                                     yield {"thought": part.get("text")}
                                                 elif "text" in part:
                                                     yield part["text"]
-                                                elif "functionCall" in part and tools:
-                                                    if model_message["parts"]:
-                                                        api_contents.append(model_message)
-                                                    function_calls = [part["functionCall"]]
-                                                    function_responses = await self._execute_tool(function_calls, tools, tool_fixed_params)
-                                                    api_contents.extend(function_responses)
-                                                    async for text in self._chat_api(
-                                                        api_contents, stream=stream, tools=tools, tool_fixed_params=tool_fixed_params,
-                                                        tool_declarations=tool_declarations,
-                                                        max_output_tokens=max_output_tokens,
-                                                        system_instruction=system_instruction,
-                                                        topp=topp, temperature=temperature,
-                                                        include_thoughts=include_thoughts,
-                                                        thinking_budget=thinking_budget,
-                                                        thinking_level=thinking_level,
-                                                        topk=topk, candidate_count=candidate_count,
-                                                        presence_penalty=presence_penalty,
-                                                        frequency_penalty=frequency_penalty,
-                                                        stop_sequences=stop_sequences,
-                                                        response_mime_type=response_mime_type,
-                                                        response_schema=response_schema,
-                                                        seed=seed, response_logprobs=response_logprobs,
-                                                        logprobs=logprobs, audio_timestamp=audio_timestamp,
-                                                        safety_settings=safety_settings,
-                                                        google_search=google_search,
-                                                        url_context=url_context,
-                                                        retries=retries
-                                                    ):
-                                                        yield text
-                                                    model_message = {"role": "model", "parts": []}
                                             if "groundingMetadata" in candidate:
-                                                yield {"grounding_metadata": candidate["groundingMetadata"]}
+                                                grounding_metadata_to_yield = candidate["groundingMetadata"]
                                     except json.JSONDecodeError as e:
                                         logger.error(f"流式 JSON 解析错误: {e}")
-                        # 过滤空 text parts 后再添加
-                        filtered_parts = _filter_empty_text_parts(model_message["parts"])
-                        if filtered_parts and not any("functionCall" in part for part in filtered_parts):
-                            model_message["parts"] = filtered_parts
-                            api_contents.append(model_message)
+                        
+                        function_call_parts = [part for part in model_message["parts"] if "functionCall" in part]
+                        if function_call_parts and tools:
+                            model_message["parts"] = _filter_empty_text_parts(model_message["parts"])
+                            model_message["parts"] = _ensure_thought_signature_for_function_calls(model_message["parts"])
+                            if model_message["parts"]:
+                                api_contents.append(model_message)
+                            function_calls = [part["functionCall"] for part in function_call_parts]
+                            function_responses = await self._execute_tool(function_calls, tools, tool_fixed_params)
+                            api_contents.extend(function_responses)
+                            
+                            async for text in self._chat_api(
+                                api_contents, stream=stream, tools=tools, tool_fixed_params=tool_fixed_params,
+                                tool_declarations=tool_declarations,
+                                max_output_tokens=max_output_tokens,
+                                system_instruction=system_instruction,
+                                topp=topp, temperature=temperature,
+                                include_thoughts=include_thoughts,
+                                thinking_budget=thinking_budget,
+                                thinking_level=thinking_level,
+                                topk=topk, candidate_count=candidate_count,
+                                presence_penalty=presence_penalty,
+                                frequency_penalty=frequency_penalty,
+                                stop_sequences=stop_sequences,
+                                response_mime_type=response_mime_type,
+                                response_schema=response_schema,
+                                seed=seed, response_logprobs=response_logprobs,
+                                logprobs=logprobs, audio_timestamp=audio_timestamp,
+                                safety_settings=safety_settings,
+                                google_search=google_search,
+                                url_context=url_context,
+                                retries=retries
+                            ):
+                                yield text
+                        else:
+                            filtered_parts = _filter_empty_text_parts(model_message["parts"])
+                            if filtered_parts:
+                                model_message["parts"] = filtered_parts
+                                api_contents.append(model_message)
+                        
+                        if grounding_metadata_to_yield:
+                            yield {"grounding_metadata": grounding_metadata_to_yield}
+                        
                         break  # 成功完成，跳出重试循环
                 except httpx.HTTPStatusError as e:
                     if e.response.status_code == 429:
@@ -561,7 +620,7 @@ class GeminiAPI:
                             logger.error("所有模型配额均已耗尽。切换下一个apikey")
                             self.client = httpx.AsyncClient(
                                             base_url=self.baseurl,
-                                            params={'key': await GeminiKeyManager.get_gemini_apikey()},
+                                            params={'key': await self._get_next_apikey()},
                                             proxies=self.proxies,
                                             timeout=60.0
                                         )
@@ -589,7 +648,7 @@ class GeminiAPI:
                             logger.error("所有模型配额均已耗尽。切换下一个apikey")
                             self.client = httpx.AsyncClient(
                                             base_url=self.baseurl,
-                                            params={'key': await GeminiKeyManager.get_gemini_apikey()},
+                                            params={'key': await self._get_next_apikey()},
                                             proxies=self.proxies,
                                             timeout=60.0
                                         )
@@ -604,22 +663,24 @@ class GeminiAPI:
                     model_message = candidate["content"]
                     # 过滤空 text parts
                     model_message["parts"] = _filter_empty_text_parts(model_message.get("parts", []))
-                    if model_message["parts"]:  # 只有有效 parts 时才添加
-                        api_contents.append(model_message)
-                    parts = model_message.get("parts", [])
-                    for part in parts:
-                        if part.get("thought") is True:
-                            yield {"thought": part.get("text")}
-                        elif "text" in part:
-                            yield part["text"]
                     
-                    # 解析并返回 groundingMetadata（如果存在）
-                    if "groundingMetadata" in candidate:
-                        grounding_metadata = candidate["groundingMetadata"]
-                        yield {"grounding_metadata": grounding_metadata}
+                    function_call_parts = [part for part in model_message.get("parts", []) if "functionCall" in part]
                     
-                    function_calls = [part["functionCall"] for part in candidate["content"]["parts"] if "functionCall" in part]
-                    if function_calls:
+                    if function_call_parts and tools:
+                        model_message["parts"] = _ensure_thought_signature_for_function_calls(model_message["parts"])
+                        if model_message["parts"]:
+                            api_contents.append(model_message)
+
+                        for part in model_message.get("parts", []):
+                            if part.get("thought") is True:
+                                yield {"thought": part.get("text")}
+                            elif "text" in part:
+                                yield part["text"]
+
+                        if "groundingMetadata" in candidate:
+                            yield {"grounding_metadata": candidate["groundingMetadata"]}
+
+                        function_calls = [part["functionCall"] for part in function_call_parts]
                         logger.info(f"发现函数调用: {function_calls}")
                         function_responses = await self._execute_tool(function_calls, tools, tool_fixed_params)
                         api_contents.extend(function_responses)
@@ -646,6 +707,18 @@ class GeminiAPI:
                             retries=retries
                         ):
                             yield text
+                    else:
+                        if model_message["parts"]:
+                            api_contents.append(model_message)
+                        for part in model_message.get("parts", []):
+                            if part.get("thought") is True:
+                                yield {"thought": part.get("text")}
+                            elif "text" in part:
+                                yield part["text"]
+                        
+                        if "groundingMetadata" in candidate:
+                            yield {"grounding_metadata": candidate["groundingMetadata"]}
+                    
                     break
                 except httpx.HTTPStatusError as e:
                     # 检查是否是 429 错误（在 raise_for_status 之后捕获）
@@ -659,7 +732,7 @@ class GeminiAPI:
                             logger.error("所有模型配额均已耗尽。切换下一个apikey")
                             self.client = httpx.AsyncClient(
                                             base_url=self.baseurl,
-                                            params={'key': await GeminiKeyManager.get_gemini_apikey()},
+                                            params={'key': await self._get_next_apikey()},
                                             proxies=self.proxies,
                                             timeout=60.0
                                         )
