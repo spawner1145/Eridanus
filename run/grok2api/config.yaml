@@ -1,0 +1,25 @@
+# 临时文件存储路径
+TEMP_DIR_VIDEO: "data/video/cache"
+
+# 临时文件存储路径
+TEMP_DIR_IMAGE: "data/pictures/cache"
+
+# 配额数据存储路径
+QUOTA_FILE: "grok_video_quota.json"
+
+# grok2api默认
+BASE_URL: "http://127.0.0.1:8000"
+
+# 【必需】API Key（去这里创建API：https://console.x.ai/team/473d5d36-c88f-402a-97a4-14c1f2e52d9a/api-keys/create）
+API_KEY: "xai-26QZ1aXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXPj8bH64GgT"
+
+# 【必须】视频模型以及图像模型，保持默认即可
+MODEL_VIDEO: "grok-imagine-1.0-video"
+MODEL_IMAGE: "grok-imagine-1.0"
+
+# 限制设置
+PERMISSION_NEED: 2     #使用此功能的权限等级要求
+DAILY_LIMIT: 20        # 每日每人免费限制次数
+CONCURRENT_LIMIT: 1    # 单人同时运行的任务限制
+TIMEOUT: 300           # 请求超时时间 (秒)
+        

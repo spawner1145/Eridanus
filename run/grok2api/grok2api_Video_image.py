@@ -13,39 +13,41 @@ from typing import Dict, Optional, Tuple, Any
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Image, Text, File
 from framework_common.ToolKits.logger import get_logger
+from framework_common.database_util.User import get_user
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
-
+config=YAMLManager.get_instance()
 logger = get_logger("grok2api")
 
 # ================= 配置区域 =================
 class Config:
     # 临时文件存储路径
-    TEMP_DIR_VIDEO = "grok_video_temp"
+    TEMP_DIR_VIDEO = config.grok2api.config["TEMP_DIR_VIDEO"]
 
     # 临时文件存储路径
-    TEMP_DIR_IMAGE = "grok_image_temp"
+    TEMP_DIR_IMAGE =config.grok2api.config["TEMP_DIR_IMAGE"]
 
     # 配额数据存储路径
     QUOTA_FILE = "grok_video_quota.json"
 
     # 【必需】服务端地址（一般默认即可，实际情况需根据端口号而定）
-    BASE_URL = "http://127.0.0.1:8000"
+    BASE_URL = config.grok2api.config["BASE_URL"]
     API_URL_VIDEO = f"{BASE_URL}/v1/chat/completions"
     API_URL_IMAGE = f"{BASE_URL}/v1/images/generations"
 
     # 【必需】API Key（去这里创建API：https://console.x.ai/team/473d5d36-c88f-402a-97a4-14c1f2e52d9a/api-keys/create）
-    API_KEY = "xai-26QZ1aXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXPj8bH64GgT"
+    API_KEY = config.grok2api.config["API_KEY"]
 
     # 【必须】视频模型以及图像模型，保持默认即可
-    MODEL_VIDEO = "grok-imagine-1.0-video"
-    MODEL_IMAGE = "grok-imagine-1.0"
+    MODEL_VIDEO = config.grok2api.config["MODEL_VIDEO"]
+    MODEL_IMAGE = config.grok2api.config["MODEL_IMAGE"]
 
     # 限制设置
-    DAILY_LIMIT = 20        # 每日每人免费限制次数
-    CONCURRENT_LIMIT = 1    # 单人同时运行的任务限制
-    TIMEOUT = 300           # 请求超时时间 (秒)
-    ADMIN_QQ = 2702495766   # 管理员QQ号
+    DAILY_LIMIT = config.grok2api.config["DAILY_LIMIT"]        # 每日每人免费限制次数
+    PERMISSION_NEED=config.grok2api.config["PERMISSION_NEED"]
+    CONCURRENT_LIMIT = config.grok2api.config["CONCURRENT_LIMIT"]    # 单人同时运行的任务限制
+    TIMEOUT = config.grok2api.config["TIMEOUT"]           # 请求超时时间 (秒)
+    ADMIN_QQ = config.common_config.basic_config["master"]["id"]  # 管理员QQ号
 
 os.makedirs(Config.TEMP_DIR_VIDEO, exist_ok=True)
 os.makedirs(Config.TEMP_DIR_IMAGE, exist_ok=True)
@@ -390,7 +392,11 @@ def main(bot: ExtendBot, config: YAMLManager):
                 quota_manager.add_extra_quota(target_uid, count)
                 await bot.send(event, Text(f"成功为 {target_uid} 增加 {count} 次额度。\n当前剩余总次数：{quota_manager.get_remaining_count(int(target_uid))}"))
                 return
-
+        if text.startswith("/grok"):
+            user_info = await get_user(event.user_id, event.sender.nickname)
+            if not user_info.permission >= config.grok2api.config["PERMISSION_NEED"]:
+                await bot.send(event, "你没有足够的权限使用该功能哦~")
+                return
         # 取消操作
         if text in ["/grok取消", "/grok【取消】", "/grok cancel"]:
             if session_mgr.get(uid):
@@ -399,15 +405,14 @@ def main(bot: ExtendBot, config: YAMLManager):
             return
 
         # 视频指令
-        if text == "/grok视频":
+        elif text == "/grok视频":
             if not quota_manager.check_concurrent(uid): return await bot.send(event, "您当前已有任务正在运行。")
             if quota_manager.get_remaining_count(uid) <= 0: return await bot.send(event, Text("今日生成次数已用完。"))
             session_mgr.set(uid, "v_waiting_img")
             await bot.send(event, Text("请发送一张图片，或发送【取消】以终止任务。"))
             return
 
-        # 图片指令
-        if text == "/grok图片":
+        elif text == "/grok图片":
             if not quota_manager.check_concurrent(uid): return await bot.send(event, Text("您当前已有任务正在运行。"))
             if quota_manager.get_remaining_count(uid) <= 0: return await bot.send(event, Text("今日生成次数已用完。"))
             session_mgr.set(uid, "i_waiting_prompt")
