@@ -82,6 +82,7 @@ class GeminiAPI:
     ):
         self.apikey = apikey
         self.baseurl = baseurl.rstrip('/')
+        self.proxies=proxies
         # fallback_models 优先，如果提供了则使用第一个作为当前模型
         if fallback_models and len(fallback_models) > 0:
             self.model = fallback_models[0]
@@ -476,9 +477,9 @@ class GeminiAPI:
                             else:
                                 logger.error("所有模型配额均已耗尽。切换下一个apikey")
                                 self.client = httpx.AsyncClient(
-                                                base_url=baseurl,
+                                                base_url=self.baseurl,
                                                 params={'key': await GeminiKeyManager.get_gemini_apikey()},
-                                                proxies=proxies,
+                                                proxies=self.proxies,
                                                 timeout=60.0
                                             )
                                 stream_attempt += 1
@@ -558,9 +559,9 @@ class GeminiAPI:
                         else:
                             logger.error("所有模型配额均已耗尽。切换下一个apikey")
                             self.client = httpx.AsyncClient(
-                                            base_url=baseurl,
+                                            base_url=self.baseurl,
                                             params={'key': await GeminiKeyManager.get_gemini_apikey()},
-                                            proxies=proxies,
+                                            proxies=self.proxies,
                                             timeout=60.0
                                         )
                             stream_attempt += 1
@@ -586,9 +587,9 @@ class GeminiAPI:
                         else:
                             logger.error("所有模型配额均已耗尽。切换下一个apikey")
                             self.client = httpx.AsyncClient(
-                                            base_url=baseurl,
+                                            base_url=self.baseurl,
                                             params={'key': await GeminiKeyManager.get_gemini_apikey()},
-                                            proxies=proxies,
+                                            proxies=self.proxies,
                                             timeout=60.0
                                         )
                             attempt += 1
@@ -656,16 +657,18 @@ class GeminiAPI:
                         else:
                             logger.error("所有模型配额均已耗尽。切换下一个apikey")
                             self.client = httpx.AsyncClient(
-                                            base_url=baseurl,
+                                            base_url=self.baseurl,
                                             params={'key': await GeminiKeyManager.get_gemini_apikey()},
-                                            proxies=proxies,
+                                            proxies=self.proxies,
                                             timeout=60.0
                                         )
                             attempt += 1
+                            if attempt==retries:
+                                raise Exception("重试次数到达上限")
                             self._reset_model()  #重置模型
                             continue
-                        ogger.error("所有模型配额均已耗尽")
-                        raise
+                        #logger.error("所有模型配额均已耗尽")
+                        #raise
                     logger.error(f"HTTP 错误 (尝试 {attempt+1}/{total_attempts}): {e}")
                     logger.error(f"失败的请求体: {json.dumps(body, ensure_ascii=False, indent=2)}")
                     logger.error(f"服务器响应: {e.response.text}")
