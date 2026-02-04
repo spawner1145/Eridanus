@@ -195,7 +195,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                     response_text += part
             
             # 思维链累积完成后一次性发送
-            if thought_text and bot and event and config.ai_llm.config["llm"]["openai"]["CoT"]:
+            if thought_text and bot and event and ((config.ai_llm.config["llm"]["openai"]["CoT"] and config.ai_llm.config["llm"]["model"] == "openai") or (config.ai_llm.config["llm"]["gemini"]["include_thoughts"] and config.ai_llm.config["llm"]["model"] == "gemini")):
                 await bot.send(event, [Node(content=[Text(thought_text)])])
 
             reply_message = response_text.strip() if response_text else None
