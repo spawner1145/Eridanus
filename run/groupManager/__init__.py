@@ -44,7 +44,7 @@ function_declarations=[
     },
     {
         "name": "send",
-        "description": "根据要求发送消息，参数从上下文中获取。",
+        "description": "**根据用户要求发送消息**，参数从上下文中获取。在content中已经有回复时，不要调用此函数，否则会造成消息重复发送。尽量避免调用此函数。",
         "parameters": {
             "type": "object",
             "properties": {
