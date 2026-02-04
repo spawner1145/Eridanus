@@ -12,12 +12,11 @@ from typing import Dict, Optional, Tuple, Any
 
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Image, Text, File
+from framework_common.ToolKits.logger import get_logger
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 
-# 设置日志
-logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = get_logger("grok2api")
 
 # ================= 配置区域 =================
 class Config:
@@ -393,22 +392,22 @@ def main(bot: ExtendBot, config: YAMLManager):
                 return
 
         # 取消操作
-        if text in ["取消", "【取消】", "/cancel"]:
+        if text in ["/grok取消", "/grok【取消】", "/grok cancel"]:
             if session_mgr.get(uid):
                 session_mgr.clear(uid)
                 await bot.send(event, Text("操作已取消。"))
             return
 
         # 视频指令
-        if text == "/视频":
-            if not quota_manager.check_concurrent(uid): return await bot.send(event, Text("您当前已有任务正在运行。"))
+        if text == "/grok视频":
+            if not quota_manager.check_concurrent(uid): return await bot.send(event, "您当前已有任务正在运行。")
             if quota_manager.get_remaining_count(uid) <= 0: return await bot.send(event, Text("今日生成次数已用完。"))
             session_mgr.set(uid, "v_waiting_img")
             await bot.send(event, Text("请发送一张图片，或发送【取消】以终止任务。"))
             return
 
         # 图片指令
-        if text == "/图片":
+        if text == "/grok图片":
             if not quota_manager.check_concurrent(uid): return await bot.send(event, Text("您当前已有任务正在运行。"))
             if quota_manager.get_remaining_count(uid) <= 0: return await bot.send(event, Text("今日生成次数已用完。"))
             session_mgr.set(uid, "i_waiting_prompt")
