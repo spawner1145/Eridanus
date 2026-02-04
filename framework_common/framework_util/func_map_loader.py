@@ -78,6 +78,7 @@ def build_tool_map():
 
 
 NETWORK_SEARCH_FUNCTIONS = {"search_net", "read_html"}
+OFFICIAL_SEARCH_FUNCTIONS = {"search_with_official_api"}
 
 
 def build_tool_fixed_params(bot=None, event=None, config=None):
@@ -100,12 +101,18 @@ def get_tool_declarations(config=None):
         try:
             google_search_enabled = config.ai_llm.config["llm"].get("google_search", False)
             url_context_enabled = config.ai_llm.config["llm"].get("url_context", False)
+            
             if google_search_enabled or url_context_enabled:
                 declarations = [
                     decl for decl in declarations 
                     if decl.get("name") not in NETWORK_SEARCH_FUNCTIONS
                 ]
                 logger.info(f"已过滤联网相关函数 {NETWORK_SEARCH_FUNCTIONS}，因为官方搜索功能已开启")
+            else:
+                declarations = [
+                    decl for decl in declarations 
+                    if decl.get("name") not in OFFICIAL_SEARCH_FUNCTIONS
+                ]
         except Exception as e:
             logger.warning(f"检查搜索配置时出错: {e}")
     
@@ -119,12 +126,19 @@ def filter_tools_by_config(tools, config=None):
     try:
         google_search_enabled = config.ai_llm.config["llm"].get("google_search", False)
         url_context_enabled = config.ai_llm.config["llm"].get("url_context", False)
+        
         if google_search_enabled or url_context_enabled:
             filtered_tools = {
                 name: func for name, func in tools.items() 
                 if name not in NETWORK_SEARCH_FUNCTIONS
             }
             logger.info(f"已从 tools 中过滤联网相关函数 {NETWORK_SEARCH_FUNCTIONS}")
+            return filtered_tools
+        else:
+            filtered_tools = {
+                name: func for name, func in tools.items() 
+                if name not in OFFICIAL_SEARCH_FUNCTIONS
+            }
             return filtered_tools
     except Exception as e:
         logger.warning(f"过滤工具时检查配置出错: {e}")
