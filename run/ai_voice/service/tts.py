@@ -112,8 +112,11 @@ class TTS:
                 speaker=config.ai_voice.config["tts"]["blue_archive"]["speaker"]
             return await huggingface_blue_archive_tts(text, speaker)
         elif mode=="OttoTTS":
-            otto=OttoTTS()
-            return await otto.speak(text)
+            #otto=OttoTTS()
+            #return await otto.speak(text)
+            if speaker is None:
+                speaker=config.ai_voice.config["tts"]["PrettyDerby"]["speaker"]
+            return await PrettyDerby_TTS(text,speaker)
         elif mode=="MihoyoTTS":
             if speaker is None:
                 speaker=config.ai_voice.config["tts"]["MihoyoTTS"]["speaker"]
