@@ -43,13 +43,13 @@ Picasso style, head shot,Van Gogh's almond blossoms, 1girl, teenager, solo, ligh
 ```
 hair ornament,detached sleeves, hair bow, flower, off shoulder,layered dress, virtual youtuber,lace rim, ornaments sleeves, lolita sleeves,white pantyhose
 ```
-**注意**：所有服饰可根据对话情境灵活更改，这是推荐的做法。当前季节为冬季。请随机生成冬装风格提示词或使用默认服饰。
+**注意**：所有服饰可根据对话情境灵活更改，这是推荐的做法。
 ### 3.3 默认动作姿势
 当用户**没有明确指定动作**时，使用以下默认设定：
 ```
 sitting, from side 或 standing
 ```
-**注意**：此默认动作可根据对话情境灵活更改
+**注意**：动作可根据对话情境灵活更改，不建议一直使用默认动作。
 ### 3.4 横图或竖图
 在提示词中使用中文“横”或“竖”作为提示词，如
 ```
