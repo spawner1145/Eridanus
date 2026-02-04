@@ -40,20 +40,51 @@ logger = get_logger("aiReplyCore")
 
 
 async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, event=None, system_instruction=None,
-                      func_result=False):  # 后面几个函数都是供函数调用的场景使用的
+                      func_result=False):
     logger.info(f"aiReplyCore called with message: {processed_message}")
-    # 防止开头@影响人设，只在bot或event存在时处理
     if (bot or event) and isinstance(processed_message, list):
-        target_id = str(bot.id) if bot else str(event.self_id)
+        bot_id = str(bot.id) if bot else str(event.self_id)
+        bot_name = config.common_config.basic_config["bot"]
+        group_id = getattr(event, 'group_id', None) if event else None
+        logger.debug(f"Looking for at elements with bot_id: {bot_id}")
+        
         for i in range(len(processed_message)):
             item = processed_message[i]
             if isinstance(item, dict) and 'at' in item:
                 at_data = item['at']
-                if isinstance(at_data, dict) and 'qq' in at_data and str(at_data['qq']) == target_id:
-                    processed_message[i] = {
-                        'text': config.common_config.basic_config["bot"] + ','
-                    }
-                    logger.info(f"Replaced self at element with text: {processed_message[i]}")
+                logger.debug(f"Found at element at position {i}: {at_data}")
+                at_qq = None
+                if isinstance(at_data, dict) and 'qq' in at_data:
+                    at_qq = str(at_data['qq'])
+                elif isinstance(at_data, str):
+                    at_qq = at_data
+                
+                if at_qq:
+                    if at_qq == bot_id:
+                        processed_message[i] = {
+                            'text': f'@{bot_name}(qq号:{at_qq}) '
+                        }
+                        logger.info(f"Replaced @bot at position {i} with: @{bot_name}")
+                    else:
+                        sender_name = None
+                        try:
+                            if bot and group_id:
+                                member_info = await bot.get_group_member_info(group_id=group_id, user_id=int(at_qq))
+                                if member_info and 'data' in member_info:
+                                    sender_name = member_info['data'].get('nickname')
+                            if not sender_name and bot:
+                                stranger_info = await bot.get_stranger_info(user_id=int(at_qq))
+                                if stranger_info and 'data' in stranger_info:
+                                    sender_name = stranger_info['data'].get('nickname')
+                        except Exception as e:
+                            logger.debug(f"Failed to get user name for {at_qq}: {e}")
+                        if not sender_name:
+                            sender_name = at_qq
+                        
+                        processed_message[i] = {
+                            'text': f'@{sender_name} '
+                        }
+                        logger.info(f"Replaced @{at_qq} at position {i} with: @{sender_name} ")
     """
     初始值
     """
