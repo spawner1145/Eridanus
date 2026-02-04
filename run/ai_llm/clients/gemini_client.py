@@ -30,7 +30,8 @@ def _is_valid_part(part: Dict) -> bool:
 
 def _filter_empty_text_parts(parts: List[Dict]) -> List[Dict]:
     """过滤掉空 text 的 parts"""
-    return [p for p in parts if _is_valid_part(p)]
+    return parts
+    #return [p for p in parts if _is_valid_part(p)]
 
 
 def format_grounding_metadata(grounding_metadata: Dict) -> str:
