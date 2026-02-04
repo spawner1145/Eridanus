@@ -117,7 +117,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
         user_info = await get_user(user_id)
         #current_datetime = datetime.datetime.now()
         #formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
-        #system_instruction = (f"{formatted_datetime} {system_instruction}").replace("{用户}", user_info.nickname).replace("{bot_name}",config.common_config.basic_config["bot"])
+        system_instruction = (f"{system_instruction}").replace("{用户}", user_info.nickname).replace("{bot_name}",config.common_config.basic_config["bot"])
     """
     用户画像读取（保存 user_info 供后续注入主 prompt 使用）
     """
