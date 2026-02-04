@@ -251,16 +251,7 @@ class OpenAIAPI:
                 "content": api_content
             }
             if "tool_calls" in msg:
-                api_msg["tool_calls"] = [
-                    {
-                        "id": tc["id"],
-                        "type": "function",
-                        "function": {
-                            "name": tc["function"]["name"],
-                            "arguments": tc["function"]["arguments"]
-                        }
-                    } for tc in msg["tool_calls"]
-                ]
+                api_msg["tool_calls"] = msg["tool_calls"]
             if "tool_call_id" in msg:
                 api_msg["tool_call_id"] = msg["tool_call_id"]
             logger.debug(f"构造消息: {json.dumps(api_msg, ensure_ascii=False)}")
@@ -372,14 +363,19 @@ class OpenAIAPI:
                                 try:
                                     arguments = tool_call.function.arguments or "{}"
                                     json.loads(arguments)
-                                    tool_calls_buffer.append({
+                                    tc_dict = {
                                         "id": tool_call_id,
                                         "type": "function",
                                         "function": {
                                             "name": tool_call.function.name,
                                             "arguments": arguments
                                         }
-                                    })
+                                    }
+                                    if hasattr(tool_call, 'extra_content') and tool_call.extra_content:
+                                        tc_dict["extra_content"] = tool_call.extra_content
+                                    elif isinstance(tool_call, dict) and "extra_content" in tool_call:
+                                        tc_dict["extra_content"] = tool_call["extra_content"]
+                                    tool_calls_buffer.append(tc_dict)
                                 except json.JSONDecodeError:
                                     continue
                         if chunk.choices[0].finish_reason == "tool_calls" and tool_calls_buffer:
@@ -439,16 +435,21 @@ class OpenAIAPI:
                     choice = response.choices[0]
                     message = choice.message
                     if message.tool_calls:
-                        tool_calls = [
-                            {
+                        tool_calls = []
+                        for tc in message.tool_calls:
+                            tc_dict = {
                                 "id": tc.id or f"call_{uuid.uuid4()}",
                                 "type": "function",
                                 "function": {
                                     "name": tc.function.name,
                                     "arguments": tc.function.arguments
                                 }
-                            } for tc in message.tool_calls
-                        ]
+                            }
+                            if hasattr(tc, 'extra_content') and tc.extra_content:
+                                tc_dict["extra_content"] = tc.extra_content
+                            elif isinstance(tc, dict) and "extra_content" in tc:
+                                tc_dict["extra_content"] = tc["extra_content"]
+                            tool_calls.append(tc_dict)
                         assistant_message = {
                             "role": "assistant",
                             "content": [{"type": "text", "text": "Tool calls executed"}],
