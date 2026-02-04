@@ -1,5 +1,5 @@
 plugin_description="系统功能"
-
+import os
 
 dynamic_imports = {
     "run.system_plugin.Mface_Record": ["call_send_mface"],
