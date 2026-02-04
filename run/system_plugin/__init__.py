@@ -9,6 +9,7 @@ dynamic_imports = {
         "call_delete_user_history", "call_clear_all_history","operate_group_push_tasks"
     ],
 }
+mface_list = os.listdir("data/pictures/Mface")
 function_declarations=[
     {
         "name": "operate_group_push_tasks",
@@ -113,4 +114,20 @@ function_declarations=[
             ]
         }
     },
+    {
+        "name": "call_send_mface",
+        "description": "根据当前聊天内容选择一张表情包，只可从给定列表选取，只可选择一张，建议尽可能多地使用此函数，即使用户没有要求你也可以调用此函数选择表情包。表情包仅可通过此函数发送给用户，选择的表情包名称不能出现在回复消息中。不要通过send函数发送表情包。请勿在回复文本中混入表情包，例如 你好呀[你好].gif 是无效的且不被允许的组合方式。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "summary": {
+                    "type": "string",
+                    "description": f"表情包。可选{mface_list}，将选择的结果输入此函数以记录并发送。"
+                }
+            },
+            "required": [
+                "summary"
+            ]
+        }
+    }
 ]
