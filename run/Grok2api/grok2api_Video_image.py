@@ -22,31 +22,31 @@ logger = get_logger("grok2api")
 # ================= 配置区域 =================
 class Config:
     # 临时文件存储路径
-    TEMP_DIR_VIDEO = config.grok2api.config["TEMP_DIR_VIDEO"]
+    TEMP_DIR_VIDEO = config.Grok2api.config["TEMP_DIR_VIDEO"]
 
     # 临时文件存储路径
-    TEMP_DIR_IMAGE =config.grok2api.config["TEMP_DIR_IMAGE"]
+    TEMP_DIR_IMAGE =config.Grok2api.config["TEMP_DIR_IMAGE"]
 
     # 配额数据存储路径
     QUOTA_FILE = "grok_video_quota.json"
 
     # 【必需】服务端地址（一般默认即可，实际情况需根据端口号而定）
-    BASE_URL = config.grok2api.config["BASE_URL"]
+    BASE_URL = config.Grok2api.config["BASE_URL"]
     API_URL_VIDEO = f"{BASE_URL}/v1/chat/completions"
     API_URL_IMAGE = f"{BASE_URL}/v1/images/generations"
 
     # 【必需】API Key（去这里创建API：https://console.x.ai/team/473d5d36-c88f-402a-97a4-14c1f2e52d9a/api-keys/create）
-    API_KEY = config.grok2api.config["API_KEY"]
+    API_KEY = config.Grok2api.config["API_KEY"]
 
     # 【必须】视频模型以及图像模型，保持默认即可
-    MODEL_VIDEO = config.grok2api.config["MODEL_VIDEO"]
-    MODEL_IMAGE = config.grok2api.config["MODEL_IMAGE"]
+    MODEL_VIDEO = config.Grok2api.config["MODEL_VIDEO"]
+    MODEL_IMAGE = config.Grok2api.config["MODEL_IMAGE"]
 
     # 限制设置
-    DAILY_LIMIT = config.grok2api.config["DAILY_LIMIT"]        # 每日每人免费限制次数
-    PERMISSION_NEED=config.grok2api.config["PERMISSION_NEED"]
-    CONCURRENT_LIMIT = config.grok2api.config["CONCURRENT_LIMIT"]    # 单人同时运行的任务限制
-    TIMEOUT = config.grok2api.config["TIMEOUT"]           # 请求超时时间 (秒)
+    DAILY_LIMIT = config.Grok2api.config["DAILY_LIMIT"]        # 每日每人免费限制次数
+    PERMISSION_NEED=config.Grok2api.config["PERMISSION_NEED"]
+    CONCURRENT_LIMIT = config.Grok2api.config["CONCURRENT_LIMIT"]    # 单人同时运行的任务限制
+    TIMEOUT = config.Grok2api.config["TIMEOUT"]           # 请求超时时间 (秒)
     ADMIN_QQ = config.common_config.basic_config["master"]["id"]  # 管理员QQ号
 
 os.makedirs(Config.TEMP_DIR_VIDEO, exist_ok=True)
@@ -394,7 +394,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                 return
         if text.startswith("/grok"):
             user_info = await get_user(event.user_id, event.sender.nickname)
-            if not user_info.permission >= config.grok2api.config["PERMISSION_NEED"]:
+            if not user_info.permission >= config.Grok2api.config["PERMISSION_NEED"]:
                 await bot.send(event, "你没有足够的权限使用该功能哦~")
                 return
         # 取消操作
