@@ -348,86 +348,127 @@ class OpenAIAPI:
         if stream:
             assistant_content = ""
             tool_calls_buffer = []
-            async for chunk in await self.client.chat.completions.create(**request_params):
-                if chunk.choices:
+            try:
+                logger.info(f"开始流式请求: model={self.model}, base_url={self.baseurl}")
+                response_stream = await self.client.chat.completions.create(**request_params)
+                chunk_count = 0
+                async for chunk in response_stream:
+                    chunk_count += 1
+                    if not chunk.choices:
+                        if chunk_count <= 3:
+                            logger.debug(f"流式响应chunk无choices: {chunk}")
+                        continue
+                    
                     delta = chunk.choices[0].delta
+                    finish_reason = chunk.choices[0].finish_reason
+
                     if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
                         yield {"thought": delta.reasoning_content}
                     if delta.content:
                         yield delta.content
                         assistant_content += delta.content
-                    elif delta.tool_calls:
+                    elif hasattr(delta, 'text') and delta.text:
+                        yield delta.text
+                        assistant_content += delta.text
+                    
+                    if hasattr(delta, 'tool_calls') and delta.tool_calls:
                         for tool_call in delta.tool_calls:
-                            if tool_call and tool_call.function:
-                                tool_call_id = tool_call.id or f"call_{uuid.uuid4()}"
-                                try:
-                                    arguments = tool_call.function.arguments or "{}"
-                                    json.loads(arguments)
-                                    tc_dict = {
-                                        "id": tool_call_id,
-                                        "type": "function",
-                                        "function": {
-                                            "name": tool_call.function.name,
-                                            "arguments": arguments
-                                        }
-                                    }
-                                    if hasattr(tool_call, 'extra_content') and tool_call.extra_content:
-                                        tc_dict["extra_content"] = tool_call.extra_content
-                                    elif isinstance(tool_call, dict) and "extra_content" in tool_call:
-                                        tc_dict["extra_content"] = tool_call["extra_content"]
-                                    tool_calls_buffer.append(tc_dict)
-                                except json.JSONDecodeError:
-                                    continue
-                        if chunk.choices[0].finish_reason == "tool_calls" and tool_calls_buffer:
-                            assistant_message = {
-                                "role": "assistant",
-                                "content": [{"type": "text", "text": "Tool calls executed"}],
-                                "tool_calls": tool_calls_buffer
-                            }
-                            api_messages.append(assistant_message)
-                            messages.append(assistant_message)
-                            tool_messages = await self._execute_tool(
-                                tool_calls_buffer, 
-                                tools, 
-                                tool_fixed_params
-                            )
+                            if tool_call is None:
+                                continue
                             
-                            api_messages.extend(tool_messages)
-                            messages.extend(tool_messages)
-                            second_request_params = request_params.copy()
-                            second_request_params["messages"] = api_messages
-                            second_request_params["stream"] = True
-                            try:
-                                async for chunk in await self.client.chat.completions.create(**second_request_params):
-                                    if chunk.choices:
-                                        delta = chunk.choices[0].delta
-                                        if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
-                                            yield {"thought": delta.reasoning_content}
-                                        if delta.content:
-                                            yield delta.content
-                                            assistant_content += delta.content
-                                        if chunk.choices[0].finish_reason in ["stop", "length"]:
-                                            if assistant_content:
-                                                messages.append({
-                                                    "role": "assistant",
-                                                    "content": [{"type": "text", "text": assistant_content}]
-                                                })
-                                            assistant_content = ""
-                            except Exception as e:
-                                logger.error(f"第二次 API 调用失败: {str(e)}")
-                                yield f"错误: 无法获取最终响应 - {str(e)}"
-                                messages.append({
-                                    "role": "assistant",
-                                    "content": [{"type": "text", "text": f"错误: {str(e)}"}]
+                            tc_index = getattr(tool_call, 'index', None)
+                            if tc_index is None:
+                                tc_index = len(tool_calls_buffer)
+                            while len(tool_calls_buffer) <= tc_index:
+                                tool_calls_buffer.append({
+                                    "id": "",
+                                    "type": "function",
+                                    "function": {"name": "", "arguments": ""}
                                 })
+                            
+                            tc_entry = tool_calls_buffer[tc_index]
+
+                            if tool_call.id:
+                                tc_entry["id"] = tool_call.id
+                            if tool_call.function:
+                                if tool_call.function.name:
+                                    tc_entry["function"]["name"] += tool_call.function.name
+                                if tool_call.function.arguments:
+                                    tc_entry["function"]["arguments"] += tool_call.function.arguments
+
+                    if finish_reason == "tool_calls" and tool_calls_buffer:
+                        valid_tool_calls = []
+                        for tc in tool_calls_buffer:
+                            if tc["function"]["name"]:
+                                if not tc["id"]:
+                                    tc["id"] = f"call_{uuid.uuid4()}"
+                                valid_tool_calls.append(tc)
+                        
+                        if not valid_tool_calls:
+                            logger.warning("没有有效的工具调用")
                             tool_calls_buffer = []
-                    if chunk.choices[0].finish_reason in ["stop", "length"]:
+                            continue
+                        
+                        tool_calls_buffer = valid_tool_calls
+                        assistant_message = {
+                            "role": "assistant",
+                            "content": [{"type": "text", "text": "Tool calls executed"}],
+                            "tool_calls": tool_calls_buffer
+                        }
+                        api_messages.append(assistant_message)
+                        messages.append(assistant_message)
+                        tool_messages = await self._execute_tool(
+                            tool_calls_buffer, 
+                            tools, 
+                            tool_fixed_params
+                        )
+                        
+                        api_messages.extend(tool_messages)
+                        messages.extend(tool_messages)
+                        second_request_params = request_params.copy()
+                        second_request_params["messages"] = api_messages
+                        second_request_params["stream"] = True
+                        try:
+                            async for chunk2 in await self.client.chat.completions.create(**second_request_params):
+                                if chunk2.choices:
+                                    delta2 = chunk2.choices[0].delta
+                                    if hasattr(delta2, 'reasoning_content') and delta2.reasoning_content:
+                                        yield {"thought": delta2.reasoning_content}
+                                    if delta2.content:
+                                        yield delta2.content
+                                        assistant_content += delta2.content
+                                    if chunk2.choices[0].finish_reason in ["stop", "length"]:
+                                        if assistant_content:
+                                            messages.append({
+                                                "role": "assistant",
+                                                "content": [{"type": "text", "text": assistant_content}]
+                                            })
+                                        assistant_content = ""
+                        except Exception as e:
+                            logger.error(f"第二次 API 调用失败: {str(e)}")
+                            yield f"错误: 无法获取最终响应 - {str(e)}"
+                            messages.append({
+                                "role": "assistant",
+                                "content": [{"type": "text", "text": f"错误: {str(e)}"}]
+                            })
+                        tool_calls_buffer = []
+                    
+                    if finish_reason in ["stop", "length"]:
                         if assistant_content:
                             messages.append({
                                 "role": "assistant",
                                 "content": [{"type": "text", "text": assistant_content}]
                             })
                         assistant_content = ""
+            except httpx.TimeoutException as e:
+                logger.error(f"流式请求超时: {str(e)}")
+                raise
+            except httpx.ConnectError as e:
+                logger.error(f"流式请求连接失败: {str(e)}")
+                raise
+            except Exception as e:
+                logger.error(f"流式请求失败: {type(e).__name__}: {str(e)}")
+                raise
         else:
             for attempt in range(retries):
                 try:
