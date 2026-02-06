@@ -62,11 +62,11 @@ def main(bot: ExtendBot,config: YAMLManager):
         elif event.pure_text.startswith("修改城市"):
             city=event.pure_text.split("修改城市")[1]
             await call_change_city(bot,event,config,city)
-        elif event.pure_text.startswith("叫我"):
-            user_info=await get_user(event.user_id, event.sender.nickname)
-            if user_info.permission>=config.system_plugin.config["user_data"]["change_info_operate_level"]:
-                nickname=event.pure_text.split("叫我")[1]
-                await call_change_name(bot,event,config,nickname)
+        # elif event.pure_text.startswith("叫我"):
+        #     user_info=await get_user(event.user_id, event.sender.nickname)
+        #     if user_info.permission>=config.system_plugin.config["user_data"]["change_info_operate_level"]:
+        #         nickname=event.pure_text.split("叫我")[1]
+        #         await call_change_name(bot,event,config,nickname)
 
     @bot.on(GroupMessageEvent)
     async def handle_group_message1(event):

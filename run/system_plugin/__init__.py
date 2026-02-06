@@ -5,7 +5,7 @@ dynamic_imports = {
     "run.system_plugin.Mface_Record": ["call_send_mface"],
     "run.system_plugin.func_collection": [
         "call_user_data_register", "call_user_data_query", "call_user_data_sign",
-        "call_change_city", "call_change_name", "call_permit",
+        "call_change_city", "call_permit",
         "call_delete_user_history", "call_clear_all_history","operate_group_push_tasks"
     ],
 }
@@ -70,22 +70,6 @@ function_declarations=[
             },
             "required": [
                 "city"
-            ]
-        }
-    },
-    {
-        "name": "call_change_name",
-        "description": "改变称呼。触发示例： 叫我阿明。当用户告知修改昵称后，必须调用此函数以保存。",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "description": "称呼"
-                }
-            },
-            "required": [
-                "name"
             ]
         }
     },
