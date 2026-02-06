@@ -24,7 +24,8 @@ from framework_common.database_util.llmDB import get_user_history, update_user_h
     use_folder_chara
 
 from framework_common.database_util.User import get_user, update_user
-from framework_common.framework_util.func_map_loader import build_tool_fixed_params, get_tool_declarations, filter_tools_by_config
+from framework_common.framework_util.func_map_loader import build_tool_fixed_params, get_tool_declarations, \
+    filter_tools_by_config
 from run.ai_llm.clients.gemini_client import GeminiAPI, format_grounding_metadata
 from run.ai_llm.clients.openai_client import OpenAIAPI
 
@@ -32,11 +33,7 @@ from run.ai_voice.service.tts import TTS
 
 Tts = TTS()
 
-
 logger = get_logger("aiReplyCore")
-
-
-
 
 
 async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, event=None, system_instruction=None,
@@ -47,7 +44,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
         bot_name = config.common_config.basic_config["bot"]
         group_id = getattr(event, 'group_id', None) if event else None
         logger.debug(f"Looking for at elements with bot_id: {bot_id}")
-        
+
         for i in range(len(processed_message)):
             item = processed_message[i]
             if isinstance(item, dict) and 'at' in item:
@@ -58,7 +55,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                     at_qq = str(at_data['qq'])
                 elif isinstance(at_data, str):
                     at_qq = at_data
-                
+
                 if at_qq:
                     if at_qq == bot_id:
                         processed_message[i] = {
@@ -80,7 +77,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                             logger.debug(f"Failed to get user name for {at_qq}: {e}")
                         if not sender_name:
                             sender_name = at_qq
-                        
+
                         processed_message[i] = {
                             'text': f'@{sender_name} '
                         }
@@ -95,13 +92,13 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
     # 根据配置过滤 tools（如果开启了官方搜索功能，禁用自定义联网函数）
     if tools is not None:
         tools = filter_tools_by_config(tools, config)
-    
+
     # 检查是否使用官方搜索功能（google_search 或 url_context）
     use_official_search = (
-        config.ai_llm.config["llm"].get("google_search", False) or
-        config.ai_llm.config["llm"].get("url_context", False)
+            config.ai_llm.config["llm"].get("google_search", False) or
+            config.ai_llm.config["llm"].get("url_context", False)
     )
-    
+
     if tools is not None and config.ai_llm.config["llm"]["表情包发送"] and not use_official_search:
         try:
             tools = await add_send_mface(tools, config)
@@ -110,14 +107,16 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
     if not system_instruction:
         if config.ai_llm.config["llm"]["system"]:
             system_instruction = await read_chara(user_id, config.ai_llm.config["llm"]["system"])
-            #system_instruction = config.ai_llm.config["llm"]["system"]
+            # system_instruction = config.ai_llm.config["llm"]["system"]
         else:
             system_instruction = await read_chara(user_id, await use_folder_chara(
                 config.ai_llm.config["llm"]["chara_file_name"]))
         user_info = await get_user(user_id)
-        #current_datetime = datetime.datetime.now()
-        #formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
-        system_instruction = (f"{system_instruction}").replace("{用户}", user_info.nickname).replace("{bot_name}",config.common_config.basic_config["bot"])
+        # current_datetime = datetime.datetime.now()
+        # formatted_datetime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+        system_instruction = (f"{system_instruction}").replace("{用户}", user_info.nickname).replace("{bot_name}",
+                                                                                                     config.common_config.basic_config[
+                                                                                                         "bot"])
     """
     用户画像读取（保存 user_info 供后续注入主 prompt 使用）
     """
@@ -127,8 +126,9 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
 
     try:
         if config.ai_llm.config["llm"]["model"] == "default":
-            prompt, original_history = await construct_openai_standard_prompt_old_version(processed_message, system_instruction,
-                                                                              user_id)
+            prompt, original_history = await construct_openai_standard_prompt_old_version(processed_message,
+                                                                                          system_instruction,
+                                                                                          user_id)
             print(prompt)
             response_message = await defaultModelRequest(
                 prompt,
@@ -179,23 +179,26 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             response_text = ""
             thought_text = ""  # 累积思维链内容
             async for part in api.chat(
-                prompt,
-                stream=True,
-                tools=tools,
-                tool_fixed_params=tool_fixed_params,
-                tool_declarations=tool_declarations,
-                max_output_tokens=config.ai_llm.config["llm"]["openai"]["max_tokens"],
-                temperature=config.ai_llm.config["llm"]["openai"]["temperature"],
-                retries=retries,
+                    prompt,
+                    stream=True,
+                    tools=tools,
+                    tool_fixed_params=tool_fixed_params,
+                    tool_declarations=tool_declarations,
+                    max_output_tokens=config.ai_llm.config["llm"]["openai"]["max_tokens"],
+                    temperature=config.ai_llm.config["llm"]["openai"]["temperature"],
+                    retries=retries,
             ):
                 if isinstance(part, dict) and "thought" in part:
                     # 流式累积思维链
                     thought_text += str(part["thought"])
                 elif isinstance(part, str):
                     response_text += part
-            
+
             # 思维链累积完成后一次性发送
-            if thought_text and bot and event and ((config.ai_llm.config["llm"]["openai"]["CoT"] and config.ai_llm.config["llm"]["model"] == "openai") or (config.ai_llm.config["llm"]["gemini"]["include_thoughts"] and config.ai_llm.config["llm"]["model"] == "gemini")):
+            if thought_text and bot and event and ((config.ai_llm.config["llm"]["openai"]["CoT"] and
+                                                    config.ai_llm.config["llm"]["model"] == "openai") or (
+                                                           config.ai_llm.config["llm"]["gemini"]["include_thoughts"] and
+                                                           config.ai_llm.config["llm"]["model"] == "gemini")):
                 await bot.send(event, [Node(content=[Text(thought_text)])])
 
             reply_message = response_text.strip() if response_text else None
@@ -247,23 +250,23 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             tool_declarations = get_tool_declarations(config) if tools else None
             show_grounding_metadata = config.ai_llm.config["llm"].get("联网搜索显示原始数据", True)
             retries = config.ai_llm.config["llm"].get("retries", 3)
-            
+
             response_text = ""
             grounding_metadata = None
             thought_text = ""  # 累积思维链内容
             async for part in api.chat(
-                prompt,
-                stream=True,
-                tools=tools,
-                tool_fixed_params=tool_fixed_params,
-                tool_declarations=tool_declarations,
-                system_instruction=system_instruction,
-                temperature=config.ai_llm.config["llm"]["gemini"]["temperature"],
-                max_output_tokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"],
-                include_thoughts=config.ai_llm.config["llm"]["gemini"].get("include_thoughts", False),
-                google_search=False,
-                url_context=False,
-                retries=retries,
+                    prompt,
+                    stream=True,
+                    tools=tools,
+                    tool_fixed_params=tool_fixed_params,
+                    tool_declarations=tool_declarations,
+                    system_instruction=system_instruction,
+                    temperature=config.ai_llm.config["llm"]["gemini"]["temperature"],
+                    max_output_tokens=config.ai_llm.config["llm"]["gemini"]["maxOutputTokens"],
+                    include_thoughts=config.ai_llm.config["llm"]["gemini"].get("include_thoughts", False),
+                    google_search=False,
+                    url_context=False,
+                    retries=retries,
             ):
                 if isinstance(part, dict) and part.get("thought"):
                     # 流式累积思维链
@@ -272,11 +275,11 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                     grounding_metadata = part["grounding_metadata"]
                 elif isinstance(part, str):
                     response_text += part
-            
+
             # 思维链累积完成后一次性发送
             if thought_text and bot and event and config.ai_llm.config["llm"]["gemini"].get("include_thoughts", False):
                 await bot.send(event, [Node(content=[Text(thought_text)])])
-            
+
             # 如果配置了显示联网搜索原始数据，则发送 grounding metadata
             if grounding_metadata and show_grounding_metadata and bot and event:
                 formatted_metadata = format_grounding_metadata(grounding_metadata)
@@ -363,7 +366,9 @@ async def prompt_database_update(user_id, response_message, config):
     history.append(response_message)
     await update_user_history(user_id, history)
 
+
 prompt_database_updata = prompt_database_update
+
 
 async def prompt_length_check(user_id, config):
     history = await get_user_history(user_id)
@@ -387,20 +392,20 @@ def inject_user_portrait(prompt, user_portrait, model_type):
     """
     if not user_portrait or user_portrait in ["", "默认用户"]:
         return prompt
-    
+
     portrait_text = (
         "================== 用户画像 开始 ==================\n"
         f"【系统提示】以下为当前正在与你对话的用户的画像特征：\n{user_portrait}\n"
         "================== 用户画像 结束 =================="
     )
-    
+
     if model_type == "gemini":
         portrait_message = {
             "role": "user",
             "parts": [{"text": portrait_text}]
         }
         confirm_message = {
-            "role": "model", 
+            "role": "model",
             "parts": [{"text": "好的，我已经了解了这些信息。"}]
         }
     else:  # openai
@@ -412,7 +417,7 @@ def inject_user_portrait(prompt, user_portrait, model_type):
             "role": "assistant",
             "content": [{"type": "text", "text": "好的，我已经了解了这些信息。"}]
         }
-    
+
     insert_pos = max(len(prompt) - 1, 0)
     prompt = prompt[:insert_pos] + [portrait_message, confirm_message] + prompt[insert_pos:]
     return prompt
@@ -426,7 +431,7 @@ async def read_context(bot, event, config, prompt):
         if not config.ai_llm.config["llm"].get("上下文带原文", False) or not hasattr(event, "group_id"):
             return None
         include_images = config.ai_llm.config["llm"].get("上下文带图片原文", False)
-        
+
         if config.ai_llm.config["llm"]["model"] == "gemini":
             group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id, config.ai_llm.config["llm"][
                 "可获取的群聊上下文长度"], "gemini", bot, include_images=include_images)
@@ -435,20 +440,22 @@ async def read_context(bot, event, config, prompt):
                 group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id,
                                                                             config.ai_llm.config["llm"][
                                                                                 "可获取的群聊上下文长度"],
-                                                                            "old_openai", bot, include_images=include_images)
+                                                                            "old_openai", bot,
+                                                                            include_images=include_images)
             else:
                 group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id,
                                                                             config.ai_llm.config["llm"][
                                                                                 "可获取的群聊上下文长度"],
-                                                                            "new_openai", bot, include_images=include_images)
+                                                                            "new_openai", bot,
+                                                                            include_images=include_images)
         else:
             return None
-        
+
         if not group_messages_bg:
             return None
-            
+
         bot.logger.info(f"群聊上下文消息：已读取")
-        
+
         insert_pos = max(len(prompt) - 1, 0)
         context_to_insert = []
         if config.ai_llm.config["llm"].get("群聊总结", {}).get("聊天带总结", False):
@@ -472,10 +479,10 @@ async def read_context(bot, event, config, prompt):
                     }
                 context_to_insert.append(summary_message)
                 bot.logger.info(f"群聊总结已注入到prompt中")
-        
+
         context_to_insert.extend(group_messages_bg)
         prompt = prompt[:insert_pos] + context_to_insert + prompt[insert_pos:]
-        
+
         return prompt
     except Exception as e:
         logger.warning(f"读取群聊上下文时发生错误: {e}")
@@ -536,7 +543,7 @@ def remove_mface_filenames(reply_message, config, directory="data/pictures/Mface
             matched_files = matched_files[:config.ai_llm.config["llm"]["单次发送表情包数量"]]
             logger.info(f"mface 匹配到的文件名: {matched_files}")
 
-        #logger.info(f"mface 处理后的文本: {cleaned_text}")
+        # logger.info(f"mface 处理后的文本: {cleaned_text}")
         if not matched_files:
             return cleaned_text, []
         return cleaned_text, matched_files
