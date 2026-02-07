@@ -180,7 +180,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             thought_text = ""  # 累积思维链内容
             async for part in api.chat(
                     prompt,
-                    stream=True,
+                    stream=config.ai_llm.config["llm"]["stream"],
                     tools=tools,
                     tool_fixed_params=tool_fixed_params,
                     tool_declarations=tool_declarations,
@@ -256,7 +256,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             thought_text = ""  # 累积思维链内容
             async for part in api.chat(
                     prompt,
-                    stream=True,
+                    stream=config.ai_llm.config["llm"]["stream"],
                     tools=tools,
                     tool_fixed_params=tool_fixed_params,
                     tool_declarations=tool_declarations,
