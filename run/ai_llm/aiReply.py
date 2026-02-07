@@ -32,6 +32,7 @@ from run.ai_llm.service.utility_client import utility_request
 # 图片处理相关常量和函数
 BASE64_PATTERN = re.compile(r'^data:(image/\w+);base64,(.+)$')
 
+
 def is_local_file_path(url: str) -> bool:
     """判断是否为本地文件路径"""
     if url.startswith("file://"):
@@ -40,11 +41,13 @@ def is_local_file_path(url: str) -> bool:
         return True
     return False
 
+
 def get_local_file_path(url: str) -> str:
     """获取本地文件的实际路径"""
     if url.startswith("file://"):
         return url[7:]
     return url
+
 
 async def _process_image_for_summary(url: str, client_type: str) -> dict:
     """处理图片并转换为对应client格式"""
@@ -86,23 +89,24 @@ async def _process_image_for_summary(url: str, client_type: str) -> dict:
                         quality -= 5
                     img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
                     image.close()
-        
+
         if not img_base64:
             return None
         if client_type == "openai":
             return {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_base64}", "detail": "auto"}}
         else:
             return {"inlineData": {"mimeType": "image/jpeg", "data": img_base64}}
-    
+
     except Exception as e:
         print(f"处理图片失败: {e}")
         return None
+
 
 async def _extract_images_from_messages(group_messages, client_type: str, max_images: int = 10):
     """从群消息中提取图片并转换为对应格式"""
     image_parts = []
     image_count = 0
-    
+
     for msg in group_messages:
         if image_count >= max_images:
             break
@@ -124,7 +128,7 @@ async def _extract_images_from_messages(group_messages, client_type: str, max_im
                     mface_data = part.get('mface', part)
                     if isinstance(mface_data, dict):
                         url = mface_data.get('url') or mface_data.get('file')
-                
+
                 if url:
                     try:
                         img_data = await _process_image_for_summary(url, client_type)
@@ -137,13 +141,13 @@ async def _extract_images_from_messages(group_messages, client_type: str, max_im
                             image_count += 1
                     except Exception as e:
                         print(f"处理图片时出错: {e}")
-    
+
     return image_parts
 
 
 def main(bot, config):
     apikey_check = False
-    removed_keys=[]
+    removed_keys = []
     cleanup_tasks = {}
     if config.ai_llm.config["llm"]["func_calling"]:
         tools = build_tool_map()
@@ -175,11 +179,11 @@ def main(bot, config):
                 elif event.group_id not in summary_updating:
                     summary_updating.add(event.group_id)
                     asyncio.create_task(auto_generate_group_summary(event.group_id, bot, config))
-        
+
         if config.ai_llm.config["heartflow"]["whitelist_enabled"]:
             if event.group_id in config.ai_llm.config["heartflow"]["chat_whitelist"]:
                 if event.message_chain.has(At):
-                    if event.message_chain.get(At)[0].qq in [bot.id,1000000]:
+                    if event.message_chain.get(At)[0].qq in [bot.id, 1000000]:
                         pass
                     else:
                         return
@@ -188,7 +192,8 @@ def main(bot, config):
         """
         原有处理逻辑
         """
-        if (event.message_chain.has(At) and event.message_chain.get(At)[0].qq in [bot.id,1000000]) or prefix_check(str(event.pure_text), config.ai_llm.config["llm"]["prefix"]):
+        if (event.message_chain.has(At) and event.message_chain.get(At)[0].qq in [bot.id, 1000000]) or prefix_check(
+                str(event.pure_text), config.ai_llm.config["llm"]["prefix"]):
             bot.logger.info(f"接受消息{event.processed_message}")
 
             ## 权限判断
@@ -197,14 +202,14 @@ def main(bot, config):
             if not user_info.permission >= config.ai_llm.config["core"]["ai_reply_group"]:
                 await bot.send(event, "你没有足够的权限使用该功能~")
                 return
-            if event.group_id in [913122269,1050663831] and not user_info.permission >= 66:
-                #await bot.send(event,"你没有足够的权限使用该功能哦~")
+            if event.group_id in [913122269, 1050663831] and not user_info.permission >= 66:
+                # await bot.send(event,"你没有足够的权限使用该功能哦~")
                 return
             if not user_info.permission >= config.ai_llm.config["core"]["ai_token_limt"]:
                 if user_info.ai_token_record >= config.ai_llm.config["core"]["ai_token_limt_token"]:
                     await bot.send(event, "您的ai对话token已用完，请耐心等待下一次刷新～～")
                     return
-            await handle_message(event,user_info)
+            await handle_message(event, user_info)
         elif config.ai_llm.config["llm"]["仁济模式"]["延时相关性"]["enable"]:
             global recent_interactions
             if event.user_id in recent_interactions and recent_interactions[event.user_id] == event.group_id:
@@ -290,7 +295,7 @@ def main(bot, config):
                             bot.logger.debug(f"用户 {event.user_id} 权限不足，跳过回复")
                             return
 
-                        if event.group_id in [913122269,1050663831] and not user_info.permission >= 66:
+                        if event.group_id in [913122269, 1050663831] and not user_info.permission >= 66:
                             bot.logger.debug(f"特定群组 {event.group_id} 权限不足，跳过回复")
                             return
 
@@ -299,7 +304,7 @@ def main(bot, config):
                                 bot.logger.debug(f"用户 {event.user_id} token限制，跳过回复")
                                 return
 
-                        await handle_message(event,user_info)
+                        await handle_message(event, user_info)
                     else:
                         bot.logger.debug(
                             f"延时相关性判断未触发 - 消息: '{event.processed_message}' | bot_related: {result['bot_related']} | 置信度: {result.get('confidence', 0)} | 理由: {result.get('reason', 'N/A')}")
@@ -320,7 +325,7 @@ def main(bot, config):
                 if not user_info.permission >= config.ai_llm.config["core"]["ai_token_limt"]:
                     if user_info.ai_token_record >= config.ai_llm.config["core"]["ai_token_limt_token"]:
                         return
-                await handle_message(event,user_info)
+                await handle_message(event, user_info)
 
         elif config.ai_llm.config["llm"]["仁济模式"]["算法回复"]["enable"]:  # 仁济模式第二层(算法判断)
             sentences = await get_group_messages(event.group_id, config.ai_llm.config["llm"]["可获取的群聊上下文长度"])
@@ -346,8 +351,8 @@ def main(bot, config):
                         return
                 await handle_message(event, user_info)
 
-    async def handle_message(event,user_info=None):
-        global user_state,recent_interactions
+    async def handle_message(event, user_info=None):
+        global user_state, recent_interactions
         # 锁机制
         uid = event.user_id
         if user_info is None:
@@ -413,7 +418,7 @@ def main(bot, config):
                         cleanup_tasks[event.user_id].cancel()
 
                     cleanup_tasks[event.user_id] = asyncio.create_task(delayed_cleanup())
-                    #print(user_state[uid]["queue"])
+                    # print(user_state[uid]["queue"])
                     """
                     总结用户特征，伪长期记忆人格
                     """
@@ -435,7 +440,7 @@ def main(bot, config):
                                 bot.logger.info(f"更新用户 {event.user_id} 设定")
                                 await update_user(event.user_id,
                                                   portrait_update_time=datetime.datetime.now().isoformat())
-                                
+
                                 # 从用户历史记录中提取该用户发送的消息
                                 user_history = await get_user_history(current_event.user_id)
                                 user_messages = []
@@ -454,7 +459,7 @@ def main(bot, config):
                                                 for item in content:
                                                     if isinstance(item, dict) and item.get("type") == "text":
                                                         user_messages.append(item.get("text", ""))
-                                
+
                                 if user_messages:
                                     # 构建用户画像总结的 prompt
                                     messages_text = "\n".join(user_messages[-20:])  # 取最近 20 条消息
@@ -463,14 +468,14 @@ def main(bot, config):
                                     portrait_prompt = [{
                                         "text": f"以下是用户「{user_nickname}」发送的消息历史（注意：你是「{bot_name}」，请勿将bot的特征混入用户画像）：\n{messages_text}\n\n请根据以上内容总结该用户「{user_nickname}」的用户画像，包括人物性格特征、兴趣爱好、语言风格等。直接给出结果，不要回复。"
                                     }]
-                                    
+
                                     reply_message = await utility_request(
                                         config,
                                         portrait_prompt,
                                         system_instruction=f"你是一个用户画像分析助手。你需要分析的是用户「{user_nickname}」，而不是bot「{bot_name}」。请根据用户的消息历史总结其特征，不要把bot的特征混入用户画像。",
                                         user_id=current_event.user_id,
                                     )
-                                    
+
                                     if reply_message:
                                         await update_user(event.user_id, user_portrait=reply_message.strip())
                                         bot.logger.info(f"用户 {event.user_id} 画像更新成功")
@@ -493,12 +498,12 @@ def main(bot, config):
             if not group_messages:
                 bot.logger.info(f"群 {group_id} 没有足够的消息来生成总结")
                 return
-            
+
             # 读取图片配置
             read_images = config.ai_llm.config["llm"]["群聊总结"].get("读取图片", False)
             utility_config = config.ai_llm.config["llm"].get("utility_client", {})
             client_type = utility_config.get("type", "gemini").strip().lower()
-            
+
             # 提取文本内容
             messages_text = []
             for msg in group_messages:
@@ -512,7 +517,7 @@ def main(bot, config):
                         text_content += part.get('text', '')
                 if text_content.strip():
                     messages_text.append(f"{user_name}: {text_content.strip()}")
-            
+
             # 处理图片（如果启用）- 移到前面，先提取图片再判断是否有内容
             image_parts = []
             if read_images:
@@ -521,16 +526,16 @@ def main(bot, config):
                     bot.logger.info(f"群 {group_id} 总结：提取到 {len(image_parts)} 张图片")
                 except Exception as e:
                     bot.logger.warning(f"提取群消息图片失败: {e}")
-            
+
             # 检查是否既没有文本也没有图片
             if not messages_text and not image_parts:
                 bot.logger.info(f"群 {group_id} 消息中没有文本内容" + ("也没有图片" if read_images else ""))
                 return
-            
+
             # 构建提示词
             group_info = await get_group_summary(group_id)
             existing_summary = group_info.get("summary", "")
-            
+
             # 根据是否有图片构建不同的提示词格式
             if image_parts:
                 # 有图片时，构建多模态消息
@@ -539,7 +544,7 @@ def main(bot, config):
                     base_text = f"以下是群聊的最近消息记录：\n{chr(10).join(messages_text)}\n\n群成员分享的图片：\n{image_desc}\n\n"
                 else:
                     base_text = f"群成员分享的图片：\n{image_desc}\n\n"
-                
+
                 if existing_summary:
                     prompt_text = f"""## 现有群聊总结（必须完整保留其中的重要信息）：
 {existing_summary}
@@ -565,7 +570,7 @@ def main(bot, config):
 请输出完整的累积总结，可适当扩展字数以保留重要历史信息，建议300-500字。"""
                 else:
                     prompt_text = f"{base_text}请对以上群聊内容和图片进行总结，包括：\n1. 主要讨论的话题\n2. 活跃的参与者\n3. 重要的信息点\n4. 图片内容描述（如有意义）\n\n请用简洁的语言总结，200-300字。"
-                
+
                 # 构建多模态消息格式
                 if client_type == "openai":
                     summary_prompt = [{
@@ -605,17 +610,18 @@ def main(bot, config):
                     summary_prompt = [{
                         "text": f"以下是群聊的最近消息记录：\n{chr(10).join(messages_text)}\n\n请对以上群聊内容进行总结，包括：\n1. 主要讨论的话题\n2. 活跃的参与者\n3. 重要的信息点\n\n请用简洁的语言总结，200-300字。"
                     }]
-            
+
             summary = await utility_request(
                 config,
                 summary_prompt,
-                system_instruction="你是一个群聊总结助手，请根据群聊消息生成简洁的总结。" + ("消息中包含图片，请描述图片中的重要内容。" if image_parts else ""),
+                system_instruction="你是一个群聊总结助手，请根据群聊消息生成简洁的总结。" + (
+                    "消息中包含图片，请描述图片中的重要内容。" if image_parts else ""),
                 user_id=0,
             )
-            
+
             if summary:
                 current_count = group_info.get("message_count", 0)
-                
+
                 await update_group_summary(
                     group_id,
                     summary=summary.strip(),
@@ -635,7 +641,7 @@ def main(bot, config):
             existing_summary = group_info.get("summary", "")
             update_time = group_info.get("update_time", "")
             is_refresh = event.pure_text == "/群总结 刷新"
-            
+
             # /群总结，只查看现有总结，不生成
             # /群总结 刷新，重新生成总结
             if is_refresh:
@@ -664,7 +670,7 @@ def main(bot, config):
                             text_content += part.get('text', '')
                     if text_content.strip():
                         messages_text.append(f"{user_name}: {text_content.strip()}")
-                
+
                 # 处理图片（如果启用）- 移到前面，先提取图片再判断是否有内容
                 image_parts = []
                 if read_images:
@@ -673,12 +679,13 @@ def main(bot, config):
                         bot.logger.info(f"群 {group_id} 总结刷新：提取到 {len(image_parts)} 张图片")
                     except Exception as e:
                         bot.logger.warning(f"提取群消息图片失败: {e}")
-                
+
                 # 检查是否既没有文本也没有图片
                 if not messages_text and not image_parts:
-                    await bot.send(event, "本群消息中没有可供总结的内容" + ("（文本和图片均为空）" if read_images else "（无文本内容）"), True)
+                    await bot.send(event, "本群消息中没有可供总结的内容" + (
+                        "（文本和图片均为空）" if read_images else "（无文本内容）"), True)
                     return
-                
+
                 # 根据是否有图片构建不同的提示词格式
                 if image_parts:
                     # 有图片时，构建多模态消息
@@ -687,7 +694,7 @@ def main(bot, config):
                         base_text = f"以下是群聊的最近消息记录：\n{chr(10).join(messages_text)}\n\n群成员分享的图片：\n{image_desc}\n\n"
                     else:
                         base_text = f"群成员分享的图片：\n{image_desc}\n\n"
-                    
+
                     if existing_summary:
                         prompt_text = f"""## 现有群聊总结（必须完整保留其中的重要信息）：
 {existing_summary}
@@ -714,12 +721,13 @@ def main(bot, config):
 请用清晰的格式输出完整的累积总结，可适当扩展字数以保留重要历史信息。"""
                     else:
                         prompt_text = f"{base_text}请对以上群聊内容和图片进行详细总结，包括：\n1. 主要讨论的话题（按重要性列出）\n2. 活跃的参与者及其特点\n3. 重要的信息点和结论\n4. 群聊氛围和互动情况\n5. 图片内容描述（如有意义）\n\n请用清晰的格式总结，便于阅读。"
-                    
+
                     # 构建多模态消息格式
                     if client_type == "openai":
                         summary_prompt = [{
                             "role": "user",
-                            "content": [{"type": "text", "text": prompt_text}] + [img['image_data'] for img in image_parts]
+                            "content": [{"type": "text", "text": prompt_text}] + [img['image_data'] for img in
+                                                                                  image_parts]
                         }]
                     else:  # gemini
                         parts = [{"text": prompt_text}] + [img['image_data'] for img in image_parts]
@@ -755,14 +763,15 @@ def main(bot, config):
                         summary_prompt = [{
                             "text": f"以下是群聊的最近消息记录：\n{chr(10).join(messages_text)}\n\n请对以上群聊内容进行详细总结，包括：\n1. 主要讨论的话题（按重要性列出）\n2. 活跃的参与者及其特点\n3. 重要的信息点和结论\n4. 群聊氛围和互动情况\n\n请用清晰的格式总结，便于阅读。"
                         }]
-                
+
                 summary = await utility_request(
                     config,
                     summary_prompt,
-                    system_instruction="你是一个群聊总结助手，请根据群聊消息生成详细且有条理的总结。" + ("消息中包含图片，请描述图片中的重要内容。" if image_parts else ""),
+                    system_instruction="你是一个群聊总结助手，请根据群聊消息生成详细且有条理的总结。" + (
+                        "消息中包含图片，请描述图片中的重要内容。" if image_parts else ""),
                     user_id=event.user_id,
                 )
-                
+
                 if summary:
                     existing_summary = summary.strip()
                     current_count = group_info.get("message_count", 0)
@@ -782,7 +791,7 @@ def main(bot, config):
 
             formatted_date = datetime.datetime.now().strftime("%Y年%m月%d日")
             summary_lines = existing_summary.split('\n')
-            
+
             draw_list = [
                 {'type': 'basic_set', 'img_width': 800},
                 {'type': 'avatar', 'img': [f"https://p.qlogo.cn/gh/{group_id}/{group_id}/640"], 'upshift_extra': 15,
@@ -793,7 +802,7 @@ def main(bot, config):
             for line in summary_lines:
                 if line.strip():
                     draw_list.append(line.strip())
-            
+
             if update_time:
                 try:
                     if 'T' in update_time:
@@ -804,10 +813,10 @@ def main(bot, config):
                 except:
                     update_time_str = update_time
                 draw_list.append(f'\n[des]上次更新时间：{update_time_str}[/des]')
-            
+
             bot.logger.info('开始制作群聊总结图片')
             await bot.send(event, Image(file=(await manshuo_draw(draw_list))))
-            
+
         except Exception as e:
             bot.logger.error(f"生成群总结失败: {e}")
             await bot.send(event, f"生成群聊总结失败: {str(e)}", True)
@@ -817,7 +826,6 @@ def main(bot, config):
             t = event.message_chain.get(Text)[0].text.strip()
         else:
             t = ""
-
 
         if event.pure_text == "/clear" or t == "/clear":
             await delete_user_history(event.user_id)
@@ -891,10 +899,11 @@ def main(bot, config):
                 await bot.send(event, "你没有足够的权限使用该功能哦~")
                 return
             # 锁机制
-            await handle_message(event,user_info)
+            await handle_message(event, user_info)
+
     @bot.on(LifecycleMetaEvent)
     async def _(event: LifecycleMetaEvent):
-        nonlocal apikey_check,removed_keys
+        nonlocal apikey_check, removed_keys
         if not apikey_check and config.ai_llm.config["llm"]["自动清理无效apikey"]:
             apikey_check = True
             while True:
@@ -906,7 +915,8 @@ def main(bot, config):
                     await asyncio.sleep(5)
                     bot.logger.info("\n--- 检查当前 Key 状态 ---")
                     bot.logger.info(f"可用 Key ({len(key_manager._available_keys)}个): {key_manager._available_keys}")
-                    bot.logger.info(f"不可用 Key ({len(key_manager._unavailable_keys)}个): {list(key_manager._unavailable_keys.keys())}")
+                    bot.logger.info(
+                        f"不可用 Key ({len(key_manager._unavailable_keys)}个): {list(key_manager._unavailable_keys.keys())}")
 
                     for k in list(key_manager._unavailable_keys.keys()):
                         if k not in removed_keys:
