@@ -178,6 +178,11 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             retries = config.ai_llm.config["llm"].get("retries", 3)
             response_text = ""
             thought_text = ""  # 累积思维链内容
+            
+            async def clear_context_callback():
+                logger.warning(f"AI响应为空，自动清除用户 {user_id} 的上下文")
+                await delete_user_history(user_id)
+            
             async for part in api.chat(
                     prompt,
                     stream=config.ai_llm.config["llm"]["stream"],
@@ -187,6 +192,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                     max_output_tokens=config.ai_llm.config["llm"]["openai"]["max_tokens"],
                     temperature=config.ai_llm.config["llm"]["openai"]["temperature"],
                     retries=retries,
+                    on_clear_context=clear_context_callback,
             ):
                 if isinstance(part, dict) and "thought" in part:
                     # 流式累积思维链
@@ -254,6 +260,11 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             response_text = ""
             grounding_metadata = None
             thought_text = ""  # 累积思维链内容
+            
+            async def clear_context_callback_gemini():
+                logger.warning(f"Gemini AI响应为空，自动清除用户 {user_id} 的上下文")
+                await delete_user_history(user_id)
+            
             async for part in api.chat(
                     prompt,
                     stream=config.ai_llm.config["llm"]["stream"],
@@ -267,6 +278,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                     google_search=False,
                     url_context=False,
                     retries=retries,
+                    on_clear_context=clear_context_callback_gemini,
             ):
                 if isinstance(part, dict) and part.get("thought"):
                     # 流式累积思维链
