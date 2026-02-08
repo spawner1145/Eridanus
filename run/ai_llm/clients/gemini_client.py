@@ -384,7 +384,8 @@ class GeminiAPI:
         safety_settings: Optional[List[Dict]] = None,
         google_search: bool = False,
         url_context: bool = False,
-        retries: int = 3
+        retries: int = 3,
+        on_clear_context: Optional[Callable] = None
     ) -> AsyncGenerator[Union[str, Dict], None]:
         """核心 API 调用逻辑"""
         if topp is not None and (topp < 0 or topp > 1):
@@ -544,7 +545,12 @@ class GeminiAPI:
                             logger.error(f"流式 HTTP 错误: {e}")
                             logger.error(f"失败的请求体: {json.dumps(body, ensure_ascii=False, indent=2)}")
                             logger.error(f"服务器响应: {await response.aread()}")
-                            raise
+                            stream_attempt += 1
+                            if stream_attempt >= max_stream_attempts:
+                                yield f"[错误] Gemini 流式请求HTTP错误: {e.response.status_code}，已重试{max_stream_attempts}次"
+                                break
+                            await asyncio.sleep(2 ** (stream_attempt - 1))
+                            continue
                         model_message = {"role": "model", "parts": []}
                         grounding_metadata_to_yield = None
                         async for line in response.aiter_lines():
@@ -566,6 +572,44 @@ class GeminiAPI:
                                     except json.JSONDecodeError as e:
                                         logger.error(f"流式 JSON 解析错误: {e}")
                         
+                        has_text_content = any(
+                            ("text" in part and part.get("text", "").strip()) 
+                            for part in model_message["parts"] 
+                            if not part.get("thought")
+                        )
+                        has_function_call = any("functionCall" in part for part in model_message["parts"])
+                        
+                        if not has_text_content and not has_function_call:
+                            stream_attempt += 1
+                            if stream_attempt >= max_stream_attempts:
+                                logger.error(f"Gemini 流式响应内容为空（可能被安全过滤拦截），已重试 {max_stream_attempts} 次仍然失败")
+                                yield f"[错误] AI响应内容为空（疑似被内容安全过滤拦截），已重试{max_stream_attempts}次。请尝试 /clear 清除上下文后重新提问。"
+                                break
+                            
+                            clear_threshold = max(1, max_stream_attempts - 2)  # 倒数第2次开始清除
+                            if stream_attempt >= clear_threshold and on_clear_context:
+                                logger.warning(f"Gemini 流式响应内容为空（第 {stream_attempt}/{max_stream_attempts} 次重试），尝试清除上下文后重试")
+                                try:
+                                    await on_clear_context()
+                                    # 清除api_contents中的历史，只保留最后一条用户消息
+                                    if len(api_contents) > 1:
+                                        last_user_msg = None
+                                        for msg in reversed(api_contents):
+                                            if msg.get("role") == "user":
+                                                last_user_msg = msg
+                                                break
+                                        if last_user_msg:
+                                            api_contents.clear()
+                                            api_contents.append(last_user_msg)
+                                            body["contents"] = api_contents
+                                except Exception as e:
+                                    logger.error(f"清除上下文失败: {e}")
+                            else:
+                                logger.warning(f"Gemini 流式响应内容为空（第 {stream_attempt}/{max_stream_attempts} 次重试）")
+                            
+                            await asyncio.sleep(2 ** (stream_attempt - 1))
+                            continue
+
                         function_call_parts = [part for part in model_message["parts"] if "functionCall" in part]
                         if function_call_parts and tools:
                             model_message["parts"] = _filter_empty_text_parts(model_message["parts"])
@@ -596,7 +640,8 @@ class GeminiAPI:
                                 safety_settings=safety_settings,
                                 google_search=google_search,
                                 url_context=url_context,
-                                retries=retries
+                                retries=retries,
+                                on_clear_context=on_clear_context
                             ):
                                 yield text
                         else:
@@ -627,7 +672,29 @@ class GeminiAPI:
                             stream_attempt += 1
                             self._reset_model()  #重置模型
                             continue
-                    raise 
+                    logger.error(f"流式请求 HTTP 错误 (尝试 {stream_attempt+1}/{max_stream_attempts}): {e}")
+                    stream_attempt += 1
+                    if stream_attempt >= max_stream_attempts:
+                        logger.error(f"流式请求 HTTP 错误，已重试 {max_stream_attempts} 次: {e}")
+                        yield f"[错误] Gemini 流式请求失败（HTTP {e.response.status_code}），已重试{max_stream_attempts}次"
+                        break
+                    await asyncio.sleep(2 ** (stream_attempt - 1))
+                except (httpx.ConnectError, httpx.TimeoutException) as e:
+                    logger.error(f"流式请求网络错误 (尝试 {stream_attempt+1}/{max_stream_attempts}): {type(e).__name__}: {e}")
+                    stream_attempt += 1
+                    if stream_attempt >= max_stream_attempts:
+                        logger.error(f"流式请求网络错误，已重试 {max_stream_attempts} 次: {type(e).__name__}: {e}")
+                        yield f"[错误] Gemini 流式请求网络连接失败（{type(e).__name__}），已重试{max_stream_attempts}次。请检查网络或代理设置。"
+                        break
+                    await asyncio.sleep(2 ** (stream_attempt - 1))
+                except Exception as e:
+                    logger.error(f"流式请求未知错误 (尝试 {stream_attempt+1}/{max_stream_attempts}): {type(e).__name__}: {e}")
+                    stream_attempt += 1
+                    if stream_attempt >= max_stream_attempts:
+                        logger.error(f"流式请求未知错误，已重试 {max_stream_attempts} 次: {type(e).__name__}: {e}")
+                        yield f"[错误] Gemini 流式请求失败（{type(e).__name__}: {e}），已重试{max_stream_attempts}次"
+                        break
+                    await asyncio.sleep(2 ** (stream_attempt - 1))
         else:
             total_attempts = retries  # 总尝试次数 = 重试次数 * 模型数量
             attempt = 0
@@ -659,9 +726,75 @@ class GeminiAPI:
                     response.raise_for_status()
                     result = response.json()
                     #print("debug:", result)
-                    candidate = result["candidates"][0]
+                    
+                    candidates = result.get("candidates", [])
+                    if not candidates:
+                        block_reason = result.get("promptFeedback", {}).get("blockReason", "未知原因")
+                        safety_ratings = result.get("promptFeedback", {}).get("safetyRatings", [])
+                        logger.warning(f"Gemini 非流式响应无 candidates（第 {attempt+1}/{retries} 次），拦截原因: {block_reason}，安全评级: {safety_ratings}")
+                        
+                        attempt += 1
+                        if attempt >= retries:
+                            logger.error(f"Gemini 非流式响应无 candidates，已重试 {retries} 次仍然失败。拦截原因: {block_reason}")
+                            yield f"[错误] AI响应被拦截（原因: {block_reason}），已重试{retries}次。请尝试 /clear 清除上下文后重新提问。"
+                            break
+                        
+                        clear_threshold = max(1, retries - 2)
+                        if attempt >= clear_threshold and on_clear_context:
+                            logger.warning(f"尝试清除上下文后重试（第 {attempt}/{retries} 次）")
+                            try:
+                                await on_clear_context()
+                                if len(api_contents) > 1:
+                                    last_user_msg = None
+                                    for msg in reversed(api_contents):
+                                        if msg.get("role") == "user":
+                                            last_user_msg = msg
+                                            break
+                                    if last_user_msg:
+                                        api_contents.clear()
+                                        api_contents.append(last_user_msg)
+                                        body["contents"] = api_contents
+                            except Exception as e:
+                                logger.error(f"清除上下文失败: {e}")
+                        
+                        await asyncio.sleep(2 ** (attempt - 1))
+                        continue
+                    
+                    candidate = candidates[0]
+                    
+                    finish_reason = candidate.get("finishReason", "")
+                    if finish_reason == "SAFETY" or (finish_reason != "STOP" and not candidate.get("content")):
+                        safety_ratings = candidate.get("safetyRatings", [])
+                        logger.warning(f"Gemini 非流式响应被安全过滤（第 {attempt+1}/{retries} 次），finishReason: {finish_reason}，安全评级: {safety_ratings}")
+                        
+                        attempt += 1
+                        if attempt >= retries:
+                            logger.error(f"Gemini 非流式响应被安全过滤拦截，finishReason: {finish_reason}，已重试 {retries} 次")
+                            yield f"[错误] AI响应被安全过滤拦截（finishReason: {finish_reason}），已重试{retries}次。请尝试 /clear 清除上下文后重新提问。"
+                            break
+                        
+                        clear_threshold = max(1, retries - 2)
+                        if attempt >= clear_threshold and on_clear_context:
+                            logger.warning(f"尝试清除上下文后重试（第 {attempt}/{retries} 次）")
+                            try:
+                                await on_clear_context()
+                                if len(api_contents) > 1:
+                                    last_user_msg = None
+                                    for msg in reversed(api_contents):
+                                        if msg.get("role") == "user":
+                                            last_user_msg = msg
+                                            break
+                                    if last_user_msg:
+                                        api_contents.clear()
+                                        api_contents.append(last_user_msg)
+                                        body["contents"] = api_contents
+                            except Exception as e:
+                                logger.error(f"清除上下文失败: {e}")
+                        
+                        await asyncio.sleep(2 ** (attempt - 1))
+                        continue
+                    
                     model_message = candidate["content"]
-                    # 过滤空 text parts
                     model_message["parts"] = _filter_empty_text_parts(model_message.get("parts", []))
                     
                     function_call_parts = [part for part in model_message.get("parts", []) if "functionCall" in part]
@@ -704,7 +837,8 @@ class GeminiAPI:
                             safety_settings=safety_settings,
                             google_search=google_search,
                             url_context=url_context,
-                            retries=retries
+                            retries=retries,
+                            on_clear_context=on_clear_context
                         ):
                             yield text
                     else:
@@ -738,24 +872,44 @@ class GeminiAPI:
                                         )
                             attempt += 1
                             if attempt==retries:
-                                raise Exception("重试次数到达上限")
+                                logger.error("重试次数到达上限，所有模型和apikey均已耗尽")
+                                yield f"[错误] 所有模型配额和API Key均已耗尽，已重试{retries}次"
+                                break
                             self._reset_model()  #重置模型
                             continue
-                        #logger.error("所有模型配额均已耗尽")
-                        #raise
                     logger.error(f"HTTP 错误 (尝试 {attempt+1}/{total_attempts}): {e}")
                     logger.error(f"失败的请求体: {json.dumps(body, ensure_ascii=False, indent=2)}")
                     logger.error(f"服务器响应: {e.response.text}")
                     attempt += 1
                     if attempt >= total_attempts:
-                        raise
+                        logger.error(f"Gemini 非流式 HTTP 错误，已重试 {total_attempts} 次: {e}")
+                        yield f"[错误] Gemini 请求失败（HTTP {e.response.status_code}），已重试{total_attempts}次"
+                        break
+                    await asyncio.sleep(2 ** (attempt % retries))
+                except (httpx.ConnectError, httpx.TimeoutException) as e:
+                    logger.error(f"网络错误 (尝试 {attempt+1}/{total_attempts}): {type(e).__name__}: {e}")
+                    attempt += 1
+                    if attempt >= total_attempts:
+                        logger.error(f"Gemini 非流式网络错误，已重试 {total_attempts} 次: {type(e).__name__}: {e}")
+                        yield f"[错误] Gemini 请求网络连接失败（{type(e).__name__}），已重试{total_attempts}次。请检查网络或代理设置。"
+                        break
                     await asyncio.sleep(2 ** (attempt % retries))
                 except json.JSONDecodeError:
                     logger.error(f"JSON 解析错误 (尝试 {attempt+1}/{total_attempts})")
                     logger.error(f"失败的请求体: {json.dumps(body, ensure_ascii=False, indent=2)}")
                     attempt += 1
                     if attempt >= total_attempts:
-                        raise ValueError("无效的 JSON 响应")
+                        logger.error(f"Gemini 非流式 JSON 解析错误，已重试 {total_attempts} 次")
+                        yield f"[错误] Gemini 响应解析失败（无效的JSON），已重试{total_attempts}次"
+                        break
+                    await asyncio.sleep(2 ** (attempt % retries))
+                except Exception as e:
+                    logger.error(f"未知错误 (尝试 {attempt+1}/{total_attempts}): {type(e).__name__}: {e}")
+                    attempt += 1
+                    if attempt >= total_attempts:
+                        logger.error(f"Gemini 非流式未知错误，已重试 {total_attempts} 次: {type(e).__name__}: {e}")
+                        yield f"[错误] Gemini 请求失败（{type(e).__name__}: {e}），已重试{total_attempts}次"
+                        break
                     await asyncio.sleep(2 ** (attempt % retries))
 
     async def chat(
@@ -787,7 +941,8 @@ class GeminiAPI:
         safety_settings: Optional[List[Dict]] = None,
         google_search: bool = False,
         url_context: bool = False,
-        retries: int = 3
+        retries: int = 3,
+        on_clear_context: Optional[Callable] = None
     ) -> AsyncGenerator[Union[str, Dict, List[Dict[str, any]]], None]:
         """发起聊天请求"""
         if isinstance(messages, str):
@@ -820,7 +975,8 @@ class GeminiAPI:
             topk, candidate_count, presence_penalty, frequency_penalty,
             stop_sequences, response_mime_type, response_schema,
             seed, response_logprobs, logprobs, audio_timestamp,
-            safety_settings, google_search, url_context, retries
+            safety_settings, google_search, url_context, retries,
+            on_clear_context=on_clear_context
         ):
             if isinstance(part, dict):
                 if "text" in part:

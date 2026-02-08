@@ -194,7 +194,8 @@ class OpenAIAPI:
         seed: Optional[int] = None,
         response_logprobs: Optional[bool] = None,
         logprobs: Optional[int] = None,
-        retries: int = 3
+        retries: int = 3,
+        on_clear_context: Optional[Callable] = None
     ) -> AsyncGenerator[Union[str, Dict], None]:
         """核心 API 调用逻辑，遵循 OpenAI 标准，支持 reasoning_content 但不记录到历史"""
         original_model = self.model
@@ -460,21 +461,129 @@ class OpenAIAPI:
                                 "content": [{"type": "text", "text": assistant_content}]
                             })
                         assistant_content = ""
+                
+                if not assistant_content and not tool_calls_buffer:
+                    has_assistant_content = any(
+                        m.get("role") == "assistant" and m.get("content") and 
+                        any(c.get("text", "").strip() for c in m["content"] if isinstance(c, dict))
+                        for m in messages[-2:] if isinstance(m, dict)
+                    )
+                    if not has_assistant_content:
+                        logger.warning(f"OpenAI 流式响应内容为空（可能被内容过滤拦截），chunk_count: {chunk_count}, assistant_content='{assistant_content}', tool_calls_buffer={tool_calls_buffer}")
+                        if on_clear_context:
+                            logger.info("流式空响应：尝试清除上下文，请用户重新发送消息")
+                            try:
+                                await on_clear_context()
+                            except Exception as e:
+                                logger.error(f"清除上下文失败: {e}")
+                        yield f"[错误] AI流式响应内容为空（可能被内容安全过滤拦截）。已自动清除上下文，请重新提问。"
             except httpx.TimeoutException as e:
                 logger.error(f"流式请求超时: {str(e)}")
-                raise
+                yield f"[错误] OpenAI 流式请求超时，请检查网络或稍后重试。"
             except httpx.ConnectError as e:
                 logger.error(f"流式请求连接失败: {str(e)}")
-                raise
+                yield f"[错误] OpenAI 流式请求连接失败，请检查网络或代理设置。"
             except Exception as e:
                 logger.error(f"流式请求失败: {type(e).__name__}: {str(e)}")
-                raise
+                yield f"[错误] OpenAI 流式请求失败（{type(e).__name__}: {e}）"
         else:
             for attempt in range(retries):
                 try:
                     response = await self.client.chat.completions.create(**request_params)
+
+                    if not response.choices:
+                        try:
+                            raw_dump = json.dumps(response.model_dump(), ensure_ascii=False, indent=2, default=str)
+                        except Exception:
+                            raw_dump = str(response)
+                        logger.warning(f"OpenAI 非流式响应无 choices（第 {attempt+1}/{retries} 次），原始响应体:\n{raw_dump}")
+                        finish_reason_info = getattr(response, 'system_fingerprint', '未知')
+
+                        clear_threshold = max(1, retries - 2)
+                        if attempt >= clear_threshold and on_clear_context:
+                            logger.warning(f"尝试清除上下文后重试（第 {attempt+1}/{retries} 次）")
+                            try:
+                                await on_clear_context()
+                                system_msgs = [m for m in messages if m.get("role") == "system"]
+                                last_user_msg = None
+                                for msg in reversed(messages):
+                                    if msg.get("role") == "user":
+                                        last_user_msg = msg
+                                        break
+                                if last_user_msg:
+                                    messages.clear()
+                                    messages.extend(system_msgs)
+                                    messages.append(last_user_msg)
+                                    api_messages.clear()
+                                    for msg in messages:
+                                        role = msg["role"]
+                                        content = msg.get("content", "")
+                                        if isinstance(content, str):
+                                            api_content = [{"type": "text", "text": content}]
+                                        elif isinstance(content, list):
+                                            api_content = content
+                                        else:
+                                            api_content = [{"type": "text", "text": str(content)}]
+                                        api_messages.append({"role": role, "content": api_content})
+                                    request_params["messages"] = api_messages
+                            except Exception as e:
+                                logger.error(f"清除上下文失败: {e}")
+                        
+                        if attempt == retries - 1:
+                            logger.error(f"OpenAI 非流式响应无 choices，已重试 {retries} 次仍然失败")
+                            yield f"[错误] AI响应内容为空（无 choices），已重试{retries}次。请尝试 /clear 清除上下文后重新提问。"
+                            break
+                        await asyncio.sleep(2 ** attempt)
+                        continue
+                    
                     choice = response.choices[0]
                     message = choice.message
+                    
+                    if not message.content and not message.tool_calls:
+                        finish_reason = choice.finish_reason or "未知"
+                        try:
+                            raw_dump = json.dumps(response.model_dump(), ensure_ascii=False, indent=2, default=str)
+                        except Exception:
+                            raw_dump = str(response)
+                        logger.warning(f"OpenAI 非流式响应 content 为空（第 {attempt+1}/{retries} 次），finish_reason: {finish_reason}，原始响应体:\n{raw_dump}")
+                        
+                        clear_threshold = max(1, retries - 2)
+                        if attempt >= clear_threshold and on_clear_context:
+                            logger.warning(f"尝试清除上下文后重试（第 {attempt+1}/{retries} 次）")
+                            try:
+                                await on_clear_context()
+                                system_msgs = [m for m in messages if m.get("role") == "system"]
+                                last_user_msg = None
+                                for msg in reversed(messages):
+                                    if msg.get("role") == "user":
+                                        last_user_msg = msg
+                                        break
+                                if last_user_msg:
+                                    messages.clear()
+                                    messages.extend(system_msgs)
+                                    messages.append(last_user_msg)
+                                    api_messages.clear()
+                                    for msg in messages:
+                                        role = msg["role"]
+                                        content = msg.get("content", "")
+                                        if isinstance(content, str):
+                                            api_content = [{"type": "text", "text": content}]
+                                        elif isinstance(content, list):
+                                            api_content = content
+                                        else:
+                                            api_content = [{"type": "text", "text": str(content)}]
+                                        api_messages.append({"role": role, "content": api_content})
+                                    request_params["messages"] = api_messages
+                            except Exception as e:
+                                logger.error(f"清除上下文失败: {e}")
+                        
+                        if attempt == retries - 1:
+                            logger.error(f"OpenAI 非流式响应 content 为空，finish_reason: {finish_reason}，已重试 {retries} 次")
+                            yield f"[错误] AI响应内容为空（finish_reason: {finish_reason}），已重试{retries}次。请尝试 /clear 清除上下文后重新提问。"
+                            break
+                        await asyncio.sleep(2 ** attempt)
+                        continue
+                    
                     if message.tool_calls:
                         tool_calls = []
                         for tc in message.tool_calls:
@@ -534,10 +643,19 @@ class OpenAIAPI:
                             if message.content:
                                 yield message.content
                     break
+                except (httpx.ConnectError, httpx.TimeoutException) as e:
+                    logger.error(f"API 网络错误 (尝试 {attempt+1}/{retries}): {type(e).__name__}: {str(e)}")
+                    if attempt == retries - 1:
+                        logger.error(f"OpenAI 非流式网络错误，已重试 {retries} 次: {type(e).__name__}: {e}")
+                        yield f"[错误] OpenAI 请求网络连接失败（{type(e).__name__}），已重试{retries}次。请检查网络或代理设置。"
+                        break
+                    await asyncio.sleep(2 ** attempt)
                 except Exception as e:
                     logger.error(f"API 调用失败 (尝试 {attempt+1}/{retries}): {str(e)}")
                     if attempt == retries - 1:
-                        raise
+                        logger.error(f"OpenAI 非流式请求失败，已重试 {retries} 次: {type(e).__name__}: {e}")
+                        yield f"[错误] OpenAI 请求失败（{type(e).__name__}: {e}），已重试{retries}次"
+                        break
                     await asyncio.sleep(2 ** attempt)
 
         self.model = original_model
@@ -561,7 +679,8 @@ class OpenAIAPI:
         seed: Optional[int] = None,
         response_logprobs: Optional[bool] = None,
         logprobs: Optional[int] = None,
-        retries: int = 3
+        retries: int = 3,
+        on_clear_context: Optional[Callable] = None
     ) -> AsyncGenerator[Union[str, Dict], None]:
         """发起聊天请求，支持多文件和多图片输入"""
         if isinstance(messages, str):
@@ -580,7 +699,7 @@ class OpenAIAPI:
             presence_penalty, frequency_penalty,
             stop_sequences, response_format,
             reasoning_effort, seed, response_logprobs, logprobs,
-            retries
+            retries, on_clear_context=on_clear_context
         ):
             yield part
 
