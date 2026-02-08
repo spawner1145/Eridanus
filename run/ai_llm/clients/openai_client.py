@@ -469,7 +469,7 @@ class OpenAIAPI:
                         for m in messages[-2:] if isinstance(m, dict)
                     )
                     if not has_assistant_content:
-                        logger.warning(f"OpenAI 流式响应内容为空（可能被内容过滤拦截），chunk_count: {chunk_count}")
+                        logger.warning(f"OpenAI 流式响应内容为空（可能被内容过滤拦截），chunk_count: {chunk_count}, assistant_content='{assistant_content}', tool_calls_buffer={tool_calls_buffer}")
                         if on_clear_context:
                             logger.info("流式空响应：尝试清除上下文，请用户重新发送消息")
                             try:
@@ -492,7 +492,11 @@ class OpenAIAPI:
                     response = await self.client.chat.completions.create(**request_params)
 
                     if not response.choices:
-                        logger.warning(f"OpenAI 非流式响应无 choices（第 {attempt+1}/{retries} 次）")
+                        try:
+                            raw_dump = json.dumps(response.model_dump(), ensure_ascii=False, indent=2, default=str)
+                        except Exception:
+                            raw_dump = str(response)
+                        logger.warning(f"OpenAI 非流式响应无 choices（第 {attempt+1}/{retries} 次），原始响应体:\n{raw_dump}")
                         finish_reason_info = getattr(response, 'system_fingerprint', '未知')
 
                         clear_threshold = max(1, retries - 2)
@@ -537,7 +541,11 @@ class OpenAIAPI:
                     
                     if not message.content and not message.tool_calls:
                         finish_reason = choice.finish_reason or "未知"
-                        logger.warning(f"OpenAI 非流式响应 content 为空（第 {attempt+1}/{retries} 次），finish_reason: {finish_reason}")
+                        try:
+                            raw_dump = json.dumps(response.model_dump(), ensure_ascii=False, indent=2, default=str)
+                        except Exception:
+                            raw_dump = str(response)
+                        logger.warning(f"OpenAI 非流式响应 content 为空（第 {attempt+1}/{retries} 次），finish_reason: {finish_reason}，原始响应体:\n{raw_dump}")
                         
                         clear_threshold = max(1, retries - 2)
                         if attempt >= clear_threshold and on_clear_context:
