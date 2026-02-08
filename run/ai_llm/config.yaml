@@ -4,6 +4,7 @@ llm:
   chara_file_name: 猫娘.txt   #system为""时生效,默认启动的人设文件名，在data/system/chara文件夹内(目前支持txt,json,酒馆角色卡(图片))
   自动清理无效apikey: false
   retries: 6                           #LLM请求重试次数
+  stream: true     #是否使用流式输出。可能遇到gemini截断问题。
   openai:          #兼容所有openai标准接口。https://platform.openai.com/docs/overview
     enable_official_sdk: true   #是否使用官方sdk，如果不使用，则为直接发送post请求。
     api_keys:   #继续像这样添加apikey
