@@ -526,7 +526,7 @@ class GeminiAPI:
                         logger.info(f"流式响应状态: {response.status_code}")
 
                         # 检查 429 错误
-                        if response.status_code == 429:
+                        if response.status_code == 429 or response.status_code==503:
                             logger.warning(f"模型 {self.model} 配额耗尽 (429)")
                             if self._fallback_to_next_model():
                                 # stream_attempt += 1
@@ -670,7 +670,7 @@ class GeminiAPI:
 
                         break  # 成功完成，跳出重试循环
                 except httpx.HTTPStatusError as e:
-                    if e.response.status_code == 429:
+                    if e.response.status_code == 429 or e.response.status_code==503:
                         logger.warning(f"流式请求模型 {self.model} 配额耗尽 (429)")
                         if self._fallback_to_next_model():
                             # stream_attempt += 1
@@ -722,7 +722,7 @@ class GeminiAPI:
                     logger.info(f"非流式响应状态: {response.status_code}")
 
                     # 检查 429 错误
-                    if response.status_code == 429:
+                    if response.status_code == 429 or response.status_code==503:
                         logger.warning(f"模型 {self.model} 配额耗尽 (429)")
                         if self._fallback_to_next_model():
                             # 不切换apikey重试
@@ -888,7 +888,7 @@ class GeminiAPI:
                     break
                 except httpx.HTTPStatusError as e:
                     # 检查是否是 429 错误（在 raise_for_status 之后捕获）
-                    if e.response.status_code == 429:
+                    if e.response.status_code == 429 or response.status_code==503:
                         logger.warning(f"模型 {self.model} 配额耗尽 (429)")
                         if self._fallback_to_next_model():
                             # attempt += 1
