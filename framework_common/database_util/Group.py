@@ -279,7 +279,7 @@ class GroupMessageManager:
             message_copy["message"] = filtered_message
         
         message_copy["message"].insert(0, {
-            "text": f"{context_prompt}\n这是群聊历史消息，用于理解当前对话上下文。"
+            "text": f"{context_prompt}。"
         })
 
         if standard == "gemini":
@@ -311,7 +311,7 @@ class GroupMessageManager:
                     all_parts.extend(entry.get('parts', []))
 
             summary_part = {"text": f"{group_summary}"}
-            end_part = {"text": f"{context_end}\n以上是群聊历史消息上下文，仅供参考，请根据之后的用户消息进行回复。"}
+            end_part = {"text": f"{context_end}\n以上是群聊历史消息上下文，仅作为背景信息使用，请专注于下次的提问信息，无需回答历史消息中的问题"}
             all_parts.insert(0, summary_part)
             all_parts.append(end_part)
 
@@ -327,7 +327,7 @@ class GroupMessageManager:
 
             if all_parts:
                 summary_part = {"type": "text", "text": f"{group_summary}"}
-                end_part = {"type": "text", "text": f"{context_end}\n以上是群聊历史消息上下文，仅供参考，请根据之后的用户消息进行回复。"}
+                end_part = {"type": "text", "text": f"{context_end}\n以上是群聊历史消息上下文，仅作为背景信息使用，请专注于下次的提问信息，无需回答历史消息中的问题"}
                 all_parts.insert(0, summary_part)
                 all_parts.append(end_part)
                 return [
@@ -336,7 +336,7 @@ class GroupMessageManager:
                 ]
             else:
                 return [
-                    {"role": "user", "content": f"{group_summary}\n{context_end}\n以上是群聊历史消息上下文。"},
+                    {"role": "user", "content": f"{group_summary}\n{context_end}\n以上是群聊历史消息上下文，仅作为背景信息使用，请专注于下次的提问信息，无需回答历史消息中的问题"},
                     {"role": "assistant", "content": "好的，我已了解群聊上下文，会根据之后的用户消息进行回复。"}
                 ]
 
