@@ -348,7 +348,8 @@ class GeminiAPI:
                     result = await func(**combined_args)
                 else:
                     result = await asyncio.to_thread(func, **combined_args)
-
+                if result is None:
+                    return None
                 return {"functionResponse": {"name": name, "response": {"result": str(result)}}}
             except Exception as e:
                 return {"functionResponse": {"name": name, "response": {"error": str(e)}}}
@@ -630,32 +631,34 @@ class GeminiAPI:
                                 api_contents.append(model_message)
                             function_calls = [part["functionCall"] for part in function_call_parts]
                             function_responses = await self._execute_tool(function_calls, tools, tool_fixed_params)
-                            api_contents.extend(function_responses)
-
-                            async for text in self._chat_api(
-                                    api_contents, stream=stream, tools=tools, tool_fixed_params=tool_fixed_params,
-                                    tool_declarations=tool_declarations,
-                                    max_output_tokens=max_output_tokens,
-                                    system_instruction=system_instruction,
-                                    topp=topp, temperature=temperature,
-                                    include_thoughts=include_thoughts,
-                                    thinking_budget=thinking_budget,
-                                    thinking_level=thinking_level,
-                                    topk=topk, candidate_count=candidate_count,
-                                    presence_penalty=presence_penalty,
-                                    frequency_penalty=frequency_penalty,
-                                    stop_sequences=stop_sequences,
-                                    response_mime_type=response_mime_type,
-                                    response_schema=response_schema,
-                                    seed=seed, response_logprobs=response_logprobs,
-                                    logprobs=logprobs, audio_timestamp=audio_timestamp,
-                                    safety_settings=safety_settings,
-                                    google_search=google_search,
-                                    url_context=url_context,
-                                    retries=retries,
-                                    on_clear_context=on_clear_context
-                            ):
-                                yield text
+                            if function_responses:
+                                api_contents.extend(function_responses)
+                                async for text in self._chat_api(
+                                        api_contents, stream=stream, tools=tools, tool_fixed_params=tool_fixed_params,
+                                        tool_declarations=tool_declarations,
+                                        max_output_tokens=max_output_tokens,
+                                        system_instruction=system_instruction,
+                                        topp=topp, temperature=temperature,
+                                        include_thoughts=include_thoughts,
+                                        thinking_budget=thinking_budget,
+                                        thinking_level=thinking_level,
+                                        topk=topk, candidate_count=candidate_count,
+                                        presence_penalty=presence_penalty,
+                                        frequency_penalty=frequency_penalty,
+                                        stop_sequences=stop_sequences,
+                                        response_mime_type=response_mime_type,
+                                        response_schema=response_schema,
+                                        seed=seed, response_logprobs=response_logprobs,
+                                        logprobs=logprobs, audio_timestamp=audio_timestamp,
+                                        safety_settings=safety_settings,
+                                        google_search=google_search,
+                                        url_context=url_context,
+                                        retries=retries,
+                                        on_clear_context=on_clear_context
+                                ):
+                                    yield text
+                            else:
+                                api_contents.extend({"functionResponse": {"name": name, "response": {"result": "请等待结果"}}})
                         else:
                             filtered_parts = _filter_empty_text_parts(model_message["parts"])
                             if filtered_parts:
@@ -842,31 +845,34 @@ class GeminiAPI:
                         function_calls = [part["functionCall"] for part in function_call_parts]
                         logger.info(f"发现函数调用: {function_calls}")
                         function_responses = await self._execute_tool(function_calls, tools, tool_fixed_params)
-                        api_contents.extend(function_responses)
-                        async for text in self._chat_api(
-                                api_contents, stream=False, tools=tools, tool_fixed_params=tool_fixed_params,
-                                tool_declarations=tool_declarations,
-                                max_output_tokens=max_output_tokens,
-                                system_instruction=system_instruction,
-                                topp=topp, temperature=temperature,
-                                include_thoughts=include_thoughts,
-                                thinking_budget=thinking_budget,
-                                thinking_level=thinking_level,
-                                topk=topk, candidate_count=candidate_count,
-                                presence_penalty=presence_penalty,
-                                frequency_penalty=frequency_penalty,
-                                stop_sequences=stop_sequences,
-                                response_mime_type=response_mime_type,
-                                response_schema=response_schema,
-                                seed=seed, response_logprobs=response_logprobs,
-                                logprobs=logprobs, audio_timestamp=audio_timestamp,
-                                safety_settings=safety_settings,
-                                google_search=google_search,
-                                url_context=url_context,
-                                retries=retries,
-                                on_clear_context=on_clear_context
-                        ):
-                            yield text
+                        if function_responses is not None:
+                            api_contents.extend(function_responses)
+                            async for text in self._chat_api(
+                                    api_contents, stream=False, tools=tools, tool_fixed_params=tool_fixed_params,
+                                    tool_declarations=tool_declarations,
+                                    max_output_tokens=max_output_tokens,
+                                    system_instruction=system_instruction,
+                                    topp=topp, temperature=temperature,
+                                    include_thoughts=include_thoughts,
+                                    thinking_budget=thinking_budget,
+                                    thinking_level=thinking_level,
+                                    topk=topk, candidate_count=candidate_count,
+                                    presence_penalty=presence_penalty,
+                                    frequency_penalty=frequency_penalty,
+                                    stop_sequences=stop_sequences,
+                                    response_mime_type=response_mime_type,
+                                    response_schema=response_schema,
+                                    seed=seed, response_logprobs=response_logprobs,
+                                    logprobs=logprobs, audio_timestamp=audio_timestamp,
+                                    safety_settings=safety_settings,
+                                    google_search=google_search,
+                                    url_context=url_context,
+                                    retries=retries,
+                                    on_clear_context=on_clear_context
+                            ):
+                                yield text
+                        else:
+                            api_contents.extend({"functionResponse": {"name": name, "response": {"result": "请等待结果"}}})
                     else:
                         if model_message["parts"]:
                             api_contents.append(model_message)
@@ -996,6 +1002,7 @@ class GeminiAPI:
         thought = []
         logprobs_data = []
         grounding_metadata = None
+        print(api_contents)
         async for part in self._chat_api(
                 api_contents, stream, tools, tool_fixed_params, tool_declarations,
                 max_output_tokens, system_instruction, topp, temperature, include_thoughts, thinking_budget,
