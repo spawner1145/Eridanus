@@ -305,7 +305,10 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                     raise Exception("Empty response。Gemini API返回的文本为空。")
 
             # 注意：不在此处保存历史记录，construct_gemini_standard_prompt 已经保存了不含群聊上下文的历史
-
+            if reply_message:
+                await prompt_database_update(user_id, {"role": "model", "parts": [{"text": reply_message}]}, config)
+            else:
+                await prompt_database_update(user_id, {"role": "model", "parts": [{"text": "（system：此处已进行函数调用）"}]}, config)
             if mface_files:
                 for mface_file in mface_files:
                     await bot.send(event, Image(file=mface_file))
