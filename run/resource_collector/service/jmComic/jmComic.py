@@ -10,6 +10,7 @@ from jmcomic import *
 from PIL import Image
 import os
 import gc
+import copy
 from framework_common.utils.random_str import random_str
 from run.ai_generated_art.service.antiSFW import process_folder, compress_gifs
 from datetime import date
