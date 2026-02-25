@@ -49,7 +49,8 @@ async def main():
         [6].B站 or 抖音 or 小红书 登录。不登也不影响你用
         [7].导出配置文件
         [8].导入配置文件
-        [9].退出""")
+        [9].更新jmcomic库(当代理正常但jm功能不可用时请自助更新)
+        [10].退出""")
     user_input = input("请输入指令序号：")
     if user_input == "1":
         logger.info("youtube登录")
@@ -116,6 +117,9 @@ async def main():
         logger.info("导入配置文件")
         import_yaml()
         logger.info("配置文件导入完成")
+    elif user_input=="9":
+        pip_main(['upgrade', 'jmcomic'])
+
 
 def updaat(f=False, source=None, yamls:dict=None):
     if not yamls:
