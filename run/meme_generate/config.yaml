@@ -1,0 +1,3 @@
+pic_path: "./data/pictures/meme_cache/"
+meme_generate:
+  host: "http://127.0.0.1:2233/memes/"
