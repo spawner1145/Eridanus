@@ -1,3 +1,5 @@
 pic_path: "./data/pictures/meme_cache/"
 meme_generate:
+  # 请自行配置并启动meme-generator服务（包括项目网站[其他表情]中的3个额外表情仓库）,在host中填写本地服务端口（或该项目的api接口地址)
+  # 项目地址：https://github.com/MemeCrafters/meme-generator
   host: "http://127.0.0.1:2233/memes/"
