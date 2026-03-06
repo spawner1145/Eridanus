@@ -6,7 +6,7 @@ from typing import Optional
 
 def generate_meme_key_image(json_file_path: str) -> Optional[str]:
     """
-    根据指定的JSON文件路径，生成meme表情包关键字图片，并返回图片保存路径
+    根据指定的JSON文件路径，生成meme表情包关键字列表图片，并返回图片保存路径
     """
     # 读取并解析JSON文件 
     if not os.path.exists(json_file_path):

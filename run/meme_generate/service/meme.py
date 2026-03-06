@@ -15,7 +15,7 @@ MEME_HOST = _cfg.get("meme_generate", {}).get("host", "http://127.0.0.1:2233/mem
 
 result_dir = os.path.join(PIC_PATH, "result/")
 
-async def get_more_img_func(func_name: str, img_paths: list, result_id: int,result_type: str,options: str = "",details: str = "")-> str:
+async def get_img_only_func(func_name: str, img_paths: list, result_id: int,result_type: str,options: str = "",details: str = "")-> str:
     """生成仅需一或多张图片的表情包，返回结果路径"""
     files = []
     for img_path in img_paths:
@@ -32,7 +32,7 @@ async def get_more_img_func(func_name: str, img_paths: list, result_id: int,resu
     async with httpx.AsyncClient() as client:
         resp = await client.post(url, files=files, data=data)
     
-    if os.path.exists(result_dir) is False:
+    if not os.path.exists(result_dir):
         os.makedirs(result_dir)
     result_path = f"{result_dir}{func_name}_{result_id}.{result_type}"
     with open(result_path, "wb") as f:

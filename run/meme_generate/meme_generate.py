@@ -1,6 +1,5 @@
 import requests
 import os
-import re
 import json
 import asyncio
 import shutil
@@ -8,8 +7,7 @@ from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Image, Reply,Video,Text,File,Node,At
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
-from framework_common.utils.utils import delay_recall
-from run.meme_generate.service.meme import get_more_img_func,get_func
+from run.meme_generate.service.meme import get_img_only_func,get_func
 
 mapping_path = "./run/meme_generate/config/mapping.json"
 meme_list_path = "./run/meme_generate/config/meme_keys.jpg"
@@ -118,7 +116,7 @@ def main(bot: ExtendBot,config: YAMLManager):
                 download_image(traget_img, traget_path, bot)
 
                 result_id = len(os.listdir(result_dir))+1
-                result_path = await get_more_img_func(function,[traget_path],result_id,result_type,options,details)
+                result_path = await get_img_only_func(function,[traget_path],result_id,result_type,options,details)
                 await bot.send(event,Image(file=result_path))
             elif(min_img_num > 1 and max_img_num > 1):
 
@@ -151,7 +149,7 @@ def main(bot: ExtendBot,config: YAMLManager):
                 traget_img_list.append(traget_path)
 
                 result_id = len(os.listdir(result_dir))+1
-                result_path = await get_more_img_func(function,traget_img_list,result_id,result_type,options,details)
+                result_path = await get_img_only_func(function,traget_img_list,result_id,result_type,options,details)
                 await bot.send(event,Image(file=result_path))
             return
         if(event.message_chain.has(Text)):

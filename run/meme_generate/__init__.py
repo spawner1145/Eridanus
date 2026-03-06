@@ -1,1 +1,1 @@
-plugin_description="my_meme"
+plugin_description="meme表情包生成插件"
