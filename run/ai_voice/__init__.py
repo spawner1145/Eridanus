@@ -8,7 +8,7 @@ dynamic_imports = {
 function_declarations=[
     {
         "name": "call_tts",
-        "description": "根据文本和语音合成角色，合成语音并播放。",
+        "description": "根据文本和语音合成角色，合成语音并播放。非用户要求不要主动调用此函数。",
         "parameters": {
             "type": "object",
             "properties": {
