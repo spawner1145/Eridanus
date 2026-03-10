@@ -41,6 +41,32 @@ def _filter_empty_text_parts(parts: List[Dict]) -> List[Dict]:
     return [p for p in parts if _is_valid_part(p)]
 
 
+def _is_ok_tool_response_part(part: Dict) -> bool:
+    """判断一个 functionResponse 是否为“无输出/OK”占位结果。
+    {
+      "functionResponse": {
+        "name": "tool_name",
+        "response": {"result": "ok"}
+      }
+    }
+    """
+    if not isinstance(part, dict):
+        return False
+    fr = part.get("functionResponse")
+    if not isinstance(fr, dict):
+        return False
+    resp = fr.get("response")
+    if not isinstance(resp, dict):
+        return False
+    return resp.get("result") == "ok"
+
+
+def _should_skip_followup_ai_request_after_tools(function_response_parts: List[Dict]) -> bool:
+    if not function_response_parts:
+        return True
+    return all(_is_ok_tool_response_part(p) for p in function_response_parts)
+
+
 # Gemini 官方推荐的跳过验证签名（用于处理缺失 thoughtSignature 的情况）
 # 参考: https://ai.google.dev/gemini-api/docs/thought-signatures#faqs
 DUMMY_THOUGHT_SIGNATURE = "skip_thought_signature_validator"
@@ -349,7 +375,7 @@ class GeminiAPI:
                 else:
                     result = await asyncio.to_thread(func, **combined_args)
                 if result is None:
-                    return None
+                    return {"functionResponse": {"name": name, "response": {"result": "ok"}}}
                 return {"functionResponse": {"name": name, "response": {"result": str(result)}}}
             except Exception as e:
                 return {"functionResponse": {"name": name, "response": {"error": str(e)}}}
@@ -357,10 +383,17 @@ class GeminiAPI:
         tasks = [run_single_tool(call) for call in function_calls]
         function_response_parts = await asyncio.gather(*tasks)
 
-        return [{
+        function_response_parts = [p for p in function_response_parts if p is not None]
+
+        tool_message = {
             "role": "user",
             "parts": list(function_response_parts)
-        }]
+        }
+
+        if _should_skip_followup_ai_request_after_tools(function_response_parts):
+            tool_message["_skip_followup_ai_request"] = True
+
+        return [tool_message]
 
     async def _chat_api(
             self,
@@ -633,6 +666,8 @@ class GeminiAPI:
                             function_responses = await self._execute_tool(function_calls, tools, tool_fixed_params)
                             if function_responses:
                                 api_contents.extend(function_responses)
+                                if any(isinstance(m, dict) and m.get("_skip_followup_ai_request") for m in function_responses):
+                                    break
                                 async for text in self._chat_api(
                                         api_contents, stream=stream, tools=tools, tool_fixed_params=tool_fixed_params,
                                         tool_declarations=tool_declarations,
@@ -847,6 +882,8 @@ class GeminiAPI:
                         function_responses = await self._execute_tool(function_calls, tools, tool_fixed_params)
                         if function_responses is not None:
                             api_contents.extend(function_responses)
+                            if any(isinstance(m, dict) and m.get("_skip_followup_ai_request") for m in function_responses):
+                                break
                             async for text in self._chat_api(
                                     api_contents, stream=False, tools=tools, tool_fixed_params=tool_fixed_params,
                                     tool_declarations=tool_declarations,
