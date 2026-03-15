@@ -262,7 +262,13 @@ class GroupMessageManager:
         )
 
         message_copy = json.loads(json.dumps(raw_message))
-        
+        # 过滤空消息
+        message_copy["message"] = [
+            item for item in message_copy["message"]
+            if not (isinstance(item, dict) and
+                    item.get('type') == 'text' and
+                    not item.get('text', '').strip())
+        ]
         # 如果不包含图片，过滤掉图片消息
         if not include_images:
             filtered_message = []
@@ -277,7 +283,6 @@ class GroupMessageManager:
                 else:
                     filtered_message.append(item)
             message_copy["message"] = filtered_message
-        
         message_copy["message"].insert(0, {
             "text": f"{context_prompt}。"
         })
