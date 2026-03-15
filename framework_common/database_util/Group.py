@@ -262,13 +262,15 @@ class GroupMessageManager:
         )
 
         message_copy = json.loads(json.dumps(raw_message))
-        # 过滤空消息
         message_copy["message"] = [
-            item for item in message_copy["message"]
-            if not (isinstance(item, dict) and
+            {"type": "text", "text": "艾特你了"} if (
+                    isinstance(item, dict) and
                     item.get('type') == 'text' and
-                    not item.get('text', '').strip())
+                    not item.get('text', '').strip()
+            ) else item
+            for item in message_copy["message"]
         ]
+
         # 如果不包含图片，过滤掉图片消息
         if not include_images:
             filtered_message = []
