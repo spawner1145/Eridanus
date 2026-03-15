@@ -38,6 +38,10 @@ logger = get_logger("aiReplyCore")
 
 async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, event=None, system_instruction=None,
                       func_result=False):
+
+    for item in processed_message:
+        if item.get("text") == " ":
+            item["text"] = " 你好"
     logger.info(f"aiReplyCore called with message: {processed_message}")
     if (bot or event) and isinstance(processed_message, list):
         bot_id = str(bot.id) if bot else str(event.self_id)
