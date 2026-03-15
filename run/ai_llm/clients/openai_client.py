@@ -175,49 +175,16 @@ class OpenAIAPI:
         tasks = [run_single_tool(tc) for tc in tool_calls]
         return list(await asyncio.gather(*tasks))
 
-    async def _chat_api(
-        self,
-        messages: List[Dict],
-        stream: bool,
-        tools: Optional[Dict[str, Callable]] = None,
-        tool_fixed_params: Optional[Dict[str, Dict]] = None,
-        tool_declarations: Optional[List[Dict]] = None,
-        max_output_tokens: Optional[int] = None,
-        system_instruction: Optional[str] = None,
-        topp: Optional[float] = None,
-        temperature: Optional[float] = None,
-        presence_penalty: Optional[float] = None,
-        frequency_penalty: Optional[float] = None,
-        stop_sequences: Optional[List[str]] = None,
-        response_format: Optional[Dict] = None,
-        reasoning_effort: Optional[str] = None,
-        seed: Optional[int] = None,
-        response_logprobs: Optional[bool] = None,
-        logprobs: Optional[int] = None,
-        retries: int = 3,
-        on_clear_context: Optional[Callable] = None
-    ) -> AsyncGenerator[Union[str, Dict], None]:
-        """核心 API 调用逻辑，遵循 OpenAI 标准，支持 reasoning_content 但不记录到历史"""
-        original_model = self.model
-
-        # 验证参数
-        if topp is not None and (topp < 0 or topp > 1):
-            raise ValueError("top_p 必须在 0 到 1 之间")
-        if temperature is not None and (temperature < 0 or temperature > 2):
-            raise ValueError("temperature 必须在 0 到 2 之间")
-        if presence_penalty is not None and (presence_penalty < -2 or presence_penalty > 2):
-            raise ValueError("presence_penalty 必须在 -2 到 2 之间")
-        if frequency_penalty is not None and (frequency_penalty < -2 or frequency_penalty > 2):
-            raise ValueError("frequency_penalty 必须在 -2 到 2 之间")
-        if logprobs is not None and (logprobs < 0 or logprobs > 20):
-            raise ValueError("logprobs 必须在 0 到 20 之间")
-        if reasoning_effort is not None and reasoning_effort not in ["minimal", "low", "medium", "high"]:
-            raise ValueError("reasoning_effort 必须是 minimal、low、medium 或 high")
-
-        # 构造消息
+    @staticmethod
+    def _convert_messages(messages: List[Dict]) -> List[Dict]:
+        """将内部消息格式转换为 OpenAI API 格式，并自动修正 role=model → assistant。"""
         api_messages = []
         for msg in messages:
             role = msg["role"]
+            # ── 快速修正：Gemini 风格的 model role ──
+            if role == "model":
+                role = "assistant"
+
             content = msg.get("content", "")
             if isinstance(content, str):
                 api_content = [{"type": "text", "text": content}]
@@ -227,433 +194,434 @@ class OpenAIAPI:
                     if "text" in part:
                         api_content.append({"type": "text", "text": part["text"]})
                     elif "input_file" in part:
-                        api_content.append({
-                            "type": "input_file",
-                            "file_id": part["input_file"]["file_id"]
-                        } if "file_id" in part["input_file"] else {
-                            "type": "input_file",
-                            "filename": part["input_file"]["filename"],
-                            "file_data": part["input_file"]["file_data"]
-                        })
+                        f = part["input_file"]
+                        api_content.append(
+                            {"type": "input_file", "file_id": f["file_id"]}
+                            if "file_id" in f
+                            else {"type": "input_file", "filename": f["filename"], "file_data": f["file_data"]}
+                        )
                     elif "input_image" in part:
+                        img = part["input_image"]
                         api_content.append({
                             "type": "image_url",
-                            "image_url": {
-                                "url": part["input_image"]["image_url"],
-                                "detail": part["input_image"].get("detail", "auto")
-                            }
+                            "image_url": {"url": img["image_url"], "detail": img.get("detail", "auto")},
                         })
                     elif part.get("type") == "image_url" and "image_url" in part:
                         api_content.append(part)
             else:
                 raise ValueError(f"无效的消息内容格式: {content}")
-            api_msg = {
-                "role": role,
-                "content": api_content
-            }
+
+            api_msg = {"role": role, "content": api_content}
             if "tool_calls" in msg:
                 api_msg["tool_calls"] = msg["tool_calls"]
             if "tool_call_id" in msg:
                 api_msg["tool_call_id"] = msg["tool_call_id"]
+
             logger.debug(f"构造消息: {json.dumps(api_msg, ensure_ascii=False)}")
             api_messages.append(api_msg)
+        return api_messages
 
-        # 构造请求参数
-        request_params = {
-            "model": self.model,
-            "messages": api_messages,
-            "stream": stream
-        }
-        if max_output_tokens is not None:
-            request_params["max_tokens"] = max_output_tokens
-        if topp is not None:
-            request_params["top_p"] = topp
-        if temperature is not None:
-            request_params["temperature"] = temperature
-        if stop_sequences is not None:
-            request_params["stop"] = stop_sequences
-        if presence_penalty is not None:
-            request_params["presence_penalty"] = presence_penalty
-        if frequency_penalty is not None:
-            request_params["frequency_penalty"] = frequency_penalty
-        if seed is not None:
-            request_params["seed"] = seed
+    # ──────────────────────────────────────────────
+    # 辅助：构建 OpenAI 请求参数
+    # ──────────────────────────────────────────────
+    def _build_request_params(
+            self,
+            api_messages,
+            stream,
+            tools=None,
+            tool_fixed_params=None,
+            tool_declarations=None,
+            max_output_tokens=None,
+            topp=None,
+            temperature=None,
+            presence_penalty=None,
+            frequency_penalty=None,
+            stop_sequences=None,
+            response_format=None,
+            reasoning_effort=None,
+            seed=None,
+            response_logprobs=None,
+            logprobs=None,
+    ) -> dict:
+        params = {"model": self.model, "messages": api_messages, "stream": stream}
+
+        if max_output_tokens is not None: params["max_tokens"] = max_output_tokens
+        if topp is not None: params["top_p"] = topp
+        if temperature is not None: params["temperature"] = temperature
+        if stop_sequences is not None: params["stop"] = stop_sequences
+        if presence_penalty is not None: params["presence_penalty"] = presence_penalty
+        if frequency_penalty is not None: params["frequency_penalty"] = frequency_penalty
+        if seed is not None: params["seed"] = seed
         if response_logprobs is not None:
-            request_params["logprobs"] = response_logprobs
+            params["logprobs"] = response_logprobs
             if logprobs is not None:
-                request_params["top_logprobs"] = logprobs
-        if response_format:
-            request_params["response_format"] = response_format
-        if reasoning_effort is not None:
-            request_params["reasoning_effort"] = reasoning_effort
+                params["top_logprobs"] = logprobs
+        if response_format:               params["response_format"] = response_format
+        if reasoning_effort is not None: params["reasoning_effort"] = reasoning_effort
 
         if tools is not None:
-            # 如果提供了预定义的 tool_declarations，优先使用它（转换为 OpenAI 格式）
+            tool_defs = []
             if tool_declarations:
                 tool_names = set(tools.keys())
-                tool_definitions = []
                 for decl in tool_declarations:
-                    if decl.get("name") in tool_names:
-                        # 转换 Gemini 格式到 OpenAI 格式
-                        params = decl.get("parameters", {"type": "object", "properties": {}, "required": []})
-                        if "additionalProperties" not in params:
-                            params["additionalProperties"] = False
-                        tool_definitions.append({
-                            "type": "function",
-                            "function": {
-                                "name": decl["name"],
-                                "description": decl.get("description", f"调用 {decl['name']} 函数"),
-                                "parameters": params
-                            }
-                        })
-                if not tool_definitions:
+                    if decl.get("name") not in tool_names:
+                        continue
+                    p = decl.get("parameters", {"type": "object", "properties": {}, "required": []})
+                    p.setdefault("additionalProperties", False)
+                    tool_defs.append({
+                        "type": "function",
+                        "function": {
+                            "name": decl["name"],
+                            "description": decl.get("description", f"调用 {decl['name']} 函数"),
+                            "parameters": p,
+                        },
+                    })
+                if not tool_defs:
                     logger.warning("tool_declarations 中没有与 tools 匹配的函数声明，回退到自动推断")
                     tool_declarations = None
-                else:
-                    request_params["tools"] = tool_definitions
-            
-            # 如果没有提供 tool_declarations 或过滤后为空，则自动推断
+
             if not tool_declarations:
-                tool_definitions = []
-                # 获取全局固定参数（如果存在）
-                fixed_params = tool_fixed_params.get("all", {}) if tool_fixed_params else {}
+                fixed = (tool_fixed_params or {}).get("all", {})
                 for name, func in tools.items():
-                    params = {
-                        "type": "object",
-                        "properties": {},
-                        "required": [],
-                        "additionalProperties": False
-                    }
+                    p = {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
                     if hasattr(func, "__code__"):
-                        param_names = func.__code__.co_varnames[:func.__code__.co_argcount]
-                        # 排除固定参数，仅声明动态参数
-                        dynamic_params = [p for p in param_names if p not in fixed_params]
-                        for param in dynamic_params:
-                            params["properties"][param] = {"type": "string"}
-                            params["required"].append(param)
+                        dynamic = [
+                            v for v in func.__code__.co_varnames[:func.__code__.co_argcount]
+                            if v not in fixed
+                        ]
+                        p["properties"] = {v: {"type": "string"} for v in dynamic}
+                        p["required"] = dynamic
                     else:
-                        params["properties"] = {"arg": {"type": "string"}}
-                        params["required"] = ["arg"]
-                    tool_definitions.append({
+                        p["properties"] = {"arg": {"type": "string"}}
+                        p["required"] = ["arg"]
+                    tool_defs.append({
                         "type": "function",
                         "function": {
                             "name": name,
                             "description": getattr(func, "__doc__", f"调用 {name} 函数"),
-                            "parameters": params
-                        }
+                            "parameters": p,
+                        },
                     })
-                request_params["tools"] = tool_definitions
 
-        #print(f"[DEBUG] OpenAI request params: {json.dumps(request_params, ensure_ascii=False, indent=2, default=str)}")
+            if tool_defs:
+                params["tools"] = tool_defs
 
+        return params
+
+    # ──────────────────────────────────────────────
+    # 辅助：空响应时清除上下文并重建 api_messages
+    # ──────────────────────────────────────────────
+    async def _clear_context_and_rebuild(
+            self,
+            messages: list,
+            api_messages: list,
+            request_params: dict,
+            on_clear_context,
+    ):
+        try:
+            await on_clear_context()
+            system_msgs = [m for m in messages if m.get("role") == "system"]
+            last_user = next((m for m in reversed(messages) if m.get("role") == "user"), None)
+            if last_user:
+                messages.clear()
+                messages.extend(system_msgs)
+                messages.append(last_user)
+                rebuilt = self._convert_messages(messages)
+                api_messages.clear()
+                api_messages.extend(rebuilt)
+                request_params["messages"] = api_messages
+        except Exception as e:
+            logger.error(f"清除上下文失败: {e}")
+
+    # ──────────────────────────────────────────────
+    # 辅助：yield reasoning + content（非流式单条消息）
+    # ──────────────────────────────────────────────
+    @staticmethod
+    async def _yield_message(message):
+        if hasattr(message, "reasoning_content") and message.reasoning_content:
+            yield {"thought": message.reasoning_content}
+        if message.content:
+            yield message.content
+
+    # ──────────────────────────────────────────────
+    # 辅助：处理工具调用并续接（流式/非流式共用）
+    # ──────────────────────────────────────────────
+    async def _handle_tool_calls_openai(
+            self,
+            tool_calls_raw,  # list[dict] 或 SDK tool_call 对象列表
+            api_messages: list,
+            messages: list,
+            request_params: dict,
+            tools,
+            tool_fixed_params,
+            stream: bool,
+    ):
+        # 统一转换为 dict 格式
+        tool_calls = []
+        for tc in tool_calls_raw:
+            if isinstance(tc, dict):
+                tc_dict = tc
+            else:
+                tc_dict = {
+                    "id": tc.id or f"call_{uuid.uuid4()}",
+                    "type": "function",
+                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                }
+                if hasattr(tc, "extra_content") and tc.extra_content:
+                    tc_dict["extra_content"] = tc.extra_content
+            tool_calls.append(tc_dict)
+
+        assistant_message = {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "Tool calls executed"}],
+            "tool_calls": tool_calls,
+        }
+        api_messages.append(assistant_message)
+        messages.append(assistant_message)
+
+        tool_messages = await self._execute_tool(tool_calls_raw, tools, tool_fixed_params)
+        api_messages.extend(tool_messages)
+        messages.extend(tool_messages)
+
+        followup_params = {**request_params, "messages": api_messages, "stream": stream}
+
+        if stream:
+            try:
+                async for chunk in await self.client.chat.completions.create(**followup_params):
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, "reasoning_content") and delta.reasoning_content:
+                        yield {"thought": delta.reasoning_content}
+                    if delta.content:
+                        yield delta.content
+                    if chunk.choices[0].finish_reason in ("stop", "length"):
+                        break
+            except Exception as e:
+                logger.error(f"工具调用后续接失败: {e}")
+                yield f"[错误] 无法获取工具调用后的响应 - {e}"
+        else:
+            resp = await self.client.chat.completions.create(**followup_params)
+            msg = resp.choices[0].message
+            messages.append({
+                "role": "assistant",
+                "content": [{"type": "text", "text": msg.content or ""}],
+            })
+            async for chunk in self._yield_message(msg):
+                yield chunk
+
+    # ──────────────────────────────────────────────
+    # 核心 API 调用（精简版）
+    # ──────────────────────────────────────────────
+    async def _chat_api(
+            self,
+            messages: List[Dict],
+            stream: bool,
+            tools=None,
+            tool_fixed_params=None,
+            tool_declarations=None,
+            max_output_tokens=None,
+            system_instruction=None,
+            topp=None,
+            temperature=None,
+            presence_penalty=None,
+            frequency_penalty=None,
+            stop_sequences=None,
+            response_format=None,
+            reasoning_effort=None,
+            seed=None,
+            response_logprobs=None,
+            logprobs=None,
+            retries=3,
+            on_clear_context=None,
+    ):
+        original_model = self.model
+
+        # ---------- 参数校验 ----------
+        if topp is not None and not (0 <= topp <= 1):               raise ValueError("top_p 必须在 0 到 1 之间")
+        if temperature is not None and not (0 <= temperature <= 2):        raise ValueError(
+            "temperature 必须在 0 到 2 之间")
+        if presence_penalty is not None and not (-2 <= presence_penalty <= 2):  raise ValueError(
+            "presence_penalty 必须在 -2 到 2 之间")
+        if frequency_penalty is not None and not (-2 <= frequency_penalty <= 2): raise ValueError(
+            "frequency_penalty 必须在 -2 到 2 之间")
+        if logprobs is not None and not (0 <= logprobs <= 20):          raise ValueError(
+            "logprobs 必须在 0 到 20 之间")
+        if reasoning_effort is not None and reasoning_effort not in ("minimal", "low", "medium", "high"):
+            raise ValueError("reasoning_effort 必须是 minimal、low、medium 或 high")
+
+        api_messages = self._convert_messages(messages)
+        request_params = self._build_request_params(
+            api_messages, stream,
+            tools=tools, tool_fixed_params=tool_fixed_params,
+            tool_declarations=tool_declarations,
+            max_output_tokens=max_output_tokens, topp=topp, temperature=temperature,
+            presence_penalty=presence_penalty, frequency_penalty=frequency_penalty,
+            stop_sequences=stop_sequences, response_format=response_format,
+            reasoning_effort=reasoning_effort, seed=seed,
+            response_logprobs=response_logprobs, logprobs=logprobs,
+        )
+
+        clear_threshold = max(1, retries - 2)
+
+        # ══════════════════════════════════════════
+        # 流式
+        # ══════════════════════════════════════════
         if stream:
             assistant_content = ""
             tool_calls_buffer = []
             try:
                 logger.info(f"开始流式请求: model={self.model}, base_url={self.baseurl}")
-                response_stream = await self.client.chat.completions.create(**request_params)
-                chunk_count = 0
-                async for chunk in response_stream:
-                    chunk_count += 1
+                async for chunk in await self.client.chat.completions.create(**request_params):
                     if not chunk.choices:
-                        if chunk_count <= 3:
-                            logger.debug(f"流式响应chunk无choices: {chunk}")
                         continue
-                    
                     delta = chunk.choices[0].delta
                     finish_reason = chunk.choices[0].finish_reason
 
-                    if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                    if hasattr(delta, "reasoning_content") and delta.reasoning_content:
                         yield {"thought": delta.reasoning_content}
+
                     if delta.content:
                         yield delta.content
                         assistant_content += delta.content
-                    elif hasattr(delta, 'text') and delta.text:
+                    elif hasattr(delta, "text") and delta.text:
                         yield delta.text
                         assistant_content += delta.text
-                    
-                    if hasattr(delta, 'tool_calls') and delta.tool_calls:
-                        for tool_call in delta.tool_calls:
-                            if tool_call is None:
-                                continue
-                            
-                            tc_index = getattr(tool_call, 'index', None)
-                            if tc_index is None:
-                                tc_index = len(tool_calls_buffer)
-                            while len(tool_calls_buffer) <= tc_index:
-                                tool_calls_buffer.append({
-                                    "id": "",
-                                    "type": "function",
-                                    "function": {"name": "", "arguments": ""}
-                                })
-                            
-                            tc_entry = tool_calls_buffer[tc_index]
 
-                            if tool_call.id:
-                                tc_entry["id"] = tool_call.id
-                            if tool_call.function:
-                                if tool_call.function.name:
-                                    tc_entry["function"]["name"] += tool_call.function.name
-                                if tool_call.function.arguments:
-                                    tc_entry["function"]["arguments"] += tool_call.function.arguments
+                    # 累积工具调用 delta
+                    if hasattr(delta, "tool_calls") and delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            if tc is None:
+                                continue
+                            idx = getattr(tc, "index", None) or len(tool_calls_buffer)
+                            while len(tool_calls_buffer) <= idx:
+                                tool_calls_buffer.append(
+                                    {"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
+                            entry = tool_calls_buffer[idx]
+                            if tc.id:                          entry["id"] = tc.id
+                            if tc.function:
+                                if tc.function.name:           entry["function"]["name"] += tc.function.name
+                                if tc.function.arguments:      entry["function"][
+                                    "arguments"] += tc.function.arguments
 
                     if finish_reason == "tool_calls" and tool_calls_buffer:
-                        valid_tool_calls = []
-                        for tc in tool_calls_buffer:
-                            if tc["function"]["name"]:
-                                if not tc["id"]:
-                                    tc["id"] = f"call_{uuid.uuid4()}"
-                                valid_tool_calls.append(tc)
-                        
-                        if not valid_tool_calls:
+                        valid = [tc for tc in tool_calls_buffer if tc["function"]["name"]]
+                        for tc in valid:
+                            if not tc["id"]:
+                                tc["id"] = f"call_{uuid.uuid4()}"
+                        if not valid:
                             logger.warning("没有有效的工具调用")
                             tool_calls_buffer = []
                             continue
-                        
-                        tool_calls_buffer = valid_tool_calls
-                        assistant_message = {
-                            "role": "assistant",
-                            "content": [{"type": "text", "text": "Tool calls executed"}],
-                            "tool_calls": tool_calls_buffer
-                        }
-                        api_messages.append(assistant_message)
-                        messages.append(assistant_message)
-                        tool_messages = await self._execute_tool(
-                            tool_calls_buffer, 
-                            tools, 
-                            tool_fixed_params
-                        )
-                        
-                        api_messages.extend(tool_messages)
-                        messages.extend(tool_messages)
-                        second_request_params = request_params.copy()
-                        second_request_params["messages"] = api_messages
-                        second_request_params["stream"] = True
-                        try:
-                            async for chunk2 in await self.client.chat.completions.create(**second_request_params):
-                                if chunk2.choices:
-                                    delta2 = chunk2.choices[0].delta
-                                    if hasattr(delta2, 'reasoning_content') and delta2.reasoning_content:
-                                        yield {"thought": delta2.reasoning_content}
-                                    if delta2.content:
-                                        yield delta2.content
-                                        assistant_content += delta2.content
-                                    if chunk2.choices[0].finish_reason in ["stop", "length"]:
-                                        if assistant_content:
-                                            messages.append({
-                                                "role": "assistant",
-                                                "content": [{"type": "text", "text": assistant_content}]
-                                            })
-                                        assistant_content = ""
-                        except Exception as e:
-                            logger.error(f"第二次 API 调用失败: {str(e)}")
-                            yield f"错误: 无法获取最终响应 - {str(e)}"
-                            messages.append({
-                                "role": "assistant",
-                                "content": [{"type": "text", "text": f"错误: {str(e)}"}]
-                            })
+                        async for chunk in self._handle_tool_calls_openai(
+                                valid, api_messages, messages, request_params, tools, tool_fixed_params, stream=True
+                        ):
+                            yield chunk
                         tool_calls_buffer = []
-                    
-                    if finish_reason in ["stop", "length"]:
+
+                    if finish_reason in ("stop", "length"):
                         if assistant_content:
-                            messages.append({
-                                "role": "assistant",
-                                "content": [{"type": "text", "text": assistant_content}]
-                            })
+                            messages.append(
+                                {"role": "assistant", "content": [{"type": "text", "text": assistant_content}]})
                         assistant_content = ""
-                
+
+                # 检测空响应
                 if not assistant_content and not tool_calls_buffer:
-                    has_assistant_content = any(
-                        m.get("role") == "assistant" and m.get("content") and 
-                        any(c.get("text", "").strip() for c in m["content"] if isinstance(c, dict))
-                        for m in messages[-2:] if isinstance(m, dict)
+                    has_content = any(
+                        m.get("role") == "assistant"
+                        and any(c.get("text", "").strip() for c in m.get("content", []) if isinstance(c, dict))
+                        for m in messages[-2:]
                     )
-                    if not has_assistant_content:
-                        logger.warning(f"OpenAI 流式响应内容为空（可能被内容过滤拦截），chunk_count: {chunk_count}, assistant_content='{assistant_content}', tool_calls_buffer={tool_calls_buffer}")
+                    if not has_content:
+                        logger.warning("OpenAI 流式响应内容为空")
                         if on_clear_context:
-                            logger.info("流式空响应：尝试清除上下文，请用户重新发送消息")
                             try:
                                 await on_clear_context()
                             except Exception as e:
                                 logger.error(f"清除上下文失败: {e}")
-                        yield f"[错误] AI流式响应内容为空（可能被内容安全过滤拦截）。已自动清除上下文，请重新提问。"
+                        yield "[错误] AI流式响应内容为空（可能被内容安全过滤拦截）。已自动清除上下文，请重新提问。"
+
             except httpx.TimeoutException as e:
-                logger.error(f"流式请求超时: {str(e)}")
-                yield f"[错误] OpenAI 流式请求超时，请检查网络或稍后重试。"
+                logger.error(f"流式请求超时: {e}")
+                yield "[错误] OpenAI 流式请求超时，请检查网络或稍后重试。"
             except httpx.ConnectError as e:
-                logger.error(f"流式请求连接失败: {str(e)}")
-                yield f"[错误] OpenAI 流式请求连接失败，请检查网络或代理设置。"
+                logger.error(f"流式请求连接失败: {e}")
+                yield "[错误] OpenAI 流式请求连接失败，请检查网络或代理设置。"
             except Exception as e:
-                logger.error(f"流式请求失败: {type(e).__name__}: {str(e)}")
+                logger.error(f"流式请求失败: {type(e).__name__}: {e}")
                 yield f"[错误] OpenAI 流式请求失败（{type(e).__name__}: {e}）"
+
+        # ══════════════════════════════════════════
+        # 非流式（带重试）
+        # ══════════════════════════════════════════
         else:
             for attempt in range(retries):
                 try:
                     response = await self.client.chat.completions.create(**request_params)
 
+                    # ── 无 choices ──
                     if not response.choices:
-                        try:
-                            raw_dump = json.dumps(response.model_dump(), ensure_ascii=False, indent=2, default=str)
-                        except Exception:
-                            raw_dump = str(response)
-                        logger.warning(f"OpenAI 非流式响应无 choices（第 {attempt+1}/{retries} 次），原始响应体:\n{raw_dump}")
-                        finish_reason_info = getattr(response, 'system_fingerprint', '未知')
-
-                        clear_threshold = max(1, retries - 2)
+                        logger.warning(f"无 choices（第 {attempt + 1}/{retries} 次）")
                         if attempt >= clear_threshold and on_clear_context:
-                            logger.warning(f"尝试清除上下文后重试（第 {attempt+1}/{retries} 次）")
-                            try:
-                                await on_clear_context()
-                                system_msgs = [m for m in messages if m.get("role") == "system"]
-                                last_user_msg = None
-                                for msg in reversed(messages):
-                                    if msg.get("role") == "user":
-                                        last_user_msg = msg
-                                        break
-                                if last_user_msg:
-                                    messages.clear()
-                                    messages.extend(system_msgs)
-                                    messages.append(last_user_msg)
-                                    api_messages.clear()
-                                    for msg in messages:
-                                        role = msg["role"]
-                                        content = msg.get("content", "")
-                                        if isinstance(content, str):
-                                            api_content = [{"type": "text", "text": content}]
-                                        elif isinstance(content, list):
-                                            api_content = content
-                                        else:
-                                            api_content = [{"type": "text", "text": str(content)}]
-                                        api_messages.append({"role": role, "content": api_content})
-                                    request_params["messages"] = api_messages
-                            except Exception as e:
-                                logger.error(f"清除上下文失败: {e}")
-                        
+                            await self._clear_context_and_rebuild(messages, api_messages, request_params,
+                                                                  on_clear_context)
                         if attempt == retries - 1:
-                            logger.error(f"OpenAI 非流式响应无 choices，已重试 {retries} 次仍然失败")
                             yield f"[错误] AI响应内容为空（无 choices），已重试{retries}次。请尝试 /clear 清除上下文后重新提问。"
                             break
                         await asyncio.sleep(2 ** attempt)
                         continue
-                    
+
                     choice = response.choices[0]
                     message = choice.message
-                    
+
+                    # ── content 为空且无工具调用 ──
                     if not message.content and not message.tool_calls:
                         finish_reason = choice.finish_reason or "未知"
-                        try:
-                            raw_dump = json.dumps(response.model_dump(), ensure_ascii=False, indent=2, default=str)
-                        except Exception:
-                            raw_dump = str(response)
-                        logger.warning(f"OpenAI 非流式响应 content 为空（第 {attempt+1}/{retries} 次），finish_reason: {finish_reason}，原始响应体:\n{raw_dump}")
-                        
-                        clear_threshold = max(1, retries - 2)
+                        logger.warning(
+                            f"content 为空（第 {attempt + 1}/{retries} 次），finish_reason: {finish_reason}")
                         if attempt >= clear_threshold and on_clear_context:
-                            logger.warning(f"尝试清除上下文后重试（第 {attempt+1}/{retries} 次）")
-                            try:
-                                await on_clear_context()
-                                system_msgs = [m for m in messages if m.get("role") == "system"]
-                                last_user_msg = None
-                                for msg in reversed(messages):
-                                    if msg.get("role") == "user":
-                                        last_user_msg = msg
-                                        break
-                                if last_user_msg:
-                                    messages.clear()
-                                    messages.extend(system_msgs)
-                                    messages.append(last_user_msg)
-                                    api_messages.clear()
-                                    for msg in messages:
-                                        role = msg["role"]
-                                        content = msg.get("content", "")
-                                        if isinstance(content, str):
-                                            api_content = [{"type": "text", "text": content}]
-                                        elif isinstance(content, list):
-                                            api_content = content
-                                        else:
-                                            api_content = [{"type": "text", "text": str(content)}]
-                                        api_messages.append({"role": role, "content": api_content})
-                                    request_params["messages"] = api_messages
-                            except Exception as e:
-                                logger.error(f"清除上下文失败: {e}")
-                        
+                            await self._clear_context_and_rebuild(messages, api_messages, request_params,
+                                                                  on_clear_context)
                         if attempt == retries - 1:
-                            logger.error(f"OpenAI 非流式响应 content 为空，finish_reason: {finish_reason}，已重试 {retries} 次")
                             yield f"[错误] AI响应内容为空（finish_reason: {finish_reason}），已重试{retries}次。请尝试 /clear 清除上下文后重新提问。"
                             break
                         await asyncio.sleep(2 ** attempt)
                         continue
-                    
+
+                    # ── 工具调用 ──
                     if message.tool_calls:
-                        tool_calls = []
-                        for tc in message.tool_calls:
-                            tc_dict = {
-                                "id": tc.id or f"call_{uuid.uuid4()}",
-                                "type": "function",
-                                "function": {
-                                    "name": tc.function.name,
-                                    "arguments": tc.function.arguments
-                                }
-                            }
-                            if hasattr(tc, 'extra_content') and tc.extra_content:
-                                tc_dict["extra_content"] = tc.extra_content
-                            elif isinstance(tc, dict) and "extra_content" in tc:
-                                tc_dict["extra_content"] = tc["extra_content"]
-                            tool_calls.append(tc_dict)
-                        assistant_message = {
-                            "role": "assistant",
-                            "content": [{"type": "text", "text": "Tool calls executed"}],
-                            "tool_calls": tool_calls
-                        }
-                        api_messages.append(assistant_message)
-                        messages.append(assistant_message)
-                        tool_messages = await self._execute_tool(message.tool_calls, tools, tool_fixed_params)
-                        api_messages.extend(tool_messages)
-                        messages.extend(tool_messages)
-                        second_request_params = request_params.copy()
-                        second_request_params["messages"] = api_messages
-                        second_request_params["stream"] = False
-                        response = await self.client.chat.completions.create(**second_request_params)
-                        choice = response.choices[0]
-                        message = choice.message
-                        assistant_message = {
-                            "role": "assistant",
-                            "content": [{"type": "text", "text": message.content or ""}]
-                        }
-                        messages.append(assistant_message)
-                        if hasattr(message, 'reasoning_content') and message.reasoning_content:
-                            yield {"thought": message.reasoning_content}
-                        if message.content:
-                            yield message.content
+                        async for chunk in self._handle_tool_calls_openai(
+                                message.tool_calls, api_messages, messages, request_params, tools,
+                                tool_fixed_params, stream=False
+                        ):
+                            yield chunk
                     else:
+                        # ── 正常响应 ──
                         assistant_message = {
                             "role": "assistant",
-                            "content": [{"type": "text", "text": message.content or ""}]
+                            "content": [{"type": "text", "text": message.content or ""}],
                         }
                         if response_logprobs and choice.logprobs:
                             assistant_message["logprobs"] = choice.logprobs.content
                             messages.append(assistant_message)
-                            if hasattr(message, 'reasoning_content') and message.reasoning_content:
-                                yield {"thought": message.reasoning_content}
-                            yield f"{message.content or ''}\nLogprobs: {json.dumps(choice.logprobs.content, ensure_ascii=False)}"
+                            async for chunk in self._yield_message(message):
+                                yield chunk
+                            yield f"\nLogprobs: {json.dumps(choice.logprobs.content, ensure_ascii=False)}"
                         else:
                             messages.append(assistant_message)
-                            if hasattr(message, 'reasoning_content') and message.reasoning_content:
-                                yield {"thought": message.reasoning_content}
-                            if message.content:
-                                yield message.content
+                            async for chunk in self._yield_message(message):
+                                yield chunk
                     break
+
                 except (httpx.ConnectError, httpx.TimeoutException) as e:
-                    logger.error(f"API 网络错误 (尝试 {attempt+1}/{retries}): {type(e).__name__}: {str(e)}")
+                    logger.error(f"网络错误 (尝试 {attempt + 1}/{retries}): {type(e).__name__}: {e}")
                     if attempt == retries - 1:
-                        logger.error(f"OpenAI 非流式网络错误，已重试 {retries} 次: {type(e).__name__}: {e}")
                         yield f"[错误] OpenAI 请求网络连接失败（{type(e).__name__}），已重试{retries}次。请检查网络或代理设置。"
                         break
                     await asyncio.sleep(2 ** attempt)
                 except Exception as e:
-                    logger.error(f"API 调用失败 (尝试 {attempt+1}/{retries}): {str(e)}")
+                    logger.error(f"API 调用失败 (尝试 {attempt + 1}/{retries}): {e}")
                     if attempt == retries - 1:
-                        logger.error(f"OpenAI 非流式请求失败，已重试 {retries} 次: {type(e).__name__}: {e}")
                         yield f"[错误] OpenAI 请求失败（{type(e).__name__}: {e}），已重试{retries}次"
                         break
                     await asyncio.sleep(2 ** attempt)
