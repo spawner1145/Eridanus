@@ -244,7 +244,7 @@ class OpenAIAPI:
             logprobs=None,
     ) -> dict:
         params = {"model": self.model, "messages": api_messages, "stream": stream}
-
+        print(api_messages)
         if max_output_tokens is not None: params["max_tokens"] = max_output_tokens
         if topp is not None: params["top_p"] = topp
         if temperature is not None: params["temperature"] = temperature
