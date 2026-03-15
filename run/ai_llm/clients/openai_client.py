@@ -243,6 +243,18 @@ class OpenAIAPI:
             response_logprobs=None,
             logprobs=None,
     ) -> dict:
+        #params = {"model": self.model, "messages": api_messages, "stream": stream}
+        for msg in api_messages:
+            if isinstance(msg.get('content'), list):
+                msg['content'] = [
+                    {'type': item['type'], 'text': '艾特你了'} if (
+                            isinstance(item, dict) and
+                            item.get('type') == 'text' and
+                            not item.get('text', '').strip()
+                    ) else item
+                    for item in msg['content']
+                ]
+
         params = {"model": self.model, "messages": api_messages, "stream": stream}
         print(api_messages)
         if max_output_tokens is not None: params["max_tokens"] = max_output_tokens
