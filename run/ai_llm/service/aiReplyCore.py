@@ -41,7 +41,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
 
     for item in processed_message:
         if item.get("text", "").strip() == "":
-            item["text"] = " 你好"
+            item["text"] = " 。。"
     logger.info(f"aiReplyCore called with message: {processed_message}")
     if (bot or event) and isinstance(processed_message, list):
         bot_id = str(bot.id) if bot else str(event.self_id)
