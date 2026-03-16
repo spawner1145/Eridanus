@@ -41,7 +41,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
 
     for item in processed_message:
         if item.get("text", "").strip() == "":
-            item["text"] = " 。。"
+            item["text"] = "。"
     logger.info(f"aiReplyCore called with message: {processed_message}")
     if (bot or event) and isinstance(processed_message, list):
         bot_id = str(bot.id) if bot else str(event.self_id)
@@ -486,7 +486,7 @@ async def read_context(bot, event, config, prompt):
             if group_summary:
                 summary_text = (
                     "================== 群聊历史总结 开始 ==================\n"
-                    f"以下是本群之前的聊天总结，供你参考：\n{group_summary}\n"
+                    f"以下是本群之前的聊天总结，供你参考：\n{group_summary}\n，将其作为背景信息，回答最新提问。"
                     "================== 群聊历史总结 结束 =================="
                 )
                 if config.ai_llm.config["llm"]["model"] == "gemini":
