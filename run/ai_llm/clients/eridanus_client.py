@@ -202,7 +202,8 @@ class EridanusModel:
 
         # 若没有 system 消息，则在最前面插入
         #if tool_system_extra and not system_injected:
-        api.insert(-2,{"role": "system", "content": tool_system_extra})
+        api.insert(-3,{"role": "user", "content": tool_system_extra})
+        api.insert(-2, {"role": "assistant", "content": "好的，我会在接下来的对话中，自主判断并调用函数"})
 
         return api
 
