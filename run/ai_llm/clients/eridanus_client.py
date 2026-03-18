@@ -431,8 +431,7 @@ class EridanusModel:
                     )
                     # ======= 【新增：终端动作类工具拦截】 =======
                     # 如果本轮调用的所有工具都是纯执行动作（不需要AI看结果再废话的），直接结束本轮回复
-                    ACTION_TOOLS = {"call_send_mface", "call_text2img", "call_user_data_sign", "call_tts",
-                                    "call_quit_chat"}
+                    ACTION_TOOLS = {"call_send_mface", "call_user_data_sign", "call_tts"}
                     if all(tc["name"] in ACTION_TOOLS for tc in tool_calls):
                         return
                     # ============================================
@@ -516,7 +515,7 @@ class EridanusModel:
                     tool_system_extra or "",
                 )
                 # ======= 【新增：终端动作类工具拦截】 =======
-                ACTION_TOOLS = {"call_send_mface", "call_text2img", "call_user_data_sign", "call_tts", "call_quit_chat"}
+                ACTION_TOOLS = {"call_send_mface"}
                 if all(tc["name"] in ACTION_TOOLS for tc in tool_calls):
                     return
                 # ===========================================
