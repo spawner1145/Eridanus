@@ -14,6 +14,7 @@ from developTools.utils.logger import get_logger
 from framework_common.database_util.Group import get_last_20_and_convert_to_prompt, add_to_group
 from framework_common.database_util.GroupSummary import get_group_summary
 from framework_common.utils.GeminiKeyManager import GeminiKeyManager
+from run.ai_llm.clients.eridanus_client import EridanusModel
 from run.ai_llm.service.aiReplyHandler.default import defaultModelRequest
 from run.ai_llm.service.aiReplyHandler.gemini import construct_gemini_standard_prompt, \
     get_current_gemini_prompt
@@ -145,7 +146,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 reply_message = response_message['content']
             await prompt_database_updata(user_id, response_message, config)
 
-        elif config.ai_llm.config["llm"]["model"] == "openai":
+        elif config.ai_llm.config["llm"]["model"] in ["openai","eridanus"]:
             if processed_message:
                 prompt, original_history = await construct_openai_standard_prompt(
                     processed_message, system_instruction, user_id, bot, func_result, event
@@ -169,12 +170,20 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 "enable_proxy"] else None
             proxies = {"http://": proxy, "https://": proxy} if proxy else None
 
-            api = OpenAIAPI(
-                apikey=random.choice(config.ai_llm.config["llm"]["openai"]["api_keys"]),
-                baseurl=config.ai_llm.config["llm"]["openai"]["quest_url"],
-                model=config.ai_llm.config["llm"]["openai"]["model"],
-                proxies=proxies
-            )
+            if config.ai_llm.config["llm"]["model"]=="openai":
+                api = OpenAIAPI(
+                    apikey=random.choice(config.ai_llm.config["llm"]["openai"]["api_keys"]),
+                    baseurl=config.ai_llm.config["llm"]["openai"]["quest_url"],
+                    model=config.ai_llm.config["llm"]["openai"]["model"],
+                    proxies=proxies
+                )
+            else:
+                api = EridanusModel(
+                    apikey=random.choice(config.ai_llm.config["llm"]["openai"]["api_keys"]),
+                    baseurl=config.ai_llm.config["llm"]["openai"]["quest_url"],
+                    model=config.ai_llm.config["llm"]["openai"]["model"],
+                    proxies=proxies
+                )
 
             tool_fixed_params = build_tool_fixed_params(bot, event, config) if tools else None
             tool_declarations = get_tool_declarations(config) if tools else None
