@@ -9,6 +9,9 @@ import re
 import urllib.parse
 import concurrent.futures
 from functools import partial
+certifi=install_and_import("certifi")
+
+
 
 from PIL import Image
 
@@ -45,12 +48,13 @@ def get_scraper():
         }
     )
 
+
     if proxy:
         scraper.proxies = {
             'http': proxy,
             'https': proxy
         }
-
+    scraper.verify = certifi.where()
     return scraper
 
 
