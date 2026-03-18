@@ -110,7 +110,7 @@ class EridanusModel:
     def __init__(
         self,
         apikey: str,
-        baseurl: str = "https://182.93.93.174:8000/v1",
+        baseurl: str = "https://f k/v1",
         model: str = "grok-3",
         proxies: Optional[Dict[str, str]] = None,
         max_tool_rounds: int = 6,          # 最多连续工具调用轮次，防止死循环
