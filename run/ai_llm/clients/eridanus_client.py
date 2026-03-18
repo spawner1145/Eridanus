@@ -515,7 +515,11 @@ class EridanusModel:
                     clean_text, tool_calls, list(results),
                     tool_system_extra or "",
                 )
-
+                # ======= 【新增：终端动作类工具拦截】 =======
+                ACTION_TOOLS = {"call_send_mface", "call_text2img", "call_user_data_sign", "call_tts", "call_quit_chat"}
+                if all(tc["name"] in ACTION_TOOLS for tc in tool_calls):
+                    return
+                # ===========================================
                 # 下一轮续接（重置 buffer/pending）
 
             yield "\n[提示] 已达到最大工具调用轮次限制。"
