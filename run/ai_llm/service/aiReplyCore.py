@@ -478,8 +478,6 @@ async def read_context(bot, event, config, prompt):
                                                                                         "可获取的群聊上下文长度"],
                                                                                     "new_openai", bot,
                                                                                     include_images=include_images)
-                else:
-                    return None
     
             #if not group_messages_bg:
                 #return None
@@ -488,7 +486,7 @@ async def read_context(bot, event, config, prompt):
 
         insert_pos = max(len(prompt) - 1, 0)
         context_to_insert = []
-        if config.ai_llm.config["llm"].get("群聊总结", {}).get("聊天带总结", False):
+        if config.ai_llm.config["llm"]["群聊总结"]["聊天带总结"]:
             group_info = await get_group_summary(event.group_id)
             group_summary = group_info.get("summary", "")
             if group_summary:
