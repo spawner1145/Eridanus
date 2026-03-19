@@ -23,7 +23,8 @@ class Translator:
         """
         递归深度约束
         """
-        if recursion_times > config.ai_llm.config["llm"]["recursion_limit"]:
+        
+        if recursion_times > config.ai_llm.config["llm"]["retries"]:
             logger.warning(f"roll back to original history, recursion times: {recursion_times}")
             return text
 
@@ -114,7 +115,7 @@ class Translator:
             logger.error(f"Error occurred: {e}")
             traceback.print_exc()
             logger.warning(f"roll back to original history, recursion times: {recursion_times}")
-            if recursion_times <= config.ai_llm.config["llm"]["recursion_limit"]:
+            if recursion_times <= config.ai_llm.config["llm"]["retries"]:
                 logger.warning(f"Recursion times: {recursion_times}")
                 return await self.aiReplyCore(text, config, system_instruction, recursion_times + 1)
             else:
