@@ -155,7 +155,7 @@ def main(bot, config):
         tools = None
 
     # 设置群消息保留数量
-    group_cache_size = config.ai_llm.config["llm"].get("群消息保留数量", 100)
+    group_cache_size = config.ai_llm.config["llm"].get("群消息保留数量", 60)
     GroupMessageManager().set_max_messages(group_cache_size)
 
     global user_state, recent_interactions
