@@ -222,15 +222,21 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             reply_message = response_text.strip() if response_text else None
             if reply_message is not None:
                 reply_message, mface_files = remove_mface_filenames(reply_message, config)
-
-            # 注意：不在此处保存历史记录，construct_openai_standard_prompt 已经保存了不含群聊上下文的历史
-            if reply_message:
-                await prompt_database_update(user_id, {"role": "assistant", "content": [{"type": "text", "text": reply_message}]}, config)
-            else:
-                await prompt_database_update(user_id, {"role": "assistant", "content": [{"type": "text", "text": "（system：此提问已由函数调用或其他部分处理，请处理接下来的提问）"}]}, config)
             if mface_files:
                 for mface_file in mface_files:
                     await bot.send(event, Image(file=mface_file))
+            # 更新聊天记录
+            rep_mes=None
+            if reply_message:
+                await prompt_database_update(user_id, {"role": "assistant", "content": [{"type": "text", "text": reply_message}]}, config)
+                rep_mes=reply_message
+            else:
+                await prompt_database_update(user_id, {"role": "assistant", "content": [{"type": "text", "text": "（system：此提问已由函数调用或其他部分处理，请处理接下来的提问）"}]}, config)
+            # 将bot自身回复加入群聊上下文。
+            if event and hasattr(event,"group_id") and rep_mes:
+                message = {"user_name": config.common_config.basic_config["bot"], "user_id": 0, "message": [{"text": reply_message}]}
+
+                await add_to_group(event.group_id, message)
         elif config.ai_llm.config["llm"]["model"] == "gemini":
             if processed_message:
                 prompt, original_history = await construct_gemini_standard_prompt(
@@ -320,14 +326,20 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                     raise Exception("Empty response。Gemini API返回的文本为空。")
 
             # 注意：不在此处保存历史记录，construct_gemini_standard_prompt 已经保存了不含群聊上下文的历史
+            rep_mes=None
             if reply_message:
                 await prompt_database_update(user_id, {"role": "model", "parts": [{"text": reply_message}]}, config)
+                rep_mes=reply_message
             else:
                 await prompt_database_update(user_id, {"role": "model", "parts": [{"text": "（system：此处已进行函数调用）"}]}, config)
             if mface_files:
                 for mface_file in mface_files:
                     await bot.send(event, Image(file=mface_file))
+            if event and hasattr(event, "group_id") and rep_mes:
+                message = {"user_name": config.common_config.basic_config["bot"], "user_id": 0,
+                           "message": [{"text": reply_message}]}
 
+                await add_to_group(event.group_id, message)
         elif config.ai_llm.config["llm"]["model"] == "腾讯元器":
             prompt, original_history = await construct_tecent_standard_prompt(processed_message, user_id, bot, event)
             response_message = await YuanQiTencent(
