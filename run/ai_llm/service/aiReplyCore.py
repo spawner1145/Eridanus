@@ -14,6 +14,7 @@ from developTools.utils.logger import get_logger
 from framework_common.database_util.Group import get_last_20_and_convert_to_prompt, add_to_group
 from framework_common.database_util.GroupSummary import get_group_summary
 from framework_common.utils.GeminiKeyManager import GeminiKeyManager
+from run.ai_llm.clients.eridanus_client import EridanusModel
 from run.ai_llm.service.aiReplyHandler.default import defaultModelRequest
 from run.ai_llm.service.aiReplyHandler.gemini import construct_gemini_standard_prompt, \
     get_current_gemini_prompt
@@ -41,7 +42,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
 
     for item in processed_message:
         if item.get("text", "").strip() == "":
-            item["text"] = " 你好"
+            item["text"] = "。"
     logger.info(f"aiReplyCore called with message: {processed_message}")
     if (bot or event) and isinstance(processed_message, list):
         bot_id = str(bot.id) if bot else str(event.self_id)
@@ -145,7 +146,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 reply_message = response_message['content']
             await prompt_database_updata(user_id, response_message, config)
 
-        elif config.ai_llm.config["llm"]["model"] == "openai":
+        elif config.ai_llm.config["llm"]["model"] in ["openai","eridanus"]:
             if processed_message:
                 prompt, original_history = await construct_openai_standard_prompt(
                     processed_message, system_instruction, user_id, bot, func_result, event
@@ -169,13 +170,20 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 "enable_proxy"] else None
             proxies = {"http://": proxy, "https://": proxy} if proxy else None
 
-            api = OpenAIAPI(
-                apikey=random.choice(config.ai_llm.config["llm"]["openai"]["api_keys"]),
-                baseurl=(config.ai_llm.config["llm"]["openai"].get("quest_url")
-                         or config.ai_llm.config["llm"]["openai"].get("base_url")),
-                model=config.ai_llm.config["llm"]["openai"]["model"],
-                proxies=proxies
-            )
+            if config.ai_llm.config["llm"]["model"]=="openai":
+                api = OpenAIAPI(
+                    apikey=random.choice(config.ai_llm.config["llm"]["openai"]["api_keys"]),
+                    baseurl=config.ai_llm.config["llm"]["openai"]["quest_url"],
+                    model=config.ai_llm.config["llm"]["openai"]["model"],
+                    proxies=proxies
+                )
+            else:
+                api = EridanusModel(
+                    apikey=random.choice(config.ai_llm.config["llm"]["openai"]["api_keys"]),
+                    baseurl=config.ai_llm.config["llm"]["openai"]["quest_url"],
+                    model=config.ai_llm.config["llm"]["openai"]["model"],
+                    proxies=proxies
+                )
 
             tool_fixed_params = build_tool_fixed_params(bot, event, config) if tools else None
             tool_declarations = get_tool_declarations(config) if tools else None
@@ -214,15 +222,21 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             reply_message = response_text.strip() if response_text else None
             if reply_message is not None:
                 reply_message, mface_files = remove_mface_filenames(reply_message, config)
-
-            # 注意：不在此处保存历史记录，construct_openai_standard_prompt 已经保存了不含群聊上下文的历史
-            if reply_message:
-                await prompt_database_update(user_id, {"role": "assistant", "content": [{"type": "text", "text": reply_message}]}, config)
-            else:
-                await prompt_database_update(user_id, {"role": "assistant", "content": [{"type": "text", "text": "（system：此提问已由函数调用或其他部分处理，请处理接下来的提问）"}]}, config)
             if mface_files:
                 for mface_file in mface_files:
                     await bot.send(event, Image(file=mface_file))
+            # 更新聊天记录
+            rep_mes=None
+            if reply_message:
+                await prompt_database_update(user_id, {"role": "assistant", "content": [{"type": "text", "text": reply_message}]}, config)
+                rep_mes=reply_message
+            else:
+                await prompt_database_update(user_id, {"role": "assistant", "content": [{"type": "text", "text": "（system：此提问已由函数调用或其他部分处理，请处理接下来的提问）"}]}, config)
+            # 将bot自身回复加入群聊上下文。
+            if event and hasattr(event,"group_id") and rep_mes:
+                message = {"user_name": config.common_config.basic_config["bot"], "user_id": 0, "message": [{"text": reply_message}]}
+
+                await add_to_group(event.group_id, message)
         elif config.ai_llm.config["llm"]["model"] == "gemini":
             if processed_message:
                 prompt, original_history = await construct_gemini_standard_prompt(
@@ -312,14 +326,20 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                     raise Exception("Empty response。Gemini API返回的文本为空。")
 
             # 注意：不在此处保存历史记录，construct_gemini_standard_prompt 已经保存了不含群聊上下文的历史
+            rep_mes=None
             if reply_message:
                 await prompt_database_update(user_id, {"role": "model", "parts": [{"text": reply_message}]}, config)
+                rep_mes=reply_message
             else:
                 await prompt_database_update(user_id, {"role": "model", "parts": [{"text": "（system：此处已进行函数调用）"}]}, config)
             if mface_files:
                 for mface_file in mface_files:
                     await bot.send(event, Image(file=mface_file))
+            if event and hasattr(event, "group_id") and rep_mes:
+                message = {"user_name": config.common_config.basic_config["bot"], "user_id": 0,
+                           "message": [{"text": reply_message}]}
 
+                await add_to_group(event.group_id, message)
         elif config.ai_llm.config["llm"]["model"] == "腾讯元器":
             prompt, original_history = await construct_tecent_standard_prompt(processed_message, user_id, bot, event)
             response_message = await YuanQiTencent(
@@ -449,44 +469,42 @@ async def read_context(bot, event, config, prompt):
     try:
         if event is None:
             return None
+        group_messages_bg=[]
         # 检查是否开启上下文带原文功能（需要同时开启读取群聊上下文总开关）
-        if not config.ai_llm.config["llm"].get("上下文带原文", False) or not hasattr(event, "group_id"):
-            return None
-        include_images = config.ai_llm.config["llm"].get("上下文带图片原文", False)
-
-        if config.ai_llm.config["llm"]["model"] == "gemini":
-            group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id, config.ai_llm.config["llm"][
-                "可获取的群聊上下文长度"], "gemini", bot, include_images=include_images)
-        elif config.ai_llm.config["llm"]["model"] == "openai":
-            if config.ai_llm.config["llm"]["openai"]["使用旧版prompt结构"]:
-                group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id,
-                                                                            config.ai_llm.config["llm"][
-                                                                                "可获取的群聊上下文长度"],
-                                                                            "old_openai", bot,
-                                                                            include_images=include_images)
-            else:
-                group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id,
-                                                                            config.ai_llm.config["llm"][
-                                                                                "可获取的群聊上下文长度"],
-                                                                            "new_openai", bot,
-                                                                            include_images=include_images)
-        else:
-            return None
-
-        if not group_messages_bg:
-            return None
-
-        bot.logger.info(f"群聊上下文消息：已读取")
+        if hasattr(event, "group_id"):
+            if config.ai_llm.config["llm"].get("上下文带原文", False) :
+                include_images = config.ai_llm.config["llm"].get("上下文带图片原文", False)
+                if config.ai_llm.config["llm"]["model"] == "gemini":
+                    group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id, config.ai_llm.config["llm"][
+                        "可获取的群聊上下文长度"], "gemini", bot, include_images=include_images)
+                elif config.ai_llm.config["llm"]["model"] == "openai":
+                    if config.ai_llm.config["llm"]["openai"]["使用旧版prompt结构"]:
+                        group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id,
+                                                                                    config.ai_llm.config["llm"][
+                                                                                        "可获取的群聊上下文长度"],
+                                                                                    "old_openai", bot,
+                                                                                    include_images=include_images)
+                    else:
+                        group_messages_bg = await get_last_20_and_convert_to_prompt(event.group_id,
+                                                                                    config.ai_llm.config["llm"][
+                                                                                        "可获取的群聊上下文长度"],
+                                                                                    "new_openai", bot,
+                                                                                    include_images=include_images)
+    
+            #if not group_messages_bg:
+                #return None
+    
+                bot.logger.info(f"群聊上下文消息：已读取")
 
         insert_pos = max(len(prompt) - 1, 0)
         context_to_insert = []
-        if config.ai_llm.config["llm"].get("群聊总结", {}).get("聊天带总结", False):
+        if config.ai_llm.config["llm"]["群聊总结"]["聊天带总结"]:
             group_info = await get_group_summary(event.group_id)
             group_summary = group_info.get("summary", "")
             if group_summary:
                 summary_text = (
                     "================== 群聊历史总结 开始 ==================\n"
-                    f"以下是本群之前的聊天总结，供你参考：\n{group_summary}\n"
+                    f"以下是本群之前的聊天总结，供你参考：\n{group_summary}\n，将其作为背景信息，回答最新提问。"
                     "================== 群聊历史总结 结束 =================="
                 )
                 if config.ai_llm.config["llm"]["model"] == "gemini":
@@ -501,8 +519,7 @@ async def read_context(bot, event, config, prompt):
                     }
                 context_to_insert.append(summary_message)
                 bot.logger.info(f"群聊总结已注入到prompt中")
-
-        context_to_insert.extend(group_messages_bg)
+        if group_messages_bg: context_to_insert.extend(group_messages_bg)
         prompt = prompt[:insert_pos] + context_to_insert + prompt[insert_pos:]
 
         return prompt

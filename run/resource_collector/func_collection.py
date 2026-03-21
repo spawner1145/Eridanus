@@ -1,3 +1,4 @@
+import os.path
 import traceback
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Text, Node, File, Image
@@ -49,7 +50,11 @@ async def iwara_search(bot:ExtendBot,event:GroupMessageEvent,config,aim:str,oper
             if config.resource_collector.config["iwara"]["zip_file"]:
                 zip_name=f"{list.get('title')}.zip"
                 bot.logger.info(f"正在压缩文件至data/video/cache/{zip_name}")
-                if config.resource_collector.config["iwara"]["zip_password"]:
+                if os.path.exists(f"data/video/cache/{sanitize_filename(list.get('title'))}.zip"):
+                    bot.logger.warning("iwara要下载的文件已经存在")
+                    if config.resource_collector.config["iwara"]["zip_password"]:
+                        await bot.send(event, Text(f"文件密码：{config.resource_collector.config['iwara']['zip_password']}"))
+                elif config.resource_collector.config["iwara"]["zip_password"]:
                     compress_files_with_pwd(list.get('path'), "data/video/cache", zip_name=zip_name, password=config.resource_collector.config["iwara"]["zip_password"])
                     await bot.send(event, Text(f"文件压缩中，密码：{config.resource_collector.config['iwara']['zip_password']}"))
                 else:

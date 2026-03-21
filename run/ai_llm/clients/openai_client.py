@@ -253,6 +253,7 @@ class OpenAIAPI:
                             not item.get('text', '').strip()
                     ) else item
                     for item in msg['content']
+                    if item is not None
                 ]
 
         params = {"model": self.model, "messages": api_messages, "stream": stream}

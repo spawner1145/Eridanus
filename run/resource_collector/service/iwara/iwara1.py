@@ -9,14 +9,17 @@ import re
 import urllib.parse
 import concurrent.futures
 from functools import partial
+certifi=install_and_import("certifi")
+
+
 
 from PIL import Image
 
 from framework_common.framework_util.yamlLoader import YAMLManager
 
 # 全局变量
-DOWNLOAD_LIMIT = 5  # 获取到的视频数量，或者信息条数
-API_BASE_URL = "https://api.iwara.tv/videos"
+DOWNLOAD_LIMIT = 10  # 获取到的视频数量，或者信息条数
+API_BASE_URL = "https://apiq.iwara.tv/videos"
 RATING = "all"  # ecchi(r18), all（没啥用，因为就没有不是r18的）
 DOWNLOAD_DIR = "data/pictures/cache"  # 视频下载目录
 
@@ -45,12 +48,13 @@ def get_scraper():
         }
     )
 
+
     if proxy:
         scraper.proxies = {
             'http': proxy,
             'https': proxy
         }
-
+    scraper.verify = certifi.where()
     return scraper
 
 
@@ -93,7 +97,7 @@ async def async_download_file(url, file_path):
 
 async def download_video(client, video_id):
     print(f"\n正在处理视频 ID: {video_id}")
-    video_details_url = f"https://api.iwara.tv/video/{video_id}"
+    video_details_url = f"https://apiq.iwara.tv/video/{video_id}"
     print(f"从以下地址获取详情: {video_details_url}")
 
     # 异步获取视频详情
@@ -290,7 +294,7 @@ async def download_specific_video(videoid, config):
 
 async def search_videos(word, config, iwara_gray_layer=False):
     query = urllib.parse.quote(word)
-    url = f"https://api.iwara.tv/search?type=video&page=0&query={query}&limit={DOWNLOAD_LIMIT}"
+    url = f"https://apiq.iwara.tv/search?type=videos&page=0&query={query}&limit={DOWNLOAD_LIMIT}"
 
     response = await async_request('GET', url)
     response.raise_for_status()
@@ -313,7 +317,7 @@ async def search_videos(word, config, iwara_gray_layer=False):
             print(f"处理搜索结果时出错: {video_info}")
         elif video_info:
             video_info_list.append(video_info)
-
+    print(video_info_list)
     return video_info_list
 
 
@@ -340,8 +344,9 @@ def main(command):
 
 if __name__ == "__main__":
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-    while True:
-        print(
-            "\nname可以是date(最新), popularity(热门), trending(趋势);所有结果个数为DOWNLOAD_LIMIT(代码开头去改)\n用的时候不要带大括号")
-        command = input("请输入命令 (榜单{name}/榜单下载{name}/下载{video_id}/搜索{关键词}): ")
-        main(command)
+    main("搜索菲比")
+    #while True:
+        #print(
+            #"\nname可以是date(最新), popularity(热门), trending(趋势);所有结果个数为DOWNLOAD_LIMIT(代码开头去改)\n用的时候不要带大括号")
+        #command = input("请输入命令 (榜单{name}/榜单下载{name}/下载{video_id}/搜索{关键词}): ")
+        #main(command)

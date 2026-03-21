@@ -118,7 +118,7 @@ async def main():
         import_yaml()
         logger.info("配置文件导入完成")
     elif user_input=="9":
-        pip_main(['upgrade', 'jmcomic'])
+        pip_main(['install', '--upgrade', 'jmcomic'])
 
 
 def updaat(f=False, source=None, yamls:dict=None):
