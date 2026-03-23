@@ -212,10 +212,13 @@ async def merge_file_to_mp4(v_full_file_name: str, a_full_file_name: str, output
             pass
         else:
             print("ffmpeg 未安装或无法访问")
+            raise FileNotFoundError("ffmpeg 未安装或无法访问")
             return False
     except FileNotFoundError:
         # 命令未找到，说明 ffmpeg 没有安装或不在 PATH 中
         print("ffmpeg 未安装或不在系统 PATH 中")
+        traceback.print_exc()
+        raise FileNotFoundError("ffmpeg 未安装或不在系统 PATH 中")
         return False
     #print(platform.system())
     if platform.system() == "Windows":

@@ -181,10 +181,10 @@ async def skland_signin(userid,bot=None,event=None):
         info = sing_info['zmd_sign_info']['info']
         #构建每日签到奖励
         msg += f"终末地签到奖励 (管理员 {character_info_self['endfield'].get('nickname')})：\n"
-        per_msg = f"[title]终末地[/title] \n管理员 {character_info_self['endfield'].get('nickname')}：\n"
+        per_msg = f"[title]终末地[/title] \n管理员 {character_info_self['endfield'].get('nickname')}："
         for award_info in info['awardIds']:
             msg += f"{info['resourceInfoMap'][award_info['id']]['name']} × {info['resourceInfoMap'][award_info['id']]['count']}\n"
-            per_msg += f"{info['resourceInfoMap'][award_info['id']]['name']} × {info['resourceInfoMap'][award_info['id']]['count']}\n"
+            per_msg += f"\n{info['resourceInfoMap'][award_info['id']]['name']} × {info['resourceInfoMap'][award_info['id']]['count']}"
         msg_list.append(per_msg)
     if bot and event: await bot.send(event, msg)
     else: print(msg)
