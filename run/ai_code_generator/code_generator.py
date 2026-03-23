@@ -17,6 +17,7 @@ def main(bot: ExtendBot,config: YAMLManager):
                 if prompt=="":
                     await bot.send(event, "请输入需求")
                     return
+                await bot.send(event, "正在开始生成插件，请耐心等待喵")
                 r=await code_generate(config,prompt,event.user_id)
                 await bot.send(event, "请查看控制台输出以验证")
             else:
