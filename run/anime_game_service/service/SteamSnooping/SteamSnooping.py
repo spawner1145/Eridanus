@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 import traceback
 from datetime import datetime
 from developTools.utils.logger import get_logger
+import pprint
 logger=get_logger("SteamSnooping")
 
 def url_main(bot, config, db,steam_api_key):
@@ -46,11 +47,23 @@ async def steamsnoopall(bot, config, db, steam_api_key):
             ids_list = await db.read_user('SteamSnoopingList')
             if not ids_list:
                 return
-
+            #获取bot所在所有群组
+            #print('获取bot所在所有群组')
+            try:
+                group_info = (await bot.get_group_list())["data"]
+                group_list = []
+                for item in group_info:
+                    if 'group_id' in item:
+                        group_list.append(item['group_id'])
+            except:
+                group_list = []
+            #pprint.pprint(group_list)
             # 数据准备阶段（保持原逻辑）
             for targetgruop in ids_list:
                 if not targetgruop.isdigit():
                     continue
+                #新增检测是否bot在该群组内，若不在则直接跳过
+                if int(targetgruop) not in group_list:continue
                 for targetid in ids_list[targetgruop]:
                     if ids_list[targetgruop][targetid] is not True:
                         continue
@@ -190,85 +203,66 @@ async def create_notification_task(bot, config, userid, steamid, replay_content,
         game_task = get_user_data(int(steamid), config.common_config.basic_config['proxy']['http_proxy'])
 
         # 为每个群组创建获取用户昵称的任务
-        member_info_tasks = []
-        for group_id in all_snoop_ids_send[userid]:
-            task = get_group_member_name(bot, group_id, userid)
-            member_info_tasks.append((group_id, task))
-
+        group_id = all_snoop_ids_send[userid][0]
+        try:
+            result = await bot.get_group_member_info(group_id, userid)
+            user_name = result['data']['nickname']
+        except Exception as e:
+            bot.logger.warning(f"Failed to get member name for {userid} in group {group_id}: {e}")
+            user_name = '未知'
         # 等待游戏数据
         game_data = await game_task
         game = game_data["game_data"][0]
-
         #替换被ban的steam cdn
+        #print(new_players_dict[steamid]['avatarfull'])
+        #print(game_data['avatar_url'])
         new_players_dict[steamid]['avatarfull'] = game_data['avatar_url']
 
-        # 并发获取所有群组的用户昵称
-        group_results = await asyncio.gather(
-            *[task for _, task in member_info_tasks],
-            return_exceptions=True
+        message = await get_message_send(
+            bot, config, userid, user_name, replay_content,
+            user_times_str, new_players_dict, steamid, game
         )
+        for group_id_send in all_snoop_ids_send[userid]:
+            try: await bot.send_group_message(group_id_send, message)
+            except Exception as e:
+                bot.logger.warning(f"Steam视奸：{group_id} 群组发送失败，疑似群组不存在")
 
-        # 🚀 优化7: 为每个群组并发发送消息
-        send_tasks = []
-        for i, (group_id, _) in enumerate(member_info_tasks):
-            user_name = group_results[i] if not isinstance(group_results[i], Exception) else '未知'
-
-            task = send_notification_message(
-                bot, config, group_id, userid, user_name, replay_content,
-                user_times_str, new_players_dict, steamid, game
-            )
-            send_tasks.append(task)
-
-        await asyncio.gather(*send_tasks, return_exceptions=True)
 
     except Exception as e:
         bot.logger.error(f"Notification task for user {userid} failed: {e}")
         raise
 
-async def get_group_member_name(bot, group_id, userid):
-    """安全获取群成员昵称"""
-    try:
-        result = await bot.get_group_member_info(group_id, userid)
-        return result['data']['nickname']
-    except Exception as e:
-        bot.logger.warning(f"Failed to get member name for {userid} in group {group_id}: {e}")
-        return '未知'
 
-async def send_notification_message(bot, config, group_id, userid, user_name,
+async def get_message_send(bot, config, userid, user_name,
                                     replay_content, user_times_str, new_players_dict,
                                     steamid, game):
-    """发送通知消息"""
-    try:
-        bot.logger.info(f"Steam视奸检测到新活动，开始制作图片并推送，用户：{userid}，昵称：{user_name}，群号：{group_id}")
 
-        full_content = f'[title]{user_name}[/title]' + replay_content
-        #print(f'Steam Avatar: {new_players_dict[steamid]["avatarfull"]}')
-        draw_json = [
-            {'type': 'basic_set', 'img_width': 1500, 'proxy': config.common_config.basic_config['proxy']['http_proxy']},
-            {'type': 'avatar', 'subtype': 'common','auto_line_change':False,
-             'img': [f'https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640', new_players_dict[steamid]['avatarfull']],
-             'upshift_extra': 15, 'number_per_row': 2,
-             'content': [
-                 f"[name]qq昵称: {user_name}[/name]\n[time]qqid:{userid}[/time]",
-                 f'[name]Steam昵称: {new_players_dict[steamid]["personaname"]}[/name]\n[time]steamid：{steamid}[/time]'],
-             'is_rounded_corners_img': False, 'is_stroke_img': False, 'is_shadow_img': False},
-            f'{full_content}\n今天一共玩了 {user_times_str} 了哦',
-            {'type': 'img', 'subtype': 'common_with_des_right',
-             'img': [f"{game['game_image_url']}"],
-             'content': [
-                 f"[title]{game['game_name']}[/title]\n游玩时间：{game['play_time']} 小时\n{game['last_played']}"
-                 f"\n成就：{game.get('completed_achievement_number')} / {game.get('total_achievement_number')}"
-             ], 'number_per_row': 1, 'is_crop': False}
-        ]
+    bot.logger.info(f"Steam视奸检测到新活动，开始制作图片并推送，用户：{userid}，昵称：{user_name}")
 
-        image = await manshuo_draw(draw_json)
-        message = [f"{config.common_config.basic_config['bot']} 发现了群友的Steam动态了哦", Image(file=image)]
+    full_content = f'[title]{user_name}[/title]' + replay_content
+    #print(f'Steam Avatar: {new_players_dict[steamid]["avatarfull"]}')
+    draw_json = [
+        {'type': 'basic_set', 'img_width': 1500, 'proxy': config.common_config.basic_config['proxy']['http_proxy']},
+        {'type': 'avatar', 'subtype': 'common','auto_line_change':False,
+         'img': [f'https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640', new_players_dict[steamid]['avatarfull']],
+         'upshift_extra': 15, 'number_per_row': 2,
+         'content': [
+             f"[name]qq昵称: {user_name}[/name]\n[time]qqid:{userid}[/time]",
+             f'[name]Steam昵称: {new_players_dict[steamid]["personaname"]}[/name]\n[time]steamid：{steamid}[/time]'],
+         'is_rounded_corners_img': False, 'is_stroke_img': False, 'is_shadow_img': False},
+        f'{full_content}\n今天一共玩了 {user_times_str} 了哦',
+        {'type': 'img', 'subtype': 'common_with_des_right',
+         'img': [f"{game['game_image_url']}"],
+         'content': [
+             f"[title]{game['game_name']}[/title]\n游玩时间：{game['play_time']} 小时\n{game['last_played']}"
+             f"\n成就：{game.get('completed_achievement_number')} / {game.get('total_achievement_number')}"
+         ], 'number_per_row': 1, 'is_crop': False}
+    ]
 
-        await bot.send_group_message(group_id, message)
+    image = await manshuo_draw(draw_json)
+    message = [f"{config.common_config.basic_config['bot']} 发现了群友的Steam动态了哦", Image(file=image)]
+    return message
 
-    except Exception as e:
-        bot.logger.error(f"Failed to send message to group {group_id}: {e}")
-        raise
 
 
 

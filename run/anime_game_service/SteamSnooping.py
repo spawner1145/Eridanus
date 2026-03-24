@@ -161,8 +161,11 @@ def main(bot, config):
                 return
             #print(user_list)
             for user_id in user_list :
-                target_name = (await bot.get_group_member_info(event.group_id, user_id))['data']['nickname']
-                name_list += f'@{target_name} '
+                try:
+                    target_name = (await bot.get_group_member_info(event.group_id, user_id))['data']['nickname']
+                    name_list += f'@{target_name} '
+                except:
+                    pass
             await bot.send(event, name_list)
 
     #取消视奸当前群聊的所有人
@@ -182,9 +185,12 @@ def main(bot, config):
             #print(user_list)
             db_write_json = {}
             for user_id in user_list :
-                target_name = (await bot.get_group_member_info(event.group_id, user_id))['data']['nickname']
+                try:
+                    target_name = (await bot.get_group_member_info(event.group_id, user_id))['data']['nickname']
+                    name_list += f'@{target_name} '
+                except:
+                    pass
                 db_write_json[user_id] = False
-                name_list += f'@{target_name} '
             await db.write_user('SteamSnoopingList', {str(event.group_id): db_write_json})
             await bot.send(event, name_list)
 

@@ -133,7 +133,10 @@ def main(bot, config):
         if event_obj is None or event_obj.message is None: return
         if event_obj.message[0]['type'] != 'forward': return
         bot.logger.info("开始进行消息记录")
-        message_check = event_obj.message[0]['data']['content']
+        message_check = event_obj.message[0]['data'].get('content')
+        if message_check is None:
+            await bot.send(event, 'llob暂不支持此命令，若需要请更换至napcat喵')
+            return
         #pprint.pprint(message_check)
         #pprint.pprint(event_obj.processed_message)
         forward_list = []
