@@ -32,8 +32,8 @@ async def call_image_search(bot, event, config, image_url=None):
         并发调用
         """
         functions = [
-            #call_image_search1(bot, event, config, img_url),
-            #call_image_search2(bot, event, config, img_url),
+            call_image_search1(bot, event, config, img_url),
+            call_image_search2(bot, event, config, img_url),
             call_image_search3(bot, event, config, img_url),
         ]
 
