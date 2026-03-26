@@ -116,8 +116,7 @@ async def call_image_search2(bot, event, config, img_url):
             bot.logger.error("图片下载失败")
             forMeslist.append(Node(content=[Text(sst)]))
     await bot.send(event, forMeslist)
-    await bot.send(event, [Image(file=first_img), Text(
-        f"最高相似度:{r[0]['similarity']}\n标题：{r[0]['title']}\n页码：{r[0]['page']}\n\n")], True)
+    await bot.send(event, [Text(f"最高相似度:{r[0]['similarity']}\n标题：{r[0]['title']}\n页码：{r[0]['page']}\n\n")], True)
 
 async def call_image_search3(bot, event, config, img_url):
     img_path = "data/pictures/cache/" + random_str() + ".png"
