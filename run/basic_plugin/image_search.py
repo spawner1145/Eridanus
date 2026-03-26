@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Node, Image, Text
@@ -9,6 +10,7 @@ from framework_common.utils.random_str import random_str
 from framework_common.utils.utils import download_img
 from run.basic_plugin.service.imgae_search.image_search import automate_browser
 from run.basic_plugin.service.imgae_search.image_search2 import fetch_results
+from run.basic_plugin.service.imgae_search.soutubot import search_img_by_path_or_url, async_search_by_image
 
 image_search={}
 
@@ -29,7 +31,7 @@ async def call_image_search(bot, event, config, image_url=None):
         并发调用
         """
         functions = [
-            call_image_search1(bot, event, config, img_url),
+            #call_image_search1(bot, event, config, img_url),
             call_image_search2(bot, event, config, img_url),
         ]
 
@@ -38,6 +40,7 @@ async def call_image_search(bot, event, config, image_url=None):
                 await future
             except Exception as e:
                 bot.logger.error(f"Error in image_search: {e}")
+                traceback.print_exc()
 
         await bot.recall(recall_id['data']['message_id'])
     else:
@@ -81,10 +84,13 @@ async def call_image_search2(bot, event, config, img_url):
         return
     bot.logger.info("调用soutu.bot搜索图片")
     img_path = "data/pictures/cache/" + random_str() + ".png"
-    await download_img(img_url, img_path)
+    if img_url.startswith("file://"): img_path = img_url[7:]
+    else:
+        await download_img(img_url, img_path)
     forMeslist = []
     try:
-        r, img = await automate_browser(img_path)
+        r=await async_search_by_image(img_path)
+        #r, img = await automate_browser(img_path)
     except Exception as e:
         bot.logger.error(f"Error in automate_browser: {e}")
         return
@@ -95,17 +101,17 @@ async def call_image_search2(bot, event, config, img_url):
     for item in r:
 
         try:
-            sst = f"标题:{item['title']}\n相似度:{item['similarity']}\n链接:{item['detail_page_url']}"
+            sst = f"标题:{item['title']}\n相似度:{item['similarity']}\n链接:https://e-hentai.org{item['subjectPath']}"
             sst_img = f"data/pictures/cache/{random_str()}.png"
-            await download_img(item['image_url'], sst_img, True,
+            await download_img(item['previewImageUrl'], sst_img, True,
                                proxy=config.common_config.basic_config["proxy"]["http_proxy"])
             forMeslist.append(Node(content=[Text(sst), Image(file=sst_img)]))
         except:
             bot.logger.error("图片下载失败")
             forMeslist.append(Node(content=[Text(sst)]))
     await bot.send(event, forMeslist)
-    await bot.send(event, [Image(file=img), Text(
-        f"最高相似度:{r[0]['similarity']}\n标题：{r[0]['title']}\n链接：{r[0]['detail_page_url']}\n\n")], True)
+    await bot.send(event, [Image(file=r[0]["previewImageUrl"]), Text(
+        f"最高相似度:{r[0]['similarity']}\n标题：{r[0]['title']}\n链接：https://e-hentai.org{r[0]['subjectPath']}\n\n")], True)
 
 
 def main(bot: ExtendBot,config:YAMLManager):
