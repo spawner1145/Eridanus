@@ -17,6 +17,7 @@ async def search_(img:str):
                 "accept": "application/json"
             }
             response = await client.post("http://127.0.0.1:5008/search",headers=headers,files=files,timeout=None)
+            #print(response.text)
         except Exception as e:
             traceback.print_exc()
             print(e)

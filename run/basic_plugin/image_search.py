@@ -32,8 +32,8 @@ async def call_image_search(bot, event, config, image_url=None):
         并发调用
         """
         functions = [
-            call_image_search1(bot, event, config, img_url),
-            call_image_search2(bot, event, config, img_url),
+            #call_image_search1(bot, event, config, img_url),
+            #call_image_search2(bot, event, config, img_url),
             call_image_search3(bot, event, config, img_url),
         ]
 
@@ -100,11 +100,15 @@ async def call_image_search2(bot, event, config, img_url):
     if not r:
         return
     forMeslist.append(Node(content=[Text(f"图片已经过处理，但不保证百分百不被吞。")]))
+    first_img=None
     for item in r[:5]:
 
         try:
-            sst = f"标题:{item['title']}\n相似度:{item['similarity']}\n链接:https://e-hentai.org{item['subjectPath']}"
+            print(item)
+            sst = f"标题:{item['title']}\n相似度:{item['similarity']}\n页码:{item['page']}"
             sst_img = f"data/pictures/cache/{random_str()}.png"
+            if not first_img:
+                first_img=sst_img
             await download_img(item['previewImageUrl'], sst_img, True,
                                proxy=config.common_config.basic_config["proxy"]["http_proxy"])
             forMeslist.append(Node(content=[Text(sst), Image(file=sst_img)]))
@@ -112,8 +116,8 @@ async def call_image_search2(bot, event, config, img_url):
             bot.logger.error("图片下载失败")
             forMeslist.append(Node(content=[Text(sst)]))
     await bot.send(event, forMeslist)
-    await bot.send(event, [Image(file=r[0]["previewImageUrl"]), Text(
-        f"最高相似度:{r[0]['similarity']}\n标题：{r[0]['title']}\n链接：https://e-hentai.org{r[0]['subjectPath']}\n\n")], True)
+    await bot.send(event, [Image(file=first_img), Text(
+        f"最高相似度:{r[0]['similarity']}\n标题：{r[0]['title']}\n页码：{r[0]['page']}\n\n")], True)
 
 async def call_image_search3(bot, event, config, img_url):
     img_path = "data/pictures/cache/" + random_str() + ".png"
@@ -124,9 +128,9 @@ async def call_image_search3(bot, event, config, img_url):
     r=await search_(img_path)
     forMeslist = []
     for item in r:
-        if "status"=="success":
+        if item["status"]=="success":
             try:
-                sst=f"{item['title']}\n{item['similarity']}\n{item['author']}\n{item['url']}"
+                sst=f"搜图引擎：{item['engine']}\n标题：{item['title']}\n相似度：{item['similarity']}\n作者：{item['author']}\n链接：{item['url']}"
                 sst_img = f"data/pictures/cache/{random_str()}.png"
                 await download_img(item['thumbnail'], sst_img, True,
                                    proxy=config.common_config.basic_config["proxy"]["http_proxy"])
@@ -134,6 +138,7 @@ async def call_image_search3(bot, event, config, img_url):
             except:
                 bot.logger.error("图片下载失败")
                 forMeslist.append(Node(content=[Text(sst)]))
+    #print(forMeslist)
     await bot.send(event, forMeslist)
 
 def main(bot: ExtendBot,config:YAMLManager):
