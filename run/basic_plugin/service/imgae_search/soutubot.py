@@ -9,8 +9,9 @@ import asyncio
 API_URL  = "https://soutubot.moe/api/search"
 BASE_URL = "https://soutubot.moe"
 
-
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0"
+from framework_common.ToolKits.util import Util
+tool=Util.get_instance()
+USER_AGENT = tool.network.random_headers()["User-Agent"]
 
 BROWSER_HEADERS = {
     "User-Agent": USER_AGENT,
