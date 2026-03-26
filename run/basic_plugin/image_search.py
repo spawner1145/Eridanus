@@ -100,7 +100,7 @@ async def call_image_search2(bot, event, config, img_url):
     if not r:
         return
     forMeslist.append(Node(content=[Text(f"图片已经过处理，但不保证百分百不被吞。")]))
-    for item in r:
+    for item in r[:5]:
 
         try:
             sst = f"标题:{item['title']}\n相似度:{item['similarity']}\n链接:https://e-hentai.org{item['subjectPath']}"
