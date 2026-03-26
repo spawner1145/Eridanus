@@ -8,7 +8,8 @@ from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.random_str import random_str
 from framework_common.utils.utils import download_img
-from run.basic_plugin.service.imgae_search.image_search import automate_browser
+from run.basic_plugin.service.imgae_search.eridanus_img_search_server import search_
+
 from run.basic_plugin.service.imgae_search.image_search2 import fetch_results
 from run.basic_plugin.service.imgae_search.soutubot import search_img_by_path_or_url, async_search_by_image
 
@@ -31,8 +32,9 @@ async def call_image_search(bot, event, config, image_url=None):
         并发调用
         """
         functions = [
-            #call_image_search1(bot, event, config, img_url),
+            call_image_search1(bot, event, config, img_url),
             call_image_search2(bot, event, config, img_url),
+            call_image_search3(bot, event, config, img_url),
         ]
 
         for future in asyncio.as_completed(functions):
@@ -113,6 +115,26 @@ async def call_image_search2(bot, event, config, img_url):
     await bot.send(event, [Image(file=r[0]["previewImageUrl"]), Text(
         f"最高相似度:{r[0]['similarity']}\n标题：{r[0]['title']}\n链接：https://e-hentai.org{r[0]['subjectPath']}\n\n")], True)
 
+async def call_image_search3(bot, event, config, img_url):
+    img_path = "data/pictures/cache/" + random_str() + ".png"
+    if img_url.startswith("file://"):
+        img_path = img_url[7:]
+    else:
+        await download_img(img_url, img_path)
+    r=await search_(img_path)
+    forMeslist = []
+    for item in r:
+        if "status"=="success":
+            try:
+                sst=f"{item['title']}\n{item['similarity']}\n{item['author']}\n{item['url']}"
+                sst_img = f"data/pictures/cache/{random_str()}.png"
+                await download_img(item['thumbnail'], sst_img, True,
+                                   proxy=config.common_config.basic_config["proxy"]["http_proxy"])
+                forMeslist.append(Node(content=[Text(sst), Image(file=sst_img)]))
+            except:
+                bot.logger.error("图片下载失败")
+                forMeslist.append(Node(content=[Text(sst)]))
+    await bot.send(event, forMeslist)
 
 def main(bot: ExtendBot,config:YAMLManager):
     @bot.on(GroupMessageEvent)
