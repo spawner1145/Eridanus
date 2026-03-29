@@ -984,7 +984,7 @@ async def get_time(event: str, config: Dict, city: str) -> str:
 
 
 # 主函数
-async def main():
+async def test():
     PROXY = 'http://127.0.0.1:7890'
     if PROXY and PROXY.strip():
         proxies = {
@@ -1279,4 +1279,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test())

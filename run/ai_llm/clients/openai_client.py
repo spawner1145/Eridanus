@@ -708,7 +708,7 @@ async def send_email(event: str, config: Dict, to: str, body: str) -> str:
     return f"邮件已发送至 {to}，内容：{body}（事件 {event}，配置 {config}）。"
 
 # 主函数
-async def main():
+async def test():
     api = OpenAIAPI(
         apikey="",  # 请替换为你的实际 API 密钥
         baseurl="https://api-inference.modelscope.cn/v1/",
@@ -914,4 +914,4 @@ async def main():
     print()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test())
