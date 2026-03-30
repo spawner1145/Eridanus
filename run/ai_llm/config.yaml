@@ -114,3 +114,13 @@ core:
   ai_change_character: 0  #ai更换角色所需权限等级
   ai_token_limt: 0 #不限制ai对话token所需权限等级
   ai_token_limt_token: 10000 #一般用户限制ai对话token数量
+content_moderation: #色情文本审核。和heartflow共用client
+  enabled: false
+  porn_threshold: 6.0
+  politics_threshold: 5.0
+  violence_threshold: 6.0
+  other_threshold: 7.0
+  private_batch_size: 3 #私聊多少轮触发一次批量审核
+  private_context_size: 10
+  group_whitelist:
+    - 879886836
