@@ -41,7 +41,7 @@ class Translator:
                 reply_message = response_message['content']
 
 
-            elif config.ai_llm.config["llm"]["model"] == "openai":
+            elif config.ai_llm.config["llm"]["model"] in ["openai",'eridanus']:
                 prompt = [{"role": "user", "content": system_instruction + text}]
 
                 proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"]["enable_proxy"] else None
