@@ -24,8 +24,8 @@ def main(bot: ExtendBot,config: YAMLManager):
             bot.logger.info("正在制作卫戍头像")
             at_aim=event.message_chain.get(At)[0].qq
             avatar_url=f"https://q1.qlogo.cn/g?b=qq&nk={at_aim}&s=640"
-            rel_img_path = f"data/pictures/{event.user_id}.png"
-            rel_out_path = f"data/pictures/{event.user_id}_avatar.png"
+            rel_img_path = f"data/pictures/cache/{event.user_id}.png"
+            rel_out_path = f"data/pictures/cache/{event.user_id}_avatar.png"
             await download_img(avatar_url, rel_img_path)
             abs_img_path = os.path.abspath(rel_img_path)
             abs_out_path = os.path.abspath(rel_out_path)
@@ -48,8 +48,8 @@ def main(bot: ExtendBot,config: YAMLManager):
         if event.user_id in temp_dict and event.message_chain.has(Image):
             temp_dict.remove(event.user_id)
             img=await get_img(event,bot)
-            rel_img_path = f"data/pictures/{event.user_id}.png"
-            rel_out_path = f"data/pictures/{event.user_id}_avatar.png"
+            rel_img_path = f"data/pictures/cache/{event.user_id}.png"
+            rel_out_path = f"data/pictures/cache/{event.user_id}_avatar.png"
             await download_img(img, rel_img_path)
 
             abs_img_path = os.path.abspath(rel_img_path)
