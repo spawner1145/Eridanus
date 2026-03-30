@@ -175,7 +175,10 @@ class EridanusModel:
         system_injected = False
 
         for msg in messages:
-            role = msg["role"]
+            try:
+                role = msg["role"]
+            except Exception as e:
+                continue
             if role == "model":
                 role = "assistant"
 
