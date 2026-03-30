@@ -678,6 +678,8 @@ class GeminiAPI:
         attempt = 0
         while attempt < retries:
             try:
+                #print(body)
+
                 if stream:
                     endpoint = f"/v1beta/models/{self.model}:streamGenerateContent"
                     logger.info(f"请求端点: {endpoint}")

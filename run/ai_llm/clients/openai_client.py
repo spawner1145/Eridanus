@@ -180,8 +180,11 @@ class OpenAIAPI:
         """将内部消息格式转换为 OpenAI API 格式，并自动修正 role=model → assistant。"""
         api_messages = []
         for msg in messages:
-            role = msg["role"]
-            # ── 快速修正：Gemini 风格的 model role ──
+            try:
+                role = msg["role"]
+            except Exception as e:
+                continue
+            #修正初次启动对话报错。
             if role == "model":
                 role = "assistant"
 
