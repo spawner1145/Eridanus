@@ -150,6 +150,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             await prompt_database_updata(user_id, response_message, config)
 
         elif config.ai_llm.config["llm"]["model"] in ["openai","eridanus"]:
+
             if processed_message:
                 prompt, original_history = await construct_openai_standard_prompt(
                     processed_message, system_instruction, user_id, bot, func_result, event
@@ -239,7 +240,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             if event and hasattr(event,"group_id") and rep_mes:
                 message = {"user_name": config.common_config.basic_config["bot"], "user_id": 0, "message": [{"text": reply_message}]}
 
-                await add_to_group(event.group_id, message)
+                if not config.ai_llm.config["llm"]["model"]=="eridanus": await add_to_group(event.group_id, message)
         elif config.ai_llm.config["llm"]["model"] == "gemini":
             if processed_message:
                 prompt, original_history = await construct_gemini_standard_prompt(
@@ -342,7 +343,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 message = {"user_name": config.common_config.basic_config["bot"], "user_id": 0,
                            "message": [{"text": reply_message}]}
 
-                await add_to_group(event.group_id, message)
+                if not config.ai_llm.config["llm"]["model"]=="eridanus": await add_to_group(event.group_id, message)
         elif config.ai_llm.config["llm"]["model"] == "腾讯元器":
             prompt, original_history = await construct_tecent_standard_prompt(processed_message, user_id, bot, event)
             response_message = await YuanQiTencent(
