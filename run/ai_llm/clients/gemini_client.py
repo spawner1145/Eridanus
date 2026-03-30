@@ -911,7 +911,7 @@ class GeminiAPI:
         thought = []
         logprobs_data = []
         grounding_metadata = None
-        print(api_contents)
+        #print(api_contents)
         async for part in self._chat_api(
                 api_contents, stream, tools, tool_fixed_params, tool_declarations,
                 max_output_tokens, system_instruction, topp, temperature, include_thoughts, thinking_budget,
