@@ -94,10 +94,14 @@ class MessageEvent(BaseModel):
     processed_message: List[Dict[str, Union[str, Dict]]] = []
 
     message_chain: MessageChain=[]
-    pure_text: str = ""
+    #pure_text: str = ""
 
     model_config = ConfigDict(extra="allow",arbitrary_types_allowed=True)
 
+
+    @property
+    def pure_text(self) -> str:
+        return self.message_chain.fetch_text()
 
     @property
     def raw_message(self):
@@ -121,7 +125,7 @@ class MessageEvent(BaseModel):
             else:
                 self.processed_message = parse_message_with_cq_codes_to_list(self.raw_message)
         self.message_chain=MessageChain(self.message)
-        self.pure_text=self.message_chain.fetch_text()
+        #self.pure_text=self.message_chain.fetch_text()
     def get(self, message_type: str):
         """
         按指定类型获取 processed_message 中的消息。
