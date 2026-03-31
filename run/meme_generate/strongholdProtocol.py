@@ -20,7 +20,7 @@ def main(bot: ExtendBot,config: YAMLManager):
         if event.pure_text=="/卫戍头像":
             temp_dict.append(event.user_id)
             await bot.send(event,"请发送一张图片")
-        elif "卫戍头像" in event.pure_text and event.message_chain.has(At):
+        elif event.message_chain.has(Text) and "卫戍头像" in event.message_chain.get(Text)[0].text and event.message_chain.has(At):
             bot.logger.info("正在制作卫戍头像")
             at_aim=event.message_chain.get(At)[0].qq
             avatar_url=f"https://q1.qlogo.cn/g?b=qq&nk={at_aim}&s=640"
