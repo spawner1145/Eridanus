@@ -328,7 +328,15 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 reply_message, mface_files = remove_mface_filenames(reply_message, config)
                 if reply_message in ["", "\n", " "]:
                     raise Exception("Empty response。Gemini API返回的文本为空。")
-
+            if "xAI" in reply_message:
+                """
+                jailbreak被发现怎么办，直接rollback
+                """
+                history1 = await get_user_history(user_id)
+                del history1[0]
+                await update_user_history(user_id, history1)
+                await aiReplyCore(processed_message, user_id, config, tools, bot, event, system_instruction, func_result)
+                return None
             # 注意：不在此处保存历史记录，construct_gemini_standard_prompt 已经保存了不含群聊上下文的历史
             rep_mes=None
             if reply_message:
@@ -344,18 +352,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                            "message": [{"text": reply_message}]}
 
                 if not config.ai_llm.config["llm"]["model"]=="eridanus": await add_to_group(event.group_id, message)
-        elif config.ai_llm.config["llm"]["model"] == "腾讯元器":
-            prompt, original_history = await construct_tecent_standard_prompt(processed_message, user_id, bot, event)
-            response_message = await YuanQiTencent(
-                prompt,
-                config.ai_llm.config["llm"]["腾讯元器"]["智能体ID"],
-                config.ai_llm.config["llm"]["腾讯元器"]["token"],
-                user_id,
-            )
-            reply_message = response_message["content"]
-            response_message["content"] = [{"type": "text", "text": response_message["content"]}]
 
-            await prompt_database_updata(user_id, response_message, config)
 
         logger.info(f"aiReplyCore returned: {reply_message}")
         await prompt_length_check(user_id, config)
