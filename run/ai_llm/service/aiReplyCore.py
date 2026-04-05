@@ -229,6 +229,15 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             if mface_files:
                 for mface_file in mface_files:
                     await bot.send(event, Image(file=mface_file))
+            if "xAI" in reply_message:
+                """
+                jailbreak被发现怎么办，直接rollback
+                """
+                history1 = await get_user_history(user_id)
+                del history1[0]
+                await update_user_history(user_id, history1)
+                await aiReplyCore(processed_message, user_id, config, tools, bot, event, system_instruction, func_result)
+                return None
             # 更新聊天记录
             rep_mes=None
             if reply_message:
@@ -328,16 +337,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 reply_message, mface_files = remove_mface_filenames(reply_message, config)
                 if reply_message in ["", "\n", " "]:
                     raise Exception("Empty response。Gemini API返回的文本为空。")
-            if "xAI" in reply_message:
-                """
-                jailbreak被发现怎么办，直接rollback
-                """
-                history1 = await get_user_history(user_id)
-                del history1[0]
-                await update_user_history(user_id, history1)
-                await aiReplyCore(processed_message, user_id, config, tools, bot, event, system_instruction, func_result)
-                return None
-            # 注意：不在此处保存历史记录，construct_gemini_standard_prompt 已经保存了不含群聊上下文的历史
+
             rep_mes=None
             if reply_message:
                 await prompt_database_update(user_id, {"role": "model", "parts": [{"text": reply_message}]}, config)
