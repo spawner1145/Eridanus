@@ -38,7 +38,7 @@ llm:
   联网搜索显示原始数据: true   #显示搜索来源和grounding metadata
   search_client:            #搜索专用client配置（google_search或url_context开启时使用，仅支持gemini）
     api_key: "" #搜索专用API Key，留空则使用gemini的api_keys
-    base_url: "https://generativelanguage.googleapis.com" #搜索专用Base URL，留空则使用gemini的base_url
+    base_url: "" #搜索专用Base URL，留空则使用gemini的base_url
     model: "" #搜索专用模型名，留空则使用gemini的fallback_models列表
   utility_client:           #通用任务client配置（用于用户画像总结等任务）
     type: "gemini"          #可选 "openai" 或 "gemini"
@@ -85,10 +85,10 @@ heartflow:     #心流模式，自动根据群聊内容回复，需完成相关c
   system: ""   #心流专用角色文件名，填写后直接使用该文件（不进行总结精简），留空则使用主llm的角色并自动总结
   listen_image: false   #是否监听图片，开启后判断是否回复时会读取图片内容
   client:                    #心流专用client配置，类似utility_client
-    type: "gemini"           #可选 "openai" 或 "gemini"
+    type: ""           #可选 "openai" 或 "gemini"
     api_key: ""              #专用API Key，留空则根据type使用对应的api_keys
-    base_url: "https://generativelanguage.googleapis.com"             #专用Base URL，留空则根据type使用对应的base_url
-    model: "gemma-3-27b-it"  #专用模型名，留空则根据type使用对应的默认模型/fallback_models
+    base_url: ""             #专用Base URL，留空则根据type使用对应的base_url
+    model: ""  #专用模型名，留空则根据type使用对应的默认模型/fallback_models
     temperature: 0.7         #温度参数，留空则使用对应type的默认值
     max_tokens: 2048         #最大输出token数
   reply_threshold: 0.6
