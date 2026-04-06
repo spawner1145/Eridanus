@@ -243,7 +243,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             if processed_message:
                 esystem_instruction = await read_chara(user_id, await use_folder_chara("grok.txt"))
                 user_info = await get_user(user_id)
-                esystem_instruction = (f"{system_instruction}").replace("{用户}", user_info.nickname).replace(
+                esystem_instruction = (f"{esystem_instruction}").replace("{用户}", user_info.nickname).replace(
                     "{bot_name}",
                     config.common_config.basic_config[
                         "bot"])

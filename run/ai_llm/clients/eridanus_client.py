@@ -380,7 +380,7 @@ class EridanusModel:
 
         # ── 构造初始 api_messages ──
         api_messages = self._build_api_messages(messages, tool_system_extra)
-        print(api_messages)
+        #print(api_messages)
         # ════════════════════════════════════════
         #  非流式
         # ════════════════════════════════════════
