@@ -13,7 +13,7 @@ from framework_common.utils.GeminiKeyManager import GeminiKeyManager
 class Translator:
     def __init__(self):
         self.config = YAMLManager.get_instance()
-        self.system_instruction="请翻译以下内容为日文，直接给出结果，不要有回应之类的内容。需要翻译的文本为："
+        self.system_instruction="请翻译以下内容为日文，直接给出结果，不要有多余废话，也不要回应，直接输出结果。需要翻译的文本为："
         self.logger=get_logger()
     async def translate(self, text):
         return await self.aiReplyCore(text, self.config, self.system_instruction)
@@ -41,7 +41,7 @@ class Translator:
                 reply_message = response_message['content']
 
 
-            elif config.ai_llm.config["llm"]["model"] in ["openai",'eridanus']:
+            elif config.ai_llm.config["llm"]["model"] in ["openai",'eridanus',"double"]:
                 prompt = [{"role": "user", "content": system_instruction + text}]
 
                 proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"]["enable_proxy"] else None
