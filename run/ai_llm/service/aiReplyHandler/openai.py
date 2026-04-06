@@ -198,6 +198,24 @@ async def construct_openai_standard_prompt(processed_message,system_instruction,
         full_prompt = history
     await update_user_history(user_id, full_prompt)  # 更新数据库中的历史记录
     return full_prompt, original_history
+async def construct_openai_standard_prompt2(processed_message,system_instruction,user_id,bot=None,func_result=False,event=None):
+    message=await prompt_elements_construct(processed_message,bot,func_result,event)
+    history = await get_user_history(user_id)
+    original_history = history.copy()  # 备份，出错的时候可以rollback
+    history.append(message)
+    if system_instruction:
+        full_prompt = [
+
+        ]
+        try:
+            history.index({"role": "system", "content": [{"type": "text", "text": system_instruction}]})
+        except ValueError:
+            full_prompt.append({"role": "system", "content": [{"type": "text", "text": system_instruction}]})
+        full_prompt.extend(history)
+    else:
+        full_prompt = history
+    #await update_user_history(user_id, full_prompt)  # 更新数据库中的历史记录
+    return full_prompt, original_history
 """
 旧版prompt都是谁在用啊，原来是你啊deepseek
 """
