@@ -121,14 +121,14 @@ content_moderation: #色情文本审核。和heartflow共用client
   private_context_size: 10
   group_whitelist:
     - 879886836
-  double:  #双模型，主模型用于对话，副模型实现模拟函数调用。
-    main:
-        api_keys: #继续像这样添加apikey
-        - YOUR_API_KEY_1
-        model: deepseek-reasoner
-        base_url: https://api.deepseek.com   #如使用官方sdk，则只填base_url，否则填完整url。
-    vice:
-        api_keys: #继续像这样添加apikey
-        - 111
-        model: gpt-4o-mini
-        base_url: https://openai                #后面的/v1/beta什么的会自动填充。
+double:  #双模型，主模型用于对话，副模型实现模拟函数调用。
+  main:
+      api_keys: #继续像这样添加apikey
+      - YOUR_API_KEY_1
+      model: deepseek-reasoner
+      base_url: https://api.deepseek.com   #如使用官方sdk，则只填base_url，否则填完整url。
+  vice:
+      api_keys: #继续像这样添加apikey
+      - 111
+      model: gpt-4o-mini
+      base_url: https://openai                #后面的/v1/beta什么的会自动填充。
