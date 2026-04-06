@@ -274,8 +274,8 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
 
             api = OpenAIAPI(
                 apikey=random.choice(config.ai_llm.config["double"]["main"]["api_keys"]),
-                baseurl=["double"]["main"]["base_url"],
-                model=["double"]["main"]["model"],
+                baseurl=config.ai_llm.config["double"]["main"]["base_url"],
+                model=config.ai_llm.config["double"]["main"]["model"],
                 proxies=proxies
             )
 
