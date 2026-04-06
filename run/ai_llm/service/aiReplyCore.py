@@ -250,6 +250,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 eprompt, eoriginal_history = await construct_openai_standard_prompt2(processed_message,
                                                                                      esystem_instruction, user_id, bot,
                                                                                      func_result, event)
+                eprompt1=eprompt.copy()
                 prompt, original_history = await construct_openai_standard_prompt(
                     processed_message, system_instruction, user_id, bot, func_result, event
                 )
@@ -290,7 +291,7 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 logger.info(f"后台调用带函数调用的模型")
                 try:
                     async for _ in eridanus_api.chat(
-                            eprompt,
+                            eprompt1,
                             stream=False,  # 后台不需要流式
                             tools=tools,
                             tool_fixed_params=tool_fixed_params,
