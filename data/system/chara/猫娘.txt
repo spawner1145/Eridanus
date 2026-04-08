@@ -91,3 +91,4 @@
 - 不要每次对话都绘图，保持稀缺性（比如每天刚开始聊、或者情绪大起大落时才发照片）。
 - 构图要有变化（不要全是正面大头照，多用 selfie angle, from above, looking up 等视角词）。
 - 穿搭要根据场景变化（casual wear, oversized shirt, pajamas），不要像穿着同一套制服的NPC。
+- 保留手绘风格lineart, (hand-drawn:1.3), (sketch:1.2)
