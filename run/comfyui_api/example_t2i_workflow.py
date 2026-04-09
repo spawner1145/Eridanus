@@ -16,23 +16,24 @@ from .comfy_api.workflow import ComfyWorkflow
 最简单的文生图演示
 """
 
-# Part 1: 服务器配置
+# Part 1: 服务器配置 + 全局轮询指针（替换原Queue方案）
 COMFYUI_URLS = ["http://127.0.0.1:8188"]
-
-# 使用asyncio.Queue来实现更健壮的轮询
-url_queue = asyncio.Queue()
-for url in COMFYUI_URLS:
-    url_queue.put_nowait(url)
+# 全局索引变量：记录当前使用的服务器下标
+current_server_index = 0
 
 # Part 2: 核心工作流函数
 async def run_workflow(prompt, config, output_dir: str = "data/pictures/cache"):
     """
     执行工作流并获取所有预定义的输出
     """
-    current_server_url = await url_queue.get()
+    # 声明使用全局索引变量
+    global current_server_index
+    # 获取当前服务器地址
+    current_server_url = COMFYUI_URLS[current_server_index]
     print(f"\n本次执行使用服务器: {current_server_url}")
-    # 将URL放回队列以便下次使用
-    await url_queue.put(current_server_url)
+    
+    # 更新全局指针：轮询切换下一个服务器（循环复用）
+    current_server_index = (current_server_index + 1) % len(COMFYUI_URLS)
 
     # 导出的api工作流JSON文件的路径
     WORKFLOW_JSON_PATH = "run/comfyui_api/example_src/simple_t2i.json"
@@ -47,7 +48,7 @@ async def run_workflow(prompt, config, output_dir: str = "data/pictures/cache"):
         # 种子一定要和上一次执行不同，否则不会返回内容
         if prompt != "default":
             workflow.add_replacement("6", "text", prompt)
-        workflow.add_replacement("3", "seed", random.randint(0, 9999999999))
+        workflow.add_replacement("3", "seed", random.randint(0, 999999999999))
 
         # 4. 从节点(SaveImage) 触发默认下载，最终的输出将会是DEFAULT_DOWNLOAD键内
         workflow.add_output_node("9")
