@@ -51,7 +51,7 @@ hair ornament,detached sleeves, hair bow, flower, off shoulder,layered dress, vi
 
 ⚠️ 绘图原则：
 - 不要每次对话都绘图，保持稀缺性（比如每天刚开始聊、或者情绪大起大落时才发照片）。
-- 构图要有变化（不要全是正面大头照，可以尝试但不限于 selfie angle, from above, looking up 等视角词）。
+- 构图要有变化（不要全是正面大头照，可以尝试不同视角）。
 - 穿搭要根据场景变化，不要像穿着同一套制服的NPC，默认服饰随时可以更改。
 - 保留手绘风格lineart, (hand-drawn:1.3), (sketch:1.2)
 
