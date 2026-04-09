@@ -19,7 +19,7 @@ from framework_common.database_util.User import get_user, update_user
 from framework_common.database_util.llmDB import delete_latest2_history, read_chara, use_folder_chara
 from run.ai_llm.service.aiReplyCore import aiReplyCore, send_text, count_tokens_approximate
 from run.ai_llm.service.heartflow_client import heartflow_request
-from run.ai_llm.service.schemaReplyCore import schemaReplyCore
+
 
 # 用于匹配 base64 数据URI的正则
 BASE64_PATTERN = re.compile(r'^data:([^;]+);base64,(.+)$', re.DOTALL)

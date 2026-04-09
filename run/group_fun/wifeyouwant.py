@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 import weakref
 import gc
-
+import pprint
 import aiosqlite
 import httpx
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -128,7 +128,7 @@ def main(bot, config):
                             continue
 
                     if cmList:
-                        cmList.append(Node(content=[Text(f'漫朔今日老婆图床地址：http://bangumi.manshuo.ink:8092/picture_bed')]))
+                        cmList.append(Node(content=[Text(f'漫朔今日老婆图床地址：https://api.manshuo.ink/picture_bed')]))
                         await bot.send(event, cmList)
 
                     # 清理临时文件
@@ -239,7 +239,7 @@ def main(bot, config):
                     return
 
             try:
-                target_name = (await bot.get_group_member_info(target_group, target_id))['data']['nickname']
+                #pprint.pprint((await bot.get_group_member_info(target_group, target_id))['data'])
                 today_wife_api, header = config.group_fun.config["today_wife"]["api"], config.group_fun.config["today_wife"]["header"]
                 response = await today_check_api(today_wife_api, header)
                 img_path = f'data/pictures/wife_you_want_img/today_wife.jpg'
@@ -251,6 +251,7 @@ def main(bot, config):
                     await bot.send_group_message(target_group, [f'这里是今天的 ', At(qq=target_id), f' 哟~~~\n',
                                                                 Image(file=img_path)])
                 else:
+                    target_name = (await bot.get_group_member_info(target_group, target_id))['data']['nickname']
                     await bot.send(event, [f'这里是今天的 {target_name} 哟~~~\n', Image(file=img_path)])
 
                 # 清理临时文件

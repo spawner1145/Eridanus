@@ -109,6 +109,7 @@ async def url_to_base64(url):
     return await util.image.Image2Base64(url)
 async def download_img(url, path=None, gray_layer=False, proxy=None, headers=None):
     """下载图片"""
+    if url.startswith("file://"): return url[7:]
     return await util.image.download_img(url, path, gray_layer, proxy, headers)
 async def download_file(url,path,proxy=None):
     """下载文件"""

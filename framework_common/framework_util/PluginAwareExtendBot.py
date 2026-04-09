@@ -950,7 +950,7 @@ class PluginManager:
         plugin_dir = self.plugins_dir / plugin_name
 
         # 定义需要跳过的目录名
-        skip_dirs = {'service', 'services', 'utils', 'lib', 'libs', 'config', 'configs', '__pycache__'}
+        skip_dirs = {'service', 'services', 'clients','utils', 'lib', 'libs', 'config', 'configs', '__pycache__'}
 
         # 只加载插件目录第一层的.py文件，不递归，同时跳过特定目录中的文件
         py_files = []

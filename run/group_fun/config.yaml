@@ -3,6 +3,7 @@ today_wife:
   - 'https://sese.iw233.top/iapi.php?sort=random'
   - 'https://moe.jitsu.top/api'
   - 'https://api.seaya.link/wap'
+  - 'https://cnmiw.com/api.php?sort=CDNtop'
   header: 'https://weibo.com/'          #知道的自己改，不知道的不要动
   wifePrefix: '/'                       #透群友的指令前缀
   今日萝莉: True

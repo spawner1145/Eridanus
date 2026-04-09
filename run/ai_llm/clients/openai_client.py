@@ -180,8 +180,11 @@ class OpenAIAPI:
         """将内部消息格式转换为 OpenAI API 格式，并自动修正 role=model → assistant。"""
         api_messages = []
         for msg in messages:
-            role = msg["role"]
-            # ── 快速修正：Gemini 风格的 model role ──
+            try:
+                role = msg["role"]
+            except Exception as e:
+                continue
+            #修正初次启动对话报错。
             if role == "model":
                 role = "assistant"
 
@@ -708,7 +711,7 @@ async def send_email(event: str, config: Dict, to: str, body: str) -> str:
     return f"邮件已发送至 {to}，内容：{body}（事件 {event}，配置 {config}）。"
 
 # 主函数
-async def main():
+async def test():
     api = OpenAIAPI(
         apikey="",  # 请替换为你的实际 API 密钥
         baseurl="https://api-inference.modelscope.cn/v1/",
@@ -914,4 +917,4 @@ async def main():
     print()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test())

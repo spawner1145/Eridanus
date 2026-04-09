@@ -37,6 +37,8 @@ def main(bot: ExtendBot, config):
         nonlocal enabled
         if not enabled:
             enabled = True
+            await sleep(3)
+            await bot.send_friend_message(config.common_config.basic_config["master"]["id"],"初次使用请发送“/clear”或“/clearall”以初始化对话功能")
             await start_scheduler()  # 异步调用
 
     async def task_executor(task_name, task_info):

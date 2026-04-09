@@ -678,6 +678,8 @@ class GeminiAPI:
         attempt = 0
         while attempt < retries:
             try:
+                #print(body)
+
                 if stream:
                     endpoint = f"/v1beta/models/{self.model}:streamGenerateContent"
                     logger.info(f"请求端点: {endpoint}")
@@ -909,7 +911,7 @@ class GeminiAPI:
         thought = []
         logprobs_data = []
         grounding_metadata = None
-        print(api_contents)
+        #print(api_contents)
         async for part in self._chat_api(
                 api_contents, stream, tools, tool_fixed_params, tool_declarations,
                 max_output_tokens, system_instruction, topp, temperature, include_thoughts, thinking_budget,
@@ -984,7 +986,7 @@ async def get_time(event: str, config: Dict, city: str) -> str:
 
 
 # 主函数
-async def main():
+async def test():
     PROXY = 'http://127.0.0.1:7890'
     if PROXY and PROXY.strip():
         proxies = {
@@ -1279,4 +1281,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test())

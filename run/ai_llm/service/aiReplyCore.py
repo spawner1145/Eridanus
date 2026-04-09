@@ -19,7 +19,7 @@ from run.ai_llm.service.aiReplyHandler.default import defaultModelRequest
 from run.ai_llm.service.aiReplyHandler.gemini import construct_gemini_standard_prompt, \
     get_current_gemini_prompt
 from run.ai_llm.service.aiReplyHandler.openai import construct_openai_standard_prompt, \
-    get_current_openai_prompt, construct_openai_standard_prompt_old_version
+    get_current_openai_prompt, construct_openai_standard_prompt_old_version, construct_openai_standard_prompt2
 from run.ai_llm.service.aiReplyHandler.tecentYuanQi import construct_tecent_standard_prompt, YuanQiTencent
 from framework_common.database_util.llmDB import get_user_history, update_user_history, delete_user_history, read_chara, \
     use_folder_chara
@@ -41,8 +41,11 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                       func_result=False):
 
     for item in processed_message:
-        if item.get("text", "").strip() == "":
-            item["text"] = "。"
+        try:
+            if item.get("text").strip() == "":
+                item["text"] = "。"
+        except Exception as e:
+            pass
     logger.info(f"aiReplyCore called with message: {processed_message}")
     if (bot or event) and isinstance(processed_message, list):
         bot_id = str(bot.id) if bot else str(event.self_id)
@@ -146,8 +149,108 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 reply_message = response_message['content']
             await prompt_database_updata(user_id, response_message, config)
 
-        elif config.ai_llm.config["llm"]["model"] in ["openai","eridanus"]:
+        elif config.ai_llm.config["llm"]["model"] in ["openai", "eridanus"]:
             if processed_message:
+                prompt, original_history = await construct_openai_standard_prompt(
+                    processed_message, system_instruction, user_id, bot, func_result, event
+                )
+            else:
+                prompt = await get_current_openai_prompt(user_id)
+            if processed_message is None:
+                tools = None
+            # 先注入用户画像到主 prompt
+            if config.ai_llm.config["llm"]["用户画像"] and user_info and user_info.user_portrait:
+                prompt = inject_user_portrait(prompt, user_info.user_portrait, "openai")
+            # 再注入群聊上下文
+            p = await read_context(bot, event, config, prompt)
+            if p:
+                prompt = p
+            proxy = config.common_config.basic_config["proxy"]["http_proxy"] if config.ai_llm.config["llm"]["enable_proxy"] else None
+            proxies = {"http://": proxy, "https://": proxy} if proxy else None
+            if config.ai_llm.config["llm"]["model"] == "openai":
+                api = OpenAIAPI(
+                    apikey=random.choice(config.ai_llm.config["llm"]["openai"]["api_keys"]),
+                    baseurl=config.ai_llm.config["llm"]["openai"]["quest_url"],
+                    model=config.ai_llm.config["llm"]["openai"]["model"],
+                    proxies=proxies
+                )
+            else:
+                api = EridanusModel(
+                    apikey=random.choice(config.ai_llm.config["llm"]["openai"]["api_keys"]),
+                    baseurl=config.ai_llm.config["llm"]["openai"]["quest_url"],
+                    model=config.ai_llm.config["llm"]["openai"]["model"],
+                    proxies=proxies
+                )
+            tool_fixed_params = build_tool_fixed_params(bot, event, config) if tools else None
+            tool_declarations = get_tool_declarations(config) if tools else None
+            retries = config.ai_llm.config["llm"].get("retries", 3)
+            response_text = ""
+            thought_text = ""  # 累积思维链内容
+            async def clear_context_callback():
+                logger.warning(f"AI响应为空，自动清除用户 {user_id} 的上下文")
+                await delete_user_history(user_id)
+            async for part in api.chat(
+                    prompt,
+                    stream=config.ai_llm.config["llm"]["stream"],
+                    tools=tools,
+                    tool_fixed_params=tool_fixed_params,
+                    tool_declarations=tool_declarations,
+                    max_output_tokens=config.ai_llm.config["llm"]["openai"]["max_tokens"],
+                    temperature=config.ai_llm.config["llm"]["openai"]["temperature"],
+                    retries=retries,
+                    on_clear_context=clear_context_callback,
+            ):
+                if isinstance(part, dict) and "thought" in part:
+                    # 流式累积思维链
+                    thought_text += str(part["thought"])
+                elif isinstance(part, str):
+                    response_text += part
+            # 思维链累积完成后一次性发送
+            if thought_text and bot and event and ((config.ai_llm.config["llm"]["openai"]["CoT"] and
+                                                    config.ai_llm.config["llm"]["model"] == "openai") or (
+                                                           config.ai_llm.config["llm"]["gemini"]["include_thoughts"] and
+                                                           config.ai_llm.config["llm"]["model"] == "gemini")):
+                await bot.send(event, [Node(content=[Text(thought_text)])])
+            reply_message = response_text.strip() if response_text else None
+            if reply_message is not None:
+                reply_message, mface_files = remove_mface_filenames(reply_message, config)
+            if mface_files:
+                for mface_file in mface_files:
+                    await bot.send(event, Image(file=mface_file))
+            if "xAI" in reply_message:
+                """
+                jailbreak被发现怎么办，直接rollback
+                """
+                history1 = await get_user_history(user_id)
+                del history1[0]
+                await update_user_history(user_id, history1)
+                await aiReplyCore(processed_message, user_id, config, tools, bot, event, system_instruction, func_result)
+                return None
+            # 更新聊天记录
+            rep_mes=None
+            if reply_message:
+                await prompt_database_update(user_id, {"role": "assistant", "content": [{"type": "text", "text": reply_message}]}, config)
+                rep_mes = reply_message
+            else:
+                await prompt_database_update(user_id, {"role": "assistant", "content": [
+                    {"type": "text", "text": "（system：此提问已由函数调用或其他部分处理，请处理接下来的提问）"}]}, config)
+            # 将bot自身回复加入群聊上下文。
+            if event and hasattr(event, "group_id") and rep_mes:
+                message = {"user_name": config.common_config.basic_config["bot"], "user_id": 0, "message": [{"text": reply_message}]}
+                if not config.ai_llm.config["llm"]["model"] == "eridanus": await add_to_group(event.group_id, message)
+        elif config.ai_llm.config["llm"]["model"] =="double":
+
+            if processed_message:
+                esystem_instruction = await read_chara(user_id, await use_folder_chara("grok.txt"))
+                user_info = await get_user(user_id)
+                esystem_instruction = (f"{esystem_instruction}").replace("{用户}", user_info.nickname).replace(
+                    "{bot_name}",
+                    config.common_config.basic_config[
+                        "bot"])
+                eprompt, eoriginal_history = await construct_openai_standard_prompt2(processed_message,
+                                                                                     esystem_instruction, user_id, bot,
+                                                                                     func_result, event)
+                eprompt1=eprompt.copy()
                 prompt, original_history = await construct_openai_standard_prompt(
                     processed_message, system_instruction, user_id, bot, func_result, event
                 )
@@ -170,31 +273,49 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 "enable_proxy"] else None
             proxies = {"http://": proxy, "https://": proxy} if proxy else None
 
-            if config.ai_llm.config["llm"]["model"]=="openai":
-                api = OpenAIAPI(
-                    apikey=random.choice(config.ai_llm.config["llm"]["openai"]["api_keys"]),
-                    baseurl=config.ai_llm.config["llm"]["openai"]["quest_url"],
-                    model=config.ai_llm.config["llm"]["openai"]["model"],
-                    proxies=proxies
-                )
-            else:
-                api = EridanusModel(
-                    apikey=random.choice(config.ai_llm.config["llm"]["openai"]["api_keys"]),
-                    baseurl=config.ai_llm.config["llm"]["openai"]["quest_url"],
-                    model=config.ai_llm.config["llm"]["openai"]["model"],
-                    proxies=proxies
-                )
+            api = OpenAIAPI(
+                apikey=random.choice(config.ai_llm.config["double"]["main"]["api_keys"]),
+                baseurl=config.ai_llm.config["double"]["main"]["base_url"],
+                model=config.ai_llm.config["double"]["main"]["model"],
+                proxies=proxies
+            )
 
+            eridanus_api = EridanusModel(
+                apikey=random.choice(config.ai_llm.config["double"]["vice"]["api_keys"]),
+                baseurl=config.ai_llm.config["double"]["vice"]["base_url"],
+                model=config.ai_llm.config["double"]["vice"]["model"],
+                proxies=proxies
+            )
+
+            async def run_eridanus_background():
+                logger.info(f"后台调用带函数调用的模型")
+                try:
+                    async for _ in eridanus_api.chat(
+                            eprompt1,
+                            stream=False,  # 后台不需要流式
+                            tools=tools,
+                            tool_fixed_params=tool_fixed_params,
+                            tool_declarations=tool_declarations,
+                            max_output_tokens=config.ai_llm.config["llm"]["openai"]["max_tokens"],
+                            temperature=config.ai_llm.config["llm"]["openai"]["temperature"],
+                            retries=retries,
+                    ):
+                        pass
+                except Exception as e:
+                    logger.warning(f"Eridanus 后台执行失败: {e}")
+
+            if tools:
+                asyncio.create_task(run_eridanus_background())
             tool_fixed_params = build_tool_fixed_params(bot, event, config) if tools else None
             tool_declarations = get_tool_declarations(config) if tools else None
             retries = config.ai_llm.config["llm"].get("retries", 3)
             response_text = ""
             thought_text = ""  # 累积思维链内容
-            
+
             async def clear_context_callback():
                 logger.warning(f"AI响应为空，自动清除用户 {user_id} 的上下文")
                 await delete_user_history(user_id)
-            
+
             async for part in api.chat(
                     prompt,
                     stream=config.ai_llm.config["llm"]["stream"],
@@ -225,18 +346,31 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
             if mface_files:
                 for mface_file in mface_files:
                     await bot.send(event, Image(file=mface_file))
+            if "xAI" in reply_message:
+                """
+                jailbreak被发现怎么办，直接rollback
+                """
+                history1 = await get_user_history(user_id)
+                del history1[0]
+                await update_user_history(user_id, history1)
+                await aiReplyCore(processed_message, user_id, config, tools, bot, event, system_instruction,
+                                  func_result)
+                return None
             # 更新聊天记录
-            rep_mes=None
+            rep_mes = None
             if reply_message:
-                await prompt_database_update(user_id, {"role": "assistant", "content": [{"type": "text", "text": reply_message}]}, config)
-                rep_mes=reply_message
+                await prompt_database_update(user_id, {"role": "assistant",
+                                                       "content": [{"type": "text", "text": reply_message}]}, config)
+                rep_mes = reply_message
             else:
-                await prompt_database_update(user_id, {"role": "assistant", "content": [{"type": "text", "text": "（system：此提问已由函数调用或其他部分处理，请处理接下来的提问）"}]}, config)
+                await prompt_database_update(user_id, {"role": "assistant", "content": [
+                    {"type": "text", "text": "（system：此提问已由函数调用或其他部分处理，请处理接下来的提问）"}]}, config)
             # 将bot自身回复加入群聊上下文。
-            if event and hasattr(event,"group_id") and rep_mes:
-                message = {"user_name": config.common_config.basic_config["bot"], "user_id": 0, "message": [{"text": reply_message}]}
+            if event and hasattr(event, "group_id") and rep_mes:
+                message = {"user_name": config.common_config.basic_config["bot"], "user_id": 0,
+                           "message": [{"text": reply_message}]}
 
-                await add_to_group(event.group_id, message)
+                if not config.ai_llm.config["llm"]["model"] == "eridanus": await add_to_group(event.group_id, message)
         elif config.ai_llm.config["llm"]["model"] == "gemini":
             if processed_message:
                 prompt, original_history = await construct_gemini_standard_prompt(
@@ -325,7 +459,6 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 if reply_message in ["", "\n", " "]:
                     raise Exception("Empty response。Gemini API返回的文本为空。")
 
-            # 注意：不在此处保存历史记录，construct_gemini_standard_prompt 已经保存了不含群聊上下文的历史
             rep_mes=None
             if reply_message:
                 await prompt_database_update(user_id, {"role": "model", "parts": [{"text": reply_message}]}, config)
@@ -339,19 +472,8 @@ async def aiReplyCore(processed_message, user_id, config, tools=None, bot=None, 
                 message = {"user_name": config.common_config.basic_config["bot"], "user_id": 0,
                            "message": [{"text": reply_message}]}
 
-                await add_to_group(event.group_id, message)
-        elif config.ai_llm.config["llm"]["model"] == "腾讯元器":
-            prompt, original_history = await construct_tecent_standard_prompt(processed_message, user_id, bot, event)
-            response_message = await YuanQiTencent(
-                prompt,
-                config.ai_llm.config["llm"]["腾讯元器"]["智能体ID"],
-                config.ai_llm.config["llm"]["腾讯元器"]["token"],
-                user_id,
-            )
-            reply_message = response_message["content"]
-            response_message["content"] = [{"type": "text", "text": response_message["content"]}]
+                if not config.ai_llm.config["llm"]["model"]=="eridanus": await add_to_group(event.group_id, message)
 
-            await prompt_database_updata(user_id, response_message, config)
 
         logger.info(f"aiReplyCore returned: {reply_message}")
         await prompt_length_check(user_id, config)

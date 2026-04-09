@@ -38,7 +38,7 @@ ai绘画:
 
   禁止nsfw: false
   allow_nsfw_groups:               #允许色图的群号，禁止nsfw开启时有效
-  - 123
+  - 879886836  #webui使用的虚拟群号。
   其他默认绘图参数: # 各参数见文档https://eridanus-doc.netlify.app/configuration/ai%E7%BB%98%E7%94%BB/ai%E7%BB%98%E7%94%BB.html#%E5%8F%8D%E6%8E%A8%E4%B8%8E%E5%AE%A1%E6%A0%B8%E7%94%A8%E6%A8%A1%E5%9E%8B%E7%9B%B8%E5%85%B3
     - --d 0.7
     - --p {},rating:general, best quality, very aesthetic, absurdres
