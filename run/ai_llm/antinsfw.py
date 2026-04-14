@@ -4,7 +4,7 @@ import re
 import random
 import traceback
 from typing import Dict
-
+import os
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
 from developTools.message.message_components import At,Record
 from run.ai_llm.service.heartflow_client import heartflow_request
