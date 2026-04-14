@@ -1,11 +1,12 @@
 import asyncio
 import datetime
 import re
+import random
 import traceback
 from typing import Dict
 
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
-from developTools.message.message_components import At
+from developTools.message.message_components import At,Record
 from run.ai_llm.service.heartflow_client import heartflow_request
 
 
@@ -39,6 +40,7 @@ def main(bot, config):
     violence_threshold: float = mod_cfg.get("violence_threshold", 6.0)
     other_threshold: float = mod_cfg.get("other_threshold", 7.0)
     master_id: int = config.common_config.basic_config["master"]["id"]
+    send_gay_audio: bool = mod_cfg.get("send_gay_audio",True)
 
     # 跨群/私聊统一计数 {user_id: count}
     counters: Dict[int, int] = {}
@@ -125,6 +127,8 @@ def main(bot, config):
                 bot.logger.warning(
                     f"内容审核触发 | uid={user_id} | 类别:{category_str} | 理由:{reasoning}"
                 )
+                if send_gay_audio:
+                    await bot.send(event,Record(file="data/pictures/gay_audio/"+random.choice(os.listdir("data/pictures/gay_audio"))))
 
         except Exception as e:
             traceback.print_exc()
