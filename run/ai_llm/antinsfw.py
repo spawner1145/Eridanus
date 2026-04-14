@@ -128,7 +128,11 @@ def main(bot, config):
                     f"内容审核触发 | uid={user_id} | 类别:{category_str} | 理由:{reasoning}"
                 )
                 if send_gay_audio:
-                    await bot.send(event,Record(file="data/pictures/gay_audio/"+random.choice(os.listdir("data/pictures/gay_audio"))))
+                    try:
+                        await bot.send(event,Record(file="data/audio/gay_audio/"+random.choice(os.listdir("data/audio/gay_audio"))))
+                    except Exception as e:
+                        bot.logger.error(e)
+                        bot.logger.error("请在data/audio/gay_audio放入恶心人的音频")
 
         except Exception as e:
             traceback.print_exc()
