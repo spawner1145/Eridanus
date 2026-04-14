@@ -129,7 +129,7 @@ def main(bot, config):
                 )
                 if send_gay_audio:
                     try:
-                        await bot.send(event,Record(file="data/voice/gay_audio/"+random.choice(os.listdir("data/voice/gay_audio"))))
+                        await bot.send_friend_message(user_id,Record(file="data/voice/gay_audio/"+random.choice(os.listdir("data/voice/gay_audio"))))
                     except Exception as e:
                         bot.logger.error(e)
                         bot.logger.error("请在data/audio/gay_audio放入恶心人的音频")
