@@ -121,6 +121,7 @@ content_moderation: #色情文本审核。和heartflow共用client
   private_context_size: 10
   group_whitelist:
     - 879886836
+  send_gay_audio: False #触发审核发送时代少年团语音。文件放在data/audio/gay_audio
 double:  #双模型，主模型用于对话，副模型实现模拟函数调用。
   main:
     api_keys:   #继续像这样添加apikey
