@@ -5,6 +5,8 @@ import shutil
 import subprocess
 import sys
 
+
+
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -20,6 +22,7 @@ logger.warning("请在关闭bot主程序的情况下运行更新程序")
 logger.warning("请在关闭bot主程序的情况下运行更新程序")
 logger.warning("请在关闭bot主程序的情况下运行更新程序")
 
+
 parent_dir = os.path.dirname(os.getcwd())
 # 检测上一级目录下的environments/MinGit/cmd/git.exe是否存在
 custom_git_path = os.path.join(parent_dir, "environments", "MinGit", "cmd", "git.exe")
@@ -28,6 +31,32 @@ if os.path.exists(custom_git_path):
 else:
     git_path = "git"
 logger.info(f"git_path: {git_path}")
+try:
+    logger.info("尝试为git配置代理")
+    from framework_common.framework_util.yamlLoader import YAMLManager
+    ym = YAMLManager.get_instance()
+    proxy=ym.common_config.basic_config["proxy"]["http_proxy"]
+    if proxy:
+        logger.info(f"检测到代理配置，正在为 Git 配置代理: {proxy}")
+        try:
+            # 设置 http 和 https 代理
+            subprocess.run([git_path, "config", "--global", "http.proxy", proxy], check=True)
+            subprocess.run([git_path, "config", "--global", "https.proxy", proxy], check=True)
+            logger.info("Git 代理配置成功。")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Git 代理配置失败: {e}")
+    else:
+        logger.info("未配置代理或代理为空，正在清除 Git 全局代理设置（如果存在）...")
+        try:
+            # 使用 --unset 清除代理配置，stderr=subprocess.DEVNULL 是为了忽略由于本来就没有配置代理而产生的报错
+            subprocess.run([git_path, "config", "--global", "--unset", "http.proxy"], stderr=subprocess.DEVNULL)
+            subprocess.run([git_path, "config", "--global", "--unset", "https.proxy"], stderr=subprocess.DEVNULL)
+            logger.info("Git 全局代理已清除。")
+        except Exception as e:
+            logger.warning(f"清除 Git 代理时发生异常 (通常可以忽略): {e}")
+except Exception as e:
+    logger.error(f"无法配置 Git 代理: {e}")
+
 custom_python_path = os.path.join(parent_dir, "environments", "Python311", "python.exe")
 
 python_path = sys.executable
