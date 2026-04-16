@@ -168,7 +168,12 @@ async def call_text2img1(bot, event, config, tag):
                 id_ = event.group_id
             else:
                 id_ = event.user_id
-            p = await SdDraw0(tag, path, config, id_, args)
+            try:
+                p = await SdDraw0(tag, path, config, id_, args)
+            except Exception as e:
+                bot.logger.error(e)
+                bot.logger.error("sd自动重试")
+                p = await SdDraw0(tag, path, config, id_, args)
             if not p:
                 turn -= 1
                 bot.logger.info("色图已屏蔽")
