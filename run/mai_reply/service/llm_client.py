@@ -401,7 +401,7 @@ class LLMClient:
                     if 'config' in sig.parameters:
                         # 【更新】通过单例获取全局 config
                         args['config'] = YAMLManager.get_instance()
-                    logger.info(f"[MaiReply] 正在执行工具 {func_name}，参数: {args}")
+                    logger.info(f"[MaiReply] 正在执行工具 {func_name}，参数: {args.keys()}")
                     ret = await func(**args) if asyncio.iscoroutinefunction(func) else await asyncio.to_thread(func, **args)
 
                     if ret is None:
@@ -409,6 +409,7 @@ class LLMClient:
 
                     content = json.dumps(ret, ensure_ascii=False) if not isinstance(ret, str) else ret
                 except Exception as e:
+                    traceback.print_exc()
                     logger.error(f"[MaiReply] 执行工具 {func_name} 时发生系统异常: {e}")
                     content = json.dumps({"error": str(e)}, ensure_ascii=False)
                     # 【防刷屏死循环机制】遇到崩溃级别的异常，直接强制中断
