@@ -58,7 +58,7 @@ def main(bot: ExtendBot, config: YAMLManager):
             return
         if trigger._has_at(event,bot.id):   #艾特无论如何要回复
             should_reply=True
-            clean_text = event.pure_text if event.pure_text else "你好"
+            clean_text = text
         else:
             if config.mai_reply.config["trigger"]["whitelist_enabled"]:
                 if not event.group_id in config.mai_reply.config["trigger"]["whitelist"]:
