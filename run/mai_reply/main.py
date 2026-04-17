@@ -62,7 +62,7 @@ def main(bot: ExtendBot, config: YAMLManager):
         else:
             if config.mai_reply.config["trigger"]["whitelist_enabled"]:
                 if not event.group_id in config.mai_reply.config["trigger"]["whitelist"]:
-                    bot.logger.info(f"[MaiReply] 群 {event.group_id} 不在触发白名单中，跳过")
+                    #bot.logger.info(f"[MaiReply] 群 {event.group_id} 不在触发白名单中，跳过")
                     return
             should_reply, clean_text = await trigger.check(
                 event=event,
