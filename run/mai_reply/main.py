@@ -64,6 +64,8 @@ def main(bot: ExtendBot, config: YAMLManager):
             else:
                 clean_text = "(艾特了你)"
         else:
+            if not config.mai_reply.config["trigger_llm"]["enable"]:
+                return
             if config.mai_reply.config["trigger"]["whitelist_enabled"]:
                 if not event.group_id in config.mai_reply.config["trigger"]["whitelist"]:
                     #bot.logger.info(f"[MaiReply] 群 {event.group_id} 不在触发白名单中，跳过")
@@ -75,6 +77,8 @@ def main(bot: ExtendBot, config: YAMLManager):
                 pure_text=text,
             )
         #print(should_reply, clean_text)
+        #print(event.message_chain)
+        #print(clean_text)
         bot.logger.info(f"[MaiReply] trigger={should_reply} self_id={bot.id} text={clean_text}")
         if not should_reply:
             # 即使不回复，也把消息存入群旁观窗口（感知群聊气氛）
