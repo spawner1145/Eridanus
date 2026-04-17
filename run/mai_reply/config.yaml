@@ -1,6 +1,6 @@
 
 # 参考Maibot设计的ai回复插件。
-enable: true   # 总开关，关闭后插件不工作
+enable: False  # 总开关，关闭后插件不工作
 llm:
   # 接口类型: openai / gemini
   provider: openai

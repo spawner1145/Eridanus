@@ -33,7 +33,8 @@ from run.mai_reply.service.reply_engine import ReplyEngine
 
 def main(bot: ExtendBot, config: YAMLManager):
     if not config.mai_reply.config["enable"]:
-        bot.logger.info("[MaiReply] 功能未开启")
+        bot.logger.warning("[MaiReply] 功能未开启。使用旧版ai对话组件")
+        bot.logger.warning("[MaiReply] 如要启用新版ai对话请在配置文件中将 mai_reply.enable 设置为 true ")
         return
     engine = ReplyEngine(config)
 
