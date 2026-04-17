@@ -26,7 +26,7 @@ trigger_llm:
   enable: true
   api_key: ""
   base_url: "http://apollodorus.xyz:8080/v1"   # 可以去我们的开发群1050663831获取免费apikey。
-  model: "gpt-5"                # 填入你用于判断的廉价/快速模型
+  model: "gpt-4o-mini"                # 填入你用于判断的廉价/快速模型
   stream: True
 # ---------- 人设(Persona) ----------
 persona:
