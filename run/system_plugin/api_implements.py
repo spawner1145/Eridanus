@@ -160,7 +160,7 @@ def main(bot, config):
                         await bot.send_group_message(event.group_id, Image(file=img_path))
                         return
                 if config.ai_llm.config["llm"]["aiReplyCore"]:
-                    if not config.mai_reply.config["trigger_llm"]["enable"]:
+                    if not config.mai_reply.config["enable"]:
                         r = await aiReplyCore(
                             [{"text": text}],
                             event.user_id,
