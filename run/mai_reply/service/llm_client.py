@@ -401,7 +401,7 @@ class LLMClient:
                     if 'config' in sig.parameters:
                         # 【更新】通过单例获取全局 config
                         args['config'] = YAMLManager.get_instance()
-
+                    logger.info(f"[MaiReply] 正在执行工具 {func_name}，参数: {args}")
                     ret = await func(**args) if asyncio.iscoroutinefunction(func) else await asyncio.to_thread(func, **args)
 
                     if ret is None:
