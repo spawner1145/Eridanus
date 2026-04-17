@@ -138,7 +138,8 @@ class ReplyEngine:
                 system_prompt=system_prompt,
                 tools=self._tools,
                 bot=bot,  # 【新增这一行】
-                event=event  # 【新增这一行】
+                event=event,  # 【新增这一行】
+                retries=10
             )
 
             if not raw_reply:
