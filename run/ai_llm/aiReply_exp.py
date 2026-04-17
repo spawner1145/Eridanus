@@ -20,7 +20,6 @@ from framework_common.database_util.llmDB import delete_latest2_history, read_ch
 from run.ai_llm.service.aiReplyCore import aiReplyCore, send_text, count_tokens_approximate
 from run.ai_llm.service.heartflow_client import heartflow_request
 
-
 # 用于匹配 base64 数据URI的正则
 BASE64_PATTERN = re.compile(r'^data:([^;]+);base64,(.+)$', re.DOTALL)
 
@@ -82,14 +81,14 @@ async def _process_image_for_heartflow(url: str, client_type: str) -> dict:
                         quality -= 5
                     img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
                     image.close()
-        
+
         if not img_base64:
             return None
         if client_type == "openai":
             return {"input_image": {"image_url": f"data:image/jpeg;base64,{img_base64}", "detail": "auto"}}
         else:
             return {"inlineData": {"mimeType": "image/jpeg", "data": img_base64}}
-    
+
     except Exception as e:
         print(f"处理图片失败: {e}")
         return None
@@ -125,18 +124,18 @@ async def heartflow_reply(config, prompt, group_messages_bg=None, recursion_time
         messages = [{"text": prompt}]
         if image_parts:
             messages.extend(image_parts)
-        
+
         result = await heartflow_request(
             config,
             messages,
             system_instruction=None,
             group_context=group_messages_bg,
         )
-        
+
         if result:
             print(result)
         return result
-        
+
     except Exception as e:
         traceback.print_exc()
         recursion_times += 1
@@ -145,21 +144,24 @@ async def heartflow_reply(config, prompt, group_messages_bg=None, recursion_time
         if recursion_times > recursion_limit:
             return None
         return await heartflow_reply(config, prompt, group_messages_bg, recursion_times, image_parts)
+
+
 def main(bot, config):
     """
     此插件代码参考了https://github.com/advent259141/Astrbot_plugin_Heartflow
     """
     """心流插件主函数"""
-    summarized_chara=None
+    summarized_chara = None
     # 获取tools配置（从原框架复制）
     tools = None
     if config.ai_llm.config["llm"]["func_calling"]:
         from framework_common.framework_util.func_map_loader import build_tool_map
         tools = build_tool_map()
+    if config.mai_reply.config["enable"]:
+        bot.logger.info("[MaiReply] 功能开启，原版 心流模式 暂时禁用")
+        return
 
     # ============ 配置读取 ============
-
-
 
     # 判断权重配置
     weights = {
@@ -245,7 +247,7 @@ def main(bot, config):
                 return persona_cache[cache_key]
 
             heartflow_system = config.ai_llm.config.get("heartflow", {}).get("system", "")
-            
+
             if heartflow_system:
                 try:
                     persona = await read_chara(user_id, await use_folder_chara(heartflow_system))
@@ -255,7 +257,7 @@ def main(bot, config):
                     return persona
                 except FileNotFoundError:
                     bot.logger.warning(f"心流插件：未找到专用角色文件 {heartflow_system}，回退到主llm角色")
-            
+
             user_info = await get_user(user_id)
             chara_file = getattr(user_info, 'chara_file', None)
 
@@ -265,8 +267,9 @@ def main(bot, config):
             chara_path = f"./data/system/chara/{chara_file}"
             try:
 
-                persona = await read_chara(user_id, await use_folder_chara(config.ai_llm.config["llm"]["chara_file_name"]))
-                persona=persona.replace("{bot_name}",config.common_config.basic_config["bot"])
+                persona = await read_chara(user_id,
+                                           await use_folder_chara(config.ai_llm.config["llm"]["chara_file_name"]))
+                persona = persona.replace("{bot_name}", config.common_config.basic_config["bot"])
                 if len(persona) > 500:
                     persona = await summarize_persona(persona)
 
@@ -287,7 +290,7 @@ def main(bot, config):
                 return summarized_chara
             prompt = f"""请将以下机器人角色设定总结为简洁的核心要点。
             总结后的内容应该在100-200字以内，突出最重要的角色特点。
-            
+
             原始角色设定：
             {original_persona}"""
 
@@ -296,7 +299,7 @@ def main(bot, config):
                 prompt,
                 recursion_times=7
             )
-            summarized_chara=result
+            summarized_chara = result
             summarized = result
             if summarized and len(summarized.strip()) > 10:
                 bot.logger.info(f"心流插件：人格精简完成 {len(original_persona)} -> {len(summarized)}")
@@ -317,12 +320,12 @@ def main(bot, config):
             client_config = heartflow_config.get("client", {})
             client_type = client_config.get("type", "gemini").strip().lower()
             listen_image = heartflow_config.get("listen_image", False)
-            
+
             if client_type == "openai":
                 prompt_format = "new_openai"
             else:
                 prompt_format = "gemini"
-            
+
             # 根据 listen_image 配置决定是否在群聊上下文中包含图片
             group_messages_bg = await get_last_20_and_convert_to_prompt(
                 event.group_id, config.ai_llm.config["heartflow"]["context_messages_count"], prompt_format, bot,
@@ -339,7 +342,7 @@ def main(bot, config):
                                 url = item["mface"].get("url") or item["mface"].get("file")
                             else:
                                 url = item["image"].get("url") or item["image"].get("file")
-                            
+
                             if url:
                                 img_data = await _process_image_for_heartflow(url, client_type)
                                 if img_data:
@@ -352,7 +355,7 @@ def main(bot, config):
                 role = msg.get("role", "")
                 if role not in ["user", "model", "assistant"]:
                     return None
-                
+
                 # Gemini 格式: {"role": "user", "parts": [{"text": "..."}, ...]}
                 if "parts" in msg:
                     texts = []
@@ -360,7 +363,7 @@ def main(bot, config):
                         if isinstance(part, dict) and "text" in part:
                             texts.append(part["text"])
                     return "\n".join(texts) if texts else None
-                
+
                 # OpenAI 格式: {"role": "user", "content": [{"type": "text", "text": "..."}, ...]}
                 if "content" in msg:
                     content = msg["content"]
@@ -372,9 +375,9 @@ def main(bot, config):
                             if isinstance(item, dict) and item.get("type") == "text":
                                 texts.append(item.get("text", ""))
                         return "\n".join(texts) if texts else None
-                
+
                 return None
-            
+
             if group_messages_bg:
                 recent_texts = []
                 for msg in group_messages_bg[-5:]:
@@ -384,7 +387,7 @@ def main(bot, config):
                 recent_messages = "\n---\n".join(recent_texts) if recent_texts else "暂无对话历史"
             else:
                 recent_messages = "暂无对话历史"
-            
+
             reply_threshold = config.ai_llm.config['heartflow']['reply_threshold']
             message_content_desc = event.pure_text if event.pure_text else "(无文字内容)"
             if image_parts:
@@ -392,29 +395,29 @@ def main(bot, config):
             image_prefix_text = ""
             if image_parts and not event.pure_text:
                 image_prefix_text = f"以下是用户{event.sender.nickname}发送的图片:\n"
-            
+
             prompt = f"""你是群聊机器人的决策系统，判断是否应该主动回复。
 
                 ## 机器人角色设定
                 {persona}
-                
+
                 ## 当前群聊情况
                 - 群聊ID: {event.group_id}
                 - 精力水平: {chat_state.energy:.1f}/1.0
                 - 上次发言: {get_minutes_since_last_reply(event.group_id)}分钟前
                 - 回复率: {(chat_state.total_replies / max(1, chat_state.total_messages) * 100):.1f}%
-                
+
                 ## 最近对话
                 {recent_messages}
-                
+
                 ## 待判断消息
                 发送者: {event.sender.nickname}
                 内容: {message_content_desc}
                 时间: {datetime.datetime.now().strftime('%H:%M:%S')}
-                
+
                 回复阈值: {reply_threshold}
                 请从5个维度评估（0-10分）。
-                
+
                 {image_prefix_text}"""
             prompt += """
 
@@ -436,8 +439,8 @@ def main(bot, config):
                 group_messages_bg=group_messages_bg,
                 image_parts=image_parts if image_parts else None
             )
-            #print(result_text)
-            #print(type(result_text))
+            # print(result_text)
+            # print(type(result_text))
             # 使用正则解析分数
             import re
 
@@ -450,7 +453,6 @@ def main(bot, config):
             social = ext("社交|社交适宜性|social")
             timing = ext("时机|时机恰当性|timing")
             continuity = ext("连贯|对话连贯|continuity")
-
 
             # 提取理由
             reasoning_match = re.search(r"(理由|分析|原因)[:：]\s*(.+)", result_text, re.S)
@@ -465,8 +467,8 @@ def main(bot, config):
                             ) / 10.0
 
             should_reply = overall_score >= reply_threshold
-            #print(should_reply)
-            r=JudgeResult(
+            # print(should_reply)
+            r = JudgeResult(
                 relevance=relevance,
                 willingness=willingness,
                 social=social,
@@ -510,7 +512,8 @@ def main(bot, config):
             try:
                 current_event = await user_state[uid]["queue"].get()
                 try:
-                    current_event.processed_message.append({"text": "(系统提示：你目前正处于群聊环境中，请根据当前上下文做出自然、长度适当的回复以融入聊天。不要让此提示信息出现在回复中。)"})
+                    current_event.processed_message.append({
+                                                               "text": "(系统提示：你目前正处于群聊环境中，请根据当前上下文做出自然、长度适当的回复以融入聊天。不要让此提示信息出现在回复中。)"})
                     reply_message = await aiReplyCore(
                         current_event.processed_message,
                         current_event.user_id,
@@ -572,7 +575,7 @@ def main(bot, config):
 
         if not has_text and not has_image:
             return
-        
+
         if event.message_chain.has(At):
             if event.message_chain.get(At)[0].qq in [bot.id, 1000000]:
                 bot.logger.info(f"心流插件：跳过@机器人消息")
@@ -597,8 +600,8 @@ def main(bot, config):
                     if not user_info.permission >= config.ai_llm.config["core"]["ai_reply_group"]:
                         return
 
-                    #if event.group_id in [913122269, 1050663831] and not user_info.permission >= 66:
-                        #return
+                    # if event.group_id in [913122269, 1050663831] and not user_info.permission >= 66:
+                    # return
 
                     if not user_info.permission >= config.ai_llm.config["core"]["ai_token_limt"]:
                         if user_info.ai_token_record >= config.ai_llm.config["core"]["ai_token_limt_token"]:
@@ -613,8 +616,6 @@ def main(bot, config):
 
             except Exception as e:
                 bot.logger.error(f"心流处理异常: {e}")
-
-
 
     # ============ 管理命令 ============
 
