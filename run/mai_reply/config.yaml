@@ -61,6 +61,7 @@ context: # 上下文相关配置
   session_ttl: 7200      # 2小时
   # 是否启用用户印象记忆（跨会话）
   enable_impression: true
+  impression_model: ""   #生成用户印象使用的模型，留空则使用llm配置中的模型
   impression_ttl: 604800  # 7天
 
 # ---------- 拟人化行为 ----------

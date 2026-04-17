@@ -70,7 +70,8 @@ class LLMClient:
         retries: int = 3,
         stream: Optional[bool] = None,
         bot=None,
-        event=None
+        event=None,
+        model=None
     ) -> Optional[str]:
         """
         发送对话请求。
@@ -79,22 +80,22 @@ class LLMClient:
         should_stream = self.use_stream if stream is None else stream
 
         if should_stream:
-            return await self._chat_stream_with_retries(messages, system_prompt, tools, retries, bot, event)
+            return await self._chat_stream_with_retries(messages, system_prompt, tools, retries, bot, event,model)
         else:
-            return await self._chat_non_stream_with_retries(messages, system_prompt, tools, retries, bot, event)
+            return await self._chat_non_stream_with_retries(messages, system_prompt, tools, retries, bot, event,model)
 
     # ==================================================================
     # 流式 (Stream) 执行引擎 (内部消费生成器，合并后返回)
     # ==================================================================
-    async def _chat_stream_with_retries(self, messages, system_prompt, tools, retries, bot, event) -> Optional[str]:
+    async def _chat_stream_with_retries(self, messages, system_prompt, tools, retries, bot, event,model=None) -> Optional[str]:
         for attempt in range(retries):
             try:
                 full_text = ""
                 if self.provider == "gemini":
-                    async for chunk in self._chat_gemini_stream(messages, system_prompt, tools, bot, event):
+                    async for chunk in self._chat_gemini_stream(messages, system_prompt, tools, bot, event,model):
                         full_text += chunk
                 else:
-                    async for chunk in self._chat_openai_stream(messages, system_prompt, tools, bot, event):
+                    async for chunk in self._chat_openai_stream(messages, system_prompt, tools, bot, event,model):
                         full_text += chunk
 
                 return full_text.strip() if full_text else None
@@ -106,7 +107,7 @@ class LLMClient:
                     raise e
         return None
 
-    async def _chat_openai_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None) -> AsyncGenerator[str, None]:
+    async def _chat_openai_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None,model=None) -> AsyncGenerator[str, None]:
         api_key = next(self._oa_key_cycle)
         url = f"{self._oa_base_url}/chat/completions"
 
@@ -118,7 +119,7 @@ class LLMClient:
 
         for _round in range(10):
             payload = {
-                "model": self._oa_model,
+                "model": self._oa_model if not model else model,
                 "messages": full_messages,
                 "temperature": self._oa_temperature,
                 "max_tokens": self._oa_max_tokens,
@@ -182,9 +183,10 @@ class LLMClient:
                     return
                 full_messages.extend(tool_results)
 
-    async def _chat_gemini_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None) -> AsyncGenerator[str, None]:
+    async def _chat_gemini_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None,model=None) -> AsyncGenerator[str, None]:
         api_key = next(self._gm_key_cycle)
-        url = f"{self._gm_base_url}/v1beta/models/{self._gm_model}:streamGenerateContent?alt=sse&key={api_key}"
+        model=self._gm_model if not model else model
+        url = f"{self._gm_base_url}/v1beta/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
 
         gemini_tools = self._build_gemini_tool_defs(tools) if tools else None
         contents = self._build_gemini_contents(messages)
