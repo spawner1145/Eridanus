@@ -131,7 +131,7 @@ class ReplyEngine:
             # ---------- 调用 LLM（工具调用在 llm_client 内部自动处理）
             #logger.info(f"[MaiReply] {messages}")
             #logger.info(f"[MaiReply] {system_prompt}")
-            logger.info(self._tools)
+            #logger.info(self._tools)
 
             raw_reply = await self.llm.chat(
                 messages=messages,

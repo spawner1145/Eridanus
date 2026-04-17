@@ -67,7 +67,7 @@ class TriggerChecker:
         text = pure_text.strip()
 
         # 提取硬件级别的判定因子
-        print(bot_self_id)
+        #print(bot_self_id)
         is_at = self._has_at(event=event,bot_self_id= bot_self_id)
         is_reply = self._is_reply_to_bot(event, bot_self_id)
 
@@ -75,7 +75,7 @@ class TriggerChecker:
         clean_text = self._remove_at_segments(event, text, bot_name, bot_self_id)
         if not clean_text:
             clean_text = "你好"
-        print(is_at)
+        #print(is_at)
         if is_at:
             return True, clean_text
         # 私聊直接放行（如果配置允许）
@@ -236,13 +236,13 @@ class TriggerChecker:
 
     @staticmethod
     def _has_at( event, bot_self_id: int) -> bool:
-        print(event)
+        #print(event)
         if not hasattr(event, "group_id"):
-            print("不是群消息")
+            #print("不是群消息")
             return False
 
         if not event.message_chain.has(At):
-            print("消息中没有At")
+            #print("消息中没有At")
             return False
         if event.message_chain.get(At)[0].qq in [bot_self_id, 1000000]:
             return True
