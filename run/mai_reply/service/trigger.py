@@ -12,7 +12,7 @@ import traceback
 import httpx
 from typing import Tuple
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
-from developTools.message.message_components import At
+from developTools.message.message_components import At, Text
 from developTools.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -251,6 +251,8 @@ class TriggerChecker:
 
     @staticmethod
     def _remove_at_segments(event, text: str, bot_name: str, bot_self_id: int) -> str:
+        if event.message_chain.has(Text):
+            text = event.message_chain.get(Text)[0].text
         text = text.replace(f"@{bot_name}", "").strip()
         if bot_self_id:
             text = text.replace(f"@{bot_self_id}", "").strip()

@@ -24,6 +24,7 @@ MaiReply 插件主入口
 import asyncio
 
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
+from developTools.message.message_components import Text
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 
@@ -58,7 +59,10 @@ def main(bot: ExtendBot, config: YAMLManager):
             return
         if trigger._has_at(event,bot.id):   #艾特无论如何要回复
             should_reply=True
-            clean_text = text
+            if event.message_chain.has(Text):
+                clean_text = event.message_chain.get(Text)[0].text
+            else:
+                clean_text = "(艾特了你)"
         else:
             if config.mai_reply.config["trigger"]["whitelist_enabled"]:
                 if not event.group_id in config.mai_reply.config["trigger"]["whitelist"]:
