@@ -254,7 +254,11 @@ class TriggerChecker:
         if event.message_chain.has(Text):
             text = event.message_chain.get(Text)[0].text
         if event.message_chain.has(At):
-            text = f"@{bot_name}"+text
+            if event.message_chain.get(At)[0].qq in [bot_self_id, 1000000]:
+                logger.info(f"[TriggerChecker] 消息中包含@机器人自己的At，原始文本: '{text}'，已替换为 '@{bot_name}'")
+                text = f"@{bot_name}"+text
+            else:
+                text = f"@{event.message_chain.get(At)[0].name}"+text
         if not event.message_chain.has(Text) and not event.message_chain.has(At):
             logger.warning(f"[TriggerChecker] 无法提取文本内容，消息链中既没有 Text 也没有 At，原始消息链: {event.message_chain}")
             return None
