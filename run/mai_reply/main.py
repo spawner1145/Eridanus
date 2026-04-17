@@ -75,13 +75,13 @@ def main(bot: ExtendBot, config: YAMLManager):
                 pure_text=text,
             )
         #print(should_reply, clean_text)
-        bot.logger.info(f"[MaiReply] trigger={should_reply} self_id={bot.id} text={text!r}")
+        bot.logger.info(f"[MaiReply] trigger={should_reply} self_id={bot.id} text={clean_text}")
         if not should_reply:
             # 即使不回复，也把消息存入群旁观窗口（感知群聊气氛）
             if text.strip():
                 try:
                     user_name = str(event.user_id)
-                    engine.context.push_group_window(event.group_id, user_name, text)
+                    engine.context.push_group_window(event.group_id, user_name, clean_text)
                 except Exception:
                     pass
             return
