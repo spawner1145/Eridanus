@@ -1,9 +1,7 @@
 
-# 参考Maibot设计的ai回复插件。
-enable: False  # 总开关，关闭后插件不工作
+enable: True  # 开启后将自动禁用旧版ai回复
 llm:
-  # 接口类型: openai / gemini
-  provider: openai
+  provider: openai  #接口类型
   stream: true   # 是否开启流式回复（需要模型支持）
   func_calling: true  # 是否开启函数调用功能（需要模型支持）
   openai:
@@ -28,69 +26,45 @@ trigger_llm:
   base_url: "http://apollodorus.xyz:8080/v1"   # 可以去我们的开发群1050663831获取免费apikey。
   model: "gpt-4o-mini"                # 填入你用于判断的廉价/快速模型
   stream: True
-# ---------- 人设(Persona) ----------
-persona:
-  # bot自称的名字（留空则读取框架bot_name）
-  name: ""
-  system_prompt: ""
-  # 加载角色卡文件（留空则使用上面的system_prompt） 支持txt/json，放在 data/system/chara/ 下
-  chara_file: "猫娘.txt"
 
-# ---------- 触发配置 ----------
-trigger:
-  # @机器人 触发
-  at_trigger: true
-  # 前缀触发（列表）
-  prefix:
+persona:  # 人设
+  name: ""  # 角色名（可选，留空则读取默认配置
+  system_prompt: ""   #系统提示词（留空则使用默认角色卡内容）建议在角色卡里写好system prompt，这里留空即可。
+  chara_file: "猫娘.txt"  #角色文件名，放在data/system/chara文件夹内(目前支持txt,json,酒馆角色卡(图片))
+
+trigger:  # 触发相关配置
+  at_trigger: true  #艾特触发
+  prefix:     # 前缀触发（列表）
     - ""     # 空字符串=禁用
-  # 私聊直接触发
-  private_trigger: true
-  # 概率触发（0=关闭，1-100=概率）
-  random_reply_probability: 3
+  private_trigger: true   # 私聊直接触发
+  random_reply_probability: 3   # 概率触发（0=关闭，1-100=概率）
   whitelist_enabled: true  # 是否启用白名单模式，启用后只有在白名单中的群聊才会触发随机回复
   whitelist:
     - 1050663831
 
-
 context: # 上下文相关配置
-  # 每个会话保存的最大消息轮数（一来一回=1轮）
-  max_turns: 20
-  # 群聊上下文：读取群内最近N条消息作为旁观上下文（让bot感知群聊气氛）
-  group_context_window: 15
-  # Redis TTL（秒）。会话历史缓存存活时间
-  session_ttl: 7200      # 2小时
-  # 是否启用用户印象记忆（跨会话）
-  enable_impression: true
-  impression_model: ""   #生成用户印象使用的模型，留空则使用llm配置中的模型
-  impression_ttl: 604800  # 7天
+  max_turns: 20   # 每个会话保存的最大消息轮数（一来一回=1轮）
+  group_context_window: 15   # 群聊上下文：读取群内最近N条消息作为旁观上下文（让bot感知群聊气氛）
+  session_ttl: 7200      # 2小时   # Redis TTL（秒）。会话历史缓存存活时间
+  enable_impression: true   # 是否启用用户印象记忆（跨会话）
+  impression_model: ""   #生成用户印象使用的模型，留空则使用llm配置中的模型。建议改成廉价快速的模型
+  impression_ttl: 604800  # 7天 印象保留时间
 
-# ---------- 拟人化行为 ----------
-human_like:
-  # 打字延迟模拟（毫秒/字，0=关闭）
-  typing_delay_ms_per_char: 30
-  # 最大打字延迟上限（毫秒）
-  typing_delay_max_ms: 4000
-  # 消息分割：超过N字自动拆成多条发（0=不分割）
-  split_threshold: 60
-  # 分割后每条消息之间的间隔（毫秒）
-  split_interval_ms: 800
-  # 偶尔故意打错字的概率（0-100）。0=关闭
-  typo_probability: 8
-  # 不回复的概率（模拟"看了不回"，0=总是回，100=从不回）。仅对概率触发有效
-  ignore_probability: 15
-  # 是否在回复时随机引用原消息
-  quote_reply: true
+human_like:  # 模拟人类回复特征的配置
+  typing_delay_ms_per_char: 30 # 打字延迟模拟（毫秒/字，0=关闭）
+  typing_delay_max_ms: 4000 # 最大打字延迟上限（毫秒）
+  split_threshold: 60 # 消息分割：超过N字自动拆成多条发（0=不分割）
+  split_interval_ms: 800  # 分割后每条消息之间的间隔（毫秒）
+  typo_probability: 8  # 偶尔故意打错字的概率（0-100）。0=关闭
+  ignore_probability: 15  # 不回复的概率（模拟"看了不回"，0=总是回，100=从不回）。仅对概率触发有效
+  quote_reply: true  # 是否在回复时随机引用原消息
   quote_reply_probability: 40   # 引用概率（0-100）
 
-# ---------- 情绪系统 ----------
-emotion:
+emotion:  # 情绪系统配置
   enable: true
-  # 情绪衰减速率（分钟/级，越小衰减越快）
-  decay_rate_min: 20
-  # 默认情绪（启动时）
-  default_mood: "还行，没啥特别的"
-  # 情绪词库（会被注入到persona prompt的{mood}中）
-  moods:
+  decay_rate_min: 20  # 情绪衰减速率（分钟/级，越小衰减越快）
+  default_mood: "还行，没啥特别的"  # 默认情绪（启动时）
+  moods:  # 情绪词库（会被注入到persona prompt的{mood}中）
     - "挺好的，今天状态不错"
     - "有点无聊，不知道聊啥"
     - "困了，有点犯懒"
@@ -98,26 +72,20 @@ emotion:
     - "有点烦，不过没关系"
     - "今天心情好，想聊天"
     - "脑子有点转不动了"
-  # 情绪Redis db编号
-  redis_db: 4
+  redis_db: 4  # 情绪Redis db编号
 
-# ---------- 并发控制 ----------
-concurrency:
-  # 单个会话（群/私聊）并发回复锁超时（秒）
-  lock_timeout: 30
-  # 全局最大并发回复数（防止爆炸）
-  max_concurrent: 20
-  # 消息队列：同一会话短时间内多条消息合并处理（毫秒，0=禁用）
-  message_merge_window_ms: 1200
+concurrency:  # 并发控制配置
+  lock_timeout: 30 # 单个会话（群/私聊）并发回复锁超时（秒）
+  max_concurrent: 30  # 全局最大并发回复数（防止爆炸）
+  message_merge_window_ms: 1200  # 消息队列：同一会话短时间内多条消息合并处理（毫秒，0=禁用）
 
-# ---------- 权限 ----------
+
 permission:
-  # 群聊回复所需权限等级
-  group_reply_level: 0
-  # 私聊回复所需权限等级
-  private_reply_level: 0
-
-redis:
-  # 上下文存储db编号（避免和其他插件冲突）
+  group_reply_level: 0  # 群聊回复所需权限等级
+  private_reply_level: 0  # 私聊回复所需权限等级
+redis: # 上下文存储db编号（避免和其他插件冲突）
   context_db: 5
   impression_db: 6
+sqlite:
+  context_db_path:    "data/database/context_store.db"
+  impression_db_path: "data/database/impression_store.db"

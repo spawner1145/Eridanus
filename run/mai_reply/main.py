@@ -63,6 +63,8 @@ def main(bot: ExtendBot, config: YAMLManager):
                 clean_text = event.message_chain.get(Text)[0].text
             else:
                 clean_text = "(艾特了你)"
+        elif prefix_check(text,config.mai_reply.config["trigger"]["prefix"]):
+            should_reply=True
         else:
             if not config.mai_reply.config["trigger_llm"]["enable"]:
                 return
@@ -112,3 +114,10 @@ def main(bot: ExtendBot, config: YAMLManager):
             return
 
         asyncio.create_task(engine.handle(bot, event, text))
+
+    def prefix_check(message: str, prefix: list):
+        for p in prefix:
+            if message.startswith(p) and p != "":
+                bot.logger.info(f"消息{message}匹配到关键词{p}")
+                return True
+        return False
