@@ -65,6 +65,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                 clean_text = "(艾特了你)"
         elif prefix_check(text,config.mai_reply.config["trigger"]["prefix"]):
             should_reply=True
+            clean_text = text
         else:
             if not config.mai_reply.config["trigger_llm"]["enable"]:
                 return
