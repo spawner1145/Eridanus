@@ -119,6 +119,6 @@ def main(bot: ExtendBot, config: YAMLManager):
     def prefix_check(message: str, prefix: list):
         for p in prefix:
             if message.startswith(p) and p != "":
-                bot.logger.info(f"消息{message}匹配到关键词{p}")
+                bot.logger.info(f"[MaiReply] 消息以触发前缀 {p} 开头，强制触发")
                 return True
         return False
