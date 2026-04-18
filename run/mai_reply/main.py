@@ -63,9 +63,6 @@ def main(bot: ExtendBot, config: YAMLManager):
                 clean_text = event.message_chain.get(Text)[0].text
             else:
                 clean_text = "(艾特了你)"
-        elif prefix_check(text,config.mai_reply.config["trigger"]["prefix"]):
-            should_reply=True
-            clean_text = text
         else:
             if not config.mai_reply.config["trigger_llm"]["enable"]:
                 return
@@ -82,6 +79,9 @@ def main(bot: ExtendBot, config: YAMLManager):
         #print(should_reply, clean_text)
         #print(event.message_chain)
         #print(clean_text)
+        if prefix_check(text,config.mai_reply.config["trigger"]["prefix"]):
+            should_reply=True
+            clean_text = text
         bot.logger.info(f"[MaiReply] trigger={should_reply} self_id={bot.id} text={clean_text}")
         if not should_reply:
             # 即使不回复，也把消息存入群旁观窗口（感知群聊气氛）
