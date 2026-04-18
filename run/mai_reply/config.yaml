@@ -78,8 +78,8 @@ emotion:  # 情绪系统配置
   redis_db: 4  # 情绪Redis db编号
 
 concurrency:  # 并发控制配置
-  lock_timeout: 30 # 单个会话（群/私聊）并发回复锁超时（秒）
-  max_concurrent: 30  # 全局最大并发回复数（防止爆炸）
+  lock_timeout: 100 # 单个会话（群/私聊）并发回复锁超时（秒）
+  max_concurrent: 150  # 全局最大并发回复数（防止爆炸）
   message_merge_window_ms: 1200  # 消息队列：同一会话短时间内多条消息合并处理（毫秒，0=禁用）
 
 
