@@ -1,4 +1,4 @@
-plugin_description = "AA.v2 MaiRepy 新版ai对话"
+plugin_description = "mai_reply 新版ai对话"
 
 dynamic_imports = {
     "run.mai_reply.func_collection": [
