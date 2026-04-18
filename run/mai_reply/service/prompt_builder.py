@@ -85,7 +85,7 @@ class PromptBuilder:
         mood = self.emotion.get_mood()
 
         # 变量替换
-        prompt = base.format(
+        prompt = base.replace("{","{{").replace("}","}}").format(
             bot_name=bot_name,
             用户=user_name,
             time=time_str,
