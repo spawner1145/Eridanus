@@ -20,27 +20,30 @@ llm:
     base_url: https://generativelanguage.googleapis.com
     temperature: 1.0
     max_output_tokens: 1024
-trigger_llm:
+
+trigger:  # 基础触发相关配置
+  at_trigger: true  #艾特触发
+  prefix:     # 前缀触发（列表）
+    - ""     # 空字符串=禁用
+  private_trigger: true   # 私聊直接触发
+  random_reply_probability: 3   # 概率触发（0=关闭，1-100=概率）
+trigger_llm:   #ai判断是否触发
   enable: true
   api_key: ""
   base_url: "http://apollodorus.xyz:8080/v1"   # 可以去我们的开发群1050663831获取免费apikey。
   model: "gpt-4o-mini"                # 填入你用于判断的廉价/快速模型
   stream: True
+  whitelist_enabled: true  # 是否启用白名单模式，启用后只有在白名单中的群聊才会触发ai回复
+  whitelist:
+    - 1050663831
 
 persona:  # 人设
   name: ""  # 角色名（可选，留空则读取默认配置
   system_prompt: ""   #系统提示词（留空则使用默认角色卡内容）建议在角色卡里写好system prompt，这里留空即可。
   chara_file: "猫娘.txt"  #角色文件名，放在data/system/chara文件夹内(目前支持txt,json,酒馆角色卡(图片))
 
-trigger:  # 触发相关配置
-  at_trigger: true  #艾特触发
-  prefix:     # 前缀触发（列表）
-    - ""     # 空字符串=禁用
-  private_trigger: true   # 私聊直接触发
-  random_reply_probability: 3   # 概率触发（0=关闭，1-100=概率）
-  whitelist_enabled: true  # 是否启用白名单模式，启用后只有在白名单中的群聊才会触发随机回复
-  whitelist:
-    - 1050663831
+
+
 
 context: # 上下文相关配置
   max_turns: 20   # 每个会话保存的最大消息轮数（一来一回=1轮）
