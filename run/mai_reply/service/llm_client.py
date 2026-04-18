@@ -247,13 +247,13 @@ class LLMClient:
     # ==================================================================
     # 非流式 (Non-Stream) 传统执行引擎
     # ==================================================================
-    async def _chat_non_stream_with_retries(self, messages, system_prompt, tools, retries, bot, event) -> Optional[str]:
+    async def _chat_non_stream_with_retries(self, messages, system_prompt, tools, retries, bot, event,model=None) -> Optional[str]:
         for attempt in range(retries):
             try:
                 if self.provider == "gemini":
-                    return await self._chat_gemini_non_stream(messages, system_prompt, tools, bot, event)
+                    return await self._chat_gemini_non_stream(messages, system_prompt, tools, bot, event,model)
                 else:
-                    return await self._chat_openai_non_stream(messages, system_prompt, tools, bot, event)
+                    return await self._chat_openai_non_stream(messages, system_prompt, tools, bot, event,model)
             except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(1.5 * (attempt + 1))
@@ -262,16 +262,17 @@ class LLMClient:
                     raise e
         return None
 
-    async def _chat_openai_non_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None) -> Optional[str]:
+    async def _chat_openai_non_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None,model=None) -> Optional[str]:
         api_key = next(self._oa_key_cycle)
         url = f"{self._oa_base_url}/chat/completions"
         full_messages =[{"role": "system", "content": system_prompt}] if system_prompt else[]
         full_messages.extend(messages)
         tool_defs = self._build_openai_tool_defs(tools) if tools else None
         temp_signal=False
+        temp_model=model if model else self._oa_model
         for _round in range(10):
             payload: Dict[str, Any] = {
-                "model": self._oa_model, "messages": full_messages,
+                "model": temp_model, "messages": full_messages,
                 "temperature": self._oa_temperature, "max_tokens": self._oa_max_tokens,
             }
             if tool_defs and not temp_signal:
@@ -300,9 +301,10 @@ class LLMClient:
             full_messages.extend(tool_results)
         return None
 
-    async def _chat_gemini_non_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None) -> Optional[str]:
+    async def _chat_gemini_non_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None,model=None) -> Optional[str]:
         api_key = next(self._gm_key_cycle)
-        url = f"{self._gm_base_url}/v1beta/models/{self._gm_model}:generateContent?key={api_key}"
+        temp_model=model if model else self._gm_model
+        url = f"{self._gm_base_url}/v1beta/models/{temp_model}:generateContent?key={api_key}"
         contents = self._build_gemini_contents(messages)
         gemini_tools = self._build_gemini_tool_defs(tools) if tools else None
         temp_signal=False
