@@ -56,6 +56,8 @@ context: # 上下文相关配置
   vision_base_url: "http://apollodorus.xyz:8080/v1"  # 视觉模型接口URL，留空则使用llm配置中的base_url
   vision_api_key: "xxxxx"  # 视觉模型API
   vision_model: "grok-4"  # 能读图的模型
+  vision_enable_group:
+    - 1050663831  # 启用图像上下文的群聊ID列表（需要trigger_llm的白名单群启用）
 
 human_like:  # 模拟人类回复特征的配置
   typing_delay_ms_per_char: 30 # 打字延迟模拟（毫秒/字，0=关闭）

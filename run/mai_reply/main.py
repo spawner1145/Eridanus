@@ -107,7 +107,7 @@ def main(bot: ExtendBot, config: YAMLManager):
             return
         async def add_to_context():
             if event.message_chain.has(Image) or event.message_chain.has(Mface):
-                if config.mai_reply.config["context"]["img_context"]:
+                if config.mai_reply.config["context"]["img_context"] and event.group_id in config.mai_reply.config["context"]["vision_enable_group"]:
                     bot.logger.info(f"[MaiReply] 消息包含图片，且已开启图片上下文，将存入旁观窗口")
                     async def img_add_to_window():
                         img_url = await get_img(event, bot)
@@ -136,11 +136,11 @@ def main(bot: ExtendBot, config: YAMLManager):
             clean_text = pure_text
         else:
             if not config.mai_reply.config["trigger_llm"]["enable"]:
-                #await add_to_context()  # 即使不触发，也把消息存入群旁观窗口（感知群聊气氛）
+                await add_to_context()  # 即使不触发，也把消息存入群旁观窗口（感知群聊气氛）
                 return
             if config.mai_reply.config["trigger_llm"]["whitelist_enabled"]:
                 if event.group_id not in config.mai_reply.config["trigger_llm"]["whitelist"]:
-                    #await add_to_context()
+                    await add_to_context()
                     return
             should_reply, clean_text = await trigger.check(
                 event=event,
