@@ -1,6 +1,6 @@
 import os
 from ruamel.yaml import YAML
-from typing import Any
+from typing import Any, Callable, List
 from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
@@ -92,6 +92,7 @@ class YAMLManager:
         self.data = {}
         self.file_paths = {}
         self.path_to_key = {}  # 文件路径到配置键的映射
+        self._reload_callbacks: List[Callable[[str], None]] = []  # 文件重载回调列表
 
         # 设置监控目录
         self.run_dir = os.path.join(os.getcwd(), plugins_dir or "run")
@@ -105,6 +106,13 @@ class YAMLManager:
         self._start_file_watcher()
 
         YAMLManager._instance = self
+
+    def register_reload_callback(self, callback: Callable[[str], None]):
+        """
+        注册一个在 YAML 文件重载完成后触发的回调。
+        callback 接收一个参数：plugin_name (str)，根目录文件为 None。
+        """
+        self._reload_callbacks.append(callback)
 
     def _load_all_files(self):
         """加载所有YAML文件"""
@@ -237,6 +245,14 @@ class YAMLManager:
 
             logger.info(f"文件重新加载完成: {file_path}")
 
+            # 触发已注册的回调，通知对应的插件名
+            if plugin_name:
+                for cb in self._reload_callbacks:
+                    try:
+                        cb(plugin_name)
+                    except Exception as e:
+                        logger.error(f"reload callback 执行出错 (plugin={plugin_name}): {e}")
+
         except Exception as e:
             logger.error(f"重新加载文件时出错 {file_path}: {e}")
             import traceback
@@ -287,7 +303,7 @@ class YAMLManager:
     def __setattr__(self, name: str, value: Any):
         """允许通过属性修改 YAML 数据"""
         if name in ["yaml", "data", "file_paths", "path_to_key", "run_dir", "event_handler", "observer", "_instance",
-                    "_lock"]:
+                    "_lock", "_reload_callbacks"]:
             super().__setattr__(name, value)
         elif hasattr(self, 'data') and name in self.data and not isinstance(self.data[name], dict):
             self.data[name] = value

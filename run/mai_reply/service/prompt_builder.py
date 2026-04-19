@@ -83,7 +83,7 @@ class PromptBuilder:
 
         # 情绪
         mood = self.emotion.get_mood()
-
+        #print(bot_name,user_name)
         # 变量替换
         prompt = base.replace("{","{{").replace("}","}}").format(
             bot_name=bot_name,
@@ -104,7 +104,8 @@ class PromptBuilder:
 
         # 追加拟人化输出规则
         prompt += _HUMANLIKE_RULES
-
+        prompt=prompt.replace("{bot_name}", bot_name).replace("{用户}", user_name)
+        #print(prompt)
         return prompt.strip()
 
 

@@ -131,7 +131,7 @@ class LLMClient:
                 payload["tool_choice"] = "auto"
 
             http = await self._get_http()
-
+            #print(full_messages)
             async with http.stream(
                 "POST", url, json=payload,
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
@@ -208,6 +208,7 @@ class LLMClient:
                 payload["tools"] = gemini_tools
 
             http = await self._get_http()
+
             async with http.stream("POST", url, json=payload, headers={"Content-Type": "application/json"}) as resp:
                 resp.raise_for_status()
 
@@ -342,19 +343,53 @@ class LLMClient:
     # 辅助构建与执行方法
     # ==================================================================
     def _build_gemini_contents(self, messages: List[Dict]) -> List[Dict]:
-        contents =[]
+        contents = []
         for msg in messages:
             role = "user" if msg["role"] == "user" else "model"
-            if isinstance(msg.get("content"), str):
-                contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+            content = msg.get("content")
+
+            if isinstance(content, str):
+                contents.append({"role": role, "parts": [{"text": content}]})
+
             elif msg.get("role") == "tool":
-                contents.append({"role": "user", "parts":[{"functionResponse": {"name": msg.get("name", ""), "response": {"result": msg.get("content", "")}}}]})
-            elif isinstance(msg.get("content"), list):
+                contents.append({
+                    "role": "user",
+                    "parts": [{"functionResponse": {
+                        "name": msg.get("name", ""),
+                        "response": {"result": msg.get("content", "")}
+                    }}]
+                })
+
+            elif isinstance(content, list):
                 parts = []
-                for part in msg["content"]:
-                    if "text" in part: parts.append({"text": part["text"]})
-                    elif "functionCall" in part: parts.append(part)
-                if parts: contents.append({"role": role, "parts": parts})
+                for part in content:
+                    if isinstance(part, dict):
+                        if part.get("type") == "text":
+                            parts.append({"text": part["text"]})
+                        elif part.get("type") == "image_url":
+                            # 支持 OpenAI vision 格式：data URI 或普通 URL
+                            url_val = part.get("image_url", {}).get("url", "")
+                            if url_val.startswith("data:"):
+                                # data:image/png;base64,<b64data>
+                                try:
+                                    header, b64data = url_val.split(",", 1)
+                                    mime = header.split(":")[1].split(";")[0]
+                                    parts.append({
+                                        "inlineData": {
+                                            "mimeType": mime,
+                                            "data": b64data
+                                        }
+                                    })
+                                except Exception:
+                                    pass
+                            else:
+                                # 普通 URL —— Gemini 支持 fileUri
+                                parts.append({"fileData": {"fileUri": url_val, "mimeType": "image/jpeg"}})
+                        elif "functionCall" in part:
+                            parts.append(part)
+                if parts:
+                    contents.append({"role": role, "parts": parts})
+
         return contents
 
     @staticmethod

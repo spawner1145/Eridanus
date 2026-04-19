@@ -63,10 +63,11 @@ class ReplyEngine:
             pass
         return None
 
-    async def handle(self, bot, event, clean_text: str) -> None:
+    async def handle(self, bot, event, clean_text: str, multimodal_content=None) -> None:
         """
         处理一条已判定需要回复的消息。
-        clean_text: 已去除触发前缀的用户文本
+        clean_text: 已去除触发前缀的用户文本（纯文本，用于存储/日志）
+        multimodal_content: 可选，str 或 OpenAI vision 格式的 list，用于实际发送给 LLM
         """
         is_group = isinstance(event, GroupMessageEvent)
         group_id: Optional[int] = getattr(event, "group_id", None) if is_group else None
@@ -84,11 +85,17 @@ class ReplyEngine:
         user_name = await self._get_user_name(bot, event, user_id, group_id)
         bot_name = await self._get_bot_name(bot)
 
-        # ---------- 消息合并窗口
+        # ---------- 消息合并窗口（仅对纯文本去抖；图片消息跳过合并直接处理）
         session_key = self.context.session_key_for(group_id, user_id)
-        final_text = await self.concurrency.merge_or_process(session_key, clean_text)
-        if final_text is None:
-            return  # 被后来的消息合并掉，不处理
+        if isinstance(multimodal_content, list):
+            # 含图片，不走合并窗口，直接处理
+            final_text = clean_text
+        else:
+            final_text = await self.concurrency.merge_or_process(session_key, clean_text)
+            if final_text is None:
+                return  # 被后来的消息合并掉，不处理
+            # 纯文本情况下，multimodal_content 与 final_text 保持同步
+            multimodal_content = final_text
 
         # ---------- 并发控制
         await self.concurrency.acquire_global()
@@ -112,6 +119,7 @@ class ReplyEngine:
             group_context = ""
             if is_group:
                 group_context = self.context.build_group_context_snippet(group_id, bot_name)
+                #print(group_context)
             user_impression = self.context.get_impression(user_id)
 
             # ---------- 构建 system prompt
@@ -125,8 +133,10 @@ class ReplyEngine:
             )
 
             # ---------- 构建消息列表（对话历史 + 本次）
+            # multimodal_content 为 list 时携带图片，否则退回纯文本
             messages = list(history)
-            messages.append({"role": "user", "content": final_text})
+            user_content = multimodal_content if multimodal_content is not None else clean_text
+            messages.append({"role": "user", "content": user_content})
 
             # ---------- 调用 LLM（工具调用在 llm_client 内部自动处理）
             #logger.info(f"[MaiReply] {messages}")
@@ -157,8 +167,14 @@ class ReplyEngine:
             # ---------- 发送（带打字延迟）
             await self.processor.send_with_delay(bot, event, segments, quote_message_id=msg_id)
 
-            # ---------- 更新历史（存储完整原始回复，不存分割后的）
-            self.context.append_to_session(group_id, user_id, final_text, raw_reply)
+            # ---------- 更新历史
+            # 上下文历史只存纯文本（图片 base64 不落库，避免撑爆存储）
+            # 若本次含图片，在历史里用文本标注"发送了图片"
+            if isinstance(multimodal_content, list):
+                history_user_text = clean_text + " [含图片]" if clean_text else "[图片]"
+            else:
+                history_user_text = clean_text
+            self.context.append_to_session(group_id, user_id, history_user_text, raw_reply)
 
             if is_group:
                 self.context.push_group_window(group_id, bot_name, raw_reply)
@@ -196,15 +212,20 @@ class ReplyEngine:
         try:
             if group_id:
                 info = await bot.get_group_member_info(group_id=group_id, user_id=user_id)
-                name = (info or {}).get("card") or (info or {}).get("nickname", "")
+                name=info["data"]["nickname"]
+                #name = (info or {}).get("card") or (info or {}).get("nickname", "")
             else:
                 info = await bot.get_stranger_info(user_id=user_id)
-                name = (info or {}).get("nickname", "")
+                name = info["data"]["nickname"]
             return name.strip() or str(user_id)
         except Exception:
             return str(user_id)
 
     async def _get_bot_name(self, bot) -> str:
+        from framework_common.framework_util.yamlLoader import YAMLManager
+        globconfig = YAMLManager.get_instance()
+        bot_name=globconfig.common_config.basic_config["bot"]
+        return bot_name
         try:
             info = await bot.get_login_info()
             name = (info or {}).get("nickname", "")
@@ -218,6 +239,7 @@ class ReplyEngine:
     async def _get_group_name(self, bot, group_id: int) -> str:
         try:
             info = await bot.get_group_info(group_id=group_id)
-            return (info or {}).get("group_name", str(group_id))
+            name=info["data"]["group_name"]
+            return name.strip() or str(group_id)
         except Exception:
             return str(group_id)
