@@ -122,7 +122,7 @@ def main(bot: ExtendBot, config: YAMLManager):
             if text.strip():
                 try:
                     user_name = event.sender.nickname
-                    print(clean_text)
+                    #print(clean_text)
                     engine.context.push_group_window(event.group_id, user_name, clean_text)
                 except Exception:
                     pass
