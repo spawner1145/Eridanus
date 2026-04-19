@@ -31,7 +31,7 @@ trigger_llm:   #ai判断是否触发
   enable: true
   api_key: ""
   base_url: "http://apollodorus.xyz:8080/v1"   # 可以去我们的开发群1050663831获取免费apikey。
-  model: "gpt-4o-mini"                # 填入你用于判断的廉价/快速模型
+  model: "grok-4"                # 填入你用于判断的廉价/快速模型
   stream: True
   whitelist_enabled: true  # 是否启用白名单模式，启用后只有在白名单中的群聊才会触发ai回复
   whitelist:
