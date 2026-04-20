@@ -115,7 +115,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                         await download_img(img_url, path)
                         window_text = await _resolve_images(path,event.message_id)
                         #print(window_text)
-                        engine.context.push_group_window(event.group_id, event.sender.nickname, window_text)
+                        engine.context.push_group_window(event.group_id, event.sender.nickname, window_text+f"url：{img_url}")
                         r=engine.context._load_group_window(event.group_id)  # 刷新窗口内容到内存
                         #print(r)
                     asyncio.create_task(img_add_to_window())
