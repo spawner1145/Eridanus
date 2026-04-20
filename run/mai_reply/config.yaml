@@ -59,8 +59,8 @@ context: # 上下文相关配置
   vision_enable_group:
     - 1050663831  # 启用图像上下文的群聊ID列表
   anti_nsfw:
-    enable: true          # 是否开启审核系统，模型默认用trigger_llm的
-    trigger_turns: 3      # 几轮对话触发一次审查
+    enable: false          # 是否开启审核系统，模型默认用trigger_llm的
+    trigger_turns: 5      # 几轮对话触发一次审查
 
 human_like:  # 模拟人类回复特征的配置
   typing_delay_ms_per_char: 30 # 打字延迟模拟（毫秒/字，0=关闭）
