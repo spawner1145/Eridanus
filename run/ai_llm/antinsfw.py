@@ -8,7 +8,6 @@ import os
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
 from developTools.message.message_components import At,Record
 from run.ai_llm.service.heartflow_client import heartflow_request
-from run.mai_reply.service.reply_engine import ReplyEngine
 
 
 async def heartflow_reply(config, prompt, recursion_times=0):
@@ -47,13 +46,11 @@ def main(bot, config):
     counters: Dict[int, int] = {}
 
     # ============ 核心审核函数 ============
-    engine = ReplyEngine(config)
 
     async def run_moderation(user_id: int, user_nickname: str) -> None:
         try:
             from framework_common.database_util.llmDB import get_user_history
-
-            history = engine.context.get_session_history(None, user_id)
+            history = await get_user_history(user_id)
             recent = history[-context_size:] if history else []
 
             lines = []

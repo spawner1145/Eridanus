@@ -20,6 +20,7 @@ from typing import Optional
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
 from framework_common.database_util.User import get_user
 from framework_common.utils.system_logger import get_logger
+from run.mai_reply.service.audit_censor import AuditSystem
 
 from run.mai_reply.service.context_manager import ContextManager
 from run.mai_reply.service.emotion_system import EmotionSystem
@@ -42,6 +43,8 @@ class ReplyEngine:
         self.processor = ReplyProcessor(config, self.context)
         self.impression_updater = ImpressionUpdater(self.llm, self.context)
         self.concurrency = ConcurrencyController(config)
+        # 审核
+        self.audit_system = AuditSystem(self.llm, self.context, config)
 
         # 函数调用工具映射（None = 不启用）
         self._tools = self._load_tools()
@@ -181,6 +184,8 @@ class ReplyEngine:
 
             # ---------- 触发印象更新（异步，不阻塞）
             self.impression_updater.tick(user_id, group_id, user_name, bot_name)
+            # 新增下面这行：---------- 触发安全审核（异步，不阻塞）
+            self.audit_system.tick(user_id, group_id, user_name, bot_name, bot)
 
             # =================================================================
             # 【新增】状态显示：在控制台打印机器人的当前心理状态
