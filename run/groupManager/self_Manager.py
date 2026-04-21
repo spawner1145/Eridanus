@@ -335,8 +335,7 @@ def main(bot:ExtendBot, config):
         else:
             user_info = await get_user(event.user_id)
             if user_info.permission >= config.common_config.basic_config["申请bot好友所需权限"]:
-                if not "低价卖钩子篮子" in str(event.comment) and bot.id==3552663628:
-                    return
+   
                 bot.logger.info_func(f"收到好友请求，{event.user_id}({event.comment}) 同意")
                 await bot.handle_friend_request(event.flag, True, "")
                 await bot.send_friend_message(config.common_config.basic_config["master"]['id'],
