@@ -2,10 +2,12 @@ plugin_description = "ai绘画"
 
 dynamic_imports = {
     "run.ai_generated_art.aiDraw": [
-        "call_text2img", "call_aiArtModerate"]
+        "call_text2img", "call_aiArtModerate"],
+    "run.function_collection": [
+        "image_edit","gptimage2_text2img"
+    ]
 }
 function_declarations=[
-
     {
     "name": "call_aiArtModerate",
     "description": "检测图片是否为ai生成，只有当用户要求检测时才可触发。",
@@ -38,4 +40,40 @@ function_declarations=[
         ]
     }
 },
+    {
+        "name": "image_edit",
+        "description": "根据用户的要求，对图片进行编辑",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "img_url": {
+                    "type": "string",
+                    "description": "需要的图片url"
+                },
+                "prompt": {
+                    "type": "string",
+                    "description": "对图片的要求"
+                }
+            },
+            "required": [
+                "img_url", "prompt"
+            ]
+        }
+    },
+    {
+        "name": "gptimage2_text2img",
+        "description": "更强大的text2img",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "生成图片所需提示词，不再需要是stable diffusion格式"
+                }
+            },
+            "required": [
+                "prompt"
+            ]
+        }
+    }
 ]
