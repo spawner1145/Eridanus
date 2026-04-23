@@ -3,7 +3,7 @@ plugin_description = "ai绘画"
 dynamic_imports = {
     "run.ai_generated_art.aiDraw": [
         "call_text2img", "call_aiArtModerate"],
-    "run.function_collection": [
+    "run.ai_generated_art.function_collection": [
         "image_edit","gptimage2_text2img"
     ]
 }
