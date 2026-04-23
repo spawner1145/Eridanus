@@ -62,7 +62,7 @@ function_declarations=[
     },
     {
         "name": "gptimage2_text2img",
-        "description": "更强大的text2img",
+        "description": "更强大的text2img。一般性绘图要求不要使用此接口，优先调用stable diffusion text2img",
         "parameters": {
             "type": "object",
             "properties": {
