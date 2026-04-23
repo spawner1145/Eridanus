@@ -172,6 +172,7 @@ def main(bot, config):
                     else:
                         # 最新版本ai对话
                         asyncio.create_task(engine.handle(bot, poke_notify_to_group_message(event), text))
+                        return
                 else:
                     reply_list = config.system_plugin.config['api_implements']['nudge']['replylist']
                     nonlocal nudge_list
