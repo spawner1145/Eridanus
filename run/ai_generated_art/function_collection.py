@@ -51,6 +51,7 @@ async def text2img(bot,event,config,prompt,is_about_bot=False):
     permission_need=config.ai_generated_art.config["gptimage2"]["权限要求"]
     if user.permission<permission_need:
         return
+    bot.logger.info(f"用户 {user.id} 请求生成图片，提示词 {prompt} is_about_bot={is_about_bot}")
     bot_name = config.common_config.basic_config["bot"]
     apikey = config.ai_generated_art.config["gptimage2"]["apikey"]
     headers = {"Authorization": f"Bearer {apikey}"}

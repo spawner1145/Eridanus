@@ -3,7 +3,7 @@ from framework_common.framework_util.yamlLoader import YAMLManager
 plugin_description = "ai绘画"
 config=YAMLManager.get_instance()
 ban_sd=config.ai_generated_art.config["gptimage2"]["接管sd"]
-
+bot_name = config.common_config.basic_config["bot"]
 aiDraw_funcs=["call_aiArtModerate"]
 gptimage2_funcs=[
         "image_edit"
@@ -76,11 +76,11 @@ else:
             "properties": {
                 "prompt": {
                     "type": "string",
-                    "description": "生成图片所需提示词，自然语言描述即可。若is_about_bot为true，则无需再输入bot形象提示词tag，用自然语言精准描述绘制要求即可"
+                    "description": f"生成图片所需提示词，自然语言描述即可。如果是要绘制{bot_name}，就不要再输入任何形象提示词tag，用自然语言（句子）精准描述绘制要求即可"
                 },
                 "is_about_bot": {
                     "type": "boolean",
-                    "description": "true为生成关于bot的图片，false为生成与bot无关的图片，如果不确定则默认为false"
+                    "description": f"true为生成关于{bot_name}的图片，false为生成与{bot_name}无关的图片，如果不确定则默认为false"
                 }
             },
             "required": [
