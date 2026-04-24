@@ -72,8 +72,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                     "size": "1024x1024"
                 }
                 user_dict.pop(uid)  # 立即清理用户数据，避免重复提交
-                for _, (_, f, _) in file_objects:
-                    f.close()
+
 
                 max_retry = 5
 
@@ -101,7 +100,8 @@ def main(bot: ExtendBot, config: YAMLManager):
 
 
                 await request_api(0)
-
+                for _, (_, f, _) in file_objects:
+                    f.close()
 
             except Exception as e:
                 traceback.print_exc()
