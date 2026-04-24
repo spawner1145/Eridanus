@@ -26,7 +26,7 @@ function_declarations=[
 },
     {
     "name": "call_text2img",
-    "description": "根据文本生成图片，即画图功能。",
+    "description": "stable diffusion 文本转图像，仅支持英文tag，一般绘图使用",
     "parameters": {
         "type": "object",
         "properties": {
@@ -62,13 +62,13 @@ function_declarations=[
     },
     {
         "name": "gptimage2_text2img",
-        "description": "更强大的text2img。一般性绘图要求不要使用此接口，优先调用stable diffusion text2img",
+        "description": "gptimage2 文本转图像，支持中文输入，如果用户用中文作为提示词要求画图，则调用此接口",
         "parameters": {
             "type": "object",
             "properties": {
                 "prompt": {
                     "type": "string",
-                    "description": "生成图片所需提示词，不再需要是stable diffusion格式"
+                    "description": "生成图片所需提示词，自然语言描述即可。"
                 }
             },
             "required": [
