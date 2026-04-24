@@ -76,7 +76,7 @@ else:
             "properties": {
                 "prompt": {
                     "type": "string",
-                    "description": "生成图片所需提示词，自然语言描述即可。"
+                    "description": "生成图片所需提示词，自然语言描述即可。若is_about_bot为true，则无需再输入bot形象提示词tag，用自然语言精准描述绘制要求即可"
                 },
                 "is_about_bot": {
                     "type": "boolean",
