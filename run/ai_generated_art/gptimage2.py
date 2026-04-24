@@ -72,27 +72,36 @@ def main(bot: ExtendBot, config: YAMLManager):
                     "size": "1024x1024"
                 }
                 user_dict.pop(uid)  # 立即清理用户数据，避免重复提交
-                # 异步请求
-                async with httpx.AsyncClient() as client:
-                    resp = await client.post(
-                        f"{base_url}/images/edits",
-                        headers=headers,
-                        files=file_objects,
-                        data=data,
-                        timeout=None  # 图像生成较慢，设置长一点的超时
-                    )
-
-                # 关闭所有文件
                 for _, (_, f, _) in file_objects:
                     f.close()
 
-                if resp.status_code == 200:
-                    res_json = resp.json()
-                    img_url = res_json["data"][0]["url"]
-                    # 发送结果图片
-                    await bot.send(event, [Image(file=img_url)])
-                else:
-                    await bot.send(event, f"请求失败 ({resp.status_code}): {resp.text}")
+                max_retry = 5
+
+                async def request_api(retries=0):
+
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.post(
+                            f"{base_url}/images/edits",
+                            headers=headers,
+                            files=file_objects,
+                            data=data,
+                            timeout=None  # 图像生成较慢，设置长一点的超时
+                        )
+                    if resp.status_code == 200:
+                        res_json = resp.json()
+                        img_url = res_json["data"][0]["url"]
+                        # 发送结果图片
+                        await bot.send(event, [Image(file=img_url)])
+                    else:
+                        retries+=1
+                        await request_api(retries)
+                        bot.logger.error(f"请求失败 ({resp.status_code}): {resp.text} 重试")
+                        if retries >= max_retry:
+                            await bot.send(event, f"请求失败 ({resp.status_code}): {resp.text}")
+
+
+                await request_api(0)
+
 
             except Exception as e:
                 traceback.print_exc()
