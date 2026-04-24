@@ -65,5 +65,5 @@ async def gptimage2_text2img(bot,event,config,prompt):
     async with httpx.AsyncClient( timeout=None,headers=headers) as client:
         response = await client.post(base_url, json=payload)
         resp=response.json()
-        img_url = resp.json()["data"][0]["url"]
+        img_url = resp["data"][0]["url"]
         await bot.send(event,Image(file=img_url))
