@@ -76,4 +76,4 @@ async def gptimage2_text2img(bot,event,config,prompt):
         response = await client.post(base_url, json=payload)
         resp=response.json()
         img_url = resp["data"][0]["url"]
-        await bot.send(event,Image(file=img_url))
+        await bot.send(event,Image(file=img_url),True)

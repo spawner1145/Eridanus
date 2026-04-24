@@ -90,7 +90,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                         res_json = resp.json()
                         img_url = res_json["data"][0]["url"]
                         # 发送结果图片
-                        await bot.send(event, [Image(file=img_url)])
+                        await bot.send(event, [Image(file=img_url)],True)
                     else:
                         retries+=1
                         if retries >= max_retry:
