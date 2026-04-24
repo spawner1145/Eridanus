@@ -2,7 +2,7 @@ import httpx
 import os
 import asyncio
 from developTools.event.events import GroupMessageEvent
-from developTools.message.message_components import Image
+from developTools.message.message_components import Image, Text, Mface
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.utils import get_img, download_img
@@ -106,10 +106,10 @@ def main(bot: ExtendBot, config: YAMLManager):
         elif uid in user_dict:
             found_any = False
             for mes in event.message_chain:
-                if mes.type == "text" and mes.text.strip():
+                if isinstance(mes,Text):
                     user_dict[uid]["text"].append(mes.text.strip())
                     found_any = True
-                elif mes.type in ["image", "mface"]:
+                elif isinstance(mes, Image) or isinstance(mes, Mface):
                     url = mes.url if hasattr(mes, 'url') and mes.url else mes.file
                     if url:
                         path = await download_img(url)
@@ -118,5 +118,5 @@ def main(bot: ExtendBot, config: YAMLManager):
 
             if found_any:
                 # 可以选择不回复，或者小声提示
-                # await bot.send(event, "已添加")
+                await bot.send(event, "已添加")
                 pass
