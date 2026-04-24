@@ -68,24 +68,40 @@ if not ban_sd:
 })
 else:
     gptimage2_funcs.append("text2img")
-    decrearations.append(    {
+    decrearations.append({
         "name": "text2img",
-        "description": "gptimage2 文本转图像，支持中文输入",
+        "description": (
+            f"使用 gptimage2 文生图，支持中文，理解自然语言描述。"
+            f"注意：本接口与 stable diffusion 完全不同，"
+            f"禁止使用 tag 堆砌或英文权重语法（如 (cat:1.2) 这类写法），"
+            f"必须用完整的中文句子描述画面内容。"
+            f"如果是关于{bot_name}的图，将 is_about_bot 设为 true，"
+            f"prompt 中不要加任何外貌描述，只描述场景、动作、表情等要求即可。"
+        ),
         "parameters": {
             "type": "object",
             "properties": {
                 "prompt": {
                     "type": "string",
-                    "description": f"生成图片所需提示词，自然语言描述即可。如果是要绘制{bot_name}，就不要再输入任何形象提示词tag，用自然语言（句子）精准描述绘制要求即可"
+                    "description": (
+                        f"用自然语言（完整句子）描述绘图要求，支持中文。"
+                        f"禁止使用逗号分隔的 tag 列表，禁止使用 (词:权重) 语法。"
+                        f"正确示例：'在樱花树下弹钢琴，傍晚暖光，温柔微笑'。"
+                        f"错误示例：'1girl, sakura, (smile:1.2), piano, warm light'。"
+                        f"如果 is_about_bot 为 true，不要在 prompt 里描述{bot_name}的外貌，"
+                        f"只描述她在做什么、在哪里、什么氛围即可。"
+                    )
                 },
                 "is_about_bot": {
                     "type": "boolean",
-                    "description": f"true为生成关于{bot_name}的图片，false为生成与{bot_name}无关的图片，如果不确定则默认为false"
+                    "description": (
+                        f"是否是关于{bot_name}的图。"
+                        f"用户明确提到{bot_name}或用'她''你'指代{bot_name}时为 true，"
+                        f"其他情况默认 false。"
+                    )
                 }
             },
-            "required": [
-                "prompt"
-            ]
+            "required": ["prompt"]
         }
     })
 dynamic_imports = {
