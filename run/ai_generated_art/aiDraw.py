@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Image, Node, Text
+from run.ai_generated_art.function_collection import gptimage2_text2img
 
 from run.ai_generated_art.service.modelscope_text2img import modelscope_drawer
 from run.ai_generated_art.service.hf_t2i import hf_drawer
@@ -55,6 +56,7 @@ async def call_text2img(bot, event, config, prompt):
                 nai4(bot, event, config, tag),
                 call_text2img3(bot, event, config, tag),
                 call_text2img4(bot, event, config, tag),
+                gptimage2_text2img(bot,event,config,tag)
                 # nai3(bot, event, config, tag),
             ]
         ]
