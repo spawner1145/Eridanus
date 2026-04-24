@@ -605,6 +605,8 @@ async def SdDraw0(prompt, path, config, groupid, args):
         "Accept": "application/json",
         "Authorization": auth_header
     }
+    #print(payload)
+    #print(headers)
     async with httpx.AsyncClient(timeout=None) as client:
         response = await client.post(url=f'{url}/sdapi/v1/txt2img', json=payload, headers=headers)
     r = response.json()

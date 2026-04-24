@@ -56,7 +56,7 @@ async def call_text2img(bot, event, config, prompt):
                 nai4(bot, event, config, tag),
                 call_text2img3(bot, event, config, tag),
                 call_text2img4(bot, event, config, tag),
-                gptimage2_text2img(bot,event,config,tag)
+                #gptimage2_text2img(bot,event,config,tag)
                 # nai3(bot, event, config, tag),
             ]
         ]
