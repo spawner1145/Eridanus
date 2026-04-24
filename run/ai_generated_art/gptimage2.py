@@ -95,6 +95,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                         retries+=1
                         if retries >= max_retry:
                             await bot.send(event, f"请求失败 ({resp.status_code}): {resp.text}")
+                            return
                         await request_api(retries)
                         bot.logger.error(f"请求失败 ({resp.status_code}): {resp.text} 重试")
 
