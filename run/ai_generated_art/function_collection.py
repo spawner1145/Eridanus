@@ -1,5 +1,6 @@
 import base64
 import os
+import re
 
 import httpx
 
@@ -51,14 +52,30 @@ async def gptimage2_text2img(bot,event,config,prompt):
     if user.permission<permission_need:
         return
 
-
     def clean_prompt(prompt):
-        pa=' (round face:1.2), (Rella:1.2), (chen bin:1.3), virtual youtuber, (starshadowmagician:1.2), lineart, (hand-drawn:1.3), (sketch:1.2), Picasso style, <lora:curearcanashadow_v1.0_IL:0.5>,'
+        remove_list = [
+            "round face:1.2",
+            "Rella:1.2",
+            "chen bin:1.3",
+            "virtual youtuber",
+            "starshadowmagician:1.2",
+            "lineart",
+            "hand-drawn:1.3",
+            "sketch:1.2",
+            "Picasso style",
+            "<lora:curearcanashadow_v1.0_IL:0.5>"
+        ]
 
-        list_prompt = pa.split(",")
-        for p in list_prompt:
-            prompt=prompt.replace(p.strip(),"")
-        prompt+="/n以上为stable diffusion的提示词，请基于这些提示词进行创作，如提示词未特别说明，则一般采用二次元/日漫风格"
+        for p in remove_list:
+            # 匹配带括号 / 不带括号 / 前后空格 / 可选逗号
+            pattern = r"\s*\(?" + re.escape(p) + r"\)?\s*,?"
+            prompt = re.sub(pattern, "", prompt)
+
+        # 清理多余逗号和空格
+        prompt = re.sub(r",\s*,+", ",", prompt)
+        prompt = prompt.strip(", ").strip()
+
+        prompt += "\n以上为stable diffusion的提示词，请基于这些提示词进行创作，如提示词未特别说明，则一般采用二次元/日漫风格"
         return prompt
     prompt=clean_prompt(prompt)
     apikey=config.ai_generated_art.config["gptimage2"]["apikey"]
