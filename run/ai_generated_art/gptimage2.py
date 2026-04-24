@@ -93,10 +93,11 @@ def main(bot: ExtendBot, config: YAMLManager):
                         await bot.send(event, [Image(file=img_url)])
                     else:
                         retries+=1
-                        await request_api(retries)
-                        bot.logger.error(f"请求失败 ({resp.status_code}): {resp.text} 重试")
                         if retries >= max_retry:
                             await bot.send(event, f"请求失败 ({resp.status_code}): {resp.text}")
+                        await request_api(retries)
+                        bot.logger.error(f"请求失败 ({resp.status_code}): {resp.text} 重试")
+
 
 
                 await request_api(0)
