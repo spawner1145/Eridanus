@@ -87,7 +87,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                     res_json = resp.json()
                     img_url = res_json["data"][0]["url"]
                     # 发送结果图片
-                    await bot.send(event, [Image(url=img_url)])
+                    await bot.send(event, [Image(file=img_url)])
                 else:
                     await bot.send(event, f"请求失败 ({resp.status_code}): {resp.text}")
 
