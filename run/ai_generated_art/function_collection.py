@@ -69,7 +69,7 @@ async def text2img(bot,event,config,prompt,is_about_bot=False):
                     ("images", (os.path.basename(bot_oc), f1, "image/png")),
                 ],
                 data={
-                    "prompt": f"给定图像是{bot_name}的基本形像设定，仅用于参考基本形像。接下来你需要根据‘{prompt}’绘制{bot_name}，场景、具体服饰、表情等要素如前文未明确指定，均可自由发挥。这是额外要求{extra_prompt}",
+                    "prompt": f"给定图像是{bot_name}的基本形像设定，仅用于参考基本形像。接下来你需要根据‘{prompt}’绘制{bot_name}，场景、具体服饰、表情等要素如前文未明确指定，均可自由发挥。这是额外要求{extra_prompt}。注意，角色特征全部在我给你的图片中，不要丢失角色形象锚点。",
                     "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"]},
                 timeout=None,
                 headers=headers,
