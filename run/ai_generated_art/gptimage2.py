@@ -81,15 +81,27 @@ def main(bot: ExtendBot, config: YAMLManager):
                 max_retry = 5
 
                 async def request_api(retries=0):
+                    if file_objects:
+                        async with httpx.AsyncClient() as client:
+                            resp = await client.post(
+                                f"{base_url}/images/edits",
+                                headers=headers,
+                                files=file_objects,
+                                data=data,
+                                timeout=None  # 图像生成较慢，设置长一点的超时
+                            )
+                    else:
+                        url1 = "http://apollodorus.xyz:8009/v1/images/generations"
+                        payload = {
+                            "prompt": full_prompt,
+                            "size": "1024x1024",  # 映射为 16:9
+                            "response_format": "url",  # 或 "b64_json"
+                            "n": 1,
+                        }
 
-                    async with httpx.AsyncClient() as client:
-                        resp = await client.post(
-                            f"{base_url}/images/edits",
-                            headers=headers,
-                            files=file_objects,
-                            data=data,
-                            timeout=None  # 图像生成较慢，设置长一点的超时
-                        )
+                        async with httpx.AsyncClient(timeout=None, headers=headers) as client:
+                            resp = await client.post(url1, json=payload)
+
                     if resp.status_code == 200:
                         res_json = resp.json()
                         img_url = res_json["data"][0]["url"]
