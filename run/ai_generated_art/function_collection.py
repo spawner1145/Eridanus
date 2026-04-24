@@ -7,6 +7,7 @@ import httpx
 from developTools.message.message_components import Image
 from framework_common.database_util.User import get_user
 from framework_common.utils.utils import download_img
+from run.auto_reply.main import bot_name
 
 
 async def image_edit(bot,event,config,prompt,image_url):
@@ -62,6 +63,17 @@ async def text2img(bot,event,config,prompt,is_about_bot=False):
         base_url = "http://api.apollodorus.xyz/v1"
         bot_oc=config.ai_generated_art.config["gptimage2"]["bot_oc"]
         extra_prompt=config.ai_generated_art.config["gptimage2"]["extra_prompt"]
+        character_anchor=bot_name+config.ai_generated_art.config["gptimage2"]["character_anchor"]
+        prompt_text = (
+            f"【角色参考】附图为{bot_name}的官方设定图，包含三视图、表情差分和服饰细节，"
+            f"请以此图为唯一外貌依据。\n"
+            f"【角色特征锚点】{character_anchor}\n"
+            f"【绘制任务】根据以下描述绘制{bot_name}：{prompt}。\n"
+            f"场景、构图、表情如未明确指定可自由发挥，但角色外貌必须与参考图一致，"
+            f"不得改变发色、瞳色、服装样式等核心特征。\n"
+            f"【画风一致性】必须和设定图画风保持一致"
+            f"【额外要求】{extra_prompt}"
+        )
         with open(bot_oc, "rb") as f1:
             resp = httpx.post(
                 f"{base_url}/images/edits",
@@ -69,7 +81,7 @@ async def text2img(bot,event,config,prompt,is_about_bot=False):
                     ("images", (os.path.basename(bot_oc), f1, "image/png")),
                 ],
                 data={
-                    "prompt": f"给定图像是{bot_name}的基本形像设定，仅用于参考基本形像。接下来你需要根据‘{prompt}’绘制{bot_name}，场景、具体服饰、表情等要素如前文未明确指定，均可自由发挥。这是额外要求{extra_prompt}。注意，角色特征全部在我给你的图片中，不要丢失角色形象锚点。",
+                    "prompt": prompt_text,
                     "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"]},
                 timeout=None,
                 headers=headers,
