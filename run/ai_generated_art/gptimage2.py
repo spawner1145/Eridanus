@@ -78,7 +78,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                         headers=headers,
                         files=file_objects,
                         data=data,
-                        timeout=120.0  # 图像生成较慢，设置长一点的超时
+                        timeout=None  # 图像生成较慢，设置长一点的超时
                     )
 
                 # 关闭所有文件
