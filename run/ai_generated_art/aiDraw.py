@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Image, Node, Text
-from run.ai_generated_art.function_collection import gptimage2_text2img
+
 
 from run.ai_generated_art.service.modelscope_text2img import modelscope_drawer
 from run.ai_generated_art.service.hf_t2i import hf_drawer
