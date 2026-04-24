@@ -64,7 +64,8 @@ async def gptimage2_text2img(bot,event,config,prompt):
             "sketch:1.2",
             "Picasso style",
             "<lora:curearcanashadow_v1.0_IL:0.5>",
-            "Van Gogh's almond blossoms"
+            "Van Gogh's almond blossoms",
+            "Van Gogh’s almond blossoms",
         ]
 
         for p in remove_list:
