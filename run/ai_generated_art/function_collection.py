@@ -29,7 +29,7 @@ async def image_edit(bot,event,config,prompt,image_url):
 
     data = {
         "prompt": prompt,
-        "size": "1024x1024"
+        "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"]
     }
     async with httpx.AsyncClient() as client:
         resp = await client.post(
@@ -46,53 +46,75 @@ async def image_edit(bot,event,config,prompt,image_url):
             await bot.send(event, [Image(file=img_url)])
         else:
             await bot.send(event, f"请求失败 ({resp.status_code}): {resp.text}")
-async def gptimage2_text2img(bot,event,config,prompt):
+async def text2img(bot,event,config,prompt,is_about_bot=False):
     user=await get_user(event.user_id)
     permission_need=config.ai_generated_art.config["gptimage2"]["权限要求"]
     if user.permission<permission_need:
         return
-
-    def clean_prompt(prompt):
-        remove_list = [
-            "round face:1.2",
-            "Rella:1.2",
-            "chen bin:1.3",
-            "virtual youtuber",
-            "starshadowmagician:1.2",
-            "lineart",
-            "hand-drawn:1.3",
-            "sketch:1.2",
-            "Picasso style",
-            "<lora:curearcanashadow_v1.0_IL:0.5>",
-            "Van Gogh's almond blossoms",
-            "Van Gogh’s almond blossoms",
-        ]
-
-        for p in remove_list:
-            # 匹配带括号 / 不带括号 / 前后空格 / 可选逗号
-            pattern = r"\s*\(?" + re.escape(p) + r"\)?\s*,?"
-            prompt = re.sub(pattern, "", prompt)
-
-        # 清理多余逗号和空格
-        prompt = re.sub(r",\s*,+", ",", prompt)
-        prompt = prompt.strip(", ").strip()
-
-        prompt += "\n以上为stable diffusion的提示词，请基于这些提示词进行创作，如提示词未特别说明，则一般采用二次元/日漫风格"
-        return prompt
-    prompt=clean_prompt(prompt)
-    apikey=config.ai_generated_art.config["gptimage2"]["apikey"]
+    bot_name = config.common_config.basic_config["bot"]
+    apikey = config.ai_generated_art.config["gptimage2"]["apikey"]
     headers = {"Authorization": f"Bearer {apikey}"}
+    if is_about_bot:
+        """
+        实际上这里就要用图像编辑的逻辑了
+        """
+        base_url = "http://apollodorus.xyz:8009/v1"
+        bot_oc=config.ai_generated_art.config["gptimage2"]["bot_oc"]
+        with open(bot_oc, "rb") as f1:
+            resp = httpx.post(
+                f"{base_url}/images/edits",
+                files=[
+                    ("images", (os.path.basename(bot_oc), f1, "image/png")),
+                ],
+                data={
+                    "prompt": f"给定图像是{bot_name}的基本形像设定，仅用于参考基本形像。接下来你需要根据‘{prompt}’绘制{bot_name}，场景、具体服饰、表情等要素如前文未明确指定，均可自由发挥。",
+                    "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"]},
+                timeout=None,
+                headers=headers,
+            )
+            await bot.send(event,Image(file=resp.json()["data"][0]["url"]))
 
-    base_url="http://apollodorus.xyz:8009/v1/images/generations"
-    payload = {
-            "prompt": prompt,
-            "size": "1024x1024",  # 映射为 16:9
-            "response_format": "url",  # 或 "b64_json"
-            "n": 1,
-        }
+    else:
+        def clean_prompt(prompt):
+            remove_list = [
+                "round face:1.2",
+                "Rella:1.2",
+                "chen bin:1.3",
+                "virtual youtuber",
+                "starshadowmagician:1.2",
+                "lineart",
+                "hand-drawn:1.3",
+                "sketch:1.2",
+                "Picasso style",
+                "<lora:curearcanashadow_v1.0_IL:0.5>",
+                "Van Gogh's almond blossoms",
+                "Van Gogh’s almond blossoms",
+            ]
 
-    async with httpx.AsyncClient( timeout=None,headers=headers) as client:
-        response = await client.post(base_url, json=payload)
-        resp=response.json()
-        img_url = resp["data"][0]["url"]
-        await bot.send(event,Image(file=img_url),True)
+            for p in remove_list:
+                # 匹配带括号 / 不带括号 / 前后空格 / 可选逗号
+                pattern = r"\s*\(?" + re.escape(p) + r"\)?\s*,?"
+                prompt = re.sub(pattern, "", prompt)
+
+            # 清理多余逗号和空格
+            prompt = re.sub(r",\s*,+", ",", prompt)
+            prompt = prompt.strip(", ").strip()
+
+            prompt += "\n以上为stable diffusion的提示词，请基于这些提示词进行创作，如提示词未特别说明，则一般采用二次元/日漫风格"
+            return prompt
+        prompt=clean_prompt(prompt)
+
+
+        base_url="http://apollodorus.xyz:8009/v1/images/generations"
+        payload = {
+                "prompt": prompt,
+                "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
+                "response_format": "url",  # 或 "b64_json"
+                "n": 1,
+            }
+
+        async with httpx.AsyncClient( timeout=None,headers=headers) as client:
+            response = await client.post(base_url, json=payload)
+            resp=response.json()
+            img_url = resp["data"][0]["url"]
+            await bot.send(event,Image(file=img_url),True)
