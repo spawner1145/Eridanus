@@ -15,7 +15,7 @@ async def image_edit(bot,event,config,prompt,image_url):
     if user.permission<permission_need:
         return
     image_path=await download_img(image_url)
-    aim_url="http://apollodorus.xyz:8080/v1/images/edits"
+    aim_url="http://api.apollodorus.xyz/v1/images/edits"
 
     file_objects = []
     f = open(image_path, "rb")
@@ -58,7 +58,7 @@ async def text2img(bot,event,config,prompt,is_about_bot=False):
         """
         实际上这里就要用图像编辑的逻辑了
         """
-        base_url = "http://apollodorus.xyz:8009/v1"
+        base_url = "http://api.apollodorus.xyz/v1"
         bot_oc=config.ai_generated_art.config["gptimage2"]["bot_oc"]
         extra_prompt=config.ai_generated_art.config["gptimage2"]["extra_prompt"]
         with open(bot_oc, "rb") as f1:
@@ -106,7 +106,7 @@ async def text2img(bot,event,config,prompt,is_about_bot=False):
         prompt=clean_prompt(prompt)
 
 
-        base_url="http://apollodorus.xyz:8009/v1/images/generations"
+        base_url="http://api.apollodorus.xyz/v1/images/generations"
         payload = {
                 "prompt": prompt,
                 "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
