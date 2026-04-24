@@ -1,3 +1,5 @@
+import traceback
+
 import httpx
 import os
 import asyncio
@@ -68,7 +70,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                     "prompt": full_prompt,
                     "size": "1024x1024"
                 }
-
+                user_dict.pop(uid)  # 立即清理用户数据，避免重复提交
                 # 异步请求
                 async with httpx.AsyncClient() as client:
                     resp = await client.post(
@@ -92,6 +94,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                     await bot.send(event, f"请求失败 ({resp.status_code}): {resp.text}")
 
             except Exception as e:
+                traceback.print_exc()
                 await bot.send(event, f"发生错误: {str(e)}")
             finally:
                 # 无论成功失败，清理该用户的临时数据和本地文件
