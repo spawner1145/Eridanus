@@ -65,12 +65,12 @@ async def text2img(bot,event,config,prompt,is_about_bot=False):
         extra_prompt=config.ai_generated_art.config["gptimage2"]["extra_prompt"]
         character_anchor=bot_name+config.ai_generated_art.config["gptimage2"]["character_anchor"]
         prompt_text = (
-            f"【角色参考】附图为{bot_name}的官方设定图，包含三视图、表情差分和服饰细节，"
+            f"【角色参考】附图为{bot_name}的基本形像设定图"
             f"请以此图为唯一外貌依据。\n"
             f"【角色特征锚点】{character_anchor}\n"
             f"【绘制任务】根据以下描述绘制{bot_name}：{prompt}。\n"
-            f"场景、构图、表情如未明确指定可自由发挥，但角色外貌必须与参考图一致，"
-            f"不得改变发色、瞳色、服装样式等核心特征。\n"
+            f"场景、构图、表情、姿势如未明确指定可自由发挥，但角色外貌必须与参考图一致，"
+            f"不得改变发色、瞳色、脸型等核心特征。\n"
             f"【画风一致性】必须和设定图画风保持一致"
             f"【额外要求】{extra_prompt}"
         )
