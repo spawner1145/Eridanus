@@ -60,6 +60,7 @@ async def extract_message_content(event, bot) -> tuple:
                     "type": "image_url",
                     "image_url": {"url": f"data:image/png;base64,{b64}"}
                 })
+                text_parts.append(f"图片url为{url}")
             except Exception as e:
                 # 图片获取失败时降级为文本说明
                 text_parts.append("[图片获取失败]")
