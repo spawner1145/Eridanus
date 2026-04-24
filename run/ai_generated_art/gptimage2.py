@@ -27,6 +27,7 @@ def main(bot: ExtendBot, config: YAMLManager):
         if event.pure_text.startswith("/gpt"):
             prompt = event.pure_text.replace("/gpt", "", 1).strip()
             # 假设 gptimage2_text2img 是异步的
+            await bot.send(event, "正在生成图片，请稍候...")
             await gptimage2_text2img(bot, event, config, prompt)
             return
 
