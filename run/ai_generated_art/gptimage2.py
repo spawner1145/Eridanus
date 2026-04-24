@@ -8,7 +8,7 @@ from developTools.message.message_components import Image, Text, Mface
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.utils import get_img, download_img
-from run.ai_generated_art.function_collection import gptimage2_text2img
+from run.ai_generated_art.function_collection import text2img
 
 
 # 假设这个函数已经在别处定义好
@@ -17,6 +17,7 @@ from run.ai_generated_art.function_collection import gptimage2_text2img
 def main(bot: ExtendBot, config: YAMLManager):
     # 存储格式: {user_id: {"image": [path1, path2], "text": [prompt1, prompt2]}}
     user_dict = {}
+    bot_name=config.common_config.basic_config["bot"]
 
     @bot.on(GroupMessageEvent)
     async def handle_group_message(event: GroupMessageEvent):
@@ -28,12 +29,13 @@ def main(bot: ExtendBot, config: YAMLManager):
             prompt = event.pure_text.replace("/gpt", "", 1).strip()
             # 假设 gptimage2_text2img 是异步的
             await bot.send(event, "正在生成图片，请稍候...")
-            await gptimage2_text2img(bot, event, config, prompt)
+
+            await text2img(bot, event, config, prompt,True if bot_name in prompt else False)
             return
         elif event.pure_text.startswith("/生图"):
             prompt= event.pure_text.replace("/生图","",1).strip()
             await bot.send(event, "正在生成图片，请稍候...")
-            await gptimage2_text2img(bot, event, config, prompt)
+            await text2img(bot, event, config, prompt,True if bot_name in prompt else False)
             return
         # 2. 进入编辑模式
         if event.pure_text == "/图像编辑":
