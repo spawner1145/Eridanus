@@ -36,16 +36,20 @@ async def gptimage2_text2img(bot,event,config,prompt):
     permission_need=config.ai_generated_art.config["gptimage2"]["权限要求"]
     if user.permission<permission_need:
         return
-    aim_url = "http://apollodorus.xyz:8080/v1/images/generations"
-    payload={
-        "prompt": prompt,
-        "aspect_ratio": "1:1",
-        "quality": "medium"
-    }
+
     apikey=config.ai_generated_art.config["gptimage2"]["apikey"]
     headers = {"Authorization": f"Bearer {apikey}"}
+
+    base_url="http://apollodorus.xyz:8009/v1/images/generations"
+    payload = {
+            "prompt": prompt,
+            "size": "1024x1024",  # 映射为 16:9
+            "response_format": "url",  # 或 "b64_json"
+            "n": 1,
+        }
+
     async with httpx.AsyncClient( timeout=None,headers=headers) as client:
-        response = await client.post(aim_url, data=payload)
-        data=response.json()
-        img_url = data["data"][0]["url"]
+        response = await client.post(base_url, data=payload)
+        resp=response.json()
+        img_url = resp.json()["data"][0]["url"]
         await bot.send(event,Image(file=img_url))
