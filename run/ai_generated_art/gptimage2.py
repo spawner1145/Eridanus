@@ -75,7 +75,8 @@ def main(bot: ExtendBot, config: YAMLManager):
                 headers = {"Authorization": f"Bearer {apikey}"}
                 data = {
                     "prompt": full_prompt,
-                    "size": "1024x1024"
+                    "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
+                    "model": config.ai_generated_art.config["gptimage2"]["model"],
                 }
                 user_dict.pop(uid)  # 立即清理用户数据，避免重复提交
 
@@ -96,7 +97,8 @@ def main(bot: ExtendBot, config: YAMLManager):
                         url1 = "http://api.apollodorus.xyz/v1/images/generations"
                         payload = {
                             "prompt": full_prompt,
-                            "size": "1024x1024",  # 映射为 16:9
+                            "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
+                            "model": config.ai_generated_art.config["gptimage2"]["model"],
                             "response_format": "url",  # 或 "b64_json"
                             "n": 1,
                         }

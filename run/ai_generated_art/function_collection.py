@@ -30,7 +30,8 @@ async def image_edit(bot,event,config,prompt,image_url):
 
     data = {
         "prompt": prompt,
-        "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"]
+        "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
+        "model": config.ai_generated_art.config["gptimage2"]["model"],
     }
     async with httpx.AsyncClient() as client:
         resp = await client.post(
@@ -82,7 +83,9 @@ async def text2img(bot,event,config,prompt,is_about_bot=False):
                 ],
                 data={
                     "prompt": prompt_text,
-                    "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"]},
+                    "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
+                    "model": config.ai_generated_art.config["gptimage2"]["model"],
+                },
                 timeout=None,
                 headers=headers,
             )
@@ -123,6 +126,7 @@ async def text2img(bot,event,config,prompt,is_about_bot=False):
         payload = {
                 "prompt": prompt,
                 "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
+                "model": config.ai_generated_art.config["gptimage2"]["model"],
                 "response_format": "url",  # 或 "b64_json"
                 "n": 1,
             }
