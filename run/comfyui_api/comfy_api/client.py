@@ -11,11 +11,13 @@ from .workflow import ComfyWorkflow
 _SENTINEL = object()
 
 class ComfyUIClient:
-    def __init__(self, base_url: str, proxy: Optional[str] = None):
+    def __init__(self, base_url: str, proxy: Optional[str] = None, token: Optional[str] = None):
+        self.token = token
         if "@" in base_url:
-            token, real_base_url = base_url.split("@", 1)
+            token_from_url, real_base_url = base_url.split("@", 1)
             self.base_url = real_base_url.rstrip('/')
-            self._headers = {"Authorization": f"Bearer {token}"}
+            self.token = self.token or token_from_url
+            self._headers = {}
         else:
             self.base_url = base_url.rstrip('/')
             self._headers = {}
@@ -23,7 +25,10 @@ class ComfyUIClient:
         self.client_id = str(uuid.uuid4())
         ws_protocol = "ws" if self.base_url.startswith("http:") else "wss"
         host = self.base_url.split("://")[1]
-        self.ws_address = f"{ws_protocol}://{host}/ws?clientId={self.client_id}"
+        ws_params = f"clientId={self.client_id}"
+        if self.token:
+            ws_params += f"&token={self.token}"
+        self.ws_address = f"{ws_protocol}://{host}/ws?{ws_params}"
         
         proxies = {"http://": proxy, "https://": proxy} if proxy else None
         
@@ -37,7 +42,13 @@ class ComfyUIClient:
     async def __aenter__(self): return self
     async def __aexit__(self, exc_type, exc_val, exc_tb): await self.close()
     async def close(self): await self._client.aclose()
-    def _get_http_url(self, endpoint: str) -> str: return f"{self.base_url}{endpoint}"
+    
+    def _get_http_url(self, endpoint: str) -> str:
+        base = f"{self.base_url}{endpoint}"
+        if self.token:
+            separator = "&" if "?" in base else "?"
+            base = f"{base}{separator}token={self.token}"
+        return base
     
     def _get_data_by_selector(self, data: Any, selector: str) -> Any:
         parts = re.split(r'\.|\[(\d+)\]', selector)
@@ -150,7 +161,12 @@ class ComfyUIClient:
         attempts = 0
         while attempts < DOWNLOAD_RETRY_ATTEMPTS:
             try:
-                async with websockets.connect(self.ws_address, ping_interval=WS_PING_INTERVAL, ping_timeout=WS_PING_TIMEOUT, open_timeout=WS_OPEN_TIMEOUT) as ws:
+                async with websockets.connect(
+                    self.ws_address, 
+                    ping_interval=WS_PING_INTERVAL, 
+                    ping_timeout=WS_PING_TIMEOUT, 
+                    open_timeout=WS_OPEN_TIMEOUT
+                ) as ws:
                     print("✅ WebSocket 连接成功建立。")
                     attempts = 0
 
