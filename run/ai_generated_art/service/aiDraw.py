@@ -18,6 +18,8 @@ from run.ai_generated_art.service.wildcard import replace_wildcards
 from .setu_moderate import pic_audit_standalone
 
 same_manager = YAMLManager.get_instance()
+apikey=same_manager.ai_generated_art.config["ai绘画"]["apikey"]
+
 #print(same_manager.ai_generated_art.config,type(same_manager.ai_generated_art.config))
 aiDrawController = same_manager.ai_generated_art.config.get("ai绘画")
 ckpt = aiDrawController.get("sd默认启动模型") if aiDrawController else None
@@ -155,7 +157,10 @@ def parse_custom_url_auth(input_string: str):
         credentials_bytes = credentials_string.encode('utf-8')
         encoded_credentials_bytes = base64.b64encode(credentials_bytes)
         encoded_credentials_string = encoded_credentials_bytes.decode('utf-8')
-        auth_header = f"Basic {encoded_credentials_string}"
+        if apikey:
+            auth_header = f"Bearer {apikey}"
+        else:
+            auth_header = f"Basic {encoded_credentials_string}"
 
     return clean_url, auth_header
 
@@ -605,6 +610,8 @@ async def SdDraw0(prompt, path, config, groupid, args):
         "Accept": "application/json",
         "Authorization": auth_header
     }
+    #print(payload)
+    #print(headers)
     async with httpx.AsyncClient(timeout=None) as client:
         response = await client.post(url=f'{url}/sdapi/v1/txt2img', json=payload, headers=headers)
     r = response.json()

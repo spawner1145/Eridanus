@@ -376,10 +376,20 @@ class PluginManager:
         # 启动文件监控
         self.start_file_watcher()
 
+        # 注册 YAML 配置变更回调，当插件配置文件被修改时触发插件重载
+        self.config.register_reload_callback(self._on_yaml_changed)
+
         # 输出加载统计
         self._log_load_statistics()
         # 启动定期内存监控
         await self.start_memory_monitoring()
+
+    def _on_yaml_changed(self, plugin_name: str):
+        """YAML 配置文件变更时触发对应插件的重载"""
+        if plugin_name in self.loaded_plugins:
+            self.logger.info(f"检测到插件 {plugin_name} 的配置文件变更，触发插件重载...")
+            self._schedule_reload(plugin_name)
+
     async def stop(self):
         """停止插件管理器"""
         self.logger.info("停止插件管理器...")
@@ -1376,30 +1386,6 @@ async def main():
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-
-    # 假设你已经有了 bot 和 config 实例
-    # bot = ExtendBot()
-    # config = YAMLManager()
-
-    # 创建应用程序实例
-    # app = BotApplication(bot, config)
-
-    # 启动应用程序
-    # await app.start()
-
-    # 运行应用程序（这会持续运行直到收到停止信号）
-    # try:
-    #     await app.run()
-    # finally:
-    #     await app.stop()
-
-    # 或者，如果你只想使用插件管理器：
-    # plugin_manager = PluginManager(bot, config)
-    # await plugin_manager.start()
-
-    # 保持程序运行（在实际使用中，bot的事件循环会保持程序运行）
-    # while True:
-    #     await asyncio.sleep(1)
 
     pass
 

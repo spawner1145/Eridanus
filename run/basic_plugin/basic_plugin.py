@@ -125,10 +125,10 @@ async def call_tarot(bot, event, config):
         if text == "": text = "no description"
         await bot.send(event, [Text(f"{text}"), Image(file=card_path)])
         return {"text": "开出彩蛋牌，来源：jojo的奇妙冒险", "img": card_path}
-    txt, img = tarotChoice(config.basic_plugin.config["tarot"]["mode"])
-    await bot.send(event, Image(file=(await manshuo_draw([{'type': 'basic_set', 'img_width': 750},
-                                                          {'type': 'img', 'subtype': 'common_with_des_right',
-                                                           'img': [img], 'content': [txt]}]))))
+    txt, img, tarots = tarotChoice('bilibili')
+    await bot.send(event, Image(file=(
+        await manshuo_draw([{'type': 'basic_set', 'img_width': 750, 'img_name_save': f'{event.pure_text}_{tarots}.png'},
+                            {'type': 'img', 'subtype': 'common_with_des_right', 'img': [img], 'content': [txt]}]))))
     return {"text": txt, "img": img}
 
 

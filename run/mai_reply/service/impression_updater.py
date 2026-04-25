@@ -7,6 +7,7 @@ impression_updater.py
 import asyncio
 from typing import List, Dict
 
+from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.system_logger import get_logger
 
 logger=get_logger(__name__)
@@ -26,6 +27,8 @@ class ImpressionUpdater:
         self._ctx = context_manager
         # 计数器：(user_id, group_id) -> turn_count
         self._counters: Dict[str, int] = {}
+        cfg=YAMLManager.get_instance()
+        self.model=cfg.mai_reply.config["context"]["impression_model"] if cfg.mai_reply.config["context"]["impression_model"] else None
 
     def _counter_key(self, user_id: int, group_id) -> str:
         return f"{group_id or 'priv'}:{user_id}"
@@ -62,6 +65,7 @@ class ImpressionUpdater:
             summary = await self._llm.chat(
                 messages=[{"role": "user", "content": prompt}],
                 system_prompt="你是一个情感潜意识提取器，帮助机器人记住对别人的印象和喜恶。",
+                model=self.model,
             )
             if summary:
                 self._ctx.update_impression(user_id, summary.strip())

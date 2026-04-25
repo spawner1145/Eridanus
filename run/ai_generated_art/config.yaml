@@ -2,10 +2,18 @@
 sightengine:       #ai创作图片鉴别，自己去申请https://dashboard.sightengine.com/api-credentials
   api_user: ''
   api_secret: ''
-
+gptimage2:
+  权限要求: 0   #使用gptimage2功能所需的权限等级，超过此等级不受次数限制
+  apikey: ''  # 项目群中获取
+  aspect_ratio: '1:1'  # 生成图像的宽高比，常见的有 '1:1', '16:9', '4:3' 等，根据需要调整
+  接管sd: false  #开启后将接管sd画图功能，使用gptimage2的接口进行画图（需要sdurl和apikey配置正确），不开启则正常使用sd接口画图
+  bot_oc: "data/system/bot_oc.png" # bot的形象设定png，当要画bot自己时，依据此图像生成。
+  extra_prompt: "二次元，日漫，平涂风格，必须严格依照给定图片的特征来绘制。不必绘制过于繁复的服饰细节和发丝，无需完全还原参考图细节。简单的平涂、手绘风格即可，可简化如发丝等部分的细节。保持锚点识别度即可"   #这两块建议ai生成
+  character_anchor: "的固定外貌特征如下：银灰色长直发，发梢渐变为淡蓝色，发间点缀白色小花发饰和蓝色蝴蝶结发夹；粉色和蓝色渐变眼睛，眼神温柔清澈；身材纤细娇小（162cm），肤色白皙；标志性服装为白色不对称吊带礼裙，外搭半透明薄纱披肩，腰间系蓝色细带蝴蝶结，裙摆呈不规则燕尾形，裙边有花边；白色过膝袜配白色高跟鞋，鞋踝处有蓝色蝴蝶结装饰"
 ai绘画:
   sdUrl: # 你自己搭建的sd，地址，示例http://127.0.0.1:17858（示例≠你能直接填示例用），免费云部署见文档，本地部署https://www.bilibili.com/video/BV1iM4y1y7oA/
     - ''
+  apikey: '' # sd的api key，一般来说不需要
   sd审核和反推api: '' # 如果你的sd有反推插件https://github.com/spawner1145/stable-diffusion-webui-wd14-tagger.git，可以直接使用你的sdurl的api，也可以部署https://github.com/spawner1145/wd14-inference-webui.git并使用这个启动的网址作为api
   nai_key:
     - ''

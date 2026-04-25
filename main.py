@@ -71,6 +71,7 @@ async def load_plugins(bot, config, bot_name="main"):
 
     bot.logger.info(f"🔧 正在使用插件管理器加载插件....")
 
+
     try:
         load_strategy_dict = {
             "batch_loading": LoadStrategy.BATCH_LOADING,
@@ -216,6 +217,7 @@ def main_sync():
     except Exception as e:
         bot1.logger.error(f"主程序运行错误：{e}")
         traceback.print_exc()
+        sys.exit(1)
     finally:
         # 清理资源
         async def cleanup():

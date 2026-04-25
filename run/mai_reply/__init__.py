@@ -1,4 +1,4 @@
-plugin_description = "MaiReply - 高拟人化AI回复插件（MaiBot风格）"
+plugin_description = "mai_reply 新版ai对话"
 
 dynamic_imports = {
     "run.mai_reply.func_collection": [

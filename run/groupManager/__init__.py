@@ -36,7 +36,16 @@ function_declarations=[
     },
     {
         "name": "report_to_master",
-        "description": "向管理员(master)上报用户的恶性行为。当bot接受到任何攻击性言论、侮辱性言论、骚扰言论时触发。或是用户需要向管理员反馈时触发。"
+        "description": "向管理员(master)上报用户的恶性行为或其他需要管理员注意的事项。参数msg是要告诉管理员的内容，尽量简洁明了。需要包含来源用户信息",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "msg": {
+                    "type": "string",
+                    "description": "要告诉管理员的内容"
+                }
+            }
+        }
     },
     {
         "name": "send_contract",

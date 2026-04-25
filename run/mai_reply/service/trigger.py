@@ -12,7 +12,7 @@ import traceback
 import httpx
 from typing import Tuple
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
-from developTools.message.message_components import At
+from developTools.message.message_components import At, Text
 from developTools.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -74,7 +74,7 @@ class TriggerChecker:
         # 净化文本（去除残留的@字符）
         clean_text = self._remove_at_segments(event, text, bot_name, bot_self_id)
         if not clean_text:
-            clean_text = "你好"
+            return False, text  # 无法提取文本时，默认不回复，但返回原始文本以供记录
         #print(is_at)
         if is_at:
             return True, clean_text
@@ -251,7 +251,17 @@ class TriggerChecker:
 
     @staticmethod
     def _remove_at_segments(event, text: str, bot_name: str, bot_self_id: int) -> str:
-        text = text.replace(f"@{bot_name}", "").strip()
+        if event.message_chain.has(Text):
+            text = event.message_chain.get(Text)[0].text
+        if event.message_chain.has(At):
+            if event.message_chain.get(At)[0].qq in [bot_self_id, 1000000]:
+                logger.info(f"[TriggerChecker] 消息中包含@机器人自己的At，原始文本: '{text}'，已替换为 '@{bot_name}'")
+                text = f"@{bot_name}"+text
+            else:
+                text = f"@{event.message_chain.get(At)[0].name}"+text
+        if not event.message_chain.has(Text) and not event.message_chain.has(At):
+            logger.warning(f"[TriggerChecker] 无法提取文本内容，消息链中既没有 Text 也没有 At，原始消息链: {event.message_chain}")
+            return None
         if bot_self_id:
             text = text.replace(f"@{bot_self_id}", "").strip()
         return text

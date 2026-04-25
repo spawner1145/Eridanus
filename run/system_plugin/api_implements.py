@@ -1,3 +1,4 @@
+import asyncio
 import random
 import time
 from typing import Optional
@@ -13,8 +14,11 @@ from framework_common.utils.utils import download_img
 from framework_common.utils.random_str import random_str
 import os
 
+from run.mai_reply.service.reply_engine import ReplyEngine
+
 
 def main(bot, config):
+    engine = ReplyEngine(config)
     master = config.common_config.basic_config["master"]["id"]
 
     avatar = False
@@ -156,14 +160,19 @@ def main(bot, config):
                         await bot.send_group_message(event.group_id, Image(file=img_path))
                         return
                 if config.ai_llm.config["llm"]["aiReplyCore"]:
-                    r = await aiReplyCore(
-                        [{"text": text}],
-                        event.user_id,
-                        config,
-                        tools=tools,
-                        bot=bot,
-                        event=poke_notify_to_group_message(event),
-                    )
+                    if not config.mai_reply.config["enable"]:
+                        r = await aiReplyCore(
+                            [{"text": text}],
+                            event.user_id,
+                            config,
+                            tools=tools,
+                            bot=bot,
+                            event=poke_notify_to_group_message(event),
+                        )
+                    else:
+                        # 最新版本ai对话
+                        asyncio.create_task(engine.handle(bot, poke_notify_to_group_message(event), text))
+                        return
                 else:
                     reply_list = config.system_plugin.config['api_implements']['nudge']['replylist']
                     nonlocal nudge_list

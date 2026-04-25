@@ -56,14 +56,14 @@ def build_tool_map():
                                 func = getattr(module, func_name)
                                 if callable(func):
                                     tools[func_name] = func
-                                    logger.info(f"✅ 成功加载 {module_name}.{func_name}")
+                                    #logger.info(f"✅ 成功加载 {module_name}.{func_name}")
                                 else:
                                     logger.warning(f"⚠️ {module_name}.{func_name} 不是可调用对象")
                             else:
                                 logger.warning(f"⚠️ {module_name} 中不存在 {func_name}")
                         elif callable(func_name):
                             tools[func_name.__name__] = func_name
-                            logger.info(f"✅ 成功加载 {module_name}.{func_name.__name__}")
+                            #logger.info(f"✅ 成功加载 {module_name}.{func_name.__name__}")
                         else:
                             logger.warning(f"⚠️ {module_name} 中的 {func_name} 既不是字符串也不是可调用对象")
                 except Exception as e:

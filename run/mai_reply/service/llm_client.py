@@ -70,7 +70,8 @@ class LLMClient:
         retries: int = 3,
         stream: Optional[bool] = None,
         bot=None,
-        event=None
+        event=None,
+        model=None
     ) -> Optional[str]:
         """
         发送对话请求。
@@ -79,22 +80,22 @@ class LLMClient:
         should_stream = self.use_stream if stream is None else stream
 
         if should_stream:
-            return await self._chat_stream_with_retries(messages, system_prompt, tools, retries, bot, event)
+            return await self._chat_stream_with_retries(messages, system_prompt, tools, retries, bot, event,model)
         else:
-            return await self._chat_non_stream_with_retries(messages, system_prompt, tools, retries, bot, event)
+            return await self._chat_non_stream_with_retries(messages, system_prompt, tools, retries, bot, event,model)
 
     # ==================================================================
     # 流式 (Stream) 执行引擎 (内部消费生成器，合并后返回)
     # ==================================================================
-    async def _chat_stream_with_retries(self, messages, system_prompt, tools, retries, bot, event) -> Optional[str]:
+    async def _chat_stream_with_retries(self, messages, system_prompt, tools, retries, bot, event,model=None) -> Optional[str]:
         for attempt in range(retries):
             try:
                 full_text = ""
                 if self.provider == "gemini":
-                    async for chunk in self._chat_gemini_stream(messages, system_prompt, tools, bot, event):
+                    async for chunk in self._chat_gemini_stream(messages, system_prompt, tools, bot, event,model):
                         full_text += chunk
                 else:
-                    async for chunk in self._chat_openai_stream(messages, system_prompt, tools, bot, event):
+                    async for chunk in self._chat_openai_stream(messages, system_prompt, tools, bot, event,model):
                         full_text += chunk
 
                 return full_text.strip() if full_text else None
@@ -106,7 +107,7 @@ class LLMClient:
                     raise e
         return None
 
-    async def _chat_openai_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None) -> AsyncGenerator[str, None]:
+    async def _chat_openai_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None,model=None) -> AsyncGenerator[str, None]:
         api_key = next(self._oa_key_cycle)
         url = f"{self._oa_base_url}/chat/completions"
 
@@ -116,19 +117,21 @@ class LLMClient:
         full_messages.extend(messages)
         tool_defs = self._build_openai_tool_defs(tools) if tools else None
 
+        temp_signal=False
         for _round in range(10):
             payload = {
-                "model": self._oa_model,
+                "model": self._oa_model if not model else model,
                 "messages": full_messages,
                 "temperature": self._oa_temperature,
                 "max_tokens": self._oa_max_tokens,
                 "stream": True
             }
-            if tool_defs:
+            if tool_defs and not temp_signal:
                 payload["tools"] = tool_defs
                 payload["tool_choice"] = "auto"
 
             http = await self._get_http()
+            #print(full_messages)
             async with http.stream(
                 "POST", url, json=payload,
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
@@ -180,15 +183,20 @@ class LLMClient:
 
                 if not should_continue:
                     return
+                """
+                有返回值，那就只再调用一次
+                """
+                temp_signal=True
                 full_messages.extend(tool_results)
 
-    async def _chat_gemini_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None) -> AsyncGenerator[str, None]:
+    async def _chat_gemini_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None,model=None) -> AsyncGenerator[str, None]:
         api_key = next(self._gm_key_cycle)
-        url = f"{self._gm_base_url}/v1beta/models/{self._gm_model}:streamGenerateContent?alt=sse&key={api_key}"
+        model=self._gm_model if not model else model
+        url = f"{self._gm_base_url}/v1beta/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
 
         gemini_tools = self._build_gemini_tool_defs(tools) if tools else None
         contents = self._build_gemini_contents(messages)
-
+        temp_signal=False
         for _round in range(10):
             payload = {
                 "contents": contents,
@@ -196,10 +204,11 @@ class LLMClient:
             }
             if system_prompt:
                 payload["system_instruction"] = {"parts":[{"text": system_prompt}]}
-            if gemini_tools:
+            if gemini_tools and not temp_signal:
                 payload["tools"] = gemini_tools
 
             http = await self._get_http()
+
             async with http.stream("POST", url, json=payload, headers={"Content-Type": "application/json"}) as resp:
                 resp.raise_for_status()
 
@@ -233,18 +242,19 @@ class LLMClient:
 
                 if not should_continue:
                     return
+                temp_signal=True
                 contents.append({"role": "user", "parts": response_parts})
 
     # ==================================================================
     # 非流式 (Non-Stream) 传统执行引擎
     # ==================================================================
-    async def _chat_non_stream_with_retries(self, messages, system_prompt, tools, retries, bot, event) -> Optional[str]:
+    async def _chat_non_stream_with_retries(self, messages, system_prompt, tools, retries, bot, event,model=None) -> Optional[str]:
         for attempt in range(retries):
             try:
                 if self.provider == "gemini":
-                    return await self._chat_gemini_non_stream(messages, system_prompt, tools, bot, event)
+                    return await self._chat_gemini_non_stream(messages, system_prompt, tools, bot, event,model)
                 else:
-                    return await self._chat_openai_non_stream(messages, system_prompt, tools, bot, event)
+                    return await self._chat_openai_non_stream(messages, system_prompt, tools, bot, event,model)
             except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(1.5 * (attempt + 1))
@@ -253,23 +263,25 @@ class LLMClient:
                     raise e
         return None
 
-    async def _chat_openai_non_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None) -> Optional[str]:
+    async def _chat_openai_non_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None,model=None) -> Optional[str]:
         api_key = next(self._oa_key_cycle)
         url = f"{self._oa_base_url}/chat/completions"
         full_messages =[{"role": "system", "content": system_prompt}] if system_prompt else[]
         full_messages.extend(messages)
         tool_defs = self._build_openai_tool_defs(tools) if tools else None
-
+        temp_signal=False
+        temp_model=model if model else self._oa_model
         for _round in range(10):
             payload: Dict[str, Any] = {
-                "model": self._oa_model, "messages": full_messages,
+                "model": temp_model, "messages": full_messages,
                 "temperature": self._oa_temperature, "max_tokens": self._oa_max_tokens,
             }
-            if tool_defs:
+            if tool_defs and not temp_signal:
                 payload["tools"] = tool_defs
                 payload["tool_choice"] = "auto"
 
             http = await self._get_http()
+            print(messages)
             resp = await http.post(url, json=payload, headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
             resp.raise_for_status()
             data = resp.json()
@@ -286,22 +298,24 @@ class LLMClient:
 
             if not should_continue:
                 return None
+            temp_signal=True
             full_messages.extend(tool_results)
         return None
 
-    async def _chat_gemini_non_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None) -> Optional[str]:
+    async def _chat_gemini_non_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None,model=None) -> Optional[str]:
         api_key = next(self._gm_key_cycle)
-        url = f"{self._gm_base_url}/v1beta/models/{self._gm_model}:generateContent?key={api_key}"
+        temp_model=model if model else self._gm_model
+        url = f"{self._gm_base_url}/v1beta/models/{temp_model}:generateContent?key={api_key}"
         contents = self._build_gemini_contents(messages)
         gemini_tools = self._build_gemini_tool_defs(tools) if tools else None
-
+        temp_signal=False
         for _round in range(10):
             payload: Dict[str, Any] = {
                 "contents": contents,
                 "generationConfig": {"temperature": self._gm_temperature, "maxOutputTokens": self._gm_max_tokens},
             }
             if system_prompt: payload["system_instruction"] = {"parts": [{"text": system_prompt}]}
-            if gemini_tools: payload["tools"] = gemini_tools
+            if gemini_tools and not temp_signal: payload["tools"] = gemini_tools
 
             http = await self._get_http()
             resp = await http.post(url, json=payload, headers={"Content-Type": "application/json"})
@@ -321,6 +335,7 @@ class LLMClient:
 
             if not should_continue:
                 return None
+            temp_signal=True
             contents.append({"role": "user", "parts": response_parts})
         return None
 
@@ -328,19 +343,53 @@ class LLMClient:
     # 辅助构建与执行方法
     # ==================================================================
     def _build_gemini_contents(self, messages: List[Dict]) -> List[Dict]:
-        contents =[]
+        contents = []
         for msg in messages:
             role = "user" if msg["role"] == "user" else "model"
-            if isinstance(msg.get("content"), str):
-                contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+            content = msg.get("content")
+
+            if isinstance(content, str):
+                contents.append({"role": role, "parts": [{"text": content}]})
+
             elif msg.get("role") == "tool":
-                contents.append({"role": "user", "parts":[{"functionResponse": {"name": msg.get("name", ""), "response": {"result": msg.get("content", "")}}}]})
-            elif isinstance(msg.get("content"), list):
+                contents.append({
+                    "role": "user",
+                    "parts": [{"functionResponse": {
+                        "name": msg.get("name", ""),
+                        "response": {"result": msg.get("content", "")}
+                    }}]
+                })
+
+            elif isinstance(content, list):
                 parts = []
-                for part in msg["content"]:
-                    if "text" in part: parts.append({"text": part["text"]})
-                    elif "functionCall" in part: parts.append(part)
-                if parts: contents.append({"role": role, "parts": parts})
+                for part in content:
+                    if isinstance(part, dict):
+                        if part.get("type") == "text":
+                            parts.append({"text": part["text"]})
+                        elif part.get("type") == "image_url":
+                            # 支持 OpenAI vision 格式：data URI 或普通 URL
+                            url_val = part.get("image_url", {}).get("url", "")
+                            if url_val.startswith("data:"):
+                                # data:image/png;base64,<b64data>
+                                try:
+                                    header, b64data = url_val.split(",", 1)
+                                    mime = header.split(":")[1].split(";")[0]
+                                    parts.append({
+                                        "inlineData": {
+                                            "mimeType": mime,
+                                            "data": b64data
+                                        }
+                                    })
+                                except Exception:
+                                    pass
+                            else:
+                                # 普通 URL —— Gemini 支持 fileUri
+                                parts.append({"fileData": {"fileUri": url_val, "mimeType": "image/jpeg"}})
+                        elif "functionCall" in part:
+                            parts.append(part)
+                if parts:
+                    contents.append({"role": role, "parts": parts})
+
         return contents
 
     @staticmethod
@@ -399,7 +448,7 @@ class LLMClient:
                     if 'config' in sig.parameters:
                         # 【更新】通过单例获取全局 config
                         args['config'] = YAMLManager.get_instance()
-
+                    logger.info(f"[MaiReply] 正在执行工具 {func_name}，参数: {args.keys()}")
                     ret = await func(**args) if asyncio.iscoroutinefunction(func) else await asyncio.to_thread(func, **args)
 
                     if ret is None:
@@ -407,6 +456,7 @@ class LLMClient:
 
                     content = json.dumps(ret, ensure_ascii=False) if not isinstance(ret, str) else ret
                 except Exception as e:
+                    traceback.print_exc()
                     logger.error(f"[MaiReply] 执行工具 {func_name} 时发生系统异常: {e}")
                     content = json.dumps({"error": str(e)}, ensure_ascii=False)
                     # 【防刷屏死循环机制】遇到崩溃级别的异常，直接强制中断
