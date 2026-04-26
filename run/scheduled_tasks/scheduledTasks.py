@@ -96,6 +96,7 @@ def main(bot: ExtendBot, config):
                         event=AnyEvent()
                         event.user_id=int(user["user_id"])
                         asyncio.create_task(engine.handle(bot, event, f"保持你当前对话的角色，播报今天的天气信息并给出建议，直接发送结果，不要发送'好的'之类的命令应答提示。今天的天气信息：{weather}"))
+                        await bot.send(int(user["user_id"]), f"(如城市信息不正确，可在群内发送 修改城市【城市名】\n 如 修改城市长春)")
                         return
                     await bot.send_friend_message(int(user["user_id"]), r)
                     await sleep(6)
