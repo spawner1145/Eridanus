@@ -121,7 +121,7 @@ class HoliveTTS:
             0.2,                # sdp_ratio
             0.6,                # noise_scale
             0.8,                # noise_scale_w
-            1.0,                # length_scale
+            1.2,                # length_scale
             True,               # line_split
             0.5,                # split_interval
             "",                 # assist_text
