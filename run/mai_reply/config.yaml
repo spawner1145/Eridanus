@@ -44,7 +44,7 @@ persona:  # 人设
 tts:
   voice_reply_probability: 30 # 回复时附带语音的概率（0=关闭，1-100=概率）。需要配置voice_model和相关参数
   speaker: AZKi  # api.apollodorus.xyz提供的语音模型说话人
-  lang_type: JP
+  lang_type: JP  #自动翻译，用trigger_llm的apikey。从api.apollodorus.xyz获取
 
 
 
