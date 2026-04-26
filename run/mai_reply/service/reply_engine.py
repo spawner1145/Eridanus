@@ -1,14 +1,13 @@
-"""
-reply_engine.py
-核心回复引擎 —— 将所有子模块串联起来，完成一次完整的拟人化回复流程
-"""
+""" reply_engine.py 核心回复引擎 ——
+将所有子模块串联起来，完成一次完整的拟人化回复流程 """
 
 import asyncio
 import traceback
-import random    # <-- 新增
+import random
 import uuid
+import time
 
-import aiohttp   # <-- 新增
+import aiohttp
 from typing import Optional
 
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
@@ -26,6 +25,7 @@ from run.mai_reply.service.impression_updater import ImpressionUpdater
 from run.mai_reply.service.concurrency import ConcurrencyController
 
 logger = get_logger(__name__)
+
 
 class ReplyEngine:
     _instance = None
@@ -54,8 +54,34 @@ class ReplyEngine:
         self.concurrency = ConcurrencyController(config)
         self.audit_system = AuditSystem(self.llm, self.context, config)
 
+        # ---- 名称缓存 ----
+        # 结构: { cache_key: (name, expire_monotonic_time) }
+        self._name_cache: dict[str, tuple[str, float]] = {}
+
         self._tools = self._load_tools()
         self.emotion.random_drift()
+
+    # --------------------------------------------------
+    # 名称缓存辅助方法
+    # --------------------------------------------------
+
+    def _cache_get(self, key: str) -> Optional[str]:
+        """从缓存取名称，过期或不存在返回 None。"""
+        entry = self._name_cache.get(key)
+        if entry and time.monotonic() < entry[1]:
+            return entry[0]
+        return None
+
+    def _cache_set(self, key: str, value: str) -> None:
+        """写入缓存，TTL 从配置读取，默认 300 秒。"""
+        ttl = self.cfg.mai_reply.config.get("concurrency", {}).get("name_cache_ttl", 300)
+        now = time.monotonic()
+        # 懒清理：缓存条目过多时顺手淘汰过期项，避免无限增长
+        if len(self._name_cache) > 5000:
+            self._name_cache = {k: v for k, v in self._name_cache.items() if v[1] > now}
+        self._name_cache[key] = (value, now + ttl)
+
+    # --------------------------------------------------
 
     def _load_tools(self):
         try:
@@ -148,17 +174,16 @@ class ReplyEngine:
             await self.processor.send_with_delay(bot, event, segments, quote_message_id=msg_id)
 
             # =================================================================
-            # 【新增】触发语音回复（后台异步，完全等同于子线程避免阻塞）
+            # 触发语音回复（后台异步，完全等同于子线程避免阻塞）
             # =================================================================
-            # 假设你在配置文件中增加了 voice 节点
             voice_cfg = self.cfg.mai_reply.config["tts"]
             voice_prob = int(voice_cfg.get("voice_reply_probability", 0))
-            translate_api_key=self.cfg.mai_reply.config["trigger_llm"]["api_key"]
-            voice_cfg["translate_api_key"]=translate_api_key
+            translate_api_key = self.cfg.mai_reply.config["trigger_llm"]["api_key"]
+            voice_cfg["translate_api_key"] = translate_api_key
             if voice_prob > 0 and random.randint(1, 100) <= voice_prob:
                 # 把切分好的 segments 还原成一整句 (使用逗号间隔以便 TTS 有自然的停顿)
                 combined_text = ".".join(segments)
-                # 使用 create_task 放入后台执行。不会阻塞后续的历史更新与心情刷新
+                # 使用 create_task 放入后台执行，不会阻塞后续的历史更新与心情刷新
                 asyncio.create_task(self._async_tts_and_send(bot, event, combined_text, voice_cfg))
 
             # ---------- 更新历史
@@ -197,9 +222,8 @@ class ReplyEngine:
                 self.context.release_lock(session_key)
             self.concurrency.release_global()
 
-
     # =================================================================
-    # 【新增】后台处理语音：翻译 -> TTS 合成 -> 发送
+    # 后台处理语音：翻译 -> TTS 合成 -> 发送
     # =================================================================
     async def _async_tts_and_send(self, bot, event, text: str, voice_cfg: dict):
         """
@@ -242,25 +266,30 @@ class ReplyEngine:
             from run.mai_reply.service.HoliveTTS import HoliveTTS
             tts = HoliveTTS()
             bot.logger.info(f"[MaiReply] 正在后台合成语音 | 角色: {speaker} | 文本: {translated_text}")
-            save_path=f"data/voice/cache/{uuid.uuid4()}.wav"
+            save_path = f"data/voice/cache/{uuid.uuid4()}.wav"
             # synthesize 方法内部也是异步的，耗时处理均不阻塞主进程
             audio_bytes = await tts.synthesize_to_file(
                 text=translated_text,
                 speaker=speaker,
                 language=lang_type.upper(),
                 save_as=save_path
-
             )
 
-            await bot.send(event,Record(file=save_path))
+            await bot.send(event, Record(file=save_path))
             bot.logger.info("[MaiReply] 后台语音发送完成！")
         except Exception as e:
             bot.logger.error(f"[MaiReply] TTS合成或发送发生异常: {e}")
             traceback.print_exc()
 
-
-    # ------------------------------------------------------------------ 辅助
+    # ------------------------------------------------------------------
+    # 辅助：获取用户名（带缓存）
+    # ------------------------------------------------------------------
     async def _get_user_name(self, bot, event, user_id: int, group_id: Optional[int]) -> str:
+        cache_key = f"user:{group_id}:{user_id}"
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
         try:
             if group_id:
                 info = await bot.get_group_member_info(group_id=group_id, user_id=user_id)
@@ -268,14 +297,20 @@ class ReplyEngine:
             else:
                 info = await bot.get_stranger_info(user_id=user_id)
                 name = info["data"]["nickname"]
-            return name.strip() or str(user_id)
+            name = name.strip() or str(user_id)
         except Exception:
-            return str(user_id)
+            name = str(user_id)
 
+        self._cache_set(cache_key, name)
+        return name
+
+    # ------------------------------------------------------------------
+    # 辅助：获取 Bot 名称（固定读配置，无需缓存）
+    # ------------------------------------------------------------------
     async def _get_bot_name(self, bot) -> str:
         from framework_common.framework_util.yamlLoader import YAMLManager
         globconfig = YAMLManager.get_instance()
-        bot_name=globconfig.common_config.basic_config["bot"]
+        bot_name = globconfig.common_config.basic_config["bot"]
         return bot_name
         try:
             info = await bot.get_login_info()
@@ -287,10 +322,21 @@ class ReplyEngine:
         override = self.prompt_builder.get_bot_name(name)
         return override or name or "Bot"
 
+    # ------------------------------------------------------------------
+    # 辅助：获取群名称（带缓存）
+    # ------------------------------------------------------------------
     async def _get_group_name(self, bot, group_id: int) -> str:
+        cache_key = f"group:{group_id}"
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
         try:
             info = await bot.get_group_info(group_id=group_id)
             name = info["data"]["group_name"]
-            return name.strip() or str(group_id)
+            name = name.strip() or str(group_id)
         except Exception:
-            return str(group_id)
+            name = str(group_id)
+
+        self._cache_set(cache_key, name)
+        return name

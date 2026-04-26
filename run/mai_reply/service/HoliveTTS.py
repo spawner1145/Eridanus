@@ -93,7 +93,8 @@ class HoliveTTS:
 
     async def open(self) -> None:
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
+            connector = aiohttp.TCPConnector(ssl=False)
+            self._session = aiohttp.ClientSession(connector=connector)
 
     async def close(self) -> None:
         if self._session and not self._session.closed:
