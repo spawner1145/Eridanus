@@ -92,34 +92,7 @@ async def text2img(bot,event,config,prompt,is_about_bot=False):
             await bot.send(event,Image(file=resp.json()["data"][0]["url"]))
 
     else:
-        def clean_prompt(prompt):
-            remove_list = [
-                "round face:1.2",
-                "Rella:1.2",
-                "chen bin:1.3",
-                "virtual youtuber",
-                "starshadowmagician:1.2",
-                "lineart",
-                "hand-drawn:1.3",
-                "sketch:1.2",
-                "Picasso style",
-                "<lora:curearcanashadow_v1.0_IL:0.5>",
-                "Van Gogh's almond blossoms",
-                "Van Gogh’s almond blossoms",
-            ]
 
-            for p in remove_list:
-                # 匹配带括号 / 不带括号 / 前后空格 / 可选逗号
-                pattern = r"\s*\(?" + re.escape(p) + r"\)?\s*,?"
-                prompt = re.sub(pattern, "", prompt)
-
-            # 清理多余逗号和空格
-            prompt = re.sub(r",\s*,+", ",", prompt)
-            prompt = prompt.strip(", ").strip()
-
-            prompt += "\n以上为stable diffusion的提示词，请基于这些提示词进行创作，如提示词未特别说明，则一般采用二次元/日漫风格"
-            return prompt
-        prompt=clean_prompt(prompt)
 
 
         base_url="http://api.apollodorus.xyz/v1/images/generations"
