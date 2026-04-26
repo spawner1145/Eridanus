@@ -1,23 +1,18 @@
 """
 reply_engine.py
 核心回复引擎 —— 将所有子模块串联起来，完成一次完整的拟人化回复流程
-
-流程：
-  1. 获取/构建上下文
-  2. 构建 system prompt（含情绪、时间、群旁观上下文、用户印象）
-  3. 调用 LLM（含函数调用自动执行）
-  4. 后处理（清理 markdown、分割、错字）
-  5. 模拟打字延迟分批发送
-  6. 更新上下文历史
-  7. 更新情绪
-  8. （异步）更新用户印象
 """
 
 import asyncio
 import traceback
+import random    # <-- 新增
+import uuid
+
+import aiohttp   # <-- 新增
 from typing import Optional
 
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
+from developTools.message.message_components import Record
 from framework_common.database_util.User import get_user
 from framework_common.utils.system_logger import get_logger
 from run.mai_reply.service.audit_censor import AuditSystem
@@ -30,7 +25,7 @@ from run.mai_reply.service.reply_processor import ReplyProcessor
 from run.mai_reply.service.impression_updater import ImpressionUpdater
 from run.mai_reply.service.concurrency import ConcurrencyController
 
-logger=get_logger(__name__)
+logger = get_logger(__name__)
 
 class ReplyEngine:
     _instance = None
@@ -44,7 +39,6 @@ class ReplyEngine:
     # --------------------------------------------------
 
     def __init__(self, config=None):
-        # 如果已经初始化过，就直接跳过，防止重置各个子模块的状态
         if self._initialized:
             return
 
@@ -58,17 +52,12 @@ class ReplyEngine:
         self.processor = ReplyProcessor(config, self.context)
         self.impression_updater = ImpressionUpdater(self.llm, self.context)
         self.concurrency = ConcurrencyController(config)
-        # 审核
         self.audit_system = AuditSystem(self.llm, self.context, config)
 
-        # 函数调用工具映射（None = 不启用）
         self._tools = self._load_tools()
-
-        # 初始随机漂移情绪
         self.emotion.random_drift()
 
     def _load_tools(self):
-        """按配置决定是否加载函数调用工具表"""
         try:
             if self.cfg.mai_reply.config.get("llm", {}).get("func_calling", False):
                 from framework_common.framework_util.func_map_loader import build_tool_map
@@ -77,16 +66,10 @@ class ReplyEngine:
                 return tools
         except Exception as e:
             traceback.print_exc()
-            # func_calling 未启用或加载失败时静默降级
             pass
         return None
 
     async def handle(self, bot, event, clean_text: str, multimodal_content=None) -> None:
-        """
-        处理一条已判定需要回复的消息。
-        clean_text: 已去除触发前缀的用户文本（纯文本，用于存储/日志）
-        multimodal_content: 可选，str 或 OpenAI vision 格式的 list，用于实际发送给 LLM
-        """
         is_group = isinstance(event, GroupMessageEvent)
         group_id: Optional[int] = getattr(event, "group_id", None) if is_group else None
         user_id: int = event.user_id
@@ -99,48 +82,36 @@ class ReplyEngine:
             if user_info.permission < required_level:
                 return
 
-        # ---------- 获取用户昵称
         user_name = await self._get_user_name(bot, event, user_id, group_id)
         bot_name = await self._get_bot_name(bot)
 
-        # ---------- 消息合并窗口（仅对纯文本去抖；图片消息跳过合并直接处理）
+        # ---------- 消息合并窗口
         session_key = self.context.session_key_for(group_id, user_id)
         if isinstance(multimodal_content, list):
-            # 含图片，不走合并窗口，直接处理
             final_text = clean_text
         else:
             final_text = await self.concurrency.merge_or_process(session_key, clean_text)
             if final_text is None:
-                return  # 被后来的消息合并掉，不处理
-            # 纯文本情况下，multimodal_content 与 final_text 保持同步
+                return
             multimodal_content = final_text
 
-        # ---------- 并发控制
         await self.concurrency.acquire_global()
         lock_acquired = False
         try:
-            # ---------- 会话锁（避免同一会话并发回复）
             lock_timeout = self.cfg.mai_reply.config.get("concurrency", {}).get("lock_timeout", 30)
             lock_acquired = await self.context.acquire_lock(session_key, lock_timeout)
             if not lock_acquired:
                 return
 
-            # ---------- 更新群旁观窗口
             if is_group:
                 self.context.push_group_window(group_id, user_name, final_text)
 
-            # ---------- 情绪更新
-            #self.emotion.update_from_message(final_text)
-
-            # ---------- 构建上下文
             history = self.context.get_session_history(group_id, user_id)
             group_context = ""
             if is_group:
                 group_context = self.context.build_group_context_snippet(group_id, bot_name)
-                #print(group_context)
             user_impression = self.context.get_impression(user_id)
 
-            # ---------- 构建 system prompt
             group_name = await self._get_group_name(bot, group_id) if is_group else "私聊"
             system_prompt = self.prompt_builder.build_system_prompt(
                 bot_name=bot_name,
@@ -150,23 +121,16 @@ class ReplyEngine:
                 user_impression=user_impression,
             )
 
-            # ---------- 构建消息列表（对话历史 + 本次）
-            # multimodal_content 为 list 时携带图片，否则退回纯文本
             messages = list(history)
             user_content = multimodal_content if multimodal_content is not None else clean_text
             messages.append({"role": "user", "content": user_content})
-
-            # ---------- 调用 LLM（工具调用在 llm_client 内部自动处理）
-            #logger.info(f"[MaiReply] {messages}")
-            #logger.info(f"[MaiReply] {system_prompt}")
-            #logger.info(self._tools)
 
             raw_reply = await self.llm.chat(
                 messages=messages,
                 system_prompt=system_prompt,
                 tools=self._tools,
-                bot=bot,  # 【新增这一行】
-                event=event,  # 【新增这一行】
+                bot=bot,
+                event=event,
                 retries=10
             )
 
@@ -174,20 +138,30 @@ class ReplyEngine:
                 bot.logger.warning("[MaiReply] LLM 返回空回复")
                 return
 
-            # ---------- 后处理
             segments = self.processor.process(raw_reply)
             if not segments:
                 return
 
-            # ---------- 获取消息ID用于引用
             msg_id = getattr(event, "message_id", None)
 
-            # ---------- 发送（带打字延迟）
+            # 1. 先按计划发送切分后的文本（带打字延迟）
             await self.processor.send_with_delay(bot, event, segments, quote_message_id=msg_id)
 
+            # =================================================================
+            # 【新增】触发语音回复（后台异步，完全等同于子线程避免阻塞）
+            # =================================================================
+            # 假设你在配置文件中增加了 voice 节点
+            voice_cfg = self.cfg.mai_reply.config["tts"]
+            voice_prob = int(voice_cfg.get("voice_reply_probability", 0))
+            translate_api_key=self.cfg.mai_reply.config["trigger_llm"]["api_key"]
+            voice_cfg["translate_api_key"]=translate_api_key
+            if voice_prob > 0 and random.randint(1, 100) <= voice_prob:
+                # 把切分好的 segments 还原成一整句 (使用逗号间隔以便 TTS 有自然的停顿)
+                combined_text = ".".join(segments)
+                # 使用 create_task 放入后台执行。不会阻塞后续的历史更新与心情刷新
+                asyncio.create_task(self._async_tts_and_send(bot, event, combined_text, voice_cfg))
+
             # ---------- 更新历史
-            # 上下文历史只存纯文本（图片 base64 不落库，避免撑爆存储）
-            # 若本次含图片，在历史里用文本标注"发送了图片"
             if isinstance(multimodal_content, list):
                 history_user_text = clean_text + " [含图片]" if clean_text else "[图片]"
             else:
@@ -197,14 +171,10 @@ class ReplyEngine:
             if is_group:
                 self.context.push_group_window(group_id, bot_name, raw_reply)
 
-            # ---------- 触发印象更新（异步，不阻塞）
             self.impression_updater.tick(user_id, group_id, user_name, bot_name)
-            # 新增下面这行：---------- 触发安全审核（异步，不阻塞）
             self.audit_system.tick(user_id, group_id, user_name, bot_name, bot)
 
-            # =================================================================
-            # 【新增】状态显示：在控制台打印机器人的当前心理状态
-            # =================================================================
+            # 控制台打印机器人的当前心理状态
             current_score = self.emotion.get_score()
             current_mood = self.emotion.get_mood()
             current_imp = user_impression or "暂无，还不熟"
@@ -227,13 +197,74 @@ class ReplyEngine:
                 self.context.release_lock(session_key)
             self.concurrency.release_global()
 
+
+    # =================================================================
+    # 【新增】后台处理语音：翻译 -> TTS 合成 -> 发送
+    # =================================================================
+    async def _async_tts_and_send(self, bot, event, text: str, voice_cfg: dict):
+        """
+        后台异步执行：自动翻译 -> 调用TTS -> 组装并发送音频文件。
+        该方法被 create_task 调用，完全脱离主消息流，实现真正意义上的不阻塞。
+        """
+
+        lang_type = voice_cfg.get("lang_type", "JP")
+        speaker = voice_cfg.get("speaker", "MoriCalliope")
+        api_key = voice_cfg.get("translate_api_key", "")
+
+        translated_text = text
+
+        # 1. 翻译逻辑 (使用 aiohttp 异步请求防止网络卡顿阻塞线程)
+        if api_key and lang_type.upper() in ["JP", "JA", "EN"]:
+            direction = "zh2ja" if lang_type.upper() in ["JP", "JA"] else "zh2en"
+            headers = {"Authorization": f"Bearer {api_key}"}
+            payload = {
+                "text": text,
+                "direction": direction
+            }
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        "http://api.apollodorus.xyz/translate",
+                        json=payload,
+                        headers=headers,
+                        timeout=15
+                    ) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            translated_text = data.get("translation", text)
+                        else:
+                            bot.logger.warning(f"[MaiReply] 翻译接口异常, HTTP状态码: {resp.status}")
+            except Exception as e:
+                bot.logger.error(f"[MaiReply] 翻译API请求失败: {e}")
+
+        # 2. TTS 合成发送逻辑
+        try:
+            from run.mai_reply.service.HoliveTTS import HoliveTTS
+            tts = HoliveTTS()
+            bot.logger.info(f"[MaiReply] 正在后台合成语音 | 角色: {speaker} | 文本: {translated_text}")
+            save_path=f"data/voice/cache/{uuid.uuid4()}.wav"
+            # synthesize 方法内部也是异步的，耗时处理均不阻塞主进程
+            audio_bytes = await tts.synthesize_to_file(
+                text=translated_text,
+                speaker=speaker,
+                language=lang_type.upper(),
+                save_as=save_path
+
+            )
+
+            await bot.send(event,Record(file=save_path))
+            bot.logger.info("[MaiReply] 后台语音发送完成！")
+        except Exception as e:
+            bot.logger.error(f"[MaiReply] TTS合成或发送发生异常: {e}")
+            traceback.print_exc()
+
+
     # ------------------------------------------------------------------ 辅助
     async def _get_user_name(self, bot, event, user_id: int, group_id: Optional[int]) -> str:
         try:
             if group_id:
                 info = await bot.get_group_member_info(group_id=group_id, user_id=user_id)
-                name=info["data"]["nickname"]
-                #name = (info or {}).get("card") or (info or {}).get("nickname", "")
+                name = info["data"]["nickname"]
             else:
                 info = await bot.get_stranger_info(user_id=user_id)
                 name = info["data"]["nickname"]
@@ -259,7 +290,7 @@ class ReplyEngine:
     async def _get_group_name(self, bot, group_id: int) -> str:
         try:
             info = await bot.get_group_info(group_id=group_id)
-            name=info["data"]["group_name"]
+            name = info["data"]["group_name"]
             return name.strip() or str(group_id)
         except Exception:
             return str(group_id)
