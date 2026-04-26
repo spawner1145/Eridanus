@@ -33,8 +33,23 @@ from run.mai_reply.service.concurrency import ConcurrencyController
 logger=get_logger(__name__)
 
 class ReplyEngine:
+    _instance = None
+    _initialized = False
 
-    def __init__(self, config):
+    def __new__(cls, config=None, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(ReplyEngine, cls).__new__(cls)
+        return cls._instance
+
+    # --------------------------------------------------
+
+    def __init__(self, config=None):
+        # 如果已经初始化过，就直接跳过，防止重置各个子模块的状态
+        if self._initialized:
+            return
+
+        if config is None:
+            raise ValueError("首次实例化 ReplyEngine 时必须传入 config 参数！")
         self.cfg = config
         self.llm = LLMClient(config)
         self.emotion = EmotionSystem(config)

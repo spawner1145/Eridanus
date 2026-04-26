@@ -18,9 +18,9 @@ async def weather_query(proxy,api_key,location):
         return data["results"]
 async def free_weather_query(city):
     async with httpx.AsyncClient() as client:
-        r=await client.get(f"https://api.52vmy.cn/api/query/tian/three?city={city}")
+        r=await client.get(f"https://uapis.cn/api/v1/misc/weather?city={city}")
         data=r.json()
-        return f"{city},{data['data']['data'][1]}"
+        return f"{city},{data}"
 
 if __name__ == '__main__':
     import asyncio
