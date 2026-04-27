@@ -85,6 +85,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                     "prompt": full_prompt,
                     "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
                     "model": config.ai_generated_art.config["gptimage2"]["model"],
+                    "resolution": config.ai_generated_art.config["gptimage2"]["resolution"] or "1K",
                 }
                 user_dict.pop(uid)  # 立即清理用户数据，避免重复提交
 
@@ -106,6 +107,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                         payload = {
                             "prompt": full_prompt,
                             "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
+                            "resolution": config.ai_generated_art.config["gptimage2"]["resolution"] or "1K",
                             "model": config.ai_generated_art.config["gptimage2"]["model"],
                             "response_format": "url",  # 或 "b64_json"
                             "n": 1,
