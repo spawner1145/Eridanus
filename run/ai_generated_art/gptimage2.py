@@ -1,5 +1,6 @@
 import traceback
 
+import aiofiles
 import httpx
 import os
 import asyncio
@@ -63,14 +64,17 @@ def main(bot: ExtendBot, config: YAMLManager):
 
             try:
                 # 准备文件流
+                import io
+
+                # 准备文件流（异步读取到内存）
                 file_objects = []
-                # 注意：这里需要保存打开的文件句柄，确保在请求发送前不被关闭
-                for i, path in enumerate(user_dict[uid]["image"]):
+                for path in user_dict[uid]["image"]:
                     if os.path.exists(path):
-                        f = open(path, "rb")
-                        # 格式: (字段名, (文件名, 文件流, MIME类型))
-                        # 使用 "images" 作为字段名，对应你 API 支持的多图上传
-                        file_objects.append(("images", (os.path.basename(path), f, "image/png")))
+                        async with aiofiles.open(path, "rb") as f:
+                            content = await f.read()
+                        file_objects.append(
+                            ("images", (os.path.basename(path), io.BytesIO(content), "image/png"))
+                        )
 
                 headers = {"Authorization": f"Bearer {apikey}"}
                 data = {
@@ -122,8 +126,6 @@ def main(bot: ExtendBot, config: YAMLManager):
 
 
                 await request_api(0)
-                for _, (_, f, _) in file_objects:
-                    f.close()
 
             except Exception as e:
                 traceback.print_exc()

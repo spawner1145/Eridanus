@@ -2,6 +2,7 @@ import base64
 import os
 import re
 
+import aiofiles
 import httpx
 
 from developTools.message.message_components import Image
@@ -58,38 +59,38 @@ async def text2img(bot,event,config,prompt,is_about_bot=False):
     apikey = config.ai_generated_art.config["gptimage2"]["apikey"]
     headers = {"Authorization": f"Bearer {apikey}"}
     if is_about_bot:
-        """
-        实际上这里就要用图像编辑的逻辑了
-        """
         base_url = "http://api.apollodorus.xyz/v1"
-        bot_oc=config.ai_generated_art.config["gptimage2"]["bot_oc"]
-        extra_prompt=config.ai_generated_art.config["gptimage2"]["extra_prompt"]
-        character_anchor=bot_name+config.ai_generated_art.config["gptimage2"]["character_anchor"]
+        bot_oc = config.ai_generated_art.config["gptimage2"]["bot_oc"]
+        extra_prompt = config.ai_generated_art.config["gptimage2"]["extra_prompt"]
+        character_anchor = bot_name + config.ai_generated_art.config["gptimage2"]["character_anchor"]
         prompt_text = (
-            f"【角色参考】附图为{bot_name}的基本形像设定图"
-            f"请以此图为唯一外貌依据。\n"
+            f"【角色参考】附图为{bot_name}的设定图，仅作为外貌参考（发色、瞳色、发型），"
+            f"请在保持角色辨识度的前提下进行完整重绘。\n"
             f"【角色特征锚点】{character_anchor}\n"
             f"【绘制任务】根据以下描述绘制{bot_name}：{prompt}。\n"
-            f"场景、构图、表情、姿势如未明确指定可自由发挥，但角色外貌必须与参考图一致，"
-            f"不得改变发色、瞳色、脸型等核心特征。\n"
-            f"【画风一致性】必须和设定图画风保持一致"
+            f"必须为全新高分辨率重绘，而不是对原图进行模糊放大或局部修改。\n"
+            f"【细节要求】全身清晰，服装、手部、背景细节完整且清楚。\n"
+            f"【画质要求】masterpiece, best quality, ultra detailed, 4k, sharp focus。\n"
+            f"【负面约束】no blur, no low resolution, no smudging, no soft focus。\n"
+            f"【画风一致性】整体风格接近设定图，但允许自然细化。\n"
             f"【额外要求】{extra_prompt}"
         )
-        with open(bot_oc, "rb") as f1:
-            resp = httpx.post(
+        async with aiofiles.open(bot_oc, "rb") as f1:
+            file_content = await f1.read()
+
+        async with httpx.AsyncClient(timeout=None, headers=headers) as client:
+            resp = await client.post(
                 f"{base_url}/images/edits",
                 files=[
-                    ("images", (os.path.basename(bot_oc), f1, "image/png")),
+                    ("images", (os.path.basename(bot_oc), file_content, "image/png")),
                 ],
                 data={
                     "prompt": prompt_text,
                     "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
                     "model": config.ai_generated_art.config["gptimage2"]["model"],
                 },
-                timeout=None,
-                headers=headers,
             )
-            await bot.send(event,Image(file=resp.json()["data"][0]["url"]))
+        await bot.send(event, Image(file=resp.json()["data"][0]["url"]))
 
     else:
 
