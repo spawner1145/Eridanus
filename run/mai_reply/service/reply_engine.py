@@ -268,14 +268,14 @@ class ReplyEngine:
             bot.logger.info(f"[MaiReply] 正在后台合成语音 | 角色: {speaker} | 文本: {translated_text}")
             save_path = f"data/voice/cache/{uuid.uuid4()}.wav"
             # synthesize 方法内部也是异步的，耗时处理均不阻塞主进程
-            audio_bytes = await tts.synthesize_to_file(
+            audio_path = await tts.synthesize_to_file(
                 text=translated_text,
                 speaker=speaker,
                 language=lang_type.upper(),
                 save_as=save_path
             )
 
-            await bot.send(event, Record(file=save_path))
+            await bot.send(event, Record(file=audio_path))
             bot.logger.info("[MaiReply] 后台语音发送完成！")
         except Exception as e:
             bot.logger.error(f"[MaiReply] TTS合成或发送发生异常: {e}")
