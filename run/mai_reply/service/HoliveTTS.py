@@ -4,7 +4,7 @@ import random
 import string
 import json
 from typing import Optional
-
+from run.ai_voice.service.PrettyDerbyTTS import PrettyDerby_TTS
 
 BASE_URL = "https://kit-lemonfoot-hololive-style-bert-vits2.hf.space"
 
@@ -71,7 +71,17 @@ SPEAKERS = {
     "IchijouRirika":     {"fn_index": 49, "model_name": "SBV2_HoloJPTest",        "model_path": "model_assets/SBV2_HoloJPTest/SBV2_HoloJPTest.safetensors",                 "style": "Neutral"},
     "JuufuuteiRaden":    {"fn_index": 50, "model_name": "SBV2_HoloJPTest3",       "model_path": "model_assets/SBV2_HoloJPTest3/SBV2_HoloJPTest3.safetensors",               "style": "Neutral"},
 }
-
+pretty_derby_speakers=[
+    "agnes_digital_爱丽数码_アグネスデジタル",
+    "curren_chan_真机伶_カレンチャン",
+    "matikane_fukukitaru_待兼福来_マチカネフクキタル",
+    "matikane_tannhauser_待兼诗歌剧_マチカネタンホイサ",
+    "mejiro_mcqueen_目白麦昆_メジロマックイーン",
+    "natuki",
+    "nice_nature_优秀素质_ナイスネイチャ",
+    "rice_shower_米浴_ライスシャワー",
+    "satono_diamond_里见光钻_サトノダイヤモンド"
+]
 
 class HoliveTTS:
     _instance: Optional["HoliveTTS"] = None
@@ -201,10 +211,13 @@ class HoliveTTS:
         language: str = "JP",
     ) -> None:
         """合成语音并保存到文件。"""
+        if speaker in pretty_derby_speakers:
+            return await PrettyDerby_TTS(text,speaker)
         data = await self.synthesize(text, speaker, language)
         with open(save_as, "wb") as f:
             f.write(data)
         print(f"[done] {speaker} → {save_as} ({len(data):,} bytes)")
+        return save_as
 
     async def synthesize_all(
         self,
