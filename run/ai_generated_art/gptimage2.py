@@ -31,12 +31,16 @@ def main(bot: ExtendBot, config: YAMLManager):
             # 假设 gptimage2_text2img 是异步的
             await bot.send(event, "正在生成图片，请稍候...")
 
-            await text2img(bot, event, config, prompt,True if bot_name in prompt else False)
+            asyncio.create_task(
+                text2img(bot, event, config, prompt, True if bot_name in prompt else False)
+            )
             return
         elif event.pure_text.startswith("/生图"):
             prompt= event.pure_text.replace("/生图","",1).strip()
             await bot.send(event, "正在生成图片，请稍候...")
-            await text2img(bot, event, config, prompt,True if bot_name in prompt else False)
+            asyncio.create_task(
+                text2img(bot, event, config, prompt, True if bot_name in prompt else False)
+            )
             return
         # 2. 进入编辑模式
         if event.pure_text == "/图像编辑":
