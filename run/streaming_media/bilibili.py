@@ -119,6 +119,7 @@ async def bili_dynamic_loop(bot, config):
 
 def main(bot, config):
     """插件主入口"""
+    return
 
     @bot.on(LifecycleMetaEvent)
     async def start_bili_monitor(event):

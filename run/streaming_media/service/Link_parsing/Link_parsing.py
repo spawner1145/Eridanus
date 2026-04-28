@@ -5,7 +5,7 @@ import re
 from datetime import datetime
 import traceback
 from developTools.utils.logger import get_logger
-from run.streaming_media.service.Link_parsing.core.common import json_init
+
 from run.streaming_media.service.Link_parsing.core import *
 import os
 try:
@@ -17,6 +17,7 @@ except ImportError:
 logger=get_logger("Link_parsing")
 linking_cache = {}
 import time
+from run.streaming_media.service.Link_parsing.core.common import json_init
 
 async def link_prising(url,filepath=None,proxy=None,type=None):
     json_check = copy.deepcopy(json_init)
@@ -36,8 +37,10 @@ async def link_prising(url,filepath=None,proxy=None,type=None):
     global linking_cache
     if url in linking_cache:
         #代表有缓存，开始判断返回
-        if type != 'QQ_Check' and os.path.exists(linking_cache[url]['path']):
-            return linking_cache[url]['info']
+        try:
+            if type != 'QQ_Check' and os.path.exists(linking_cache[url]['path']):
+                return linking_cache[url]['info']
+        except:pass
         if type == 'QQ_Check':
             return linking_cache[url]['info']
         linking_cache.pop(url)
@@ -136,7 +139,7 @@ if __name__ == "__main__":#测试用，不用管
     url = 'https://weibo.com/6625787085/5245617985290482'
     url = 'https://x.com/hn_luotianyi712/status/2003787316100509941?s=46'
     url = 'https://x.com/h_ta6_h_h_ta6_h/status/2004134080229908552?s=46'
-    url = 'https://t.bilibili.com/1150887906322153510?share_source=pc_native'
+    url = 'https://t.bilibili.com/1195882507747196951'
     asyncio.run(link_prising(url))
     #asyncio.run(youxi_pil_new_text())
 

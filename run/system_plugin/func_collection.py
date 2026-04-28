@@ -94,6 +94,8 @@ async def call_user_data_register(bot,event,config):
         data["data"]["area"])
     await bot.send(event, r)
 async def call_user_data_query(bot,event,config):
+    if config.system_plugin.config["user_data"]["是否启用个人信息查询"] is False:
+        return
     user_data = await get_user(event.user_id, event.sender.nickname)
     uer_sign_days = len(user_data.signed_days)
     #await bot.send(event, str(r))
@@ -115,6 +117,8 @@ async def call_user_data_query(bot,event,config):
     await bot.send(event, Image(file=(await manshuo_draw(draw_list))))
 
 async def call_user_data_sign(bot,event,config):
+    if config.system_plugin.config["user_data"]["是否启用签到"] is False:
+        return
     context, userid, nickname = event.pure_text, event.sender.user_id, event.sender.nickname
     sign_str = await record_sign_in(event.user_id)
     if '今天已经签到过了' in sign_str and event.sender.user_id!=config.common_config.basic_config["master"]["id"]:

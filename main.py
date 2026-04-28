@@ -19,6 +19,8 @@ from developTools.adapters.websocket_adapter import WebSocketBot
 from framework_common.framework_util.DualBotManager import DualBotManager
 from framework_common.framework_util.bot_info import bot_info_collect
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, LifecycleMetaEvent
+#在bot启动时传入时间戳，这样避免B站监控循环重复启动
+from run.streaming_media.service.bili_dynamic.data.data_deal import dynamic_run_is_enable
 
 # 全局插件管理器实例
 plugin_manager = None
@@ -178,6 +180,10 @@ def setup_event_handlers():
 
 
 def main_sync():
+
+    """在bot启动时传入时间戳，这样避免B站监控循环重复启动"""
+    asyncio.run(dynamic_run_is_enable('bot_up'))
+
     """同步主函数，用于处理事件循环"""
     global dual_manager
 
