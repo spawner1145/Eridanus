@@ -10,6 +10,7 @@ from typing import List, Dict
 
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.system_logger import get_logger
+from run.mai_reply.service.simple_chat import simplified_chat
 
 logger = get_logger(__name__)
 
@@ -50,6 +51,8 @@ class AuditSystem:
         if self.enable:
             logger.info("[MaiReply Audit] 内容审查已启用，每 %d 轮对话触发一次审查，使用模型: %s",)
         self.model = config.mai_reply.config["trigger_llm"]["model"]
+        self.api_key = config.mai_reply.config["trigger_llm"]["api_key"]
+        self.base_url = config.mai_reply.config["trigger_llm"]["base_url"]
         self.trigger_turns = config.mai_reply.config["context"]["anti_nsfw"]["trigger_turns"]
 
     def _counter_key(self, user_id: int, group_id) -> str:
@@ -87,12 +90,15 @@ class AuditSystem:
                 bot_name=bot_name, user_name=user_name, history_text=history_text,
             )
             logger.info(f"[MaiReply Audit] 触发审查，用户: {user_name}({user_id}) 群聊: {group_id or '私聊'} 对话轮数: {self.trigger_turns} 审查模型: {self.model}")
-            # 调用大模型执行审查
-            summary = await self._llm.chat(
-                messages=[{"role": "user", "content": prompt}],
-                system_prompt="你是一个严格的内容安全防御矩阵，只负责客观审查。",
-                model=self.model,
-            )
+            if not self.base_url:
+                # 调用大模型执行审查
+                summary = await self._llm.chat(
+                    messages=[{"role": "user", "content": prompt}],
+                    system_prompt="你是一个严格的内容安全防御矩阵，只负责客观审查。",
+                    model=self.model,
+                )
+            else:
+                summary = await simplified_chat(self.base_url,[{"role": "user", "content": prompt}],model=self.model,api_key=self.api_key,system_prompt="你是一个严格的内容安全防御矩阵，只负责客观审查。")
             logger.info(f"[MaiReply Audit] 审查结果: {summary}")
             if not summary:
                 return

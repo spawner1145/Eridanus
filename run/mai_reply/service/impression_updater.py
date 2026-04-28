@@ -9,6 +9,7 @@ from typing import List, Dict
 
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.system_logger import get_logger
+from run.mai_reply.service.simple_chat import simplified_chat
 
 logger=get_logger(__name__)
 SUMMARY_TRIGGER_TURNS = 4   # 【修改】从 10 改为 4，每聊 4 轮就快速更新一次对这个人的印象
@@ -28,7 +29,9 @@ class ImpressionUpdater:
         # 计数器：(user_id, group_id) -> turn_count
         self._counters: Dict[str, int] = {}
         cfg=YAMLManager.get_instance()
-        self.model=cfg.mai_reply.config["context"]["impression_model"] if cfg.mai_reply.config["context"]["impression_model"] else None
+        self.model=cfg.mai_reply.config["context"]["impression_model"] if cfg.mai_reply.config["context"]["impression_model"] else cfg.mai_reply.config["trigger_llm"]["model"]
+        self.api_key = cfg.mai_reply.config["trigger_llm"]["api_key"]
+        self.base_url = cfg.mai_reply.config["trigger_llm"]["base_url"]
 
     def _counter_key(self, user_id: int, group_id) -> str:
         return f"{group_id or 'priv'}:{user_id}"
@@ -61,12 +64,14 @@ class ImpressionUpdater:
             prompt = SUMMARY_PROMPT_TEMPLATE.format(
                 bot_name=bot_name, user_name=user_name, history_text=history_text,
             )
-
-            summary = await self._llm.chat(
-                messages=[{"role": "user", "content": prompt}],
-                system_prompt="你是一个情感潜意识提取器，帮助机器人记住对别人的印象和喜恶。",
-                model=self.model,
-            )
+            if not self.base_url:
+                summary = await self._llm.chat(
+                    messages=[{"role": "user", "content": prompt}],
+                    system_prompt="你是一个情感潜意识提取器，帮助机器人记住对别人的印象和喜恶。",
+                    model=self.model,
+                )
+            else:
+                summary=await simplified_chat(self.base_url, [{"role": "user", "content": prompt}],self.model,self.api_key,system_prompt="你是一个情感潜意识提取器，帮助机器人记住对别人的印象和喜恶。")
             if summary:
                 self._ctx.update_impression(user_id, summary.strip())
                 logger.info(f"[MaiReply] 已更新对 {user_name}({user_id}) 的印象: {summary.strip()}")
