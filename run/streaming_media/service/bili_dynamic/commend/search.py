@@ -59,20 +59,24 @@ async def bili_up_search_msg(target = None, bot = None, event = None):
     u = user.User(target)
     info = await u.get_user_info()
     relation_info = await u.get_relation_info()
-    top_videos_info = await u.get_top_videos()
+
     #pprint.pprint(info)
     school = info['school'].get('name','')
-    right_icon = info['vip']['label'].get('img_label_uri_hans_static',None)
+    #right_icon = info['vip']['label'].get('img_label_uri_hans_static',None)
     manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
                          {'type': 'avatar', 'subtype': 'common', 'img': [info['face']], 'upshift_extra': 20,
                           'content': [f"[name]{info['name']}[/name] Lv.{info['level']} {school}\n[time]{info['sign']}[/time]"],
                           'background': ['https://i1.hdslb.com/' + info['top_photo']]},
                          f"关注数：{relation_info['following']}     粉丝数：{relation_info['follower']}" ,
-                         {'type': 'img', 'subtype': 'common_with_des', 'img': [top_videos_info['pic']],
+                         ]
+    try:
+        top_videos_info = await u.get_top_videos()
+        manshuo_draw_json.append({'type': 'img', 'subtype': 'common_with_des', 'img': [top_videos_info['pic']],
                           'label': ['代表作'],
                           'content': [f"{top_videos_info['title']}\n播放量：{top_videos_info['stat']['view']}\n"
                                       f"[des]点赞数：{top_videos_info['stat']['like']}  "
                                       f"投币数：{top_videos_info['stat']['coin']}  "
-                                      f"收藏数：{top_videos_info['stat']['favorite']}[/des]"]}]
-
+                                      f"收藏数：{top_videos_info['stat']['favorite']}[/des]"]})
+    except:
+        manshuo_draw_json.append('[title]代表作[/title]\n无置顶视频 or 代表作')
     return manshuo_draw_json

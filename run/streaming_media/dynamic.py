@@ -34,6 +34,18 @@ def main(bot, config):
         if userid != config.common_config.basic_config["master"]["id"]: return
         await bili_login(bot,event)
 
+    #B站账号状态检测
+    @bot.on(GroupMessageEvent)
+    async def bilibili_status_commend(event: GroupMessageEvent):
+        context, userid=event.pure_text, event.sender.user_id
+        order_list = ['/bili status']
+        if context.lower() not in order_list: return
+        info = await bili_up_status_check()
+        if info['status']:msg = f"账号：{info['up_name']}\n当前账号登录状态有效喵\n已登录 {info['time_msg']} 喵"
+        elif info['status'] is False and info['up_name'] == '请登录的说':msg = '还未登录账号喵\n请使用 “/bili login” 来登录喵'
+        else:msg = f"账号：{info['up_name']}\n登录态失效喵，请重新登录的喵\n已登录 {info['time_msg']} 喵"
+        await bot.send(event, msg)
+
     #up主动态启用（默认就是启用的）
     @bot.on(GroupMessageEvent)
     async def bilibili_dynamic_enable_commend(event: GroupMessageEvent):
@@ -153,6 +165,7 @@ def main(bot, config):
             '- [tag]添加订阅[/tag]：/bili add + upid,  eg: /bili add 389254364\n'
             '- 取消订阅：/bili remove + upid\n'
             '- 查看订阅up主们：/bili list\n'
+            '- 查看当前登录账号状态：/bili status\n'
             '- 搜索一个up：/bili search + name,  eg: /bili search 漫-朔\n'
             '- 重新添加订阅up至关注分组：/bili resub\n'
             '- 超级管理员 启用订阅某up：/bili enable + upid\n'

@@ -11,6 +11,7 @@ import asyncio
 
 async def bili_login(bot = None, event = None) -> None:
     recall_id, cookies_check = None, ''
+    day_info = await date_get()
     qr = login_v2.QrCodeLogin(platform=login_v2.QrCodeLoginChannel.WEB) # 生成二维码登录实例，平台选择网页端
     await qr.generate_qrcode()                                          # 生成二维码
     #print(qr.get_qrcode_terminal())                                     # 生成终端二维码文本，打印
@@ -29,6 +30,7 @@ async def bili_login(bot = None, event = None) -> None:
     info['cookies']['dedeuserid'] = cookies['DedeUserID']
     info['cookies']['ac_time_value'] = cookies['ac_time_value']
     info['cookies']['subscribe_group_id'] = ''
+    info['cookies']['login_time'] = day_info['time']
     #await data_save(info)
     msg = '登录成功喵'
     logger.info(msg)
@@ -62,7 +64,33 @@ async def bili_login(bot = None, event = None) -> None:
             await bot.send(event, msg)
         await data_save(info)
 
-
+#简易查询当前账号的状态
+async def bili_up_status_check():
+    data_info = await data_init()
+    day_info = await date_get()
+    time_tamp = day_info['time'] - data_info['cookies']['login_time']
+    days = time_tamp // 86400
+    time_tamp %= 86400
+    hours = time_tamp // 3600
+    time_tamp %= 3600
+    minutes = time_tamp // 60
+    time_tamp %= 60
+    user_info = data_info['dynamic_info'][f'up_info']
+    user_info['time_msg'] = f"{days}天 {hours}时 {minutes}分 {time_tamp}秒"
+    if data_info['cookies']['dedeuserid'] == '':
+        user_info['status'] = False
+        user_info['up_name'] = '请登录的说'
+        return user_info
+    user_info['status'] = True
+    up_info = user.User(int(data_info['cookies']['dedeuserid']))
+    info = await up_info.get_user_info()
+    user_info['up_name'] = info['name']
+    credential = Credential(sessdata=data_info['cookies']['sessdata'], bili_jct=data_info['cookies']['bili_jct'],
+                            buvid3=data_info['cookies']['buvid3'], dedeuserid=data_info['cookies']['dedeuserid'])
+    # 检测credential需不需要刷新，此处缺少相关值无法自动刷新，只能重新登录
+    if await credential.check_refresh():
+        user_info['status'] = False
+    return user_info
 
 if __name__ == '__main__':
     sync(bili_login())

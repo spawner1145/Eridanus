@@ -188,7 +188,7 @@ async def bili_dynamic_loop(bot, config):
         await data_save(data_info)
         del credential
         #以下时间等待主要为了在分钟属于1的时候开始检测
-        interval = config.streaming_media.config["bili_dynamic"]["dynamic_interval"]
+        #interval = config.streaming_media.config["bili_dynamic"]["dynamic_interval"]
         gc.collect()
         await asyncio.sleep(60)
         current_minute, current_second = datetime.now().minute, datetime.now().second

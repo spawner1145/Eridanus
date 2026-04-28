@@ -33,6 +33,7 @@ async def data_init(upid='up_info',day_info=None):
         user_info['info'].setdefault(key, {})
     for key in ['sessdata','bili_jct','buvid3','dedeuserid','ac_time_value','subscribe_group_id']:
         user_info['info']['cookies'].setdefault(key, '')
+    user_info['info']['cookies'].setdefault('login_time', day_info['time'])
     user_info['info']['dynamic_info'].setdefault(upid, {})
     for key in ['check_time', 'enable', 'up_name','new_dynamic_id','is_push']:
         user_info['info']['dynamic_info'][upid].setdefault(key, '')
