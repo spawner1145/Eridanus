@@ -28,6 +28,7 @@ class AvatarModule:
                 setattr(self, key, get_abs_path(value))
 
 
+
     async def common(self):
         await icon_backdrop_check(self.__dict__)  # 进行背景模块的初始化
         await init(self.__dict__)#对该模块进行初始化

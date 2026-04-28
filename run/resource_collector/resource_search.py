@@ -291,14 +291,14 @@ async def call_jm(bot,event,config,mode="preview",comic_id=607279,serach_topic=N
                         pdf_path_org = f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}.pdf"
                         JM_name = await JM_search_id(comic_id)
                         copy_path = f'/mnt/video_disk/temp/JM/{comic_id}_{JM_name}.pdf'
-                        pdf_url = f"http://bangumi.manshuo.ink:8095/JM"
+                        pdf_url = f"https://openlist.manshuo.ink/JM"
                         shutil.copy(pdf_path_org, copy_path)
                         msg_pdf = f"加密成功({comic_id})\n可移步至此网址查看非加密版本：\n{pdf_url}"
 
                     for group_id in operating[comic_id]:
                         event.group_id = group_id  # 修改数据实现切换群聊，懒狗实现，ps：那确实懒狗
                         msg = await bot.send(event, "下载完成了( >ρ< ”)。请等待上传完成。")
-                        await bot.send(event, File(file=pdf_path))
+                        #await bot.send(event, File(file=pdf_path))
                         if config.resource_collector.config["JMComic"]["autoEncrypt"]:
                             await bot.send(event, msg_pdf)
                         await delay_recall(bot, msg)

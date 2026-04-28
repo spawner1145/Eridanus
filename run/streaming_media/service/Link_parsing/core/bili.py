@@ -17,6 +17,9 @@ from run.streaming_media.service.bilibili.BiliCooikeManager import get_bili_cook
 import random
 import pprint
 import traceback
+#from run.streaming_media.service.bili_dynamic.data import *
+
+
 async def bili_init():
     BILIBILI_HEADER = {
         'User-Agent':
@@ -24,20 +27,16 @@ async def bili_init():
             'Safari/537.36',
         'referer': 'https://www.bilibili.com',
     }
-    try:cookies = await get_bili_cookies(bot=None,check=False)
-    except:cookies=[]
-    #pprint.pprint(cookies)
-    if ini_login_Link_Prising(type=1) is not None:
-        data = ini_login_Link_Prising(type=1)
-        BILI_SESSDATA: Optional[str] = f'{data["sessdata"]}'
-        credential = Credential(sessdata=BILI_SESSDATA, bili_jct=data['bili_jct'])
-    elif cookies:
-        BILI_SESSDATA,bili_jct,buvid3,DedeUserID='','','',''
-        for cookie in cookies:
-            if cookie['name'] == 'SESSDATA':BILI_SESSDATA = cookie['value']
-            elif cookie['name'] == 'bili_jct': bili_jct=cookie['value']
-            elif cookie['name'] == 'buvid3': buvid3 = cookie['value']
-            elif cookie['name'] == 'DedeUserID':DedeUserID = cookie['value']
+    # try:
+    #     cookies = await data_init()
+    # except:cookies = None
+    cookies = None
+    if cookies is not None:
+        BILI_SESSDATA = cookies['cookies']['sessdata']
+        bili_jct = cookies['cookies']['bili_jct']
+        buvid3 = cookies['cookies']['buvid3']
+        DedeUserID = cookies['cookies']['dedeuserid']
+        ac_time_value = cookies['cookies']['ac_time_value']
         credential = Credential(sessdata=BILI_SESSDATA, bili_jct=bili_jct, buvid3=buvid3,dedeuserid=DedeUserID)
     else:
         BILI_SESSDATA: Optional[str] = f' '
