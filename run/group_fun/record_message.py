@@ -8,6 +8,10 @@ from framework_common.manshuo_draw import *
 from datetime import datetime, timedelta
 # 构建分隔符正则表达式 
 separators_pattern = '|'.join(re.escape(sep) for sep in ["|", "｜"])
+message_list_global = {}
+
+
+
 
 async def parse_message_segments(event,bot):
     """解析消息段，将图片正确分配到对应的消息段"""
@@ -35,6 +39,7 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)
     async def today_message(event: GroupMessageEvent):
+        global message_list_global
         context, userid, nickname, group_id, is_at = event.pure_text, str(event.sender.user_id), event.sender.nickname, int(event.group_id),False
         if event.message_chain.has(At) and event.message_chain.has(Text):
             is_at = True
@@ -54,13 +59,36 @@ def main(bot, config):
                 await bot.send(event, '这位群友还没有说过怪话呢\n发送“消息记录”来引用记录群友的怪话吧 ！')
                 return
         random_file = random.choice(files)
-        await bot.send(event, Image(file=f'{img_path_save}/{random_file}'))
+        message_id_info = await bot.send(event, Image(file=f'{img_path_save}/{random_file}'))
+        if message_id_info is not None:
+            message_list_global[message_id_info['data']['message_id']] = f'{img_path_save}/{random_file}'
+
+    @bot.on(GroupMessageEvent)
+    async def record_message_delete(event: GroupMessageEvent):
+        global message_list_global
+        if event.get("reply") and event.get("text"):
+            context = event.get("text")[0].strip().replace(' ','')
+            if context not in ['删除','清理',"删掉"]: return
+        else:
+            return
+        message_id = int(event.get("reply")[0]["id"])
+        if message_id not in message_list_global:
+            return
+        img_path = message_list_global[message_id]
+        message_list_global.pop(message_id)
+        if os.path.isfile(img_path):
+            os.remove(img_path)
+        await bot.recall(message_id)
+        await bot.send(event, '该消息记录已被清理喵')
+
+
 
     @bot.on(GroupMessageEvent)
     async def record_message_reply(event: GroupMessageEvent):
+        global message_list_global
         if event.get("reply") and event.get("text"):
             context = event.get("text")[0].strip().replace(' ','')
-            if context not in ['记录消息','消息记录',"动词名词","名词动词"]: return
+            if context not in ['记录消息','消息记录','入典']: return
         else:
             return
         bot.logger.info("开始进行消息记录")
@@ -105,9 +133,10 @@ def main(bot, config):
                     ext = os.path.splitext(filename)[1].lower()  # 获取扩展名并转小写
                     if ext in image_extensions:
                         img_number += 1
-            if f'{userid}_{img_number}' in file_list:
+
+            if f'{userid}_{img_number}.png' in file_list:
                 for i in range(len(file_list)):
-                    if f'{userid}_{img_number}' in file_list: img_number += 1
+                    if f'{userid}_{img_number}.png' in file_list: img_number += 1
                     else:break
         img_name_save = f'{userid}_{img_number}.png'
         # 保证存储文件夹存在
@@ -118,7 +147,10 @@ def main(bot, config):
         {'type': 'img', 'subtype': 'common_with_des_right','img': [f"https://q1.qlogo.cn/g?b=qq&nk={userid}&s=640"],
          'content': [f'{context}\n{check_name}']},
         ]
-        await bot.send(event, Image(file=(await manshuo_draw(draw_list))))
+        img_path = await manshuo_draw(draw_list)
+        message_id_info = await bot.send(event, Image(file=img_path))
+        if message_id_info is not None:
+            message_list_global[message_id_info['data']['message_id']] = f'{img_path}'
 
 
 
@@ -126,9 +158,10 @@ def main(bot, config):
     async def record_message_reply_forword(event: GroupMessageEvent):
         if event.get("reply") and event.get("text"):
             context = event.get("text")[0].strip().replace(' ','')
-            if context not in ['记录消息','消息记录']: return
+            if context not in ['记录消息','消息记录','入典']: return
         else:
             return
+        global message_list_global
         event_obj = await bot.get_msg(int(event.get("reply")[0]["id"]))
         if event_obj is None or event_obj.message is None: return
         if event_obj.message[0]['type'] != 'forward': return
@@ -198,7 +231,10 @@ def main(bot, config):
         #print(f'final img width: {img_width}')；
         #pprint.pprint(draw_list)
         draw_list.append({'type': 'basic_set', 'img_width': img_width, 'font_title_size':125,'img_path_save':img_path_save, 'img_name_save': img_name_save, 'padding_up_layer':10})
-        await bot.send(event, Image(file=(await manshuo_draw(draw_list))))
+        img_path = await manshuo_draw(draw_list)
+        message_id_info = await bot.send(event, Image(file=img_path))
+        if message_id_info is not None:
+            message_list_global[message_id_info['data']['message_id']] = f'{img_path}'
 
 
 

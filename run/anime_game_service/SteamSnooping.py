@@ -131,7 +131,9 @@ def main(bot, config):
             userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
         else:
             check = context.lower().replace('steamadd', '').replace('steamremove', '').strip()
-            if check != '' and bool(re.match(r'^[-+]?(\d+(\.\d*)?|\.\d+)$', check)): userid = int(check)
+            if check != '' and bool(re.match(r'^[-+]?(\d+(\.\d*)?|\.\d+)$', check)):
+                if check.isdigit(): userid = int(check)
+                else: return
         if context.lower().startswith('steamadd') and context.lower() != 'steamaddall':
             steaminfodata =await db.read_user(userid)
             if not (steaminfodata and  'SteamSnooping' in steaminfodata and 'steamid' in steaminfodata['SteamSnooping']):
