@@ -20,10 +20,11 @@ def main(bot, config):
                 return
             if await dynamic_run_is_enable():
                 bot.logger.info_func("B站动态监控循环启动")
-                current_minute, current_second = datetime.now().minute, datetime.now().second
-                wait_seconds = ((1 - current_minute % 10) % 10) * 60 - current_second
-                await asyncio.sleep(wait_seconds)
-                asyncio.create_task(bili_dynamic_loop(bot, config))
+                # current_minute, current_second = datetime.now().minute, datetime.now().second
+                # wait_seconds = ((1 - current_minute % 10) % 10) * 60 - current_second
+                # await asyncio.sleep(wait_seconds)
+                # asyncio.create_task(bili_dynamic_loop(bot, config))
+                asyncio.create_task(bili_dynamic_loop_new(bot, config))
 
     #B站登录
     @bot.on(GroupMessageEvent)
@@ -31,7 +32,9 @@ def main(bot, config):
         context, userid=event.pure_text, event.sender.user_id
         order_list = ['/bili_login', 'b站登录', '/bili login', '/bililogin']
         if context.lower() not in order_list: return
-        if userid != config.common_config.basic_config["master"]["id"]: return
+        if userid != config.common_config.basic_config["master"]["id"]:
+            await bot.send(event, '您非超级管理员喵')
+            return
         await bili_login(bot,event)
 
     #B站账号状态检测
@@ -41,9 +44,11 @@ def main(bot, config):
         order_list = ['/bili status']
         if context.lower() not in order_list: return
         info = await bili_up_status_check()
-        if info['status']:msg = f"账号：{info['up_name']}\n当前账号登录状态有效喵\n已登录 {info['time_msg']} 喵"
-        elif info['status'] is False and info['up_name'] == '请登录的说':msg = '还未登录账号喵\n请使用 “/bili login” 来登录喵'
-        else:msg = f"账号：{info['up_name']}\n登录态失效喵，请重新登录的喵\n已登录 {info['time_msg']} 喵"
+        if info['status']:msg = (f"账号：{info['up_name']}\n当前账号登录状态有效喵\n已登录 {info['time_msg']} 喵\n"
+                                 f"上次检测动态时间：\n{info['monitor_time']}\n上次新动态时间：\n{info['check_time']}")
+        elif info['status'] is False and info['up_name'] == '':msg = '还未登录账号喵\n请使用 “/bili login” 来登录喵'
+        else:msg = (f"账号：{info['up_name']}\n登录态失效喵，请重新登录的喵\n已登录 {info['time_msg']} 喵\n"
+                    f"上次检测动态时间：\n{info['monitor_time']}\n上次新动态时间：\n{info['check_time']}")
         await bot.send(event, msg)
 
     #up主动态启用（默认就是启用的）
@@ -77,6 +82,9 @@ def main(bot, config):
         context, userid, groupid = event.pure_text, event.sender.user_id, event.group_id
         order_list = ['/bili add']
         if not any(context.startswith(word) for word in order_list): return
+        if config.streaming_media.config["bili_dynamic"]["is_only_master"] and userid != config.common_config.basic_config["master"]["id"]:
+            await bot.send(event, '您非超级管理员喵')
+            return
         target = re.compile('|'.join(map(re.escape, order_list))).sub('', context).strip()
         if not target.isdigit(): return
         if not (await bili_up_dynamic_monitor_is_enable(target)):
@@ -100,6 +108,9 @@ def main(bot, config):
         context, userid, groupid = event.pure_text, event.sender.user_id, event.group_id
         order_list = ['/bili remove']
         if not any(context.startswith(word) for word in order_list): return
+        if config.streaming_media.config["bili_dynamic"]["is_only_master"] and userid != config.common_config.basic_config["master"]["id"]:
+            await bot.send(event, '您非超级管理员喵')
+            return
         target = re.compile('|'.join(map(re.escape, order_list))).sub('', context).strip()
         if not target.isdigit(): return
         if not (await bili_up_dynamic_monitor_is_enable(target)):
@@ -123,6 +134,9 @@ def main(bot, config):
         context, userid, groupid = event.pure_text, event.sender.user_id, event.group_id
         order_list = ['/bili resub']
         if not any(context.startswith(word) for word in order_list): return
+        if config.streaming_media.config["bili_dynamic"]["is_only_master"] and userid != config.common_config.basic_config["master"]["id"]:
+            await bot.send(event, '您非超级管理员喵')
+            return
         info = await bili_up_subscribe_group_all_ups_resub()
         if info: await bot.send(event, '已成功将所有up添加至相关分组')
         else:await bot.send(event, '登录凭证失效，请重新登录喵')
