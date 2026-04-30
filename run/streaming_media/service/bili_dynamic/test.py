@@ -8,10 +8,10 @@ from framework_common.manshuo_draw import *
 
 async def test():
     info = await data_init()
-    pprint.pprint(info)
+    #pprint.pprint(info)
     # info = await bili_up_dynamic_monitor_add(3546896452815007)
     # pprint.pprint(info)
-    info = await bili_up_subscribe_group_all_ups_resub()
+    info = await bili_user_get_sub_up_dynamic()
     pprint.pprint(info)
 
     # info = await bili_up_dynamic_monitor(161775300)

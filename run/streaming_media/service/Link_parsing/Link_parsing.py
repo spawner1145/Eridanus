@@ -19,7 +19,7 @@ linking_cache = {}
 import time
 from run.streaming_media.service.Link_parsing.core.common import json_init
 
-async def link_prising(url,filepath=None,proxy=None,type=None):
+async def link_prising(url,filepath=None,proxy=None,type=None,credential_bili=None):
     json_check = copy.deepcopy(json_init)
     link_prising_json=None
     try:
@@ -48,7 +48,7 @@ async def link_prising(url,filepath=None,proxy=None,type=None):
         match url:
             case url if 'bili' in url or 'b23' in url:
                 logger.info(f"解析bilibili链接:{url}")
-                link_prising_json = await bilibili(url, filepath=filepath,type=type)
+                link_prising_json = await bilibili(url, filepath=filepath,type=type,credential_bili=None)
             case url if 'douyin' in url:
                 logger.info(f"解析抖音链接:{url}")
                 link_prising_json = await dy(url, filepath=filepath)
@@ -139,7 +139,7 @@ if __name__ == "__main__":#测试用，不用管
     url = 'https://weibo.com/6625787085/5245617985290482'
     url = 'https://x.com/hn_luotianyi712/status/2003787316100509941?s=46'
     url = 'https://x.com/h_ta6_h_h_ta6_h/status/2004134080229908552?s=46'
-    url = 'https://t.bilibili.com/1195882507747196951'
+    url = 'https://www.bilibili.com/opus/1196518265973637123?spm_id_from=333.1365.0.0'
     asyncio.run(link_prising(url))
     #asyncio.run(youxi_pil_new_text())
 
