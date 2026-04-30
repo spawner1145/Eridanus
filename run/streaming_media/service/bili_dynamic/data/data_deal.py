@@ -43,6 +43,7 @@ async def data_init(upid='up_info',day_info=None):
     #     user_info['info']['dynamic_info'][upid]['push_groups'] = []
     return user_info['info']
 
+#检测是否需要启动的函数，距离bot启动一分钟后就不允许重新启动循环
 async def dynamic_run_is_enable(up_type='check'):
     user_info = await db.read_user('bili_dynamic')
     upid = 'up_info'

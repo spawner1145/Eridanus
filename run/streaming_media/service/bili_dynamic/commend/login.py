@@ -1,13 +1,15 @@
 from bilibili_api import login_v2, sync, Credential, user, select_client
 from bilibili_api.user import create_subscribe_group, set_subscribe_group,get_self_info
-select_client("httpx")
+import asyncio
 from ..data import *
 from ..utils import *
 import requests
-import time
+from .monitor import loop_cache
+import datetime
 from developTools.utils.logger import get_logger
 logger=get_logger('bili_dynamic')
-import asyncio
+select_client("httpx")
+
 
 async def bili_login(bot = None, event = None) -> None:
     recall_id, cookies_check = None, ''
@@ -32,42 +34,83 @@ async def bili_login(bot = None, event = None) -> None:
     info['cookies']['subscribe_group_id'] = ''
     info['cookies']['login_time'] = day_info['time']
     #await data_save(info)
-    msg = '登录成功喵'
+    msg = '登录成功喵，正在处理相关数据喵'
+    if bot and event:
+        if recall_id: await bot.recall(recall_id['data']['message_id'])
+        recall_id = await bot.send(event, msg)
     logger.info(msg)
+    msg = ''
     #获取对应up分组并创建一个保存的关注分组
+    credential = Credential(sessdata=cookies['SESSDATA'], bili_jct=cookies['bili_jct'],
+                            buvid3=cookies['buvid3'], dedeuserid=cookies['DedeUserID'])
+    cookies_info = credential.get_cookies()
+    for item in cookies_info:
+        cookies_check += f'{item}={cookies_info[item]};'
     try:
-        credential = Credential(sessdata=cookies['SESSDATA'], bili_jct=cookies['bili_jct'],
-                                buvid3=cookies['buvid3'], dedeuserid=cookies['DedeUserID'])
-        cookies_info = credential.get_cookies()
-        for item in cookies_info:
-            cookies_check += f'{item}={cookies_info[item]};'
         resp = requests.get("https://api.bilibili.com/x/relation/tags",
                             headers={'Cookie': cookies_check, 'User-Agent': 'Mozilla/5.0'},
                             params={'csrf': cookies['bili_jct'] })
         res = resp.json()
-        if res['code'] != 0:
-            return
+        # if res['code'] != 0:
+        #     return
         for group in res['data']:
             if group['name'] == 'Bot关注':
                 info['cookies']['subscribe_group_id'] = group['tagid']
         if info['cookies']['subscribe_group_id'] == '':
             subscribe_group_info = await create_subscribe_group('Bot关注', credential)
             info['cookies']['subscribe_group_id'] = subscribe_group_info['tagid']
-            msg += '\n已成功创建 “Bot关注” 分组，此后订阅的所有up都将分入此组'
+            msg = '已成功创建 “Bot关注” 分组，'
         logger.info('相关分组已确认')
     except Exception as e:
-        msg += '\n用户关注分组创建失败，订阅up请手动关注喵'
+        #创建失败，发出提醒后返回
+        msg = '用户关注分组创建失败，订阅up请手动关注喵'
         logger.error(f'用户关注分组创建失败: {e}')
-    finally:
         if bot and event:
-            if recall_id: await bot.recall(recall_id['data']['message_id'])
             await bot.send(event, msg)
         await data_save(info)
+        return
+
+    #新版要求在此处就要对所有bot的订阅up进行关注并分组
+    #获取所有订阅的up主
+    up_lists = [int(item) for item in info['dynamic_info'] if item.isdigit() and info['dynamic_info'][item]['enable'] and str(item) != str(info['cookies']['dedeuserid'])]
+    if not up_lists:
+        if bot and event:
+            msg += '您此后所有订阅up都将分入此组'
+            await bot.send(event, msg)
+        await data_save(info)
+        return
+    # 这里将所有订阅up保证关注上
+    try:
+        for up in up_lists:
+            up_info = user.User(up, credential)
+            info_get_relation = await up_info.get_relation()
+            if info_get_relation['relation']['attribute'] not in [2,6]:
+                await up_info.modify_relation(user.RelationType(1))
+            del up_info
+        # 将所有订阅up主都添加到相应分组中
+        await set_subscribe_group(up_lists, [info['cookies']['subscribe_group_id']], credential)
+    except Exception as e:
+        #关注分组失败，发出提醒后返回
+        msg += '\n相关up关注失败喵，bot订阅up请手动关注喵'
+        logger.error(f'用户up主批量关注失败: {e}')
+        if bot and event:
+            await bot.send(event, msg)
+        await data_save(info)
+        return
+    #操作完成，发送信息
+    if bot and event:
+        msg += '所有订阅up都已完成关注并分组喵'
+        await bot.send(event, msg)
+    await data_save(info)
+    return
+
 
 #简易查询当前账号的状态
 async def bili_up_status_check():
+    global loop_cache
     data_info = await data_init()
     day_info = await date_get()
+    #计算账号登录时间
     time_tamp = day_info['time'] - data_info['cookies']['login_time']
     days = time_tamp // 86400
     time_tamp %= 86400
@@ -77,9 +120,20 @@ async def bili_up_status_check():
     time_tamp %= 60
     user_info = data_info['dynamic_info'][f'up_info']
     user_info['time_msg'] = f"{days}天 {hours}时 {minutes}分 {time_tamp}秒"
+    #计算上次检测的时间
+    if user_info['check_time'] != '':
+        user_info['check_time'] = datetime.datetime.fromtimestamp(int(user_info['check_time']))
+    else:
+        user_info['check_time'] = '未知'
+    if loop_cache['check_time'] != '':
+        user_info['monitor_time'] = datetime.datetime.fromtimestamp(int(loop_cache['check_time']))
+    else:
+        user_info['monitor_time'] = '未知'
+
+    #检测其默认账号
     if data_info['cookies']['dedeuserid'] == '':
         user_info['status'] = False
-        user_info['up_name'] = '请登录的说'
+        user_info['up_name'] = ''
         return user_info
     user_info['status'] = True
     up_info = user.User(int(data_info['cookies']['dedeuserid']))

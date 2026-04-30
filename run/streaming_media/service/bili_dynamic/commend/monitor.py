@@ -3,23 +3,28 @@ from bilibili_api import select_client
 import asyncio
 import gc
 import requests
-
 from bilibili_api.user import create_subscribe_group, set_subscribe_group,get_self_info,RelationType
-
-select_client("httpx")
+from .dynamic import bili_user_get_sub_up_dynamic
 from datetime import datetime, timedelta
 from ..data import *
 from ..utils import *
 from run.streaming_media.service.Link_parsing.Link_parsing import link_prising
 from developTools.utils.logger import get_logger
 logger=get_logger('bili_dynamic_monitor')
+select_client("httpx")
+#创建一个全局变量用来存储群聊列表
+loop_cache = {'is_refresh_group':True,'group_list':[],'check_time':'',
+                'is_refresh_data':True,'data_info':{},'credential':''
+              }
 
+#检测一个up的动态是否被启用
 async def bili_up_dynamic_monitor_is_enable(target = None):
     data_info = await data_init(upid=target)
     user_info = data_info['dynamic_info'][f'{target}']
     if user_info['enable'] == '':user_info['enable'] = True
     return user_info['enable']
 
+#重新将所有订阅的up关注并保存在相应分组中
 async def bili_up_subscribe_group_all_ups_resub():
     data_info = await data_init()
     user_info = data_info['dynamic_info'][f'up_info']
@@ -48,6 +53,8 @@ async def bili_up_subscribe_group_all_ups_resub():
 
 #将一个up添加到订阅列表的同时将其添加到关注分组中
 async def bili_up_dynamic_monitor_add(target = None,group = None, status = True, group_status = True):
+    global loop_cache
+    loop_cache['is_refresh_group'], loop_cache['is_refresh_data'] = True, True
     data_info = await data_init(upid=target)
     user_info = data_info['dynamic_info'][f'{target}']
     user_info['status'] = True
@@ -114,24 +121,30 @@ async def bili_up_dynamic_monitor(target = None, data_info = None, day_info = No
         del item
     return user_info
 
-
+#此版本是每次直接访问单个up主的当前动态列表，多次访问可能会导致风控
 async def bili_dynamic_loop(bot, config):
     """B站动态检查的主循环"""
-    subscribe_group_id_flag, notice_flag = True, True
+    subscribe_group_id_flag, notice_flag, group_list, up_list = True, True, [], []
     while True:
         logger.info_func("开始检测B站动态喵")
         #await bot.send_friend_message(config.common_config.basic_config["master"]['id'], f"开始检测B站动态喵")
         day_info = await date_get()
         """获取当前bot列表，避免检测多余up"""
-        group_list = []
-        try:
-            group_info = (await bot.get_group_list())["data"]
-            for item in group_info:
-                if 'group_id' in item: group_list.append(item['group_id'])
-        except:
-            pass
-        up_list = []
+        global group_list_global
+        if group_list_global['is_refresh'] or group_list_global['group_list'] == []:
+            group_list_global['is_refresh'] = False
+            try:
+                group_info = (await bot.get_group_list())["data"]
+                for item in group_info:
+                    if 'group_id' in item: group_list.append(item['group_id'])
+                group_list_global['group_list'] = group_list
+            except Exception as e:
+                logger.error(f"B站动态获取群聊列表出错：{e}")
+        else:
+            group_list = group_list_global['group_list']
+
         #构建出需要检测的ups
+        up_list = []
         data_info = await data_init()
         for up_id in data_info['dynamic_info']:
             if data_info['dynamic_info'][up_id]['enable'] is False:continue
@@ -140,6 +153,8 @@ async def bili_dynamic_loop(bot, config):
                 if group_id_check in group_list:
                     up_list.append(up_id)
                     break
+        # 记录本次检测时间
+        data_info['dynamic_info'][f'up_info']['check_time'] = day_info['time']
         #当需要订阅列表不为空再执行
         if up_list != []:
             credential = Credential(sessdata=data_info['cookies']['sessdata'],
@@ -176,7 +191,7 @@ async def bili_dynamic_loop(bot, config):
                     for group_id in dynamic_info['push_groups']:
                         if group_id not in group_list:continue
                         try:
-                            dynamic_info_prising = await link_prising(f'https://t.bilibili.com/{new_dynamic_id}')
+                            dynamic_info_prising = await link_prising(f'https://www.bilibili.com/opus/{new_dynamic_id}',credential_bili=credential)
                             logger.info_func(
                                 f"推送动态 群号:{group_id} 关注id: {up_id} 最新动态id: {new_dynamic_id}")
                             await bot.send_group_message(group_id, [Image(file=dynamic_info_prising['pic_path']),
@@ -194,3 +209,134 @@ async def bili_dynamic_loop(bot, config):
         current_minute, current_second = datetime.now().minute, datetime.now().second
         wait_seconds = ((1 - current_minute % 10) % 10) * 60 - current_second
         await asyncio.sleep(wait_seconds)
+
+
+
+#新版本循环检测主要相对老版本修改了最新动态获取方式
+#此版本将以较短时间访问当前登录人的关注动态列表，从中挑选出bot订阅的up主
+async def bili_dynamic_loop_new(bot, config):
+    """B站动态检查的主循环"""
+    global loop_cache
+    notice_flag, dynamic_interval_time= True, config.streaming_media.config["bili_dynamic"]["dynamic_interval"]
+    credential, data_info = None, None
+    while True:
+        gc.collect()
+        group_list, up_list = [], []
+        logger.info_func("开始检测B站动态喵")
+        #await bot.send_friend_message(config.common_config.basic_config["master"]['id'], f"开始检测B站动态喵")
+        day_info = await date_get()
+        """获取当前bot群组列表，避免检测多余up"""
+        #print(loop_cache['is_refresh_group'],loop_cache['is_refresh_data'])
+        if loop_cache['is_refresh_group'] or loop_cache['group_list'] == []:
+            loop_cache['is_refresh_group'] = False
+            try:
+                group_info = (await bot.get_group_list())["data"]
+                for item in group_info:
+                    if 'group_id' in item: group_list.append(item['group_id'])
+                loop_cache['group_list'] = group_list
+            except Exception as e:
+                logger.error(f"B站动态获取群聊列表出错：{e}")
+        else:
+            group_list = loop_cache['group_list']
+
+        #构建出需要检测的up列表
+        #若全局变量中显示需要刷新则从数据库中重新读取数据
+        if loop_cache['is_refresh_data']:
+            #print('刷新一次数据')
+            #先删除之前引用的数据并进行一次垃圾回收
+            del loop_cache['data_info']
+            del loop_cache['credential']
+            del data_info
+            del credential
+            gc.collect()
+            data_info = await data_init()
+            # 构建credential，本次不在每次循环检测其是否有效
+            # 修改为获取失败后检测是否有效，在根据条件发送通知
+            credential = Credential(sessdata=data_info['cookies']['sessdata'],
+                                    bili_jct=data_info['cookies']['bili_jct'],
+                                    buvid3=data_info['cookies']['buvid3'],
+                                    dedeuserid=data_info['cookies']['dedeuserid'])
+            loop_cache['data_info'], loop_cache['credential'], loop_cache['is_refresh_data'] = data_info, credential, False
+        else:
+            data_info, credential = loop_cache['data_info'], loop_cache['credential']
+
+        for up_id in data_info['dynamic_info']:
+            if data_info['dynamic_info'][up_id]['enable'] is False:continue
+            for group_id_check in data_info['dynamic_info'][up_id]['push_groups']:
+                if group_id_check in group_list:
+                    up_list.append(up_id)
+                    break
+        #当需要订阅列表不为空再执行
+        if up_list == []:
+            await asyncio.sleep(60)
+            continue
+        # 记录本次检测时间
+        data_info['dynamic_info'][f'up_info']['check_time'] = day_info['time']
+        loop_cache['check_time'] = day_info['time']
+
+        try:
+            dynamic_info_list = await dynamic.get_dynamic_page_info(credential, dynamic.DynamicType("all"))
+            notice_flag = True
+        except Exception as e:
+            logger.error(f"B站动态检测获取当前用户动态列表出错：{e}")
+            #检测凭证是否有效
+            if await credential.check_refresh():
+                if notice_flag:
+                    await asyncio.sleep(dynamic_interval_time)
+                    await bot.send_friend_message(config.common_config.basic_config["master"]['id'],f"B站登录失效，请重新登录喵")
+                    notice_flag, loop_cache['is_refresh_data'] = False, True
+            else:
+                await asyncio.sleep(dynamic_interval_time)
+            continue
+        #当前用户动态页获取成功，开始执行下一步
+        dynamic_sub_ids = {}
+        for dynamic_info in dynamic_info_list['items']:
+            if not dynamic_info['id_str'].isdigit():continue
+            dynamic_id = int(dynamic_info['id_str'])
+            dynamic_upid = str(dynamic_info['modules']['module_author']['mid'])
+            if dynamic_upid not in up_list:continue
+            if dynamic_upid not in dynamic_sub_ids:
+                dynamic_sub_ids[dynamic_upid] = []
+            dynamic_sub_ids[dynamic_upid].append(dynamic_id)
+        #将用户动态页的关注up动态分类后处理是否有新动态，后面统一推送
+        update_flag = False
+        #首先将所有up的推送指令设定为False
+        for up_id in dynamic_sub_ids:
+            user_info = data_info['dynamic_info'][up_id]
+            user_info['is_push'] = False
+            if user_info['enable'] is False:continue
+            user_info['new_dynamic_id'] = dynamic_sub_ids[up_id][0]
+            if user_info['new_dynamic_id'] not in user_info['dynamic_id']:
+                user_info['is_push'], update_flag = True, True
+            for item in dynamic_sub_ids[up_id]:
+                if item not in user_info['dynamic_id']:
+                    user_info['dynamic_id'].append(item)
+            while len(user_info['dynamic_id']) > 20:
+                user_info['dynamic_id'].pop(0)
+        #await data_save(data_info)
+        #检测到关注up有新动态，开始尝试处理
+        if update_flag is False:
+            await asyncio.sleep(dynamic_interval_time)
+            continue
+        #有新动态，那就保存数据
+        await data_save(data_info)
+        #开始制作动态图片并推送
+        for up_id in dynamic_sub_ids:
+            user_info = data_info['dynamic_info'][up_id]
+            if user_info['is_push'] is False or user_info['enable'] is False: continue
+            new_dynamic_id = user_info['new_dynamic_id']
+            for group_id in user_info['push_groups']:
+                if group_id not in group_list:continue
+                try:
+                    dynamic_info_prising = await link_prising(f'https://t.bilibili.com/{new_dynamic_id}',credential_bili=credential)
+                    logger.info_func(
+                        f"推送动态 群号:{group_id} 关注id: {up_id} 最新动态id: {new_dynamic_id}")
+                    await bot.send_group_message(group_id, [Image(file=dynamic_info_prising['pic_path']),
+                                                            f'\nhttps://t.bilibili.com/{new_dynamic_id}'])
+                except:
+                    logger.error(
+                        f"推送动态失败 群号:{group_id} 关注id: {up_id} 最新动态id: {new_dynamic_id}")
+        loop_cache['is_refresh_data'] = True
+        gc.collect()
+        #此版延时30s即可
+        await asyncio.sleep(dynamic_interval_time)
