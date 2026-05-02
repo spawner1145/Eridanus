@@ -95,7 +95,7 @@ def main(bot: ExtendBot, config: YAMLManager):
         uid = event.user_id
 
         # 1. 进入制作模式
-        if event.pure_text == "/制作表情包":
+        if event.pure_text in ["/制作表情包","/表情包制作"]:
             sticker_user_dict[uid] = {"image": [], "text": []}
             await bot.send(event,
                            "🎨 已进入表情包制作模式\n请发送：\n1. 参考图片（1张）\n2. 描述文字（如：猫咪、生气的）\n全部发送后，发送 /end 开始制作")
@@ -173,7 +173,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                     # 发送所有切分后的图片
                     msg_list = [Text(f"✅ 成功制作 {len(sticker_paths)} 张表情包：")]
                     for p in sticker_paths:
-                        msg_list.append( Node(content=[Image(file=os.path.abspath(p))]))
+                        msg_list.append(Image(file=f"file:///{os.path.abspath(p)}"))
 
 
                     await bot.send(event, msg_list)
