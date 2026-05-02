@@ -127,7 +127,7 @@ def main(bot: ExtendBot, config: YAMLManager):
             user_prompt = " ".join(data_store["text"]) if data_store["text"] else "可爱Q版"
             final_prompt = (
                 "要求：做成9张line风格的Q版表情包贴纸。必须是 3x3 矩阵，每个表情之间必须有非常宽的空白间隙 (very wide white gutters)，"
-                "日漫画风，平涂，纯白背景。作为Line表情包，应当具有“漫画感”，动态丰富，且有适当的配字"
+                "日漫画风，平涂，纯白背景。作为Line表情包，应当具有“漫画感”，动态丰富，主题丰富，且有适当的配字"
                 f"以下为附加要求：{user_prompt}"
             )
 
