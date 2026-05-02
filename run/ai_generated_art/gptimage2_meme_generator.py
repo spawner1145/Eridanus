@@ -145,7 +145,10 @@ def main(bot: ExtendBot, config: YAMLManager):
                     "model": "gpt-image-2",
                     "resolution": "2K"
                 }
-
+                if uid in sticker_user_dict:
+                    for p in sticker_user_dict[uid]["image"]:
+                        if os.path.exists(p): os.remove(p)
+                    sticker_user_dict.pop(uid)
                 # 请求 API
                 async with httpx.AsyncClient() as client:
                     resp = await client.post(
