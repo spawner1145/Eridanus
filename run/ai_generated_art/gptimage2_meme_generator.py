@@ -149,16 +149,28 @@ def main(bot: ExtendBot, config: YAMLManager):
                     for p in sticker_user_dict[uid]["image"]:
                         if os.path.exists(p): os.remove(p)
                     sticker_user_dict.pop(uid)
-                # 请求 API
-                async with httpx.AsyncClient() as client:
-                    resp = await client.post(
-                        f"{base_url}/images/edits",
-                        headers=headers,
-                        files=files,
-                        data=data,
-                        timeout=None
-                    )
+                retries=0
+                async def request_api(retries=0):
+                    try:
+                        # 请求 API
+                        async with httpx.AsyncClient() as client:
+                            resp = await client.post(
+                                f"{base_url}/images/edits",
+                                headers=headers,
+                                files=files,
+                                data=data,
+                                timeout=None
+                            )
+                    except Exception as e:
+                        bot.logger.error(traceback.format_exc())
+                        if retries < 3:
+                            retries += 1
+                            await request_api(retries)
+                            bot.logger.error("绘图出现错误，即将重试")
+                        else:
+                            raise Exception(e)
 
+                resp=request_api(retries)
                 if resp.status_code != 200:
                     await bot.send(event, f"❌ 生成失败: {resp.text}")
                     return
