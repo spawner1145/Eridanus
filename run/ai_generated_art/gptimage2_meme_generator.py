@@ -173,7 +173,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                     # 发送所有切分后的图片
                     msg_list = [Text(f"✅ 成功制作 {len(sticker_paths)} 张表情包：")]
                     for p in sticker_paths:
-                        msg_list.append( Node(content=[Image(file=f"file:///{os.path.abspath(p)}")]))
+                        msg_list.append( Node(content=[Image(file=os.path.abspath(p))]))
 
 
                     await bot.send(event, msg_list)

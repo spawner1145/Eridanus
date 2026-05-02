@@ -51,7 +51,7 @@ def main(bot: ExtendBot, config: YAMLManager):
         # 3. 提交任务
         elif event.pure_text == "/end":
             if uid not in user_dict or (not user_dict[uid]["image"] and not user_dict[uid]["text"]):
-                await bot.send(event, "你还没有添加任何内容哦。")
+                #await bot.send(event, "你还没有添加任何内容哦。")
                 return
 
             # 获取配置
