@@ -38,8 +38,7 @@ def split_message(text: str, threshold: int = 60) -> List[str]:
     if "||" in text:
         segments = [s.strip() for s in text.split("||") if s.strip()]
     else:
-        # 兼容：如果没有 ||，但有换行符，也将换行符视为多条消息
-        segments = [s.strip() for s in text.split('\n') if s.strip()]
+        segments = [text.strip()]
 
     final_segments = []
 
