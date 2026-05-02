@@ -150,6 +150,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                         if os.path.exists(p): os.remove(p)
                     sticker_user_dict.pop(uid)
                 retries=0
+
                 async def request_api(retries=0):
                     try:
                         # 请求 API
@@ -161,6 +162,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                                 data=data,
                                 timeout=None
                             )
+                            return resp
                     except Exception as e:
                         bot.logger.error(traceback.format_exc())
                         if retries < 3:
