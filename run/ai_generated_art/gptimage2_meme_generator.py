@@ -162,6 +162,9 @@ def main(bot: ExtendBot, config: YAMLManager):
                                 data=data,
                                 timeout=None
                             )
+                            if resp.status_code != 200:
+                                #await bot.send(event, f"❌ 生成失败: {resp.text}")
+                                raise Exception(resp.text)
                             return resp
                     except Exception as e:
                         bot.logger.error(traceback.format_exc())
