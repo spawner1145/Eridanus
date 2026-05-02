@@ -30,7 +30,7 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
-async def bilibili(url,filepath=None,is_twice=None,type=None):
+async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=None):
     """
         哔哩哔哩解析
     :param bot:
@@ -82,7 +82,10 @@ async def bilibili(url,filepath=None,is_twice=None,type=None):
             url = url[:url.index('?')]
         dynamic_id = int(re.search(r'[^/]+(?!.*/)', url)[0])
         #logger.info(dynamic_id)
-        dy = dynamic.Dynamic(dynamic_id, credential)
+        if credential_bili is None:
+            dy = dynamic.Dynamic(dynamic_id, credential)
+        else:
+            dy = dynamic.Dynamic(dynamic_id, credential_bili)
         #is_opus =await dy.is_opus()#判断动态是否为图文
         json_check['url'] = f'https://t.bilibili.com/{dynamic_id}'
 
@@ -121,9 +124,11 @@ async def bilibili(url,filepath=None,is_twice=None,type=None):
 
                     for text_check in opus_paragraphs['summary']['rich_text_nodes']:
                         #print('\n\n')
-                        if 'emoji' in text_check:
+                        if text_check['type'] == 'RICH_TEXT_NODE_TYPE_EMOJI':
                             text_list_check += f"[emoji]{text_check['emoji']['icon_url']}[/emoji]"
-                        elif 'orig_text' in text_check:
+                        elif text_check['type'] == 'RICH_TEXT_NODE_TYPE_TOPIC':
+                            text_list_check += f"[tag]{text_check['orig_text']}[/tag]"
+                        elif text_check['type'] == 'RICH_TEXT_NODE_TYPE_TEXT':
                             text_list_check += text_check['orig_text']
                     #print(text_list_check)
                     if dynamic_info['item']['type'] == 'DYNAMIC_TYPE_ARTICLE':

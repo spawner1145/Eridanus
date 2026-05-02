@@ -100,6 +100,6 @@ def main(bot: ExtendBot,config: YAMLManager):
                 elif '信任' in event.raw_message:
                     await update_user(user_id=target_qq, permission=4)
                     await bot.send(event, [At(qq=int(target_qq)), f' 被设定为信任者'])
-                elif '管理员' in event.raw_message:
+                elif '管理员' in event.raw_message and event.user_id == config.common_config.basic_config["master"]["id"]:
                     await update_user(user_id=target_qq, permission=10)
                     await bot.send(event, [At(qq=int(target_qq)), f' 被设定为管理员'])
