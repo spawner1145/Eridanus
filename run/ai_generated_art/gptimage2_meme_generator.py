@@ -113,8 +113,8 @@ def main(bot: ExtendBot, config: YAMLManager):
 
             # 配置获取
             api_config = config.ai_generated_art.config.get("gptimage2", {})
-            base_url = api_config.get("base_url", "http://apollodorus.xyz:8009/v1")
-            apikey = api_config.get("apikey", "endlesswork")
+            base_url = api_config.get("base_url", "http://api.apollodorus.xyz/v1")
+            apikey = api_config.get("apikey", "")
 
             # 构造 Prompt
             user_prompt = " ".join(data_store["text"]) if data_store["text"] else "可爱Q版"
