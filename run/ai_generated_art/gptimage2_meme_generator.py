@@ -16,9 +16,9 @@ from framework_common.utils.utils import download_img
 cv2=install_and_import("opencv-python","cv2")
 
 # --- 核心切分逻辑 (同步函数) ---
-def split_grid_3x3_sync(image_bytes, output_folder):
+def split_grid_3x3(image_bytes, output_folder):
     """
-    基于统计直方图的区域划分逻辑
+    最稳健的 3x3 网格切分逻辑：基于统计直方图的区域划分
     """
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -32,7 +32,9 @@ def split_grid_3x3_sync(image_bytes, output_folder):
     # 2. 横向投影找行
     row_sum = np.sum(binary, axis=1)
 
+    # 将分布分成3个主要区间
     def get_split_points(projection, count=3):
+        # 寻找波谷来切分
         points = [0]
         step = len(projection) // count
         for i in range(1, count):
@@ -45,6 +47,7 @@ def split_grid_3x3_sync(image_bytes, output_folder):
         return points
 
     row_points = get_split_points(row_sum, 3)
+
     saved_paths = []
     batch_id = uuid.uuid4().hex[:6]
     idx = 1
@@ -55,27 +58,31 @@ def split_grid_3x3_sync(image_bytes, output_folder):
         row_img = img[r_s:r_e, :]
         row_bin = binary[r_s:r_e, :]
 
+        # 纵向投影找列
         col_sum = np.sum(row_bin, axis=0)
         col_points = get_split_points(col_sum, 3)
 
         for j in range(3):
             c_s, c_e = col_points[j], col_points[j + 1]
+
+            # 此时得到了 1/9 的格子区域，进一步精修边界（去掉格子里多余的白边）
             sub_bin = row_bin[:, c_s:c_e]
             coords = cv2.findNonZero(sub_bin)
             if coords is not None:
                 x, y, sw, sh = cv2.boundingRect(coords)
+                # 在原图切片上根据内容重心再次对齐
                 pad = 10
-                y1 = max(0, y - pad)
-                y2 = min(row_img.shape[0], y + sh + pad)
-                x1 = max(0, x - pad)
-                x2 = min(c_e - c_s, x + sw + pad)
+                y1 = max(r_s, r_s + y - pad)
+                y2 = min(r_e, r_s + y + sh + pad)
+                x1 = max(c_s, c_s + x - pad)
+                x2 = min(c_e, c_s + x + sw + pad)
 
-                roi = row_img[y1:y2, x1:x2]
-                filename = f"sticker_{batch_id}_{idx}.png"
-                path = os.path.join(output_folder, filename)
+                roi = img[y1:y2, x1:x2]
+                path = os.path.join(output_folder, f"sticker_{batch_id}_{idx}.png")
                 cv2.imwrite(path, roi)
                 saved_paths.append(path)
             idx += 1
+
     return saved_paths
 
 
@@ -164,7 +171,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                 # 在线程池中执行 OpenCV 切分，避免阻塞
                 loop = asyncio.get_event_loop()
                 sticker_paths = await loop.run_in_executor(
-                    None, split_grid_3x3_sync, grid_img_bytes, CACHE_DIR
+                    None, split_grid_3x3, grid_img_bytes, CACHE_DIR
                 )
 
                 if not sticker_paths:
