@@ -22,6 +22,7 @@ from run.basic_plugin.service.nasa_api import get_nasa_apod
 from run.basic_plugin.service.weather_query import free_weather_query
 from run.group_fun.service.lex_burner_Ninja import Lexburner_Ninja
 from run.mai_reply.service.reply_engine import ReplyEngine
+from run.mai_reply.service.simple_chat import simplified_chat
 from run.resource_collector.service.asmr.asmr100 import random_asmr_100
 from run.streaming_media.service.Link_parsing.Link_parsing import bangumi_PILimg
 from run.system_plugin.func_collection import trigger_tasks
@@ -111,10 +112,18 @@ def main(bot: ExtendBot, config):
             logger.info_func("获取今日nasa天文信息推送")
             img, text = await get_nasa_apod(config.basic_plugin.config["nasa_api"]["api_key"],
                                             config.common_config.basic_config["proxy"]["http_proxy"])
-            text = await aiReplyCore(
-                [{"text": f"翻译下面的文本，直接发送结果，不要发送'好的'之类的命令应答提示。要翻译的文本为：{text}"}],
-                random.randint(1000000, 99999999),
-                config, bot=bot, tools=None,system_instruction="你是一个翻译机器人，请完成高效且准确的翻译。我给你文本，你需要直接给出翻译结果")
+            if config.mai_reply.config["enable"]:
+                model = config.mai_reply.config["trigger_llm"]["model"]
+                api_key = config.mai_reply.config["trigger_llm"]["api_key"]
+                base_url = config.mai_reply.config["trigger_llm"]["base_url"]
+                text = await simplified_chat(base_url, [{"role": "user", "content": f"翻译下面的文本，直接发送结果，不要发送'好的'之类的命令应答提示。要翻译的文本为：{text}"}], model=model,
+                                                api_key=api_key,
+                                                system_prompt="你是一个严谨的翻译。")
+            else:
+                text = await aiReplyCore(
+                    [{"text": f"翻译下面的文本，直接发送结果，不要发送'好的'之类的命令应答提示。要翻译的文本为：{text}"}],
+                    random.randint(1000000, 99999999),
+                    config, bot=bot, tools=None,system_instruction="你是一个翻译机器人，请完成高效且准确的翻译。我给你文本，你需要直接给出翻译结果")
 
             for group_id in config.scheduled_tasks.sheduled_tasks_push_groups_ordinary["每日天文"]["groups"]:
                 if group_id == 0: continue
@@ -217,9 +226,19 @@ def main(bot: ExtendBot, config):
                 if group_id == 0: continue
                 try:
                     fake_id=random.randint(1000000, 99999999)
-                    r = await aiReplyCore(
-                        [{"text": f"你现在是一个群机器人，向群内所有人道{task_name}，直接发送结果，不要发送多余内容"}],
-                        fake_id, config, bot=bot)
+                    if config.mai_reply.config["enable"]:
+                        model = config.mai_reply.config["trigger_llm"]["model"]
+                        api_key = config.mai_reply.config["trigger_llm"]["api_key"]
+                        base_url = config.mai_reply.config["trigger_llm"]["base_url"]
+                        r = await simplified_chat(base_url, [{"role": "user",
+                                                                 "content": f"你现在是一个群机器人，向群内所有人道{task_name}，直接发送结果，不要发送多余内容"}],
+                                                     model=model,
+                                                     api_key=api_key,
+                                                     system_prompt="你处于群聊环境中。")
+                    else:
+                        r = await aiReplyCore(
+                            [{"text": f"你现在是一个群机器人，向群内所有人道{task_name}，直接发送结果，不要发送多余内容"}],
+                            fake_id, config, bot=bot)
                     await delete_user_history(fake_id)
                     await bot.send_group_message(group_id, r)
                     await sleep(6)
