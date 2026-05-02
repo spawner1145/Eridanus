@@ -218,6 +218,11 @@ class PluginManager:
             'retry_count': 0,
             'total_memory_used': 0.0
         }
+        # 配置文件变更时不触发热重载的插件列表
+        self._yaml_reload_excluded_plugins: Set[str] = {
+            'resource_collector',
+            'scheduled_tasks',
+        }
         """
         内存监控
         """
@@ -386,6 +391,9 @@ class PluginManager:
 
     def _on_yaml_changed(self, plugin_name: str):
         """YAML 配置文件变更时触发对应插件的重载"""
+        if plugin_name in self._yaml_reload_excluded_plugins:
+            self.logger.debug(f"插件 {plugin_name} 在配置变更排除列表中，跳过重载")
+            return
         if plugin_name in self.loaded_plugins:
             self.logger.info(f"检测到插件 {plugin_name} 的配置文件变更，触发插件重载...")
             self._schedule_reload(plugin_name)
