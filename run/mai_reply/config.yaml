@@ -40,7 +40,7 @@ trigger_llm:   #ai判断是否触发
 persona:  # 人设
   name: ""  # 角色名（可选，留空则读取默认配置
   system_prompt: ""   #系统提示词（留空则使用默认角色卡内容）建议在角色卡里写好system prompt，这里留空即可。
-  chara_file: "猫娘.txt"  #角色文件名，放在data/system/chara文件夹内(目前支持txt,json,酒馆角色卡(图片))
+  chara_file: "猫娘.txt"  #角色文件名，放在data/system/chara文件夹内。如开启 gptimage2接管sd，建议使用【猫娘gptimage2.txt】
 tts:
   voice_reply_probability: 30 # 回复时附带语音的概率（0=关闭，1-100=概率）。需要配置voice_model和相关参数
   speaker: natuki  # api.apollodorus.xyz提供的语音模型说话人
