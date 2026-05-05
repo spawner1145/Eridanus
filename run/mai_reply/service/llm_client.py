@@ -15,7 +15,6 @@ import inspect
 from typing import List, Dict, Optional, Any, AsyncGenerator, Tuple
 
 import httpx
-from framework_common.framework_util.func_map_loader import all_function_declarations # fallback函数声明
 
 from framework_common.utils.system_logger import get_logger
 from framework_common.framework_util.yamlLoader import YAMLManager  # 【新增】引入框架配置管理器
@@ -66,7 +65,6 @@ class LLMClient:
     async def chat(
         self,
         messages: List[Dict[str, str]],
-        on_chunk=None,
         system_prompt: str = "",
         tools=None,
         retries: int = 3,
@@ -82,27 +80,23 @@ class LLMClient:
         should_stream = self.use_stream if stream is None else stream
 
         if should_stream:
-            return await self._chat_stream_with_retries(messages, system_prompt, tools, retries, bot, event, model, on_chunk)
+            return await self._chat_stream_with_retries(messages, system_prompt, tools, retries, bot, event,model)
         else:
             return await self._chat_non_stream_with_retries(messages, system_prompt, tools, retries, bot, event,model)
 
     # ==================================================================
     # 流式 (Stream) 执行引擎 (内部消费生成器，合并后返回)
     # ==================================================================
-    async def _chat_stream_with_retries(self, messages, system_prompt, tools, retries, bot, event, model=None, on_chunk=None) -> Optional[str]:
+    async def _chat_stream_with_retries(self, messages, system_prompt, tools, retries, bot, event,model=None) -> Optional[str]:
         for attempt in range(retries):
             try:
                 full_text = ""
                 if self.provider == "gemini":
                     async for chunk in self._chat_gemini_stream(messages, system_prompt, tools, bot, event,model):
                         full_text += chunk
-                        if on_chunk and chunk:
-                            asyncio.create_task(on_chunk(chunk))
                 else:
                     async for chunk in self._chat_openai_stream(messages, system_prompt, tools, bot, event,model):
                         full_text += chunk
-                        if on_chunk and chunk:
-                            asyncio.create_task(on_chunk(chunk))
 
                 return full_text.strip() if full_text else None
             except Exception as e:
@@ -146,7 +140,6 @@ class LLMClient:
 
                 is_tool_call = False
                 tool_calls_dict = {}
-                collected_text = ""
 
                 async for line in resp.aiter_lines():
                     line = line.strip()
@@ -159,7 +152,6 @@ class LLMClient:
 
                         if "content" in delta and delta["content"]:
                             yield delta["content"]
-                            collected_text += delta["content"]
 
                         if "tool_calls" in delta and delta["tool_calls"]:
                             is_tool_call = True
@@ -184,8 +176,6 @@ class LLMClient:
 
                 if not is_tool_call:
                     return
-
-                logger.info(f"[MaiReply] [OpenAI流式] 模型返回内容: {collected_text[:200]}{'...' if len(collected_text) > 200 else ''}")
 
                 tool_calls_list =[tool_calls_dict[k] for k in sorted(tool_calls_dict.keys())]
                 full_messages.append({"role": "assistant", "content": None, "tool_calls": tool_calls_list})
@@ -224,7 +214,6 @@ class LLMClient:
 
                 is_tool_call = False
                 func_call_parts_accum =[]
-                collected_text = ""
 
                 async for line in resp.aiter_lines():
                     line = line.strip()
@@ -239,7 +228,6 @@ class LLMClient:
                         for part in parts:
                             if "text" in part:
                                 yield part["text"]
-                                collected_text += part["text"]
                             elif "functionCall" in part:
                                 is_tool_call = True
                                 func_call_parts_accum.append(part)
@@ -248,8 +236,6 @@ class LLMClient:
 
                 if not is_tool_call:
                     return
-
-                logger.info(f"[MaiReply] [Gemini流式] 模型返回内容: {collected_text[:200]}{'...' if len(collected_text) > 200 else ''}")
 
                 contents.append({"role": "model", "parts": func_call_parts_accum})
                 response_parts, should_continue = await self._execute_gemini_function_calls(func_call_parts_accum, tools, bot, event)
@@ -295,6 +281,7 @@ class LLMClient:
                 payload["tool_choice"] = "auto"
 
             http = await self._get_http()
+            print(messages)
             resp = await http.post(url, json=payload, headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
             resp.raise_for_status()
             data = resp.json()
@@ -304,9 +291,6 @@ class LLMClient:
             finish_reason = choice.get("finish_reason", "")
 
             if finish_reason != "tool_calls" or not message.get("tool_calls"):
-                content = (message.get("content") or "").strip()
-                if content:
-                    logger.info(f"[MaiReply] [OpenAI非流式] 模型返回内容: {content[:200]}{'...' if len(content) > 200 else ''}")
                 return (message.get("content") or "").strip() or None
 
             full_messages.append(message)
@@ -344,9 +328,6 @@ class LLMClient:
             text_parts =[p for p in parts if "text" in p]
 
             if not func_call_parts:
-                content = "".join(p["text"] for p in text_parts).strip()
-                if content:
-                    logger.info(f"[MaiReply] [Gemini非流式] 模型返回内容: {content[:200]}{'...' if len(content) > 200 else ''}")
                 return "".join(p["text"] for p in text_parts).strip() or None
 
             contents.append({"role": "model", "parts": func_call_parts})
@@ -412,29 +393,6 @@ class LLMClient:
         return contents
 
     @staticmethod
-    def _build_func_parameters(func_name: str, func) -> Dict:
-        """
-        纯函数对象构建 parameters 定义的 fallback
-        """
-        for decl in all_function_declarations:
-            if decl.get("name") == func_name and "parameters" in decl:
-                return decl["parameters"]
-        if hasattr(func, "__code__") and hasattr(func, "__code__"):
-            try:
-                fixed_params = {"bot", "event", "config"}
-                varnames = func.__code__.co_varnames[:func.__code__.co_argcount]
-                dynamic = [v for v in varnames if v not in fixed_params and v != "self"]
-                if dynamic:
-                    return {
-                        "type": "object",
-                        "properties": {v: {"type": "string", "description": v} for v in dynamic},
-                        "required": dynamic,
-                    }
-            except Exception:
-                pass
-        return {"type": "object", "properties": {}, "required": []}
-
-    @staticmethod
     def _build_openai_tool_defs(tools) -> List[Dict]:
         if isinstance(tools, list): return tools
         if isinstance(tools, dict):
@@ -445,12 +403,7 @@ class LLMClient:
                 elif isinstance(val, dict) and "type" in val:
                     result.append(val)
                 else:
-                    params = LLMClient._build_func_parameters(name, val)
-                    result.append({"type": "function", "function": {
-                        "name": name,
-                        "description": getattr(val, "__doc__", f"调用 {name}") or f"调用 {name}",
-                        "parameters": params,
-                    }})
+                    result.append({"type": "function", "function": {"name": name, "description": getattr(val, "__doc__", f"调用 {name}"), "parameters": {"type": "object", "properties": {}, "required":[]}}})
             return result
         return[]
 
@@ -467,12 +420,7 @@ class LLMClient:
                     fn = decl.get("function", decl)
                     declarations.append({"name": fn.get("name", name), "description": fn.get("description", ""), "parameters": fn.get("parameters", {"type": "object", "properties": {}})})
                 else:
-                    params = LLMClient._build_func_parameters(name, val)
-                    declarations.append({
-                        "name": name,
-                        "description": getattr(val, "__doc__", f"调用 {name}") or f"调用 {name}",
-                        "parameters": params,
-                    })
+                    declarations.append({"name": name, "description": getattr(val, "__doc__", f"调用 {name}") or "", "parameters": {"type": "object", "properties": {}}})
         return [{"functionDeclarations": declarations}] if declarations else[]
 
     async def _execute_openai_tool_calls(self, tool_calls: List[Dict], tools, bot=None, event=None) -> Tuple[List[Dict], bool]:
