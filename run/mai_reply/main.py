@@ -106,6 +106,13 @@ def main(bot: ExtendBot, config: YAMLManager):
             engine.context.clear_session(event.group_id, event.user_id)
             await bot.send(event, "好的，对话记录已清除～")
             return
+        # 清理群内所有会话
+        if text.strip() in ("/clearall", "清除全部对话", "清理全部对话"):
+            if event.user_id != config.common_config.basic_config["master"]["id"]:
+                return
+            count = engine.context.clear_all_sessions(event.group_id)
+            await bot.send(event, f"已清除本群 {count} 个用户的对话记录～")
+            return
         async def add_to_context():
             if event.message_chain.has(Image) or event.message_chain.has(Mface):
                 if config.mai_reply.config["context"]["img_context"] and event.group_id in config.mai_reply.config["context"]["vision_enable_group"]:
@@ -170,6 +177,13 @@ def main(bot: ExtendBot, config: YAMLManager):
         if text.strip() in ("/clear", "清除对话", "清理对话"):
             engine.context.clear_session(None, event.user_id)
             await bot.send(event, "好，忘掉了～")
+            return
+        # 全清指令(管理员)
+        if text.strip() in ("/clearall", "清除全部对话", "清理全部对话"):
+            if event.user_id != config.common_config.basic_config["master"]["id"]:
+                return
+            count = engine.context.clear_all_sessions()
+            await bot.send(event, f"已清除全部 {count} 个会话记录～")
             return
 
         # 私聊配置了不触发则跳过
