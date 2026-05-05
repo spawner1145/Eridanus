@@ -298,7 +298,7 @@ async def icon_backdrop_check(params):
                 if content_check['background'] and params['background'] is None:
                     params['background'] = content_check['background']
         if params['background']:
-            params['font_name_color'], params['font_time_color'] = '(255,255,255)', '(255,255,255)'
+            params['font_name_color'], params['font_common_color'], params['font_time_color'] = '(255,255,255)', '(255,255,255)', '(255,255,255)'
             params['is_shadow_font'] = True
     if params['judge_flag'] == 'default':
         if (params['background'] or params['right_icon']) and (

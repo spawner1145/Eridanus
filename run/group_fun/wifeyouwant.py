@@ -191,7 +191,7 @@ def main(bot, config):
 
         if event.message_chain.has(At):
             try:
-                if '今日群友' in event.processed_message[0]['text'] or '今日老婆' in event.processed_message[0]['text']:
+                if '今日群友' in event.processed_message[0]['text'] or '今日老婆' in event.processed_message[0]['text'] or '今日' == str(event.pure_text):
                     target_id = event.message_chain.get(At)[0].qq
                     flag_persona = 3
             except Exception:

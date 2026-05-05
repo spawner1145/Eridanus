@@ -1,0 +1,3 @@
+
+class AnyEvent:
+    pass

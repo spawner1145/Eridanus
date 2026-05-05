@@ -38,8 +38,7 @@ def split_message(text: str, threshold: int = 60) -> List[str]:
     if "||" in text:
         segments = [s.strip() for s in text.split("||") if s.strip()]
     else:
-        # 兼容：如果没有 ||，但有换行符，也将换行符视为多条消息
-        segments = [s.strip() for s in text.split('\n') if s.strip()]
+        segments = [text.strip()]
 
     final_segments = []
 
@@ -121,14 +120,18 @@ class ReplyProcessor:
             delay = calc_typing_delay(seg, self.typing_ms_per_char, self.typing_max_ms)
             if delay > 0:
                 await asyncio.sleep(delay)
-
+            
             components =[]
             if i == 0 and quote_message_id and self.quote_reply:
                 if random.randint(1, 100) <= self.quote_probability:
                     components.append(Reply(id=quote_message_id))
 
-            components.append(Text(seg))
+            if seg.startswith('1girl, teenager, anime style'):continue
+            if '1girl, teenager, anime style' in seg:
+                seg = seg[:seg.find('1girl, teenager, anime style')]
+            if seg.endswith('\n'): seg = seg[:-1]
 
+            components.append(Text(seg))
             # 执行发送
             if len(components) == 1:
                 res = await bot.send(event, seg)

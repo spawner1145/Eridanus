@@ -19,7 +19,7 @@ from .setu_moderate import pic_audit_standalone
 
 same_manager = YAMLManager.get_instance()
 apikey=same_manager.ai_generated_art.config["ai绘画"]["apikey"]
-
+eridanus_headers={"Authorization": f"Bearer {apikey}"}
 #print(same_manager.ai_generated_art.config,type(same_manager.ai_generated_art.config))
 aiDrawController = same_manager.ai_generated_art.config.get("ai绘画")
 ckpt = aiDrawController.get("sd默认启动模型") if aiDrawController else None
@@ -610,6 +610,8 @@ async def SdDraw0(prompt, path, config, groupid, args):
         "Accept": "application/json",
         "Authorization": auth_header
     }
+    if apikey:
+        headers=eridanus_headers
     #print(payload)
     #print(headers)
     async with httpx.AsyncClient(timeout=None) as client:

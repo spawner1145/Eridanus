@@ -3,6 +3,10 @@ import httpx
 from framework_common.framework_util.yamlLoader import YAMLManager
 
 same_manager = YAMLManager.get_instance()
+apikey=same_manager.ai_generated_art.config["ai绘画"]["apikey"]
+eridanus_headers={"Authorization": f"Bearer {apikey}"}
+
+same_manager = YAMLManager.get_instance()
 aiDrawController = same_manager.ai_generated_art.config.get("ai绘画")
 tag_model = aiDrawController.get("反推和审核使用模型") if aiDrawController else "wd14-vit-v2-git"
 
@@ -41,7 +45,8 @@ async def pic_audit_standalone(
         "Accept": "application/json",
         "Authorization": auth_header
     }
-    
+    if apikey:
+        headers=eridanus_headers
     async def get_caption(payload):
         async with httpx.AsyncClient(timeout=1000) as client:
             try:

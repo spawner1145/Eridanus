@@ -8,7 +8,7 @@ llm:
     api_keys:
       - xxx
     model: gpt-5.2
-    base_url: http://apollodorus.xyz:8080/v1   #可以去我们的开发群1050663831获取免费apikey。
+    base_url: http://api.apollodorus.xyz/v1   #可以去我们的开发群1050663831获取免费apikey。
     temperature: 1.1
     max_tokens: 1024
     enable_official_sdk: false   # false=直接发post，true=用openai sdk
@@ -30,7 +30,7 @@ trigger:  # 基础触发相关配置
 trigger_llm:   #ai判断是否触发
   enable: true
   api_key: ""
-  base_url: "http://apollodorus.xyz:8080/v1"   # 可以去我们的开发群1050663831获取免费apikey。
+  base_url: "http://api.apollodorus.xyz/v1"   # 可以去我们的开发群1050663831获取免费apikey。
   model: "grok-4"                # 填入你用于判断的廉价/快速模型
   stream: True
   whitelist_enabled: true  # 是否启用白名单模式，启用后只有在白名单中的群聊才会触发ai回复
@@ -40,8 +40,11 @@ trigger_llm:   #ai判断是否触发
 persona:  # 人设
   name: ""  # 角色名（可选，留空则读取默认配置
   system_prompt: ""   #系统提示词（留空则使用默认角色卡内容）建议在角色卡里写好system prompt，这里留空即可。
-  chara_file: "猫娘.txt"  #角色文件名，放在data/system/chara文件夹内(目前支持txt,json,酒馆角色卡(图片))
-
+  chara_file: "猫娘.txt"  #角色文件名，放在data/system/chara文件夹内。如开启 gptimage2接管sd，建议使用【猫娘gptimage2.txt】
+tts:
+  voice_reply_probability: 30 # 回复时附带语音的概率（0=关闭，1-100=概率）。需要配置voice_model和相关参数
+  speaker: natuki  # api.apollodorus.xyz提供的语音模型说话人
+  lang_type: JP  #自动翻译，用trigger_llm的apikey。从api.apollodorus.xyz获取
 
 
 
@@ -53,7 +56,7 @@ context: # 上下文相关配置
   impression_model: ""   #生成用户印象使用的模型，留空则使用llm配置中的模型。建议改成廉价快速的模型
   impression_ttl: 604800  # 7天 印象保留时间
   img_context: false   # 读取上下文中的图片（需要模型能看图，会极大增加token消耗，仅在trigger_llm的白名单群启用）
-  vision_base_url: "http://apollodorus.xyz:8080/v1"  # 视觉模型接口URL，留空则使用llm配置中的base_url
+  vision_base_url: "http://api.apollodorus.xyz/v1"  # 视觉模型接口URL，留空则使用llm配置中的base_url
   vision_api_key: "xxxxx"  # 视觉模型API
   vision_model: "grok-4"  # 能读图的模型
   vision_enable_group:

@@ -196,14 +196,20 @@ def main(bot, config):
                 text = f"{user_info.nickname}{event.raw_info[2]['txt']}{bot_name}{event.raw_info[4]['txt']}"
                 bot.logger.info(text)
                 if config.ai_llm.config["llm"]["aiReplyCore"]:
-                    r = await aiReplyCore(
-                        [{"text": text}],
-                        event.user_id,
-                        config,
-                        tools=tools,
-                        bot=bot,
-                        event=poke_notify_to_group_message(event),
-                    )
+                    if not config.mai_reply.config["enable"]:
+                        r = await aiReplyCore(
+                            [{"text": text}],
+                            event.user_id,
+                            config,
+                            tools=tools,
+                            bot=bot,
+                            event=poke_notify_to_group_message(event),
+                        )
+                    else:
+                        # 最新版本ai对话
+                        asyncio.create_task(engine.handle(bot, poke_notify_to_group_message(event), text))
+                        return
+
 
                 else:
                     reply_list = config.system_plugin.config['api_implements']['nudge']['replylist']

@@ -27,6 +27,7 @@ def _load_chara_file(chara_file: str) -> Optional[str]:
     try:
         if ext == ".txt":
             with open(path, "r", encoding="utf-8") as f:
+                print(f"加载到角色{chara_file}")
                 return f.read().strip()
         elif ext == ".json":
             with open(path, "r", encoding="utf-8") as f:
@@ -36,6 +37,7 @@ def _load_chara_file(chara_file: str) -> Optional[str]:
                 desc = data.get("description") or data.get("personality") or data.get("system_prompt", "")
                 scenario = data.get("scenario", "")
                 return f"{desc}\n{scenario}".strip()
+            print(f"加载到角色{chara_file}")
             return str(data)
     except Exception:
         return None
@@ -117,7 +119,7 @@ _HUMANLIKE_RULES = """
 - 说话要随意自然，像真实的人在聊天，绝对不要写长篇大论
 - 真人聊天时喜欢把一句话拆成几条短消息连发！如果你想分段连发，请务必使用 `||` 符号分隔每条消息！
   举个例子：
-  哼…叫魂呐||一声声的||你就知道你的机器人我不想理你（推开）
+  干什么||？||你就知道你的机器人我不想理你（推开）
 - 不要用 markdown（没有加粗、没有#标题、没有列表）
 - 句末尽量不加句号，标点随意点，多用空格、逗号或省略号
 - 不要每句话都回应对方，有时候只说自己想说的就行

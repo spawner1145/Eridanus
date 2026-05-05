@@ -30,7 +30,7 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
-async def bilibili(url,filepath=None,is_twice=None,type=None):
+async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=None):
     """
         哔哩哔哩解析
     :param bot:
@@ -82,239 +82,174 @@ async def bilibili(url,filepath=None,is_twice=None,type=None):
             url = url[:url.index('?')]
         dynamic_id = int(re.search(r'[^/]+(?!.*/)', url)[0])
         #logger.info(dynamic_id)
-        dy = dynamic.Dynamic(dynamic_id, credential)
-        is_opus =await dy.is_opus()#判断动态是否为图文
+        if credential_bili is None:
+            dy = dynamic.Dynamic(dynamic_id, credential)
+        else:
+            dy = dynamic.Dynamic(dynamic_id, credential_bili)
+        #is_opus =await dy.is_opus()#判断动态是否为图文
         json_check['url'] = f'https://t.bilibili.com/{dynamic_id}'
-        #is_opus=True
-        try:
-            if not is_opus:#若判断为图文则换另一种方法读取
-                logger.info('not opus')
-                #print(dynamic_id)
 
-                dynamic_info = await Opus(dynamic_id).get_info()
-                #avatar_json = await info_search_bili(dynamic_info, is_opus,filepath=filepath,card_url_list=card_url_list)
-
-                tags = ''
-                number=0
-                text_list_check=''
-                if dynamic_info is not None:
-                    title = dynamic_info['item']['basic']['title']
-                    paragraphs = []
-                    for module in dynamic_info['item']['modules']:
-                        if 'module_content' in module:
-                            paragraphs = module['module_content']['paragraphs']
-                            break
-                    #print(json.dumps(paragraphs, indent=4))
-                    for desc_check in paragraphs[0]['text']['nodes']:
-                        if 'word' in desc_check:
-                            desc = desc_check['word']['words']
-                            if f'{desc}' not in {'',' '}:
-                                text_list_check+=f"{desc}"
-
-                        elif desc_check['type'] =='TEXT_NODE_TYPE_RICH':
-                            if desc_check['rich']['type'] =='RICH_TEXT_NODE_TYPE_EMOJI':
-                                text_list_check += f"[emoji]{desc_check['rich']['emoji']['icon_url']}[/emoji]"
-                                number += 1
-                            else:
-                                tags+=desc_check['rich']['text'] + ' '
-                    if text_list_check != '':context += text_list_check
-                    if tags != '':context += f'\n[tag]{tags}[/tag]'
-
-                    #获取头像以及名字
-                    for module in dynamic_info['item']['modules']:
-                        if 'module_author' in module:
-                            modules = module['module_author']
-                            owner_cover,owner_name,pub_time = modules['face'],modules['name'],modules['pub_time']
-                            break
-                    try:
-                        pics_context=paragraphs[1]['pic']['pics']
-                    except :
-                        pics_context=dynamic_info['item']['modules'][0]['module_top']['display']['album']['pics']
-                    image_list=[item['url'] for item in pics_context]
+        dynamic_info = await dy.get_info()
+        #print(json.dumps(dynamic_info, indent=4))
+        orig_check=1        #判断是否为转发，转发为2
+        type_set=None
+        if dynamic_info is not None:
+            paragraphs = []
+            for module in dynamic_info['item']:
+                if 'orig' in module:
+                    orig_check=2
+                    orig_context=dynamic_info['item'][module]
+            for module in dynamic_info['item']['modules']:
+                if 'module_dynamic' in module:
+                    if orig_check==1:
+                        type_set=13
+                    elif orig_check==2:
+                        paragraphs = dynamic_info['item']['modules']['module_dynamic']
+                        type_set=14
+                    break
+            #获取头像以及名字
+            owner_cover=dynamic_info['item']['modules']['module_author']['face']
+            owner_name=dynamic_info['item']['modules']['module_author']['name']
+            pub_time=dynamic_info['item']['modules']['module_author']['pub_time']
+            if orig_check ==1:
+                #avatar_json = await info_search_bili(dynamic_info, is_opus, filepath=filepath,card_url_list=card_url_list)
+                #print('非转发')
+                type_software='bilibili 动态'
+                if 'opus' in dynamic_info['item']['modules']['module_dynamic']['major']:
+                    opus_paragraphs = dynamic_info['item']['modules']['module_dynamic']['major']['opus']
+                    text_list_check = ''
+                    pics_context=[]
+                    #print(json.dumps(opus_paragraphs, indent=4))
 
 
-                    if len(image_list) != 1:
-                        manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
-                            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
-                             'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
-                             'type_software': 'bilibili', 'label': label_list}, {'type': 'text','content': [context]},{'type': 'img','img': image_list}]
+                    for text_check in opus_paragraphs['summary']['rich_text_nodes']:
+                        #print('\n\n')
+                        if text_check['type'] == 'RICH_TEXT_NODE_TYPE_EMOJI':
+                            text_list_check += f"[emoji]{text_check['emoji']['icon_url']}[/emoji]"
+                        elif text_check['type'] == 'RICH_TEXT_NODE_TYPE_TOPIC':
+                            text_list_check += f"[tag]{text_check['orig_text']}[/tag]"
+                        elif text_check['type'] == 'RICH_TEXT_NODE_TYPE_TEXT':
+                            text_list_check += text_check['orig_text']
+                    #print(text_list_check)
+                    if dynamic_info['item']['type'] == 'DYNAMIC_TYPE_ARTICLE':
+                        type_software = 'BiliBili 专栏'
+                        context += f"[title]{opus_paragraphs['title']}[/title]\n"
+                        context += text_list_check
+                        for pic_check in opus_paragraphs['pics']:
+                            pics_context.append(pic_check['url'])
+                        image_list = [item for item in pics_context]
                     else:
-                        manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
+                        if opus_paragraphs['title'] is not None:
+                            context += f"[title]{opus_paragraphs['title']}[/title]\n"
+                        context += text_list_check
+                        for pic_check in opus_paragraphs['pics']:
+                            pics_context.append(pic_check['url'])
+                        image_list = [item for item in pics_context]
+                    #print(context)
+                elif 'live_rcmd' in dynamic_info['item']['modules']['module_dynamic']['major']:
+                    live_paragraphs = dynamic_info['item']['modules']['module_dynamic']['major']['live_rcmd']
+                    content = json.loads(live_paragraphs['content'])
+                    #print(json.dumps(content['live_play_info'], indent=4))
+                    title,cover,pub_time = content['live_play_info']['title'],content['live_play_info']['cover'],content['live_play_info']['live_start_time']
+                    parent_area_name,area_name=content['live_play_info']['parent_area_name'],content['live_play_info']['area_name']
+                    image_list = [cover]
+                    context += f"[title]{title}[/title]\n[des]{parent_area_name} {area_name}[/des]"
+                    pub_time = datetime.fromtimestamp(pub_time).astimezone().strftime("%Y-%m-%d %H:%M:%S")
+                    type_software = '直播'
+                else:
+                    paragraphs = dynamic_info['item']['modules']['module_dynamic']['major']['archive']
+                    title,desc,cover,bvid=paragraphs['title'],paragraphs['desc'],paragraphs['cover'],paragraphs['bvid']
+                    image_list = [cover]
+                    context += f"[title]{title}[/title]\n[des]{desc}[/des]"
+                    type_software = 'BiliBili 投稿'
+                if len(image_list) == 1 and type_software in {'直播',}:
+                    manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
                             {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                              'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
                              'type_software': 'bilibili', },
-                            {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list,
+                            {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list, 'label': [type_software],
                              'content': [context]}]
-                    if is_twice is not True:
-                        json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
-                        json_check['time'] = pub_time
-                        json_check['pic_url_list'] = image_list
-                        return json_check
-                    return manshuo_draw_json
-
-        except Exception as e:
-            logger.error(f"{e}, 尝试使用其他方式解析")
-            is_opus=True
-
-
-        if is_opus:
-            dynamic_info = await dy.get_info()
-            logger.info('is opus')
-            #print(json.dumps(dynamic_info, indent=4))
-            orig_check=1        #判断是否为转发，转发为2
-            type_set=None
-            if dynamic_info is not None:
-                paragraphs = []
-                for module in dynamic_info['item']:
-                    if 'orig' in module:
-                        orig_check=2
-                        orig_context=dynamic_info['item'][module]
-                for module in dynamic_info['item']['modules']:
-                    if 'module_dynamic' in module:
-                        if orig_check==1:
-                            type_set=13
-                        elif orig_check==2:
-                            paragraphs = dynamic_info['item']['modules']['module_dynamic']
-                            type_set=14
-                        break
-                #获取头像以及名字
-                owner_cover=dynamic_info['item']['modules']['module_author']['face']
-                owner_name=dynamic_info['item']['modules']['module_author']['name']
-                pub_time=dynamic_info['item']['modules']['module_author']['pub_time']
-                if orig_check ==1:
-                    #avatar_json = await info_search_bili(dynamic_info, is_opus, filepath=filepath,card_url_list=card_url_list)
-                    #print('非转发')
-                    type_software='bilibili 动态'
-                    if 'opus' in dynamic_info['item']['modules']['module_dynamic']['major']:
-                        opus_paragraphs = dynamic_info['item']['modules']['module_dynamic']['major']['opus']
-                        text_list_check = ''
-                        pics_context=[]
-                        #print(json.dumps(opus_paragraphs, indent=4))
-
-
-                        for text_check in opus_paragraphs['summary']['rich_text_nodes']:
-                            #print('\n\n')
-                            if 'emoji' in text_check:
-                                text_list_check += f"[emoji]{text_check['emoji']['icon_url']}[/emoji]"
-                            elif 'orig_text' in text_check:
-                                text_list_check += text_check['orig_text']
-                        #print(text_list_check)
-                        if dynamic_info['item']['type'] == 'DYNAMIC_TYPE_ARTICLE':
-                            type_software = 'BiliBili 专栏'
-                            context += f"[title]{opus_paragraphs['title']}[/title]\n"
-                            context += text_list_check
-                            for pic_check in opus_paragraphs['pics']:
-                                pics_context.append(pic_check['url'])
-                            image_list = [item for item in pics_context]
-                        else:
-                            context += text_list_check
-                            for pic_check in opus_paragraphs['pics']:
-                                pics_context.append(pic_check['url'])
-                            image_list = [item for item in pics_context]
-                    elif 'live_rcmd' in dynamic_info['item']['modules']['module_dynamic']['major']:
-                        live_paragraphs = dynamic_info['item']['modules']['module_dynamic']['major']['live_rcmd']
-                        content = json.loads(live_paragraphs['content'])
-                        #print(json.dumps(content['live_play_info'], indent=4))
-                        title,cover,pub_time = content['live_play_info']['title'],content['live_play_info']['cover'],content['live_play_info']['live_start_time']
-                        parent_area_name,area_name=content['live_play_info']['parent_area_name'],content['live_play_info']['area_name']
-                        image_list = [cover]
-                        context += f"[title]{title}[/title]\n[des]{parent_area_name} {area_name}[/des]"
-                        pub_time = datetime.fromtimestamp(pub_time).astimezone().strftime("%Y-%m-%d %H:%M:%S")
-                        type_software = '直播'
-                    else:
-                        paragraphs = dynamic_info['item']['modules']['module_dynamic']['major']['archive']
-                        title,desc,cover,bvid=paragraphs['title'],paragraphs['desc'],paragraphs['cover'],paragraphs['bvid']
-                        image_list = [cover]
-                        context += f"[title]{title}[/title]\n[des]{desc}[/des]"
-                        type_software = 'BiliBili 投稿'
-                    if len(image_list) == 1 and type_software in {'直播',}:
-                        manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
-                                {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
-                                 'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
-                                 'type_software': 'bilibili', },
-                                {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list, 'label': [type_software],
-                                 'content': [context]}]
-                    elif len(image_list) == 1 and type_software in {'BiliBili 投稿'}:
-                        manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
-                                {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
-                                 'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
-                                 'type_software': 'bilibili', },
-                                {'type': 'img', 'subtype': 'common_with_des', 'img': image_list, 'label': [type_software],
-                                 'content': [context]}]
-                    else:
-                        manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
+                elif len(image_list) == 1 and type_software in {'BiliBili 投稿'}:
+                    manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
                             {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                              'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
-                             'type_software': 'bilibili'},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
-                    #pprint.pprint(manshuo_draw_json)
-                    if is_twice is not True:
-                        json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
-                        json_check['time'] = pub_time
-                        json_check['pic_url_list'] = image_list
-                        return json_check
-                    return manshuo_draw_json
-                elif orig_check ==2:
-                    #print(json.dumps(paragraphs, indent=4))
-                    text_list_check = ''
-                    for text_check in paragraphs['desc']['rich_text_nodes']:
-                        if 'emoji' in text_check:
-                            text_list_check += f"[emoji]{text_check['emoji']['icon_url']}[/emoji]"
-                        elif 'orig_text' in text_check:
-                            text_list_check += text_check['orig_text']
-                    #contents.append(text_list_check)
-                    #print(text_list_check)
-
-                    for module in orig_context['modules']:
-                        if 'module_dynamic' in module:
-                            if 'opus' in orig_context['modules']['module_dynamic']['major']:
-                                opus_orig_paragraphs=orig_context['modules']['module_dynamic']['major']['opus']
-                                orig_title=opus_orig_paragraphs['summary']['text']
-                                context += f"{orig_title}"
-                                #logger.info(opus_orig_paragraphs)
-                                image_list = [item['url'] for item in opus_orig_paragraphs['pics']]
-                            else:
-                                orig_paragraphs = orig_context['modules']['module_dynamic']['major']['archive']
-                                orig_title, orig_desc, orig_cover, orig_bvid = orig_paragraphs['title'], orig_paragraphs['desc'], orig_paragraphs['cover'], orig_paragraphs['bvid']
-                                image_list=[orig_cover]
-                                context += f"[title]{orig_title}[/title]\n{orig_desc}"
-                                try:
-                                    pics_context = paragraphs[1]['pic']['pics']
-                                except KeyError:
-                                    pics_context = []
-                                image_list = await add_append_img(image_list,[item['url'] for item in pics_context])
-
-                    orig_pub_time=orig_context['modules']['module_author']['pub_time']
-                    orig_owner_name = orig_context['modules']['module_author']['name']
-                    orig_owner_cover = orig_context['modules']['module_author']['face']
-
-
-                    if is_twice is True:
-                        if orig_pub_time == '': orig_pub_time = pub_time
-                        if len(image_list) != 1:
-                            manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
-                                {'type': 'avatar', 'subtype': 'common', 'img': [orig_owner_cover], 'upshift_extra': 20,
-                                 'content': [f"[name]{orig_owner_name}[/name]\n[time]{orig_pub_time}[/time]"],
-                                 'type_software': 'bilibili', 'label': label_list},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
-                        else:
-                            manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
-                                {'type': 'avatar', 'subtype': 'common', 'img': [orig_owner_cover], 'upshift_extra': 20,
-                                 'content': [f"[name]{orig_owner_name}[/name]\n[time]{orig_pub_time}[/time]"],
-                                 'type_software': 'bilibili', },
-                                {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list,
-                                 'content': [context]}]
-                        return manshuo_draw_json
-
-                    orig_url= 'orig_url:'+'https://t.bilibili.com/' + orig_context['id_str']
-                    manshuo_draw_json2=await bilibili(orig_url,f'{filepath}orig_',is_twice=True)
-
-                    manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
+                             'type_software': 'bilibili', },
+                            {'type': 'img', 'subtype': 'common_with_des', 'img': image_list, 'label': [type_software],
+                             'content': [context]}]
+                else:
+                    manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
                         {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
-                         'content': [f"[name]{owner_name}[/name]  [time]{pub_time}[/time]"],'avatar_size':50,
-                         'label': label_list}, {'type': 'text','content': [text_list_check]}]
-
-                    json_check['pic_path'] = await manshuo_draw(await add_append_img(manshuo_draw_json,manshuo_draw_json2,layer=2))
+                         'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
+                         'type_software': 'bilibili'},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
+                #pprint.pprint(manshuo_draw_json)
+                if is_twice is not True:
+                    json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
                     json_check['time'] = pub_time
+                    json_check['pic_url_list'] = image_list
                     return json_check
+                return manshuo_draw_json
+            elif orig_check ==2:
+                #print(json.dumps(paragraphs, indent=4))
+                text_list_check = ''
+                for text_check in paragraphs['desc']['rich_text_nodes']:
+                    if 'emoji' in text_check:
+                        text_list_check += f"[emoji]{text_check['emoji']['icon_url']}[/emoji]"
+                    elif 'orig_text' in text_check:
+                        text_list_check += text_check['orig_text']
+                #contents.append(text_list_check)
+                #print(text_list_check)
+
+                for module in orig_context['modules']:
+                    if 'module_dynamic' in module:
+                        if 'opus' in orig_context['modules']['module_dynamic']['major']:
+                            opus_orig_paragraphs=orig_context['modules']['module_dynamic']['major']['opus']
+                            orig_title=opus_orig_paragraphs['summary']['text']
+                            context += f"{orig_title}"
+                            #logger.info(opus_orig_paragraphs)
+                            image_list = [item['url'] for item in opus_orig_paragraphs['pics']]
+                        else:
+                            orig_paragraphs = orig_context['modules']['module_dynamic']['major']['archive']
+                            orig_title, orig_desc, orig_cover, orig_bvid = orig_paragraphs['title'], orig_paragraphs['desc'], orig_paragraphs['cover'], orig_paragraphs['bvid']
+                            image_list=[orig_cover]
+                            context += f"[title]{orig_title}[/title]\n{orig_desc}"
+                            try:
+                                pics_context = paragraphs[1]['pic']['pics']
+                            except KeyError:
+                                pics_context = []
+                            image_list = await add_append_img(image_list,[item['url'] for item in pics_context])
+
+                orig_pub_time=orig_context['modules']['module_author']['pub_time']
+                orig_owner_name = orig_context['modules']['module_author']['name']
+                orig_owner_cover = orig_context['modules']['module_author']['face']
+
+
+                if is_twice is True:
+                    if orig_pub_time == '': orig_pub_time = pub_time
+                    if len(image_list) != 1:
+                        manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
+                            {'type': 'avatar', 'subtype': 'common', 'img': [orig_owner_cover], 'upshift_extra': 20,
+                             'content': [f"[name]{orig_owner_name}[/name]\n[time]{orig_pub_time}[/time]"],
+                             'type_software': 'bilibili', 'label': label_list},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
+                    else:
+                        manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
+                            {'type': 'avatar', 'subtype': 'common', 'img': [orig_owner_cover], 'upshift_extra': 20,
+                             'content': [f"[name]{orig_owner_name}[/name]\n[time]{orig_pub_time}[/time]"],
+                             'type_software': 'bilibili', },
+                            {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list,
+                             'content': [context]}]
+                    return manshuo_draw_json
+
+                orig_url= 'orig_url:'+'https://t.bilibili.com/' + orig_context['id_str']
+                manshuo_draw_json2=await bilibili(orig_url,f'{filepath}orig_',is_twice=True)
+
+                manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
+                    {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
+                     'content': [f"[name]{owner_name}[/name]  [time]{pub_time}[/time]"],'avatar_size':50,
+                     'label': label_list}, {'type': 'text','content': [text_list_check]}]
+
+                json_check['pic_path'] = await manshuo_draw(await add_append_img(manshuo_draw_json,manshuo_draw_json2,layer=2))
+                json_check['time'] = pub_time
+                return json_check
 
         return None
 

@@ -1,5 +1,6 @@
 import traceback
 
+import aiofiles
 import httpx
 import os
 import asyncio
@@ -30,12 +31,16 @@ def main(bot: ExtendBot, config: YAMLManager):
             # 假设 gptimage2_text2img 是异步的
             await bot.send(event, "正在生成图片，请稍候...")
 
-            await text2img(bot, event, config, prompt,True if bot_name in prompt else False)
+            asyncio.create_task(
+                text2img(bot, event, config, prompt, True if bot_name in prompt else False)
+            )
             return
         elif event.pure_text.startswith("/生图"):
             prompt= event.pure_text.replace("/生图","",1).strip()
             await bot.send(event, "正在生成图片，请稍候...")
-            await text2img(bot, event, config, prompt,True if bot_name in prompt else False)
+            asyncio.create_task(
+                text2img(bot, event, config, prompt, True if bot_name in prompt else False)
+            )
             return
         # 2. 进入编辑模式
         if event.pure_text == "/图像编辑":
@@ -46,7 +51,7 @@ def main(bot: ExtendBot, config: YAMLManager):
         # 3. 提交任务
         elif event.pure_text == "/end":
             if uid not in user_dict or (not user_dict[uid]["image"] and not user_dict[uid]["text"]):
-                await bot.send(event, "你还没有添加任何内容哦。")
+                #await bot.send(event, "你还没有添加任何内容哦。")
                 return
 
             # 获取配置
@@ -63,19 +68,24 @@ def main(bot: ExtendBot, config: YAMLManager):
 
             try:
                 # 准备文件流
+                import io
+
+                # 准备文件流（异步读取到内存）
                 file_objects = []
-                # 注意：这里需要保存打开的文件句柄，确保在请求发送前不被关闭
-                for i, path in enumerate(user_dict[uid]["image"]):
+                for path in user_dict[uid]["image"]:
                     if os.path.exists(path):
-                        f = open(path, "rb")
-                        # 格式: (字段名, (文件名, 文件流, MIME类型))
-                        # 使用 "images" 作为字段名，对应你 API 支持的多图上传
-                        file_objects.append(("images", (os.path.basename(path), f, "image/png")))
+                        async with aiofiles.open(path, "rb") as f:
+                            content = await f.read()
+                        file_objects.append(
+                            ("images", (os.path.basename(path), io.BytesIO(content), "image/png"))
+                        )
 
                 headers = {"Authorization": f"Bearer {apikey}"}
                 data = {
                     "prompt": full_prompt,
-                    "size": "1024x1024"
+                    "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
+                    "model": config.ai_generated_art.config["gptimage2"]["model"],
+                    "resolution": config.ai_generated_art.config["gptimage2"]["resolution"] or "1K",
                 }
                 user_dict.pop(uid)  # 立即清理用户数据，避免重复提交
 
@@ -96,7 +106,9 @@ def main(bot: ExtendBot, config: YAMLManager):
                         url1 = "http://api.apollodorus.xyz/v1/images/generations"
                         payload = {
                             "prompt": full_prompt,
-                            "size": "1024x1024",  # 映射为 16:9
+                            "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
+                            "resolution": config.ai_generated_art.config["gptimage2"]["resolution"] or "1K",
+                            "model": config.ai_generated_art.config["gptimage2"]["model"],
                             "response_format": "url",  # 或 "b64_json"
                             "n": 1,
                         }
@@ -120,8 +132,6 @@ def main(bot: ExtendBot, config: YAMLManager):
 
 
                 await request_api(0)
-                for _, (_, f, _) in file_objects:
-                    f.close()
 
             except Exception as e:
                 traceback.print_exc()

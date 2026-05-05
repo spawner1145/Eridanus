@@ -48,14 +48,17 @@ async def mys_game_sign(user_id,bot=None,event=None,target='all',type='game'):
             if target in game_name_list[item]:
                 target = [item]
                 break
-        sign_info = await perform_game_sign(user_id=user_id,bot=bot, user=user, event=event, target=target, type=type)
+        sign_info = await perform_game_sign(user_id=user_id,bot=bot, user=user, event=event, target=str(target), type=type)
+
         return_json['img_list'], return_json['text_list'] = sign_info['img_list'], sign_info['text_list']
-        if sign_info['text_list']:
+
+        if sign_info['status']:
             for item in sign_info['text_list']:
                 return_json['text'] += f'{item}\n'
         else:
             return_json['text'] = '已尝试签到，但未获得签到数据，可自行前往米游社查看'
-        return_json['text'] += '[des]ps:为避签到时间过长，签到模块只会签到一个游戏\n请在菜单中自行更换默认签到游戏的说[/des]'
+        #return_json['text'] += '[des]ps:为避签到时间过长，签到模块只会签到一个游戏\n请在菜单中自行更换默认签到游戏的说[/des]'
+        return_json['text'] += '[des]ps:一次签到米游社所有游戏耗时很长，请耐心等待喵[/des]'
         return_json['status'] = True
         return_json['manshuo_draw'] = sign_info['manshuo_draw']
     except Exception as e:
@@ -85,6 +88,8 @@ async def perform_game_sign(user, user_id=None, bot = None, event = None, target
             print(user.target_sign_game)
             target_list = [user.target_sign_game]
     else:target_list = target
+    #直接签到所有
+    target_list = game_all_list
     failed_accounts, img_list, text_list, pure_text_list, UID = [], [], [], [], '无法获取'
     for account in user.accounts.values():
         signed = False
@@ -179,9 +184,11 @@ async def perform_game_sign(user, user_id=None, bot = None, event = None, target
                         #img_file = await get_file(award.icon)
                         #print(img_file)
                         img_list.append(award.icon)
+                        # text_list.append(f'[title]『{signer.name}』[/title]  {signer.record.nickname}·Lv{signer.record.level}\n'
+                        #                       f'签到奖励：({status})\n{award.name} * {award.cnt}\n'
+                        #                       f'本月签到次数：{info.total_sign_day}')
                         text_list.append(f'[title]『{signer.name}』[/title]  {signer.record.nickname}·Lv{signer.record.level}\n'
-                                              f'签到奖励：({status})\n{award.name} * {award.cnt}\n'
-                                              f'本月签到次数：{info.total_sign_day}')
+                                              f'签到奖励：(本月签到次数：{info.total_sign_day})\n{award.name} * {award.cnt}\n')
                         pure_text_list.append(f'『{signer.name}』\n{signer.record.nickname}·Lv{signer.record.level}\n'
                                               f'签到奖励：({status})\n{award.name} * {award.cnt}\n'
                                               f'本月签到次数：{info.total_sign_day}')
@@ -197,9 +204,7 @@ async def perform_game_sign(user, user_id=None, bot = None, event = None, target
             if bot: await bot.send(event, [At(qq=user_id), msg])
             else: print(msg)
     #print(target)
-    if target == 'daily_sign':
-        if img_list and text_list: return img_list,text_list
-        return [],[]
+
     if user_id is None:
         user_id = 1270858640
     draw_list = [
@@ -219,6 +224,9 @@ async def perform_game_sign(user, user_id=None, bot = None, event = None, target
                        {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_list, 'content': text_list,
                         'number_per_row': 1}
                    ]}
+    #若是每日签到则直接返回
+    if target == 'daily_sign':
+        return return_json
     if type == 'game':
         if len(img_list) not in [0,1]:
             img_path = await manshuo_draw(draw_list)

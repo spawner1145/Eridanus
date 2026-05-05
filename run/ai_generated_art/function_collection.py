@@ -1,7 +1,9 @@
+import asyncio
 import base64
 import os
 import re
 
+import aiofiles
 import httpx
 
 from developTools.message.message_components import Image
@@ -30,7 +32,9 @@ async def image_edit(bot,event,config,prompt,image_url):
 
     data = {
         "prompt": prompt,
-        "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"]
+        "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
+        "model": config.ai_generated_art.config["gptimage2"]["model"],
+        "resolution": config.ai_generated_art.config["gptimage2"]["resolution"] or "1K",
     }
     async with httpx.AsyncClient() as client:
         resp = await client.post(
@@ -47,88 +51,90 @@ async def image_edit(bot,event,config,prompt,image_url):
             await bot.send(event, [Image(file=img_url)])
         else:
             await bot.send(event, f"请求失败 ({resp.status_code}): {resp.text}")
-async def text2img(bot,event,config,prompt,is_about_bot=False):
-    user=await get_user(event.user_id)
-    permission_need=config.ai_generated_art.config["gptimage2"]["权限要求"]
-    if user.permission<permission_need:
-        return
-    bot.logger.info(f"用户 {event.user_id} 请求生成图片，提示词 {prompt} is_about_bot={is_about_bot}")
+
+
+async def _send_bot_image_with_retry(bot, event, config, prompt, max_retries=5):
+    """后台任务：生成bot相关图片，失败自动重试最多5次"""
     bot_name = config.common_config.basic_config["bot"]
     apikey = config.ai_generated_art.config["gptimage2"]["apikey"]
     headers = {"Authorization": f"Bearer {apikey}"}
+    base_url = "http://api.apollodorus.xyz/v1"
+    bot_oc = config.ai_generated_art.config["gptimage2"]["bot_oc"]
+    extra_prompt = config.ai_generated_art.config["gptimage2"]["extra_prompt"]
+    character_anchor = bot_name + config.ai_generated_art.config["gptimage2"]["character_anchor"]
+    prompt_text = (
+        f"【角色参考】附图为{bot_name}的设定图,仅作为外貌参考(发色、瞳色、发型),"
+        f"请在保持角色辨识度的前提下进行完整重绘。\n"
+        f"【角色特征锚点】{character_anchor}\n"
+        f"【绘制任务】根据以下描述绘制{bot_name}:{prompt}。\n"
+        f"必须为全新高分辨率重绘,而不是对原图进行模糊放大或局部修改。\n"
+        f"【细节要求】全身清晰,服装、手部、背景细节完整且清楚。\n"
+        f"【画质要求】masterpiece, best quality, ultra detailed, 4k, sharp focus。\n"
+        f"【负面约束】no blur, no low resolution, no smudging, no soft focus。\n"
+        f"【画风一致性】整体风格接近设定图,但允许自然细化。\n"
+        f"【额外要求】{extra_prompt}"
+    )
+
+    last_exception = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with aiofiles.open(bot_oc, "rb") as f1:
+                file_content = await f1.read()
+
+            async with httpx.AsyncClient(timeout=None, headers=headers) as client:
+                resp = await client.post(
+                    f"{base_url}/images/edits",
+                    files=[
+                        ("images", (os.path.basename(bot_oc), file_content, "image/png")),
+                    ],
+                    data={
+                        "prompt": prompt_text,
+                        "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
+                        "resolution": config.ai_generated_art.config["gptimage2"]["resolution"] or "1K",
+                        "model": config.ai_generated_art.config["gptimage2"]["model"],
+                    },
+                )
+            await bot.send(event, Image(file=resp.json()["data"][0]["url"]))
+            bot.logger.info(f"bot图片生成成功（第{attempt}次尝试）")
+            return  # 成功则退出
+
+        except Exception as e:
+            last_exception = e
+            bot.logger.warning(f"bot图片生成失败（第{attempt}/{max_retries}次）: {e}")
+            if attempt < max_retries:
+                await asyncio.sleep(2 ** (attempt - 1))  # 指数退避: 1s, 2s, 4s, 8s
+
+    bot.logger.error(f"bot图片生成最终失败，已重试{max_retries}次，最后错误: {last_exception}")
+
+
+async def text2img(bot, event, config, prompt, is_about_bot=False):
+    user = await get_user(event.user_id)
+    permission_need = config.ai_generated_art.config["gptimage2"]["权限要求"]
+    if user.permission < permission_need:
+        return
+    bot.logger.info(f"用户 {event.user_id} 请求生成图片,提示词 {prompt} is_about_bot={is_about_bot}")
+
     if is_about_bot:
-        """
-        实际上这里就要用图像编辑的逻辑了
-        """
-        base_url = "http://api.apollodorus.xyz/v1"
-        bot_oc=config.ai_generated_art.config["gptimage2"]["bot_oc"]
-        extra_prompt=config.ai_generated_art.config["gptimage2"]["extra_prompt"]
-        character_anchor=bot_name+config.ai_generated_art.config["gptimage2"]["character_anchor"]
-        prompt_text = (
-            f"【角色参考】附图为{bot_name}的基本形像设定图"
-            f"请以此图为唯一外貌依据。\n"
-            f"【角色特征锚点】{character_anchor}\n"
-            f"【绘制任务】根据以下描述绘制{bot_name}：{prompt}。\n"
-            f"场景、构图、表情、姿势如未明确指定可自由发挥，但角色外貌必须与参考图一致，"
-            f"不得改变发色、瞳色、脸型等核心特征。\n"
-            f"【画风一致性】必须和设定图画风保持一致"
-            f"【额外要求】{extra_prompt}"
+        # 丢到后台运行，不阻塞上游，无需等待结果
+        asyncio.create_task(
+            _send_bot_image_with_retry(bot, event, config, prompt)
         )
-        with open(bot_oc, "rb") as f1:
-            resp = httpx.post(
-                f"{base_url}/images/edits",
-                files=[
-                    ("images", (os.path.basename(bot_oc), f1, "image/png")),
-                ],
-                data={
-                    "prompt": prompt_text,
-                    "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"]},
-                timeout=None,
-                headers=headers,
-            )
-            await bot.send(event,Image(file=resp.json()["data"][0]["url"]))
+        return "genrating....please wait..."
 
     else:
-        def clean_prompt(prompt):
-            remove_list = [
-                "round face:1.2",
-                "Rella:1.2",
-                "chen bin:1.3",
-                "virtual youtuber",
-                "starshadowmagician:1.2",
-                "lineart",
-                "hand-drawn:1.3",
-                "sketch:1.2",
-                "Picasso style",
-                "<lora:curearcanashadow_v1.0_IL:0.5>",
-                "Van Gogh's almond blossoms",
-                "Van Gogh’s almond blossoms",
-            ]
-
-            for p in remove_list:
-                # 匹配带括号 / 不带括号 / 前后空格 / 可选逗号
-                pattern = r"\s*\(?" + re.escape(p) + r"\)?\s*,?"
-                prompt = re.sub(pattern, "", prompt)
-
-            # 清理多余逗号和空格
-            prompt = re.sub(r",\s*,+", ",", prompt)
-            prompt = prompt.strip(", ").strip()
-
-            prompt += "\n以上为stable diffusion的提示词，请基于这些提示词进行创作，如提示词未特别说明，则一般采用二次元/日漫风格"
-            return prompt
-        prompt=clean_prompt(prompt)
-
-
-        base_url="http://api.apollodorus.xyz/v1/images/generations"
+        apikey = config.ai_generated_art.config["gptimage2"]["apikey"]
+        headers = {"Authorization": f"Bearer {apikey}"}
+        base_url = "http://api.apollodorus.xyz/v1/images/generations"
         payload = {
-                "prompt": prompt,
-                "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
-                "response_format": "url",  # 或 "b64_json"
-                "n": 1,
-            }
-
-        async with httpx.AsyncClient( timeout=None,headers=headers) as client:
+            "prompt": prompt,
+            "aspect_ratio": config.ai_generated_art.config["gptimage2"]["aspect_ratio"],
+            "model": config.ai_generated_art.config["gptimage2"]["model"],
+            "resolution": config.ai_generated_art.config["gptimage2"]["resolution"] or "1K",
+            "response_format": "url",
+            "n": 1,
+        }
+        async with httpx.AsyncClient(timeout=None, headers=headers) as client:
             response = await client.post(base_url, json=payload)
-            resp=response.json()
+            resp = response.json()
             img_url = resp["data"][0]["url"]
-            await bot.send(event,Image(file=img_url),True)
+            await bot.send(event, Image(file=img_url), True)

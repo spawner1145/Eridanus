@@ -10,6 +10,7 @@ from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
 from developTools.message.message_components import Image, Text, Card
 from framework_common.database_util.User import get_users_with_permission_above, get_user
 from framework_common.database_util.llmDB import delete_user_history
+from framework_common.framework_util.any_event import AnyEvent
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.manshuo_draw import RedisDatabase, manshuo_draw
 from framework_common.utils.random_str import random_str
@@ -20,6 +21,8 @@ from run.basic_plugin.service.life_service import bingEveryDay, danxianglii
 from run.basic_plugin.service.nasa_api import get_nasa_apod
 from run.basic_plugin.service.weather_query import free_weather_query
 from run.group_fun.service.lex_burner_Ninja import Lexburner_Ninja
+from run.mai_reply.service.reply_engine import ReplyEngine
+from run.mai_reply.service.simple_chat import simplified_chat
 from run.resource_collector.service.asmr.asmr100 import random_asmr_100
 from run.streaming_media.service.Link_parsing.Link_parsing import bangumi_PILimg
 from run.system_plugin.func_collection import trigger_tasks
@@ -31,6 +34,8 @@ def main(bot: ExtendBot, config):
     scheduler = AsyncIOScheduler()
     enabled = False
     db = asyncio.run(AsyncSQLiteDatabase.get_instance())
+
+    engine=ReplyEngine(config)
 
     @bot.on(LifecycleMetaEvent)
     async def start_scheduler(_):
@@ -54,8 +59,15 @@ def main(bot: ExtendBot, config):
                 filtered_users = friend_list
             for user in filtered_users:
                 try:
-                    r = await aiReplyCore([{"text": f"道晚安，直接发送结果，无需对此条提示做出应答。"}], int(user["user_id"]),
-                                          config, bot=bot)
+                    if not config.mai_reply.config["enable"]:
+                        r = await aiReplyCore([{"text": f"道晚安，直接发送结果，无需对此条提示做出应答。"}],
+                                              int(user["user_id"]),
+                                              config, bot=bot)
+                    else:
+                        event=AnyEvent()
+                        event.user_id=int(user["user_id"])
+                        asyncio.create_task(engine.handle(bot, event, f"道晚安，直接发送结果，无需对此条提示做出应答。"))
+                        return
                     await bot.send_friend_message(int(user["user_id"]), r)
                     await sleep(6)
                 except Exception as e:
@@ -75,10 +87,18 @@ def main(bot: ExtendBot, config):
                     user_info = await get_user(int(user["user_id"]))
                     location = user_info.city
                     weather = await free_weather_query(location)
-                    r = await aiReplyCore([{
-                        "text": f"保持你当前对话的角色，播报今天的天气信息并给出建议，直接发送结果，不要发送'好的'之类的命令应答提示。今天的天气信息：{weather}"}],
-                        int(user["user_id"]),
-                        config, bot=bot)
+
+                    if not config.mai_reply.config["enable"]:
+                        r = await aiReplyCore([{
+                            "text": f"保持你当前对话的角色，播报今天的天气信息并给出建议，直接发送结果，不要发送'好的'之类的命令应答提示。今天的天气信息：{weather}"}],
+                            int(user["user_id"]),
+                            config, bot=bot)
+                    else:
+                        event=AnyEvent()
+                        event.user_id=int(user["user_id"])
+                        asyncio.create_task(engine.handle(bot, event, f"保持你当前对话的角色，播报今天的天气信息并给出建议，直接发送结果，不要发送'好的'之类的命令应答提示。今天的天气信息：{weather}"))
+                        await bot.send(int(user["user_id"]), f"(如城市信息不正确，可在群内发送 修改城市【城市名】\n 如 修改城市长春)")
+                        return
                     await bot.send_friend_message(int(user["user_id"]), r)
                     await sleep(6)
                 except Exception as e:
@@ -92,10 +112,19 @@ def main(bot: ExtendBot, config):
             logger.info_func("获取今日nasa天文信息推送")
             img, text = await get_nasa_apod(config.basic_plugin.config["nasa_api"]["api_key"],
                                             config.common_config.basic_config["proxy"]["http_proxy"])
-            text = await aiReplyCore(
-                [{"text": f"翻译下面的文本，直接发送结果，不要发送'好的'之类的命令应答提示。要翻译的文本为：{text}"}],
-                random.randint(1000000, 99999999),
-                config, bot=bot, tools=None,system_instruction="你是一个翻译机器人，请完成高效且准确的翻译。我给你文本，你需要直接给出翻译结果")
+            if config.mai_reply.config["enable"]:
+                model = config.mai_reply.config["trigger_llm"]["model"]
+                api_key = config.mai_reply.config["trigger_llm"]["api_key"]
+                base_url = config.mai_reply.config["trigger_llm"]["base_url"]
+                text = await simplified_chat(base_url, [{"role": "user", "content": f"翻译下面的文本，直接发送结果，不要发送'好的'之类的命令应答提示。要翻译的文本为：{text}"}], model=model,
+                                                api_key=api_key,
+                                                system_prompt="你是一个严谨的翻译。")
+            else:
+                text = await aiReplyCore(
+                    [{"text": f"翻译下面的文本，直接发送结果，不要发送'好的'之类的命令应答提示。要翻译的文本为：{text}"}],
+                    random.randint(1000000, 99999999),
+                    config, bot=bot, tools=None,system_instruction="你是一个翻译机器人，请完成高效且准确的翻译。我给你文本，你需要直接给出翻译结果")
+
             for group_id in config.scheduled_tasks.sheduled_tasks_push_groups_ordinary["每日天文"]["groups"]:
                 if group_id == 0: continue
                 try:
@@ -197,9 +226,19 @@ def main(bot: ExtendBot, config):
                 if group_id == 0: continue
                 try:
                     fake_id=random.randint(1000000, 99999999)
-                    r = await aiReplyCore(
-                        [{"text": f"你现在是一个群机器人，向群内所有人道{task_name}，直接发送结果，不要发送多余内容"}],
-                        fake_id, config, bot=bot)
+                    if config.mai_reply.config["enable"]:
+                        model = config.mai_reply.config["trigger_llm"]["model"]
+                        api_key = config.mai_reply.config["trigger_llm"]["api_key"]
+                        base_url = config.mai_reply.config["trigger_llm"]["base_url"]
+                        r = await simplified_chat(base_url, [{"role": "user",
+                                                                 "content": f"你现在是一个群机器人，向群内所有人道{task_name}，直接发送结果，不要发送多余内容"}],
+                                                     model=model,
+                                                     api_key=api_key,
+                                                     system_prompt="你处于群聊环境中。")
+                    else:
+                        r = await aiReplyCore(
+                            [{"text": f"你现在是一个群机器人，向群内所有人道{task_name}，直接发送结果，不要发送多余内容"}],
+                            fake_id, config, bot=bot)
                     await delete_user_history(fake_id)
                     await bot.send_group_message(group_id, r)
                     await sleep(6)
