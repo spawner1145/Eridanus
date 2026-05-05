@@ -163,12 +163,23 @@ class ReplyEngine:
                 tools=self._tools,
                 bot=bot,
                 event=event,
-                retries=10
+                retries=5
             )
 
             if not raw_reply:
-                bot.logger.warning("[MaiReply] LLM 返回空回复")
-                return
+                bot.logger.warning("[MaiReply] LLM 返回空回复，清理上下文后重试一次")
+                retry_messages = [{"role": "user", "content": user_content}]
+                raw_reply = await self.llm.chat(
+                    messages=retry_messages,
+                    system_prompt=system_prompt,
+                    tools=self._tools,
+                    bot=bot,
+                    event=event,
+                    retries=3
+                )
+                if not raw_reply:
+                    bot.logger.warning("[MaiReply] 重试后仍为空，放弃本次回复")
+                    return
 
             segments = self.processor.process(raw_reply)
             if not segments:
