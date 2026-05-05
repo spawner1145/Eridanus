@@ -6,6 +6,7 @@ impression_updater.py
 """
 
 import asyncio
+import traceback
 from typing import List, Dict
 
 from framework_common.framework_util.yamlLoader import YAMLManager
@@ -135,4 +136,5 @@ class ImpressionUpdater:
             logger.info(f"[MaiReply] 已更新对 {user_name}({user_id}) 的印象({len(new_impression)}字): {new_impression}")
 
         except Exception as e:
+            traceback.print_exc()
             logger.error(f"[MaiReply] 印象更新失败: {e}")
