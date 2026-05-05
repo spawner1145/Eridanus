@@ -209,6 +209,21 @@ class ContextManager:
         key = self._group_key(group_id, user_id) if group_id else self._private_key(user_id)
         self._ctx_delete(key)
 
+    def clear_all_sessions(self, group_id: Optional[int] = None) -> int:
+        """清空所有会话或指定群内的所有会话，返回清除数量"""
+        if group_id is not None:
+            pattern = f"ctx:group:{group_id}:*"
+        else:
+            pattern = "ctx:*"
+        keys = self._ctx_cache.get_keys(pattern)
+        count = 0
+        for key in keys:
+            if key.startswith("lock:"):
+                continue
+            self._ctx_delete(key)
+            count += 1
+        return count
+
     # ------------------------------------------------------------------ 群聊窗口（持久化）
 
     def push_group_window(self, group_id: int, sender_name: str, text: str) -> None:
