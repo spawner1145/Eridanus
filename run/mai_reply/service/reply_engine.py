@@ -157,20 +157,10 @@ class ReplyEngine:
             user_content = multimodal_content if multimodal_content is not None else clean_text
             messages.append({"role": "user", "content": user_content})
 
-            use_stream = self.cfg.mai_reply.config.get("llm", {}).get("stream", False)
-            msg_id = getattr(event, "message_id", None)
-            collected_reply = []  # 收集流式 chunk，最终用于 segments 处理和持久化
-
-            async def on_text_chunk(chunk: str):
-                """流式回调，每个文字 chunk 到达时实时发送"""
-                if chunk and chunk.strip():
-                    await bot.send(event, chunk)
-
             raw_reply = await self.llm.chat(
                 messages=messages,
                 system_prompt=system_prompt,
                 tools=self._tools,
-                on_chunk=on_text_chunk if use_stream else (lambda c: collected_reply.append(c)),
                 bot=bot,
                 event=event,
                 retries=3
@@ -182,7 +172,6 @@ class ReplyEngine:
                 raw_reply = await self.llm.chat(
                     messages=retry_messages,
                     system_prompt=system_prompt,
-                    on_chunk=on_text_chunk if use_stream else None,
                     tools=self._tools,
                     bot=bot,
                     event=event,
@@ -196,10 +185,10 @@ class ReplyEngine:
             if not segments:
                 return
 
-            # 流式模式下文字已实时发送，不要 send_with_delay
-            if not use_stream:
-                msg_id = getattr(event, "message_id", None)
-                await self.processor.send_with_delay(bot, event, segments, quote_message_id=msg_id)
+            msg_id = getattr(event, "message_id", None)
+
+            # 1. 先按计划发送切分后的文本（带打字延迟）
+            await self.processor.send_with_delay(bot, event, segments, quote_message_id=msg_id)
 
             # =================================================================
             # 触发语音回复（后台异步，完全等同于子线程避免阻塞）
