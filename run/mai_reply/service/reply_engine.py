@@ -163,7 +163,7 @@ class ReplyEngine:
                 tools=self._tools,
                 bot=bot,
                 event=event,
-                retries=5
+                retries=3
             )
 
             if not raw_reply:
@@ -175,7 +175,7 @@ class ReplyEngine:
                     tools=self._tools,
                     bot=bot,
                     event=event,
-                    retries=3
+                    retries=2
                 )
                 if not raw_reply:
                     bot.logger.warning("[MaiReply] 重试后仍为空，放弃本次回复")
