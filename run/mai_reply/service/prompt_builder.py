@@ -53,15 +53,6 @@ class PromptBuilder:
         self._name_override: str = pcfg.get("name", "").strip()
         self._system_template: str = pcfg.get("system_prompt", "")
         self._chara_file: str = pcfg.get("chara_file", "").strip()
-        # 主人白名单：内部统一转成 set[int]，方便 O(1) 查找，允许配置里写成 int 或 str
-        raw_owner_ids = pcfg.get("owner_ids") or []
-        self._owner_ids: set = set()
-        for oid in raw_owner_ids:
-            try:
-                self._owner_ids.add(int(oid))
-            except (TypeError, ValueError):
-                continue
-        self._owner_prompt: str = (pcfg.get("owner_prompt") or "").strip()
         # 角色卡内容缓存（启动时加载一次）
         self._chara_content: Optional[str] = _load_chara_file(self._chara_file)
 
@@ -75,7 +66,6 @@ class PromptBuilder:
         group_name: str = "私聊",
         group_context_snippet: str = "",
         user_impression: str = "",
-        user_id: Optional[int] = None,
     ) -> str:
         """
         构建完整 system prompt
@@ -108,15 +98,9 @@ class PromptBuilder:
         if group_context_snippet:
             prompt += f"\n\n{group_context_snippet}"
 
-        # 追加用户印象记忆（强化态度区分指令）——主人白名单优先级最高，会覆盖印象机制
-        is_owner = user_id is not None and int(user_id) in self._owner_ids
-        if is_owner and self._owner_prompt:
-            prompt += (
-                f"\n\n【你对 {user_name} 的专属补充设定】(仅限定核心意志与身份承认，不改变你原本的说话风格与人设)\n"
-                f"{self._owner_prompt}"
-            )
-        elif user_impression:
-            prompt += f"\n\n【你对 {user_name} 的主观印象与态度】\n{user_impression}\n（重要：请务必根据以上印象，动态调整你此刻对TA的说话语气！如果印象好就亲昵，如果印象差就冷淡甚至不爱理！）"
+        # 追加用户印象记忆（强化态度区分指令）
+        if user_impression:
+            prompt += f"\n\n【你对 {user_name} 的主观印象与态度】\n{user_impression}\n（重要：请务必根据以上印象，动态调整你此刻对TA的说话语气！如果印象好就亲昵，如果印象差就冷淡甚至回怼！）"
         else:
             prompt += f"\n\n【你对 {user_name} 的主观印象与态度】\n你们还不算太熟，按你正常的心情回应即可。"
 
