@@ -34,6 +34,7 @@ def main(bot, config):
             bot.logger.info_func("B站动态监控循环重启")
             await bot.send_friend_message(config.common_config.basic_config["master"]['id'],
                                           f"B站动态监控循环重启")
+            asyncio.create_task(bili_dynamic_loop_new(bot, config))
 
     #B站登录
     @bot.on(GroupMessageEvent)

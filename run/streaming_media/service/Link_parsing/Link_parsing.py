@@ -2,6 +2,7 @@ import sys
 import asyncio
 import copy
 import re
+from bilibili_api.exceptions import ResponseCodeException
 from datetime import datetime
 import traceback
 from developTools.utils.logger import get_logger
@@ -35,7 +36,11 @@ async def link_prising(url,filepath=None,proxy=None,type=None,credential_bili=No
     #为链接解析添加缓存
     url = str(url)
     global linking_cache
-    if re_prising is False and url in linking_cache:
+    #pprint.pprint(linking_cache)
+
+    if re_prising is True and url in linking_cache:
+        linking_cache.pop(url)
+    if url in linking_cache:
         #代表有缓存，开始判断返回
         try:
             if type != 'QQ_Check' and os.path.exists(linking_cache[url]['path']):
@@ -69,13 +74,19 @@ async def link_prising(url,filepath=None,proxy=None,type=None,credential_bili=No
                 pass
             case _:
                 pass
-        if link_prising_json is not None and 'pic_path' in link_prising_json:
-            linking_cache[url] = {'info':link_prising_json, 'time':time.time(), 'path':link_prising_json['pic_path']}
-
+        if link_prising_json is not None and link_prising_json['status'] is True and 'pic_path' in link_prising_json:
+            linking_cache[url] = {'info':copy.deepcopy(link_prising_json), 'time':time.time(), 'path':link_prising_json['pic_path']}
+    except ResponseCodeException as e:
+        print(f"B站解析接口返回错误代码: {e.code}")
+        json_check['status'] = False
+        json_check['reason'] = str(e)
+        json_check['code'] = e.code
+        #traceback.print_exc()
+        return json_check
     except Exception as e:
         json_check['status'] = False
         json_check['reason'] = str(e)
-        traceback.print_exc()
+        #traceback.print_exc()
         return json_check
     if link_prising_json is not None:
         if type == 'dynamic_check':

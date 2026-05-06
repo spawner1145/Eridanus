@@ -1,5 +1,5 @@
 bili_dynamic:     #下面的设置暂不可用，请暂时不要修改
-  enable: false    #是否开启动态推送功能
+  enable: True    #是否开启动态推送功能
   dynamic_interval: 30 #动态检查间隔时间，单位为秒
   is_only_master: false #是否仅允许master订阅
   is_QQ_chek: false #是否检测qq小程序里的视频链接
