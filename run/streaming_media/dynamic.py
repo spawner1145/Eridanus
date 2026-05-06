@@ -4,27 +4,36 @@ from framework_common.manshuo_draw import *
 from run.streaming_media.service.bili_dynamic import *
 from run.streaming_media.service.Link_parsing.Link_parsing import link_prising
 import re
-import asyncio
-import gc
-from asyncio import sleep, Lock
-bili_task_lock = asyncio.Lock()
+import pprint
 import time
-from datetime import datetime, timedelta
+import asyncio
+bili_task_lock = asyncio.Lock()
+bili_task_info = None  # 用来保存任务引用
 
 def main(bot, config):
 
     @bot.on(LifecycleMetaEvent)
     async def start_bili_monitor(event):
-        async with bili_task_lock:
-            if not config.streaming_media.config["bili_dynamic"]["enable"]:
-                return
-            if await dynamic_run_is_enable():
-                bot.logger.info_func("B站动态监控循环启动")
-                # current_minute, current_second = datetime.now().minute, datetime.now().second
-                # wait_seconds = ((1 - current_minute % 10) % 10) * 60 - current_second
-                # await asyncio.sleep(wait_seconds)
-                # asyncio.create_task(bili_dynamic_loop(bot, config))
-                asyncio.create_task(bili_dynamic_loop_new(bot, config))
+        if not config.streaming_media.config["bili_dynamic"]["enable"]:
+            return
+        if await dynamic_run_is_enable():
+            bot.logger.info_func("B站动态监控循环启动")
+            # current_minute, current_second = datetime.now().minute, datetime.now().second
+            # wait_seconds = ((1 - current_minute % 10) % 10) * 60 - current_second
+            # await asyncio.sleep(wait_seconds)
+            # asyncio.create_task(bili_dynamic_loop(bot, config))
+            asyncio.create_task(bili_dynamic_loop_new(bot, config))
+
+    #用一个消息触发组件来保活动态检测循环
+    @bot.on(GroupMessageEvent)
+    async def bilibili_alive(event: GroupMessageEvent):
+        if not config.streaming_media.config["bili_dynamic"]["enable"]: return
+        if loop_cache['check_time'] == '': return
+        dynamic_interval_time = config.streaming_media.config["bili_dynamic"]["dynamic_interval"]
+        if int(time.time()) - loop_cache['check_time'] > dynamic_interval_time*10:
+            bot.logger.info_func("B站动态监控循环重启")
+            await bot.send_friend_message(config.common_config.basic_config["master"]['id'],
+                                          f"B站动态监控循环重启")
 
     #B站登录
     @bot.on(GroupMessageEvent)

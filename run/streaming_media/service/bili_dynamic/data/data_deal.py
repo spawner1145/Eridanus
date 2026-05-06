@@ -39,6 +39,9 @@ async def data_init(upid='up_info',day_info=None):
         user_info['info']['dynamic_info'][upid].setdefault(key, '')
     for key in ['dynamic_id', 'push_groups']:
         user_info['info']['dynamic_info'][upid].setdefault(key, [])
+    user_info['info']['dynamic_info'][upid].setdefault('living_info', {})
+    for key in ['room_id', 'time', 'title', 'is_push', 'msg']:
+        user_info['info']['dynamic_info'][upid]['living_info'].setdefault(key, '')
     # if user_info['info']['dynamic_info'][upid]['push_groups'] == '':
     #     user_info['info']['dynamic_info'][upid]['push_groups'] = []
     return user_info['info']
