@@ -118,6 +118,7 @@ def main(bot, config):
             #url="".join([i for i in event.message_chain.get(Text) if i.text.strip()])
         else:
             return
+        if url.startswith('/bili '):return
         if event.group_id in teamlist:
             bot.logger.info('链接解析缓存中，开始推送~~')
             json = teamlist[event.group_id]['data']
