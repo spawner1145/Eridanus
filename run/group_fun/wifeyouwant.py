@@ -461,7 +461,7 @@ class GroupFunHandler:
             friendlist_get = await self.bot.get_group_member_list(group_id)
             for friend in friendlist_get["data"]:
                 friend_names = [name for name in [friend.get("nickname"), friend.get("card")] if name]
-                if any(search_term in name for name in friend_names):
+                if any(search_term == name for name in friend_names):
                     return friend['user_id']
         except Exception as e:
             self.bot.logger.error(f"搜索群友失败: {e}")
