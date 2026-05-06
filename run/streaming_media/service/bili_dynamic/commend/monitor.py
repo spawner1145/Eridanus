@@ -3,6 +3,7 @@ from bilibili_api import select_client
 import asyncio
 import gc
 import requests
+from bilibili_api.exceptions import ResponseCodeException
 from bilibili_api.user import create_subscribe_group, set_subscribe_group,get_self_info,RelationType
 from .dynamic import bili_user_get_sub_up_dynamic
 from datetime import datetime, timedelta
@@ -396,17 +397,16 @@ async def bili_dynamic_loop_new(bot, config):
             for new_dynamic_id in list(loop_cache['need_repush_dynamic']):
                 #检测该动态是否风控
                 if loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] is not False:
-                    if loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] == 0:
-                        logger.error(f"动态id: {new_dynamic_id} 已风控，将等待一段时间后重试")
                     loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] += 1
-                    if loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] <= 6:
+                    if loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] > 24:
+                        loop_cache['need_repush_dynamic'].pop(new_dynamic_id, None)
                         continue
-                    loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] = 0
+                    elif loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] % 6 != 0:
+                        continue
+                    elif loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] % 6 == 0:
+                        logger.error(f"动态id: {new_dynamic_id} 已风控，尝试后将等待一段时间后重试")
                 push_groups_success = []
-                try:
-                    dynamic_info_prising = await link_prising(f'https://t.bilibili.com/{new_dynamic_id}',credential_bili=credential)
-                except Exception as e:
-                    dynamic_info_prising = {'status':False,'reason':'推送动态解析失败'}
+                dynamic_info_prising = await link_prising(f'https://t.bilibili.com/{new_dynamic_id}',credential_bili=credential)
                 if dynamic_info_prising['status']:
                     for group_id in loop_cache['need_repush_dynamic'][new_dynamic_id]['push_groups']:
                         if group_id not in group_list: continue
@@ -437,16 +437,16 @@ async def bili_dynamic_loop_new(bot, config):
             for living_room_id in list(loop_cache['need_repush_live']):
                 # 检测该动态是否风控
                 if loop_cache['need_repush_live'][living_room_id]['is_danger'] is not False:
-                    if loop_cache['need_repush_live'][living_room_id]['is_danger'] == 0:
-                        logger.error(f"直播房间id: {living_room_id} 已风控，将等待一段时间后重试")
                     loop_cache['need_repush_live'][living_room_id]['is_danger'] += 1
-                    if loop_cache['need_repush_live'][living_room_id]['is_danger'] <= 6:
+                    if loop_cache['need_repush_live'][living_room_id]['is_danger'] > 24:
+                        loop_cache['need_repush_live'].pop(living_room_id, None)
                         continue
-                    loop_cache['need_repush_live'][living_room_id]['is_danger'] = 0
-                try:
-                    living_info_prising = await link_prising(f'https://live.bilibili.com/{living_room_id}', credential_bili=credential)
-                except Exception as e:
-                    living_info_prising = {'status': False, 'reason': '推送直播解析失败'}
+                    elif loop_cache['need_repush_live'][living_room_id]['is_danger'] % 6 != 0:
+                        continue
+                    elif loop_cache['need_repush_live'][living_room_id]['is_danger'] % 6 == 0:
+                        logger.error(f"直播房间id: {living_room_id} 已风控，尝试后将等待一段时间后重试")
+                living_info_prising = await link_prising(f'https://live.bilibili.com/{living_room_id}', credential_bili=credential)
+                pprint.pprint(living_info_prising)
                 up_id, push_groups_success = loop_cache['need_repush_live'][living_room_id]['up_id'], []
                 if living_info_prising['status']:
                     for group_id in loop_cache['need_repush_live'][living_room_id]['push_groups']:
@@ -454,9 +454,7 @@ async def bili_dynamic_loop_new(bot, config):
                         logger.info_func(
                             f"重新推送直播 群号:{group_id} 关注id: {up_id} 直播房间: {living_room_id}，图片地址：{living_info_prising['pic_path']}")
                         try:
-                            await bot.send_group_message(group_id,
-                                                         [f'{loop_cache['need_repush_live'][living_room_id]['msg']}\n',
-                                                          Image(file=living_info_prising['pic_path'])])
+                            await bot.send_group_message(group_id, [f"{loop_cache['need_repush_live'][living_room_id]['msg']}\n",Image(file=living_info_prising['pic_path'])])
                             push_groups_success.append(group_id)
                         except Exception as e:
                             logger.error(
@@ -492,13 +490,8 @@ async def bili_dynamic_loop_new(bot, config):
             room_id = user_info['living_info']['room_id']
             #进行动态推送
             if user_info['is_push']:
-                try:
-                    dynamic_info_prising = await link_prising(f'https://t.bilibili.com/{new_dynamic_id}',credential_bili=credential)
-                except Exception as e:
-                    dynamic_info_prising = {'status': False, 'reason': '推送动态解析失败', 'is_danger': False}
-                    if hasattr(e, "response") and e.response is not None:
-                        if e.response.status_code == -352:
-                            dynamic_info_prising['is_danger'] = 0
+                dynamic_info_prising = await link_prising(f'https://t.bilibili.com/{new_dynamic_id}',credential_bili=credential)
+                if dynamic_info_prising['code'] == -352: dynamic_info_prising['is_danger'] = 0
                 if dynamic_info_prising['status']:
                     for group_id in user_info['push_groups']:
                         if group_id not in group_list: continue
@@ -520,20 +513,16 @@ async def bili_dynamic_loop_new(bot, config):
 
             #进行直播推送
             if user_info['living_info']['is_push']:
-                try:
-                    living_info_prising = await link_prising(f'https://live.bilibili.com/{room_id}',credential_bili=credential,re_prising=live_sub_result[up_id]['is_end_live'])
-                except Exception as e:
-                    living_info_prising = {'status': False, 'reason': '推送直播解析失败'}
-                    if hasattr(e, "response") and e.response is not None:
-                        if e.response.status_code == -352:
-                            living_info_prising['is_danger'] = 0
+                living_info_prising = await link_prising(f'https://live.bilibili.com/{room_id}',credential_bili=credential,re_prising=live_sub_result[up_id]['is_end_live'])
+                pprint.pprint(living_info_prising)
+                if living_info_prising['code'] == -352: living_info_prising['is_danger'] = 0
                 if living_info_prising['status']:
                     for group_id in user_info['push_groups']:
                         if group_id not in group_list: continue
                         logger.info_func(
                             f"推送直播 群号:{group_id} 关注id: {up_id} 直播房间: {room_id}，图片地址：{living_info_prising['pic_path']}")
                         try:
-                            await bot.send_group_message(group_id, [f'{user_info['living_info']['msg']}\n',
+                            await bot.send_group_message(group_id, [f"{user_info['living_info']['msg']}\n",
                                                                     Image(file=living_info_prising['pic_path'])])
                         except Exception as e:
                             logger.error(
