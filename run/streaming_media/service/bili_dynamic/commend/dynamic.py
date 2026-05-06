@@ -27,9 +27,9 @@ async def bili_user_get_sub_up_dynamic(data_info = None, credential = None):
     if credential is None: credential = Credential(sessdata=data_info['cookies']['sessdata'], bili_jct=data_info['cookies']['bili_jct'],
                             buvid3=data_info['cookies']['buvid3'], dedeuserid=data_info['cookies']['dedeuserid'])
     # 检测credential需不需要刷新，此处缺少相关值无法自动刷新，只能重新登录
-    if await credential.check_refresh():
-        return_json['status'] = False
-        return return_json
+    # if await credential.check_refresh():
+    #     return_json['status'] = False
+    #     return return_json
 
     dynamic_info_list = await dynamic.get_dynamic_page_info(credential)
     pprint.pprint(dynamic_info_list)
