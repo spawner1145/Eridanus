@@ -147,7 +147,13 @@ class ReplyEngine:
                 user_impression=user_impression,
             )
 
-            messages = list(history)
+            # 上下文截断：只保留最近 max_turns 轮（一轮=user+assistant各一条）
+            # 确保发给LLM的历史不超限，最新用户消息始终保留
+            max_turns = self.cfg.mai_reply.config.get("context", {}).get("max_turns", 20)
+            max_history_msgs = max_turns * 2
+            trimmed_history = history[-max_history_msgs:] if len(history) > max_history_msgs else list(history)
+
+            messages = trimmed_history
             user_content = multimodal_content if multimodal_content is not None else clean_text
             messages.append({"role": "user", "content": user_content})
 
@@ -157,12 +163,23 @@ class ReplyEngine:
                 tools=self._tools,
                 bot=bot,
                 event=event,
-                retries=10
+                retries=3
             )
 
             if not raw_reply:
-                bot.logger.warning("[MaiReply] LLM 返回空回复")
-                return
+                bot.logger.warning("[MaiReply] LLM 返回空回复，清理上下文后重试一次")
+                retry_messages = [{"role": "user", "content": user_content}]
+                raw_reply = await self.llm.chat(
+                    messages=retry_messages,
+                    system_prompt=system_prompt,
+                    tools=self._tools,
+                    bot=bot,
+                    event=event,
+                    retries=2
+                )
+                if not raw_reply:
+                    bot.logger.warning("[MaiReply] 重试后仍为空，放弃本次回复")
+                    return
 
             segments = self.processor.process(raw_reply)
             if not segments:

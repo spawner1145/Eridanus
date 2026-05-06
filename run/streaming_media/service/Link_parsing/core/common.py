@@ -33,7 +33,7 @@ GENERAL_REQ_LINK = "http://47.99.158.118/video-crack/v2/parse?content={}"
 # 解析列表文件名
 RESOLVE_SHUTDOWN_LIST_NAME = "resolver_shutdown_list"
 
-json_init={'status':False,'content':{},'reason':{},'pic_path':{},'url':{},'video_url':False,'soft_type':False,'pic_url_list':[]}
+json_init={'status':False,'content':{},'reason':{},'pic_path':{},'url':{},'video_url':False,'soft_type':False,'pic_url_list':[],'code':0}
 filepath_init=f'{os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(bili_init))))}/data/cache/'
 if not os.path.exists(filepath_init):  # 初始化检测文件夹
     os.makedirs(filepath_init)

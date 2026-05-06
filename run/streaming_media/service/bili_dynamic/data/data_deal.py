@@ -39,6 +39,9 @@ async def data_init(upid='up_info',day_info=None):
         user_info['info']['dynamic_info'][upid].setdefault(key, '')
     for key in ['dynamic_id', 'push_groups']:
         user_info['info']['dynamic_info'][upid].setdefault(key, [])
+    user_info['info']['dynamic_info'][upid].setdefault('living_info', {})
+    for key in ['room_id', 'time', 'title', 'is_push', 'msg']:
+        user_info['info']['dynamic_info'][upid]['living_info'].setdefault(key, '')
     # if user_info['info']['dynamic_info'][upid]['push_groups'] == '':
     #     user_info['info']['dynamic_info'][upid]['push_groups'] = []
     return user_info['info']
@@ -62,3 +65,7 @@ async def dynamic_run_is_enable(up_type='check'):
 #将数据保存到数据库中
 async def data_save(user_info):
     await db.write_user('bili_dynamic', {f'info': user_info})
+
+#将数据保存到数据库中
+async def data_delete(upid):
+    await db.delete_user_field('bili_dynamic', f'info.dynamic_info.{upid}')

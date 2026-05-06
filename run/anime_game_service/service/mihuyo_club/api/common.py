@@ -364,6 +364,13 @@ class ApiResultHandler(BaseModel):
         return self.retcode == 1 or self.message in ["成功", "OK"]
 
     @property
+    def is_signed(self):
+        """
+        是否成功
+        """
+        return self.retcode == -5003 or self.message in ["已签到"]
+
+    @property
     def wrong_captcha(self):
         """
         是否返回验证码错误

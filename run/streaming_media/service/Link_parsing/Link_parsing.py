@@ -2,10 +2,11 @@ import sys
 import asyncio
 import copy
 import re
+from bilibili_api.exceptions import ResponseCodeException
 from datetime import datetime
 import traceback
 from developTools.utils.logger import get_logger
-
+import pprint
 from run.streaming_media.service.Link_parsing.core import *
 import os
 try:
@@ -19,7 +20,7 @@ linking_cache = {}
 import time
 from run.streaming_media.service.Link_parsing.core.common import json_init
 
-async def link_prising(url,filepath=None,proxy=None,type=None,credential_bili=None):
+async def link_prising(url,filepath=None,proxy=None,type=None,credential_bili=None,re_prising=False):
     json_check = copy.deepcopy(json_init)
     link_prising_json=None
     try:
@@ -35,6 +36,10 @@ async def link_prising(url,filepath=None,proxy=None,type=None,credential_bili=No
     #为链接解析添加缓存
     url = str(url)
     global linking_cache
+    #pprint.pprint(linking_cache)
+
+    if re_prising is True and url in linking_cache:
+        linking_cache.pop(url)
     if url in linking_cache:
         #代表有缓存，开始判断返回
         try:
@@ -69,13 +74,19 @@ async def link_prising(url,filepath=None,proxy=None,type=None,credential_bili=No
                 pass
             case _:
                 pass
-        if link_prising_json is not None and 'pic_path' in link_prising_json:
-            linking_cache[url] = {'info':link_prising_json, 'time':time.time(), 'path':link_prising_json['pic_path']}
-
+        if link_prising_json is not None and link_prising_json['status'] is True and 'pic_path' in link_prising_json:
+            linking_cache[url] = {'info':copy.deepcopy(link_prising_json), 'time':time.time(), 'path':link_prising_json['pic_path']}
+    except ResponseCodeException as e:
+        print(f"B站解析接口返回错误代码: {e.code}")
+        json_check['status'] = False
+        json_check['reason'] = str(e)
+        json_check['code'] = e.code
+        #traceback.print_exc()
+        return json_check
     except Exception as e:
         json_check['status'] = False
         json_check['reason'] = str(e)
-        traceback.print_exc()
+        #traceback.print_exc()
         return json_check
     if link_prising_json is not None:
         if type == 'dynamic_check':
@@ -139,8 +150,9 @@ if __name__ == "__main__":#测试用，不用管
     url = 'https://weibo.com/6625787085/5245617985290482'
     url = 'https://x.com/hn_luotianyi712/status/2003787316100509941?s=46'
     url = 'https://x.com/h_ta6_h_h_ta6_h/status/2004134080229908552?s=46'
-    url = 'https://www.bilibili.com/opus/1196518265973637123?spm_id_from=333.1365.0.0'
-    asyncio.run(link_prising(url))
+    url = 'https://live.bilibili.com/32461978'
+    info = asyncio.run(link_prising(url))
+    pprint.pprint(info)
     #asyncio.run(youxi_pil_new_text())
 
 
