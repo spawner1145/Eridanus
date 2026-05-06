@@ -139,7 +139,7 @@ if __name__ == "__main__":#测试用，不用管
     url = 'https://weibo.com/6625787085/5245617985290482'
     url = 'https://x.com/hn_luotianyi712/status/2003787316100509941?s=46'
     url = 'https://x.com/h_ta6_h_h_ta6_h/status/2004134080229908552?s=46'
-    url = 'https://live.bilibili.com/1738673187'
+    url = 'https://live.bilibili.com/32461978'
     info = asyncio.run(link_prising(url))
     pprint.pprint(info)
     #asyncio.run(youxi_pil_new_text())

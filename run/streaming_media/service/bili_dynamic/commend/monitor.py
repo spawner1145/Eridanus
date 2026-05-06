@@ -392,16 +392,23 @@ async def bili_dynamic_loop_new(bot, config):
         # 这里进行缓存动态推送，在新动态之前进行推送
         # 再次尝试将缓存的动态推送
         if loop_cache['need_repush_dynamic'] != {}:
-            logger.info_func(
-                f"检测到有动态推送失败，尝试再次推送喵")
-            for new_dynamic_id in loop_cache['need_repush_dynamic']:
+            #logger.info_func(f"检测到有动态推送失败，尝试再次推送喵")
+            for new_dynamic_id in list(loop_cache['need_repush_dynamic']):
+                #检测该动态是否风控
+                if loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] is not False:
+                    if loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] == 0:
+                        logger.error(f"动态id: {new_dynamic_id} 已风控，将等待一段时间后重试")
+                    loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] += 1
+                    if loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] <= 6:
+                        continue
+                    loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] = 0
                 push_groups_success = []
                 try:
                     dynamic_info_prising = await link_prising(f'https://t.bilibili.com/{new_dynamic_id}',credential_bili=credential)
                 except Exception as e:
                     dynamic_info_prising = {'status':False,'reason':'推送动态解析失败'}
                 if dynamic_info_prising['status']:
-                    for group_id in loop_cache['need_repush_dynamic'][new_dynamic_id]:
+                    for group_id in loop_cache['need_repush_dynamic'][new_dynamic_id]['push_groups']:
                         if group_id not in group_list: continue
                         logger.info_func(
                             f"重新推送动态 群号:{group_id} 动态id: {new_dynamic_id}，图片地址：{dynamic_info_prising['pic_path']}")
@@ -418,19 +425,26 @@ async def bili_dynamic_loop_new(bot, config):
                         f"重新推送动态解析失败 动态id: {new_dynamic_id}，原因：{dynamic_info_prising['reason']}，动态已存储，等待下次推送")
                 if push_groups_success:
                     for group_id in push_groups_success:
-                        loop_cache['need_repush_dynamic'][new_dynamic_id].remove(group_id)
+                        loop_cache['need_repush_dynamic'][new_dynamic_id]['push_groups'].remove(group_id)
             # 处理缓存中推送的动态
-            for new_dynamic_id in loop_cache['need_repush_dynamic']:
-                if loop_cache['need_repush_dynamic'][new_dynamic_id] == []:
+            for new_dynamic_id in list(loop_cache['need_repush_dynamic']):
+                if loop_cache['need_repush_dynamic'][new_dynamic_id]['push_groups'] == []:
                     loop_cache['need_repush_dynamic'].pop(new_dynamic_id, None)
 
         # 再次尝试将缓存的直播推送
         if loop_cache['need_repush_live'] != {}:
-            logger.info_func(f"检测到有直播推送失败，尝试再次推送喵")
-            for living_room_id in loop_cache['need_repush_live']:
+            #logger.info_func(f"检测到有直播推送失败，尝试再次推送喵")
+            for living_room_id in list(loop_cache['need_repush_live']):
+                # 检测该动态是否风控
+                if loop_cache['need_repush_live'][living_room_id]['is_danger'] is not False:
+                    if loop_cache['need_repush_live'][living_room_id]['is_danger'] == 0:
+                        logger.error(f"直播房间id: {living_room_id} 已风控，将等待一段时间后重试")
+                    loop_cache['need_repush_live'][living_room_id]['is_danger'] += 1
+                    if loop_cache['need_repush_live'][living_room_id]['is_danger'] <= 6:
+                        continue
+                    loop_cache['need_repush_live'][living_room_id]['is_danger'] = 0
                 try:
-                    living_info_prising = await link_prising(f'https://live.bilibili.com/{living_room_id}',
-                                                             credential_bili=credential)
+                    living_info_prising = await link_prising(f'https://live.bilibili.com/{living_room_id}', credential_bili=credential)
                 except Exception as e:
                     living_info_prising = {'status': False, 'reason': '推送直播解析失败'}
                 up_id, push_groups_success = loop_cache['need_repush_live'][living_room_id]['up_id'], []
@@ -454,7 +468,7 @@ async def bili_dynamic_loop_new(bot, config):
                     for group_id in push_groups_success:
                         loop_cache['need_repush_live'][living_room_id]['push_groups'].remove(group_id)
             # 处理缓存中推送的直播
-            for living_room_id in loop_cache['need_repush_live']:
+            for living_room_id in list(loop_cache['need_repush_live']):
                 if loop_cache['need_repush_live'][living_room_id]['push_groups'] == []:
                     loop_cache['need_repush_live'].pop(living_room_id, None)
 
@@ -481,32 +495,38 @@ async def bili_dynamic_loop_new(bot, config):
                 try:
                     dynamic_info_prising = await link_prising(f'https://t.bilibili.com/{new_dynamic_id}',credential_bili=credential)
                 except Exception as e:
-                    dynamic_info_prising = {'status':False,'reason':'推送动态解析失败'}
+                    dynamic_info_prising = {'status': False, 'reason': '推送动态解析失败', 'is_danger': False}
+                    if hasattr(e, "response") and e.response is not None:
+                        if e.response.status_code == -352:
+                            dynamic_info_prising['is_danger'] = 0
                 if dynamic_info_prising['status']:
                     for group_id in user_info['push_groups']:
                         if group_id not in group_list: continue
                         logger.info_func(
                             f"推送动态 群号:{group_id} 关注id: {up_id} 最新动态id: {new_dynamic_id}，图片地址：{dynamic_info_prising['pic_path']}")
-                        loop_cache['need_repush_dynamic'][new_dynamic_id] = []
                         try:
                             await bot.send_group_message(group_id, [Image(file=dynamic_info_prising['pic_path']),
                                                                 f'\nhttps://t.bilibili.com/{new_dynamic_id}'])
                         except Exception as e:
                             logger.error(
                                 f"推送动态失败 群号:{group_id} 关注id: {up_id} 最新动态id: {new_dynamic_id}，原因：{e}，动态已存储，等待下次推送")
-                            loop_cache['need_repush_dynamic'].setdefault(new_dynamic_id, [])
-                            loop_cache['need_repush_dynamic'][new_dynamic_id].append(group_id)
+                            loop_cache['need_repush_dynamic'].setdefault(new_dynamic_id, {'push_groups': [], 'up_id': up_id, 'is_danger':False})
+                            loop_cache['need_repush_dynamic'][new_dynamic_id]['push_groups'].append(group_id)
                 else:
                     logger.error(
                         f"推送动态解析失败 关注id: {up_id} 最新动态id: {new_dynamic_id}，原因：{dynamic_info_prising['reason']}，动态已存储，等待下次推送")
                     # 对推送失败的动态进行缓存，下次再次尝试推送
-                    loop_cache['need_repush_dynamic'][new_dynamic_id] = user_info['push_groups']
+                    loop_cache['need_repush_dynamic'][new_dynamic_id] = {'push_groups':user_info['push_groups'], 'up_id': up_id, 'is_danger':dynamic_info_prising.get('is_danger',False)}
+
             #进行直播推送
             if user_info['living_info']['is_push']:
                 try:
                     living_info_prising = await link_prising(f'https://live.bilibili.com/{room_id}',credential_bili=credential,re_prising=live_sub_result[up_id]['is_end_live'])
                 except Exception as e:
                     living_info_prising = {'status': False, 'reason': '推送直播解析失败'}
+                    if hasattr(e, "response") and e.response is not None:
+                        if e.response.status_code == -352:
+                            living_info_prising['is_danger'] = 0
                 if living_info_prising['status']:
                     for group_id in user_info['push_groups']:
                         if group_id not in group_list: continue
@@ -518,13 +538,13 @@ async def bili_dynamic_loop_new(bot, config):
                         except Exception as e:
                             logger.error(
                                 f"推送直播失败 群号:{group_id} 关注id: {up_id} 直播房间: {room_id}，原因：{e}，直播已存储，等待下次推送")
-                            loop_cache['need_repush_live'].setdefault(new_dynamic_id, {'push_groups':[],'msg':user_info['living_info']['msg'],'up_id':up_id})
+                            loop_cache['need_repush_live'].setdefault(new_dynamic_id, {'push_groups':[],'msg':user_info['living_info']['msg'],'up_id':up_id, 'is_danger':False})
                             loop_cache['need_repush_live'][new_dynamic_id]['push_groups'].append(group_id)
                 else:
                     logger.error(
                         f"推送直播解析失败 关注id: {up_id} 直播房间: {room_id}，原因：{living_info_prising['reason']}，直播已存储，等待下次推送")
                     # 对推送失败的动态进行缓存，下次再次尝试推送
-                    loop_cache['need_repush_live'][room_id] = {'push_groups':user_info['push_groups'],'msg':user_info['living_info']['msg'],'up_id':up_id}
+                    loop_cache['need_repush_live'][room_id] = {'push_groups':user_info['push_groups'],'msg':user_info['living_info']['msg'],'up_id':up_id, 'is_danger':living_info_prising.get('is_danger',False)}
         loop_cache['is_refresh_data'] = True
         gc.collect()
         #此版延时30s即可
