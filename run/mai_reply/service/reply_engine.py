@@ -145,6 +145,7 @@ class ReplyEngine:
                 group_name=group_name,
                 group_context_snippet=group_context,
                 user_impression=user_impression,
+                user_id=user_id,
             )
 
             # 上下文截断：只保留最近 max_turns 轮（一轮=user+assistant各一条）

@@ -148,7 +148,10 @@ class LLMClient:
                     if data_str == "[DONE]": break
                     try:
                         data = json.loads(data_str)
-                        delta = data["choices"][0].get("delta", {})
+                        choices = data.get("choices", [])
+                        if not choices:
+                            continue
+                        delta = choices[0].get("delta", {})
 
                         if "content" in delta and delta["content"]:
                             yield delta["content"]
