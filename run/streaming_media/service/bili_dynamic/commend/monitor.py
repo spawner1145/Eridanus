@@ -398,13 +398,13 @@ async def bili_dynamic_loop_new(bot, config):
                 #检测该动态是否风控
                 if loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] is not False:
                     loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] += 1
-                    if loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] % 6 == 0:
-                        logger.error(f"动态id: {new_dynamic_id} 已风控，将等待一段时间后重试")
                     if loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] > 24:
                         loop_cache['need_repush_dynamic'].pop(new_dynamic_id, None)
                         continue
                     elif loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] % 6 != 0:
                         continue
+                    elif loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] % 6 == 0:
+                        logger.error(f"动态id: {new_dynamic_id} 已风控，尝试后将等待一段时间后重试")
                 push_groups_success = []
                 dynamic_info_prising = await link_prising(f'https://t.bilibili.com/{new_dynamic_id}',credential_bili=credential)
                 if dynamic_info_prising['status']:
@@ -438,13 +438,13 @@ async def bili_dynamic_loop_new(bot, config):
                 # 检测该动态是否风控
                 if loop_cache['need_repush_live'][living_room_id]['is_danger'] is not False:
                     loop_cache['need_repush_live'][living_room_id]['is_danger'] += 1
-                    if loop_cache['need_repush_live'][living_room_id]['is_danger'] % 6 == 0:
-                        logger.error(f"直播房间id: {living_room_id} 已风控，将等待一段时间后重试")
                     if loop_cache['need_repush_live'][living_room_id]['is_danger'] > 24:
                         loop_cache['need_repush_live'].pop(living_room_id, None)
                         continue
                     elif loop_cache['need_repush_live'][living_room_id]['is_danger'] % 6 != 0:
                         continue
+                    elif loop_cache['need_repush_live'][living_room_id]['is_danger'] % 6 == 0:
+                        logger.error(f"直播房间id: {living_room_id} 已风控，尝试后将等待一段时间后重试")
                 living_info_prising = await link_prising(f'https://live.bilibili.com/{living_room_id}', credential_bili=credential)
                 pprint.pprint(living_info_prising)
                 up_id, push_groups_success = loop_cache['need_repush_live'][living_room_id]['up_id'], []
