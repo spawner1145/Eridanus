@@ -397,9 +397,9 @@ async def bili_dynamic_loop_new(bot, config):
             for new_dynamic_id in list(loop_cache['need_repush_dynamic']):
                 #检测该动态是否风控
                 if loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] is not False:
-                    if loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] == 0:
-                        logger.error(f"动态id: {new_dynamic_id} 已风控，将等待一段时间后重试")
                     loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] += 1
+                    if loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] % 6 == 0:
+                        logger.error(f"动态id: {new_dynamic_id} 已风控，将等待一段时间后重试")
                     if loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] > 24:
                         loop_cache['need_repush_dynamic'].pop(new_dynamic_id, None)
                         continue
@@ -437,9 +437,9 @@ async def bili_dynamic_loop_new(bot, config):
             for living_room_id in list(loop_cache['need_repush_live']):
                 # 检测该动态是否风控
                 if loop_cache['need_repush_live'][living_room_id]['is_danger'] is not False:
-                    if loop_cache['need_repush_live'][living_room_id]['is_danger'] == 0:
-                        logger.error(f"直播房间id: {living_room_id} 已风控，将等待一段时间后重试")
                     loop_cache['need_repush_live'][living_room_id]['is_danger'] += 1
+                    if loop_cache['need_repush_live'][living_room_id]['is_danger'] % 6 == 0:
+                        logger.error(f"直播房间id: {living_room_id} 已风控，将等待一段时间后重试")
                     if loop_cache['need_repush_live'][living_room_id]['is_danger'] > 24:
                         loop_cache['need_repush_live'].pop(living_room_id, None)
                         continue
