@@ -261,7 +261,7 @@ async def bili_dynamic_loop_new(bot, config):
         #构建出需要检测的up列表
         #若全局变量中显示需要刷新则从数据库中重新读取数据
         if loop_cache['is_refresh_data']:
-            #print('刷新一次数据')
+            logger.info_func("重新从数据库读取B站数据以及凭证")
             #先删除之前引用的数据并进行一次垃圾回收
             del data_info
             del credential
@@ -293,10 +293,22 @@ async def bili_dynamic_loop_new(bot, config):
         # 记录本次检测时间
         data_info['dynamic_info'][f'up_info']['check_time'] = day_info['time']
         loop_cache['check_time'] = day_info['time']
+        dynamic_info_list, live_info_list = {}, {}
         try:
             dynamic_info_list = await dynamic.get_dynamic_page_info(credential, dynamic.DynamicType("all"))
             live_info_list = await live.get_live_followers_info(False, credential)
             notice_flag = True
+        except ResponseCodeException as e:
+            msg = f"B站动态检测获取当前用户动态列表出错：{e}"
+            if e.code == -101: msg = f"B站账号未登录"
+            elif e.code == -352: msg = f"当前风控ing"
+            if e.code != 0:
+                notice_flag, loop_cache['is_refresh_data'] = False, True
+                loop_cache['data_info'], loop_cache['credential'] = {}, ''
+                logger.error(msg)
+                if e.code == -101:
+                    await bot.send_friend_message(config.common_config.basic_config["master"]['id'],msg)
+                await asyncio.sleep(dynamic_interval_time)
         except Exception as e:
             logger.error(f"B站动态检测获取当前用户动态列表出错：{e}")
             #检测凭证是否有效
@@ -320,12 +332,13 @@ async def bili_dynamic_loop_new(bot, config):
                 dynamic_sub_ids[dynamic_upid] = []
             dynamic_sub_ids[dynamic_upid].append(dynamic_id)
         #处理直播间信息，将有用数据拆分出来
-        for item in live_info_list['rooms']:
-            #continue
-            living_upid = str(item['uid'])
-            if living_upid not in up_list: continue
-            live_sub_result[living_upid] = {'title': item['title'], 'roomid': item['roomid'],
-                                             'time': item['live_time'], 'is_end_live':False}
+        if 'rooms' in live_info_list:
+            for item in live_info_list['rooms']:
+                #continue
+                living_upid = str(item['uid'])
+                if living_upid not in up_list: continue
+                live_sub_result[living_upid] = {'title': item['title'], 'roomid': item['roomid'],
+                                                 'time': item['live_time'], 'is_end_live':False}
         #pprint.pprint(live_sub_result)
         #将用户动态页的关注up动态分类后处理是否有新动态，后面统一推送
         update_flag = False
@@ -334,10 +347,9 @@ async def bili_dynamic_loop_new(bot, config):
         for up_id in dynamic_sub_ids:
             user_info = data_info['dynamic_info'][up_id]
             user_info['is_push'] = False
-            if user_info['enable'] is False:continue
-            user_info['new_dynamic_id'] = dynamic_sub_ids[up_id][0]
-            if user_info['new_dynamic_id'] not in user_info['dynamic_id']:
+            if dynamic_sub_ids[up_id][0] != user_info['new_dynamic_id'] and dynamic_sub_ids[up_id][0] not in user_info['dynamic_id']:
                 user_info['is_push'], update_flag = True, True
+                user_info['new_dynamic_id'] = dynamic_sub_ids[up_id][0]
             for item in dynamic_sub_ids[up_id]:
                 if item not in user_info['dynamic_id']:
                     user_info['dynamic_id'].append(item)
@@ -348,7 +360,7 @@ async def bili_dynamic_loop_new(bot, config):
         # data_info['dynamic_info']['3546883874097311']['is_push'], update_flag = True, True
         #await data_save(data_info)
         #这里处理直播间数据
-        for up_id in live_sub_result:
+        for up_id in list(live_sub_result):
             # 首先对用户数据中缺失的进行初始化
             user_info = data_info['dynamic_info'][up_id]
             user_info.setdefault('living_info', {})
@@ -358,6 +370,10 @@ async def bili_dynamic_loop_new(bot, config):
             #接着进行赋值处理
             user_info['living_info']['room_id'], user_info['living_info']['title'] = live_sub_result[up_id]['roomid'], live_sub_result[up_id]['title']
             #检测是否需要推送
+            #好像结束直播的时候time会变成0，单独处理
+            if live_sub_result[up_id]['time'] == 0:
+                live_sub_result.pop(up_id, None)
+                continue
             if user_info['living_info']['time'] != live_sub_result[up_id]['time']:
                 user_info['living_info']['is_push'], update_flag = True, True
                 user_info['living_info']['time'] = live_sub_result[up_id]['time']
@@ -479,7 +495,8 @@ async def bili_dynamic_loop_new(bot, config):
         await data_save(data_info)
 
         #构建需要推送的人员
-        push_ups_list = list(dict.fromkeys(list(dynamic_sub_ids.keys()) + list(live_sub_result.keys())))
+        #push_ups_list = list(dict.fromkeys(list(dynamic_sub_ids.keys()) + list(live_sub_result.keys())))
+        push_ups_list = list(set(dynamic_sub_ids.keys()) | set(live_sub_result.keys()))
 
         #开始制作动态图片并推送
         for up_id in push_ups_list:
@@ -489,7 +506,7 @@ async def bili_dynamic_loop_new(bot, config):
             new_dynamic_id = user_info['new_dynamic_id']
             room_id = user_info['living_info']['room_id']
             #进行动态推送
-            if user_info['is_push']:
+            if up_id in dynamic_sub_ids and user_info['is_push']:
                 dynamic_info_prising = await link_prising(f'https://t.bilibili.com/{new_dynamic_id}',credential_bili=credential)
                 if dynamic_info_prising['code'] == -352: dynamic_info_prising['is_danger'] = 0
                 if dynamic_info_prising['status']:
@@ -512,9 +529,9 @@ async def bili_dynamic_loop_new(bot, config):
                     loop_cache['need_repush_dynamic'][new_dynamic_id] = {'push_groups':user_info['push_groups'], 'up_id': up_id, 'is_danger':dynamic_info_prising.get('is_danger',False)}
 
             #进行直播推送
-            if user_info['living_info']['is_push']:
+            if up_id in live_sub_result and user_info['living_info']['is_push']:
                 living_info_prising = await link_prising(f'https://live.bilibili.com/{room_id}',credential_bili=credential,re_prising=live_sub_result[up_id]['is_end_live'])
-                pprint.pprint(living_info_prising)
+                #pprint.pprint(living_info_prising)
                 if living_info_prising['code'] == -352: living_info_prising['is_danger'] = 0
                 if living_info_prising['status']:
                     for group_id in user_info['push_groups']:
