@@ -119,7 +119,7 @@ async def text2img(bot, event, config, prompt, is_about_bot=False):
         asyncio.create_task(
             _send_bot_image_with_retry(bot, event, config, prompt)
         )
-        return "genrating....please wait..."
+        #return "genrating....please wait..."
 
     else:
         apikey = config.ai_generated_art.config["gptimage2"]["apikey"]
