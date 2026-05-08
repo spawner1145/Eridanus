@@ -489,5 +489,3 @@ async def wait_and_delete_file(bot,file_path, interval=60):
             bot.logger.error(f"删除文件时出现错误: {e}")
             return
 
-if __name__ == '__main__':
-    asyncio.run(call_jm())
