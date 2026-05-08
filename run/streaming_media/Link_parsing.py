@@ -17,7 +17,7 @@ from time import time
 teamlist = defaultdict(lambda: {'data': None, 'expire_at': 0})
 global Cachecleaner
 Cachecleaner=False
-
+linking_prising_list = {}
 
 async def call_bili_download_video(bot, event, config,type_download='video'):
     if event.group_id in teamlist:
@@ -94,7 +94,9 @@ def main(bot, config):
 
     @bot.on(GroupMessageEvent)
     async def Link_Prising_search(event: GroupMessageEvent):
-        global Cachecleaner
+        global Cachecleaner,linking_prising_list
+        if event.sender.user_id in linking_prising_list:
+            return
         type_link = None
         if not Cachecleaner:
             asyncio.create_task(cleanup_teamlist(bot))
@@ -157,6 +159,41 @@ def main(bot, config):
             if link_prising_json['reason']:
                 #print(link_prising_json)
                 bot.logger.error(str('bili_link_error ') + link_prising_json['reason'])
+
+
+    @bot.on(GroupMessageEvent)
+    async def img_collect_download(event):
+        context, userid, nickname, group_id = event.pure_text.strip(), event.sender.user_id, event.sender.nickname, event.group_id
+        global linking_prising_list
+        if context in ['开始链接解析','开启链接解析'] or userid in linking_prising_list:
+            if userid not in linking_prising_list:
+                await bot.send(event, '请发送需要解析的链接，完成请发送 “end” 喵')
+                linking_prising_list[userid] = []
+                return
+            if context == 'end':
+                await bot.send(event, '开始解析ing，请耐心等待喵')
+                prising_list = []
+                for url in linking_prising_list[userid]:
+                    prising_list.append(await link_prising(url, type='no_draw'))
+                await bot.send(event, '开始下载图片ing，请耐心等待喵')
+                node_list = [Node(content=[Text("解析结果如下，请君过目喵")])]
+                for prising_result in prising_list:
+                    #pprint.pprint(prising_result)
+                    if prising_result['status']:
+                        msg = f"链接：{prising_result['url']}\n状态：解析成功喵"
+                        node_list.append(Node(content=[Text(msg)]))
+                        for img_url in prising_result['pic_url_list']:
+                            try:
+                                node_list.append(Node(content=[Image(file=await download_img(img_url,'data/pictures/cache/'))]))
+                            except:
+                                node_list.append(Node(content=[Text('此图片下载失败喵')]))
+                    else:
+                        msg = f"链接：{prising_result['url']}\n状态：解析失败了喵QAQ"
+                        node_list.append(Node(content=[Text(msg)]))
+                await bot.send(event, node_list)
+                linking_prising_list.pop(userid)
+            else:
+                linking_prising_list[userid].append(context)
 
 async def cleanup_teamlist(bot):
     global Cachecleaner

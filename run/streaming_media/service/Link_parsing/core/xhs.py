@@ -2,7 +2,7 @@ import httpx
 import re
 import copy
 from .login_core import ini_login_Link_Prising
-from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME
+from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME,no_draw_type
 from urllib.parse import urlparse
 from urllib.parse import parse_qs
 from datetime import datetime, timedelta
@@ -17,7 +17,7 @@ from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
 XHS_REQ_LINK = "https://www.xiaohongshu.com/explore/"
 
 
-async def xiaohongshu(url,filepath=None):
+async def xiaohongshu(url,filepath=None,type_check=None):
     """
         小红书解析
     :param event:
@@ -110,14 +110,15 @@ async def xiaohongshu(url,filepath=None):
 
 
     image_list = [item['urlDefault'] for item in note_data['imageList']]
-    if len(image_list) != 1:
-        json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
-            {'type': 'avatar', 'subtype': 'common', 'img': [note_data['user']['avatar']], 'upshift_extra': 20,
-             'content': [f"[name]{note_data['user']['nickname']}[/name]\n[time]{video_time}[/time]"], 'type_software': 'xhs','label':label_list }, image_list, [context]])
-    else:
-        json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
-            {'type': 'avatar', 'subtype': 'common', 'img': [note_data['user']['avatar']], 'upshift_extra': 20,
-             'content': [f"[name]{note_data['user']['nickname']}[/name]\n[time]{video_time}[/time]"], 'type_software': 'xhs', },
-            {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list, 'content': [context]}])
+    if type_check not in no_draw_type:
+        if len(image_list) != 1:
+            json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
+                {'type': 'avatar', 'subtype': 'common', 'img': [note_data['user']['avatar']], 'upshift_extra': 20,
+                 'content': [f"[name]{note_data['user']['nickname']}[/name]\n[time]{video_time}[/time]"], 'type_software': 'xhs','label':label_list }, image_list, [context]])
+        else:
+            json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
+                {'type': 'avatar', 'subtype': 'common', 'img': [note_data['user']['avatar']], 'upshift_extra': 20,
+                 'content': [f"[name]{note_data['user']['nickname']}[/name]\n[time]{video_time}[/time]"], 'type_software': 'xhs', },
+                {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list, 'content': [context]}])
     json_check['pic_url_list'] = image_list
     return json_check
