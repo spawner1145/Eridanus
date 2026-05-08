@@ -192,6 +192,13 @@ def downloadComic(comic_id, start=1, end=5,anti_nsfw="black_and_white",gif_compr
 
 
 def downloadALLAndToPdf(comic_id, savePath):
+    download_album('123',extra=Feature.export_pdf(
+        # 下面是自定义参数
+        pdf_dir=savePath,  # PDF 保存到 D:/my_pdfs 文件夹
+        filename_rule=str(comic_id),  # 用本子标题作为文件名
+        delete_original_file=True,  # 合并完 PDF 后删除原图
+    ))
+    return f"{savePath}/{comic_id}"
     with open("run/resource_collector/jmcomic.yml", 'r', encoding='utf-8') as f:  # 不知道他这个options咋传的，我就修改配置文件得了。
         result = yaml.load(f.read(), Loader=yaml.FullLoader)
     tempResult = copy.deepcopy(result)

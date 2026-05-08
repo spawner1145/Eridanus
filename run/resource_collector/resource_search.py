@@ -261,6 +261,7 @@ async def call_jm(bot,event,config,mode="preview",comic_id=607279,serach_topic=N
             try:
                 msg=await bot.send(event, "已启用线程,请等待下载完成", True)
                 await delay_recall(bot, msg)
+
                 loop = asyncio.get_running_loop()
                 with ThreadPoolExecutor() as executor:
                     r = await loop.run_in_executor(executor, downloadALLAndToPdf, comic_id,
@@ -271,7 +272,7 @@ async def call_jm(bot,event,config,mode="preview",comic_id=607279,serach_topic=N
                 await bot.send(event, "下载失败", True)
             finally:
                 try:
-                    shutil.rmtree(f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}")
+                    #shutil.rmtree(f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}")
                     if config.resource_collector.config['JMComic']["autoEncrypt"]:
                         encryptor = AsyncPDFEncryptor()
 
