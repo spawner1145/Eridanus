@@ -53,12 +53,12 @@ class LLMClient:
 
         # httpx 共享客户端 (针对高并发复用连接池)
         limits = httpx.Limits(max_keepalive_connections=200, max_connections=500)
-        self._http: Optional[httpx.AsyncClient] = httpx.AsyncClient(timeout=60.0, limits=limits)
+        self._http: Optional[httpx.AsyncClient] = httpx.AsyncClient(timeout=360.0, limits=limits)
 
     async def _get_http(self) -> httpx.AsyncClient:
         if self._http is None or self._http.is_closed:
             limits = httpx.Limits(max_keepalive_connections=200, max_connections=500)
-            self._http = httpx.AsyncClient(timeout=60.0, limits=limits)
+            self._http = httpx.AsyncClient(timeout=360.0, limits=limits)
         return self._http
 
     # ------------------------------------------------------------------ 统一入口
@@ -134,7 +134,7 @@ class LLMClient:
             #print(full_messages)
             async with http.stream(
                 "POST", url, json=payload,
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},timeout=360
             ) as resp:
                 resp.raise_for_status()
 
@@ -212,7 +212,7 @@ class LLMClient:
 
             http = await self._get_http()
 
-            async with http.stream("POST", url, json=payload, headers={"Content-Type": "application/json"}) as resp:
+            async with http.stream("POST", url, json=payload, headers={"Content-Type": "application/json"},timeout=360) as resp:
                 resp.raise_for_status()
 
                 is_tool_call = False
@@ -285,7 +285,7 @@ class LLMClient:
 
             http = await self._get_http()
             print(messages)
-            resp = await http.post(url, json=payload, headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
+            resp = await http.post(url, json=payload, headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},timeout=360)
             resp.raise_for_status()
             data = resp.json()
 
@@ -321,7 +321,7 @@ class LLMClient:
             if gemini_tools and not temp_signal: payload["tools"] = gemini_tools
 
             http = await self._get_http()
-            resp = await http.post(url, json=payload, headers={"Content-Type": "application/json"})
+            resp = await http.post(url, json=payload, headers={"Content-Type": "application/json"},timeout=360)
             resp.raise_for_status()
             data = resp.json()
 
