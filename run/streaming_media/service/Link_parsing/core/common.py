@@ -29,6 +29,8 @@ PLUGIN_NAME = "nonebot-plugin-resolver"
 
 GLOBAL_NICKNAME='Bot'
 
+no_draw_type = ['QQ_Check','no_draw']
+
 GENERAL_REQ_LINK = "http://47.99.158.118/video-crack/v2/parse?content={}"
 # 解析列表文件名
 RESOLVE_SHUTDOWN_LIST_NAME = "resolver_shutdown_list"
