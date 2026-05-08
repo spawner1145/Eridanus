@@ -3,7 +3,7 @@ import re
 import copy
 import asyncio
 from .login_core import ini_login_Link_Prising
-from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME,GENERAL_REQ_LINK
+from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME,GENERAL_REQ_LINK,no_draw_type
 from urllib.parse import urlparse
 from urllib.parse import parse_qs
 from datetime import datetime, timedelta
@@ -18,7 +18,7 @@ from framework_common.utils.random_str import random_str
 from playwright.async_api import async_playwright
 from run.resource_collector.service.engine_search import html_read
 
-async def twitter(url,filepath=None,proxy=None):
+async def twitter(url,filepath=None,proxy=None,type_check=None):
     """
         X解析
     :param bot:
@@ -63,6 +63,8 @@ async def twitter(url,filepath=None,proxy=None):
     if match:
         img_url = match.group(1)
         json_check['pic_url_list'] = [img_url]
+        if type_check not in no_draw_type:
+            return json_check
     else:
         return json_check
     #print(img_url)

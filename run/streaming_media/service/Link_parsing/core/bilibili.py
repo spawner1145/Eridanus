@@ -2,7 +2,7 @@ import httpx
 import re
 import copy
 from .login_core import ini_login_Link_Prising
-from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME
+from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME,no_draw_type
 from urllib.parse import urlparse
 from urllib.parse import parse_qs
 from datetime import datetime, timedelta
@@ -183,7 +183,8 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
                          'type_software': 'bilibili'},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
                 #pprint.pprint(manshuo_draw_json)
                 if is_twice is not True:
-                    json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
+                    if type not in no_draw_type:
+                        json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
                     json_check['time'] = pub_time
                     json_check['pic_url_list'] = image_list
                     return json_check
@@ -246,8 +247,8 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
                     {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                      'content': [f"[name]{owner_name}[/name]  [time]{pub_time}[/time]"],'avatar_size':50,
                      'label': label_list}, {'type': 'text','content': [text_list_check]}]
-
-                json_check['pic_path'] = await manshuo_draw(await add_append_img(manshuo_draw_json,manshuo_draw_json2,layer=2))
+                if type not in no_draw_type:
+                    json_check['pic_path'] = await manshuo_draw(await add_append_img(manshuo_draw_json,manshuo_draw_json2,layer=2))
                 json_check['time'] = pub_time
                 return json_check
 
@@ -282,7 +283,8 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
              'content': [context]}]
 
         if is_twice is not True:
-            json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
+            if type not in no_draw_type:
+                json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
             json_check['pic_url_list'].append(cover)
             return json_check
         return manshuo_draw_json
@@ -365,7 +367,7 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
          'content': [context]}]
 
     if is_twice is not True:
-        if type != 'QQ_Check':
+        if type not in no_draw_type:
             json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
         json_check['pic_url_list'].append(video_cover)
         return json_check

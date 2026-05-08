@@ -56,16 +56,16 @@ async def link_prising(url,filepath=None,proxy=None,type=None,credential_bili=No
                 link_prising_json = await bilibili(url, filepath=filepath,type=type,credential_bili=None)
             case url if 'douyin' in url:
                 logger.info(f"解析抖音链接:{url}")
-                link_prising_json = await dy(url, filepath=filepath)
+                link_prising_json = await dy(url, filepath=filepath,type_check=type)
             case url if 'weibo' in url:
                 logger.info(f"解析微博链接:{url}")
-                link_prising_json = await wb(url, filepath=filepath)
+                link_prising_json = await wb(url, filepath=filepath,type_check=type)
             case url if 'xhslink' in url or 'xiaohongshu' in url:
                 logger.info(f"解析小红书链接:{url}")
-                link_prising_json = await xiaohongshu(url, filepath=filepath)
+                link_prising_json = await xiaohongshu(url, filepath=filepath,type_check=type)
             case url if 'x.com' in url:
                 logger.info(f"解析x链接:{url}")
-                link_prising_json = await twitter(url, filepath=filepath, proxy=proxy)
+                link_prising_json = await twitter(url, filepath=filepath, proxy=proxy,type_check=type)
             case url if 'gal.manshuo.ink/archives/' in url or 'www.hikarinagi.com' in url :
                 logger.info(f"解析Galgame链接:{url}")
                 link_prising_json = await Galgame_manshuo(url, filepath=filepath)
