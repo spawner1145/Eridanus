@@ -64,4 +64,4 @@ scheduledTasks:    #其他定时任务模块的内容会陆续转到这里
     time: 16/58          # 每天中午 12:00 推送
     text: "📚 今日 JM 热门排行来了！"  # 推送前缀文本
     limit: 10           # 榜单条数，最多 10 条
-    anti_nsfw: black_and_white  # 封面处理模式：black_and_white / gif / no_censor
+    anti_nsfw: obfuscate  # 封面处理模式：black_and_white / gif / no_censor/obfuscate

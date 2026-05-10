@@ -1,20 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-封面反 NSFW 处理升级补丁
-将此函数替换 jmComic.py 中原有的 download_cover_bw()。
+封面反 NSFW 处理升级补丁 (深度学习对抗增强版)
+将此完整代码替换 jmComic.py 中原有的 download_cover_bw() 及其相关依赖。
 
 设计目标：
-  - 保持图片"大致可辨"（封面构图、文字、颜色区块肉眼仍可分辨）
-  - 多层变换堆叠，使感知哈希/颜色直方图特征远离原图
+  - 保持图片"大致可辨"（依靠人脑的完形心理学脑补能力）
+  - 彻底破坏 AI 的特征提取：通过网格、错位切断连续曲线（对抗 CNN）
+  - 通过色阶、色相变换对抗颜色直方图特征
   - 每次处理引入随机参数，避免固定变换被特征库记录
-  - 纯 Pillow + numpy，不引入新依赖
-
-处理流水线（可配置，默认全开）：
-  1. 色相旋转       hue_shift ∈ [90, 150] 度，随机方向
-  2. 通道重排       随机选一种非原始排列（BRG / GBR 等）
-  3. 饱和度压缩     S *= 0.25~0.45，亮度 V 保持，图像偏灰但结构清晰
-  4. 小角度随机旋转  ±[2, 6]°，补白色边，破坏像素对齐特征
-  5. 轻微噪声叠加   每像素 ±[8, 18] 随机整数，人眼几乎察觉不到
+  - 纯 Pillow + numpy 实现
 """
 
 import os
@@ -22,34 +16,33 @@ import random
 from typing import Literal
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 from framework_common.utils.random_str import random_str
 
-# ─── 可调参数 ──────────────────────────────────────────────────────
-_HUE_SHIFT_RANGE   = (90, 150)   # 色相旋转角度范围（度）
-_SAT_FACTOR_RANGE  = (0.25, 0.45) # 饱和度乘数范围（越小越灰，但结构保留）
-_ROT_ANGLE_RANGE   = (2.0, 6.0)   # 旋转角度绝对值范围（度）
-_NOISE_RANGE       = (8, 18)      # 每像素噪声幅度范围（0-255）
+# ─── 可调参数（若觉得图片太难看清，可以微调这些参数） ───────────────────────
+_HUE_SHIFT_RANGE = (90, 150)  # 色相旋转角度范围（度）
+_SAT_FACTOR_RANGE = (0.25, 0.45)  # 饱和度乘数范围（越小越灰，结构保留）
+_ROT_ANGLE_RANGE = (2.0, 6.0)  # 旋转角度绝对值范围（度）
+_NOISE_RANGE = (8, 18)  # 每像素噪声幅度范围（0-255）
+_PIXELATE_SCALE = (0.25, 0.4)  # 像素化缩小比例（越小马赛克越大，1.0为无变化）
+_GLITCH_SHIFT_MAX = 8  # 切片错位的最大像素数（破坏线条连续性）
+_SCANLINE_INTERVAL = (4, 7)  # 扫描线间隔像素（越小网格越密）
+
+
 # ──────────────────────────────────────────────────────────────────
 
 
-# ─── 各处理步骤 ────────────────────────────────────────────────────
+# ─── 传统感知哈希/颜色对抗处理 ───────────────────────────────────────
 
 def _hue_rotate(img: Image.Image, shift: int) -> Image.Image:
-    """
-    色相旋转：将 RGB 转到 HSV，偏移 H 通道后转回。
-    shift 范围 0-360，推荐 90-150 以保证颜色明显变化但图像仍可辨。
-    人体皮肤色调（约 15-35°）旋转后落在绿/青/蓝区，
-    使肤色不再触发肤色检测器，同时轮廓、对比度完整保留。
-    """
+    """将 RGB 转到 HSV，偏移 H 通道后转回，规避肤色检测"""
     arr = np.array(img.convert("RGB"), dtype=np.float32) / 255.0
-    # RGB → HSV（纯 numpy，避免 colorsys 的逐像素 Python 循环）
     r, g, b = arr[..., 0], arr[..., 1], arr[..., 2]
     maxc = arr.max(axis=2)
     minc = arr.min(axis=2)
-    v    = maxc
-    s    = np.where(maxc != 0, (maxc - minc) / maxc, 0.0)
+    v = maxc
+    s = np.where(maxc != 0, (maxc - minc) / maxc, 0.0)
 
     delta = maxc - minc + 1e-9
     h = np.zeros_like(maxc)
@@ -60,18 +53,17 @@ def _hue_rotate(img: Image.Image, shift: int) -> Image.Image:
     h[mask_g] = (60 * ((b - r) / delta) + 120)[mask_g]
     h[mask_b] = (60 * ((r - g) / delta) + 240)[mask_b]
 
-    h = (h + shift) % 360  # ← 旋转色相
+    h = (h + shift) % 360
 
-    # HSV → RGB
     h6 = h / 60.0
-    i  = h6.astype(int) % 6
-    f  = h6 - np.floor(h6)
-    p  = v * (1 - s)
-    q  = v * (1 - s * f)
+    i = h6.astype(int) % 6
+    f = h6 - np.floor(h6)
+    p = v * (1 - s)
+    q = v * (1 - s * f)
     t_ = v * (1 - s * (1 - f))
 
     out = np.zeros_like(arr)
-    for idx, (c0, c1, c2) in enumerate([(v,t_,p),(q,v,p),(p,v,t_),(p,q,v),(t_,p,v),(v,p,q)]):
+    for idx, (c0, c1, c2) in enumerate([(v, t_, p), (q, v, p), (p, v, t_), (p, q, v), (t_, p, v), (v, p, q)]):
         m = i == idx
         out[m, 0], out[m, 1], out[m, 2] = c0[m], c1[m], c2[m]
 
@@ -80,36 +72,25 @@ def _hue_rotate(img: Image.Image, shift: int) -> Image.Image:
 
 
 def _channel_shuffle(img: Image.Image) -> Image.Image:
-    """
-    随机通道重排（排除原始 RGB 顺序）。
-    颜色分布直方图被彻底打乱，但亮度对比、边缘、构图完整。
-    可选排列：GBR, BRG, RBG, BGR, GRB（不含 RGB）
-    """
-    orders = [(0,2,1),(1,0,2),(1,2,0),(2,0,1),(2,1,0)]  # 排除 (0,1,2)
-    order  = random.choice(orders)
-    arr    = np.array(img.convert("RGB"))
-    out    = arr[:, :, list(order)]
+    """随机通道重排（排除原始 RGB 顺序），打乱颜色直方图"""
+    orders = [(0, 2, 1), (1, 0, 2), (1, 2, 0), (2, 0, 1), (2, 1, 0)]
+    order = random.choice(orders)
+    arr = np.array(img.convert("RGB"))
+    out = arr[:, :, list(order)]
     return Image.fromarray(out, "RGB")
 
 
 def _compress_saturation(img: Image.Image, factor: float) -> Image.Image:
-    """
-    饱和度压缩：图像整体偏灰，但轮廓、层次、文字仍清晰可读。
-    factor=0 → 纯灰度；factor=1 → 原色；推荐 0.25~0.45。
-    实现：RGB 与灰度图线性混合，比 HSV 转换更快且无色阶断层。
-    """
-    arr  = np.array(img.convert("RGB"), dtype=np.float32)
-    gray = 0.299 * arr[...,0] + 0.587 * arr[...,1] + 0.114 * arr[...,2]
+    """饱和度压缩：图像整体偏灰，但轮廓层次清晰"""
+    arr = np.array(img.convert("RGB"), dtype=np.float32)
+    gray = 0.299 * arr[..., 0] + 0.587 * arr[..., 1] + 0.114 * arr[..., 2]
     gray = gray[..., np.newaxis]
-    out  = gray + (arr - gray) * factor
+    out = gray + (arr - gray) * factor
     return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), "RGB")
 
 
 def _random_rotate(img: Image.Image, angle: float) -> Image.Image:
-    """
-    小角度旋转（±angle 度），白色背景填充。
-    破坏像素网格对齐，使感知哈希（pHash/dHash）产生明显偏移。
-    """
+    """小角度旋转，白色背景填充，破坏逐像素对齐"""
     direction = random.choice([-1, 1])
     return img.rotate(
         angle * direction,
@@ -120,54 +101,102 @@ def _random_rotate(img: Image.Image, angle: float) -> Image.Image:
 
 
 def _add_noise(img: Image.Image, amplitude: int) -> Image.Image:
-    """
-    均匀随机噪声叠加（每像素 [-amplitude, +amplitude]）。
-    人眼几乎察觉不到（amplitude≤20），但会使逐像素哈希完全改变。
-    """
-    arr   = np.array(img.convert("RGB"), dtype=np.int16)
+    """均匀随机噪声叠加，改变局部哈希值"""
+    arr = np.array(img.convert("RGB"), dtype=np.int16)
     noise = np.random.randint(-amplitude, amplitude + 1, arr.shape, dtype=np.int16)
-    out   = np.clip(arr + noise, 0, 255).astype(np.uint8)
+    out = np.clip(arr + noise, 0, 255).astype(np.uint8)
     return Image.fromarray(out, "RGB")
 
 
-# ─── 公开入口 ──────────────────────────────────────────────────────
+# ─── 现代 AI (深度学习/CNN) 特征破坏处理 ──────────────────────────────
+
+def _pixelate(img: Image.Image, scale_factor: float) -> Image.Image:
+    """像素化：通过缩小再用最近邻放大，移除高频敏感细节纹理"""
+    w, h = img.size
+    small = img.resize((max(1, int(w * scale_factor)), max(1, int(h * scale_factor))), Image.BILINEAR)
+    return small.resize((w, h), Image.NEAREST)
+
+
+def _apply_scanlines(img: Image.Image, interval: int) -> Image.Image:
+    """扫描线/网格干扰：引入密集人造直线边缘，使 CNN 卷积核提取混乱"""
+    arr = np.array(img)
+    color = random.choice([0, 255])  # 随机选择纯黑或纯白线条
+    # 水平线
+    arr[::interval, :, :] = color
+    # 50%概率加上垂直线形成网格，大幅增加 AI 识别难度
+    if random.random() > 0.5:
+        arr[:, ::interval, :] = color
+    return Image.fromarray(arr)
+
+
+def _glitch_shift(img: Image.Image, max_shift: int) -> Image.Image:
+    """水平切片错位：将图像横向切分并错位，打断连续的身体曲线和轮廓线"""
+    arr = np.array(img)
+    h, w, _ = arr.shape
+    chunk_size = random.randint(10, 30)
+    for y in range(0, h, chunk_size):
+        shift = random.randint(-max_shift, max_shift)
+        arr[y:y + chunk_size] = np.roll(arr[y:y + chunk_size], shift, axis=1)
+    return Image.fromarray(arr)
+
+
+def _posterize(img: Image.Image, bits: int) -> Image.Image:
+    """色阶分离：减少颜色层级，产生伪等高线，干扰 AI 对3D圆柱/球体阴影的识别"""
+    return ImageOps.posterize(img, bits)
+
+
+# ─── 公开入口与主流水线 ──────────────────────────────────────────────
 
 def obfuscate_cover(
-    img: Image.Image,
-    *,
-    hue_rotate:  bool = True,
-    chan_shuffle: bool = True,
-    sat_compress: bool = True,
-    small_rotate: bool = True,
-    add_noise:    bool = True,
+        img: Image.Image,
+        *,
+        pixelate: bool = True,
+        glitch_shift: bool = True,
+        scanlines: bool = True,
+        posterize: bool = True,
+        hue_rotate: bool = True,
+        chan_shuffle: bool = True,
+        sat_compress: bool = True,
+        small_rotate: bool = True,
+        add_noise: bool = True,
 ) -> Image.Image:
     """
-    对封面图执行多层混淆处理，返回处理后的 PIL Image（RGB 模式）。
-
-    参数（均可单独关闭）：
-        hue_rotate   – 色相旋转，最有效的肤色规避手段
-        chan_shuffle  – 通道重排，打乱颜色直方图
-        sat_compress  – 饱和度压缩，整体偏灰
-        small_rotate  – 小角度旋转，破坏像素对齐
-        add_noise     – 轻微噪声，改变逐像素哈希
-
-    处理顺序固定（旋转→重排→饱和→小转→噪声），参数在各自范围内随机取值。
+    对封面图执行多层混淆处理流水线，返回处理后的 PIL Image (RGB)。
     """
     img = img.convert("RGB")
 
+    # 1. 结构与纹理破坏 (针对 CNN 和 ViT 模型)
+    if pixelate:
+        scale = random.uniform(*_PIXELATE_SCALE)
+        img = _pixelate(img, scale)
+
+    if glitch_shift:
+        img = _glitch_shift(img, _GLITCH_SHIFT_MAX)
+
+    # 2. 色彩与阴影拓扑破坏
+    if posterize:
+        bits = random.randint(3, 5)  # 3-5 bit 能产生伪轮廓且不至于过黑
+        img = _posterize(img, bits)
+
     if hue_rotate:
         shift = random.randint(*_HUE_SHIFT_RANGE)
-        if random.random() < 0.5:
-            shift = 360 - shift          # 随机决定旋转方向
+        shift = 360 - shift if random.random() < 0.5 else shift
         img = _hue_rotate(img, shift)
 
-    if chan_shuffle:
+    # 通道重排对人类视觉有一定冲击，设为 70% 概率触发
+    if chan_shuffle and random.random() < 0.7:
         img = _channel_shuffle(img)
 
     if sat_compress:
         factor = random.uniform(*_SAT_FACTOR_RANGE)
         img = _compress_saturation(img, factor)
 
+    # 3. 强力人造边缘引入 (致命打断 AI 的边缘与轮廓识别)
+    if scanlines:
+        interval = random.randint(*_SCANLINE_INTERVAL)
+        img = _apply_scanlines(img, interval)
+
+    # 4. 传统微调破坏 (针对 pHash/dHash 特征计算)
     if small_rotate:
         angle = random.uniform(*_ROT_ANGLE_RANGE)
         img = _random_rotate(img, angle)
@@ -180,39 +209,45 @@ def obfuscate_cover(
 
 
 def download_cover_bw(
-    comic_id,
-    anti_nsfw: Literal["obfuscate", "black_and_white", "no_censor"] = "obfuscate",
+        comic_id,
+        anti_nsfw: Literal["obfuscate", "black_and_white", "no_censor"] = "obfuscate",
 ) -> str | None:
     """
-    下载封面并做反 NSFW 处理，返回本地文件路径。
-    失败时返回 None（不抛出，让调用方降级为纯文字）。
-
-    anti_nsfw 模式：
-        "obfuscate"      – 多层混淆（新默认，推荐）
-        "black_and_white"– 旧方案，二值化黑白（保留兼容）
-        "no_censor"      – 不处理，直接输出原图
+    下载封面并执行反 NSFW 混淆处理，返回本地图片路径。
+    失败时返回 None，便于调用方优雅降级。
     """
     from jmcomic import JmOption
     try:
-        client  = JmOption.default().new_jm_client()
+        client = JmOption.default().new_jm_client()
         raw_path = f'data/pictures/cache/cover_raw_{comic_id}_{random_str()}.jpg'
+
+        # 确保缓存目录存在
+        os.makedirs(os.path.dirname(raw_path), exist_ok=True)
+
+        # 下载原图
         client.download_album_cover(str(comic_id), raw_path)
 
         dst = f'data/pictures/cache/cover_{comic_id}_{random_str()}.png'
 
         if anti_nsfw == "obfuscate":
+            # 开启高强度 AI 混淆
             img = Image.open(raw_path)
-            obfuscate_cover(img).save(dst, format="PNG")
+            obfuscated_img = obfuscate_cover(img)
+            obfuscated_img.save(dst, format="PNG")
             os.remove(raw_path)
 
         elif anti_nsfw == "black_and_white":
+            # 兼容旧版本：纯粹的二值化黑白处理
             Image.open(raw_path).convert("1").save(dst)
             os.remove(raw_path)
 
-        else:  # no_censor
+        else:
+            # no_censor：不作审查处理，保留原图
             os.rename(raw_path, dst)
 
         return dst
 
-    except Exception:
+    except Exception as e:
+        # 捕获异常返回 None。如需调试可取消下一行的注释：
+        # print(f"Download cover failed: {e}")
         return None
