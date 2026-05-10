@@ -63,7 +63,7 @@ class ImpressionUpdater:
         if not self.base_url:
             return await self._llm.chat(
                 messages=[{"role": "user", "content": prompt}],
-                system_prompt="你是一个情感记忆提取器，帮助机器人记住并压缩对他人的印象。输出简洁，不加任何前缀。",
+                system_prompt="你是一个情感记忆提取器，帮助机器人记住并压缩对他人的印象。不加任何前缀。",
                 model=self.model,
             )
         else:
@@ -72,7 +72,7 @@ class ImpressionUpdater:
                 [{"role": "user", "content": prompt}],
                 self.model,
                 self.api_key,
-                system_prompt="你是一个情感记忆提取器，帮助机器人记住并压缩对他人的印象。输出简洁，不加任何前缀。"
+                system_prompt="你是一个情感记忆提取器，帮助机器人记住并压缩对他人的印象。不加任何前缀。"
             )
 
     def tick(self, user_id: int, group_id, user_name: str, bot_name: str) -> None:
