@@ -26,7 +26,7 @@ from PIL import Image
 
 from framework_common.utils.random_str import random_str
 from run.ai_generated_art.service.antiSFW import process_folder, compress_gifs
-from run.resource_collector.service.img_obfuscation import download_cover_bw
+from run.resource_collector.service.img_obfuscation import download_cover_bw, obfuscate_cover
 
 _OPTION_FILE = 'run/resource_collector/jmcomic.yml'
 
@@ -265,7 +265,13 @@ def downloadComic(
             dst = os.path.join('data/pictures/cache', fname)
             shutil.move(os.path.join(temp_dir, fname), dst)
             new_files.append(dst)
-
+    elif anti_nsfw == "obfuscate":
+        for fname in file_names:
+            dst = f'data/pictures/cache/{random_str()}.png'
+            img = Image.open(os.path.join(temp_dir, fname))
+            obfuscated_img = obfuscate_cover(img)
+            obfuscated_img.save(dst, format="PNG")
+            new_files.append(dst)
     return new_files
 
 
