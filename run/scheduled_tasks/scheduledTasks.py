@@ -2,12 +2,12 @@
 import datetime
 import random
 from asyncio import sleep
-
+from concurrent.futures.thread import ThreadPoolExecutor
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 import asyncio
 from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
-from developTools.message.message_components import Image, Text, Card
+from developTools.message.message_components import Image, Text, Card, Node
 from framework_common.database_util.User import get_users_with_permission_above, get_user
 from framework_common.database_util.llmDB import delete_user_history
 from framework_common.framework_util.any_event import AnyEvent
@@ -408,49 +408,77 @@ def main(bot: ExtendBot, config):
                 "jm每日推送", {})
             groups = push_cfg.get("groups", [])
 
-            limit = scheduledTasks.get("jm每日推送", {}).get("limit", 10)
-            anti_nsfw = scheduledTasks.get("jm每日推送", {}).get("anti_nsfw", "black_and_white")
 
+            jm_cfg = config.resource_collector.config["JMComic"]
+            anti_nsfw = jm_cfg.get("anti_nsfw", "obfuscate")
+            limit = jm_cfg.get("ranking_limit", 10)  # 榜单条数，默认 10
+            cover_workers = jm_cfg.get("cover_workers", 5)  # 并发封面下载线程数
+
+            mode="today"
+            title_text = "📅 今日JM热门榜" if mode == "today" else "📆 本周JM热门榜"
+            bot.logger.info(f"{title_text} 正在加载，请稍候...")
+
+            # ── 2. 获取榜单列表（同步，有缓存基本秒返回）────────────
+            loop = asyncio.get_running_loop()
             try:
-                id_title_list = JM_ranking_today(limit=limit)
+                with ThreadPoolExecutor() as executor:
+                    if mode == "today":
+                        id_title_list = await loop.run_in_executor(
+                            executor, JM_ranking_today, limit
+                        )
+                    else:
+                        id_title_list = await loop.run_in_executor(
+                            executor, JM_ranking_week, limit
+                        )
             except Exception as e:
-                logger.error(f"JM 每日推送：获取排行榜失败，原因：{e}")
+                bot.logger.error(f"jm_ranking fetch error: {e}")
+                #await bot.send(event, "获取榜单失败，请稍后再试", True)
                 return
 
             if not id_title_list:
-                logger.warning("JM 每日推送：排行榜为空，跳过")
+                #await bot.send(event, "暂时没有获取到榜单数据，请稍后再试", True)
                 return
 
-            # 并发下载封面（失败时 cover=None，降级为纯文字）
+            # ── 3. 并发下载封面（在线程池中执行，不阻塞事件循环）────
             try:
-                id_title_cover = download_covers_concurrent(
-                    id_title_list, anti_nsfw=anti_nsfw, max_workers=5)
+                with ThreadPoolExecutor() as executor:
+                    ranked_items = await loop.run_in_executor(
+                        executor,
+                        download_covers_concurrent,
+                        id_title_list,
+                        anti_nsfw,
+                        cover_workers,
+                    )
             except Exception as e:
-                logger.error(f"JM 每日推送：封面下载整体失败，降级纯文字，原因：{e}")
-                id_title_cover = [(aid, title, None) for aid, title in id_title_list]
+                bot.logger.error(f"jm_ranking cover download error: {e}")
+                bot.logger.error("封面下载失败，请稍后再试")
+                return
 
-            from developTools.message.message_components import Node
-            nodes = []
-            for rank, (aid, title, cover) in enumerate(id_title_cover, start=1):
-                header = f"#{rank}  [{aid}] {title}"
-                if cover:
-                    nodes.append(Node(content=[Text(header), Image(file=cover)]))
+            # ── 4. 组装合并转发消息 ────────────────────────────────
+            cm_list = [
+                Node(content=[Text(
+                    f"{title_text}\n共 {len(ranked_items)} 部\n"
+                    f"发送「验车+车牌号」可查看预览，「jm下载+车牌号」可下载完整PDF"
+                )])
+            ]
+
+            for rank, (aid, title, cover_path) in enumerate(ranked_items, start=1):
+                info_text = f"🏅 第 {rank} 名\n车牌号：{aid}\n标题：{title}"
+                if cover_path:
+                    print(cover_path)
+                    cm_list.append(Node(content=[Text(info_text), Image(file=cover_path)]))
                 else:
-                    nodes.append(Node(content=[Text(header)]))
-
-            date_str = datetime.datetime.now().strftime("%m月%d日")
-            intro = Text(
-                config.scheduled_tasks.config["scheduledTasks"]
-                .get("jm每日推送", {})
-                .get("text", f"📚 {date_str} JM 今日热门排行"))
+                    # 封面下载失败时退化为纯文字，不中断整体输出
+                    cm_list.append(Node(content=[Text(f"{info_text}\n（封面加载失败）")]))
             bot.logger.info(f"向{len(groups)}个群推送")
+            intro=config.scheduled_tasks.config["scheduledTasks"]["jm每日推送"]["text"]
             for group_id in groups:
                 if group_id == 0:
                     continue
                 try:
                     await bot.send_group_message(group_id, intro)
-                    print(nodes)
-                    await bot.send_group_message(group_id, nodes)
+                    #print(nodes)
+                    await bot.send_group_message(group_id, cm_list)
                     await sleep(6)
                 except Exception as e:
                     logger.error(f"向群{group_id}推送 jm每日推送 失败，原因：{e}")
