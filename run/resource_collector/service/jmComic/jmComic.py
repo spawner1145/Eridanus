@@ -26,6 +26,7 @@ from PIL import Image
 
 from framework_common.utils.random_str import random_str
 from run.ai_generated_art.service.antiSFW import process_folder, compress_gifs
+from run.resource_collector.service.img_obfuscation import download_cover_bw
 
 _OPTION_FILE = 'run/resource_collector/jmcomic.yml'
 
@@ -175,26 +176,7 @@ def JM_ranking_today(limit: int = 10) -> list[tuple[str, str]]:
 # 封面下载（排行榜图文专用）
 # ──────────────────────────────────────────────
 
-def download_cover_bw(comic_id, anti_nsfw: str = "black_and_white") -> str | None:
-    """
-    下载本子封面并做反 NSFW 处理，返回本地文件路径。
-    失败时返回 None（不抛出，让调用方决定是跳过还是退化为纯文字）。
-    """
-    try:
-        client = JmOption.default().new_jm_client()
-        raw_path = f'data/pictures/cache/cover_raw_{comic_id}_{random_str()}.jpg'
-        client.download_album_cover(str(comic_id), raw_path)
 
-        dst = f'data/pictures/cache/cover_{comic_id}_{random_str()}.png'
-        if anti_nsfw == "black_and_white":
-            Image.open(raw_path).convert('1').save(dst)
-            os.remove(raw_path)
-        else:
-            os.rename(raw_path, dst)
-
-        return dst
-    except Exception:
-        return None
 
 
 def download_covers_concurrent(

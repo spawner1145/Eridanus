@@ -279,6 +279,7 @@ async def call_jm_ranking(bot, event, config, mode: str = "week"):
     for rank, (aid, title, cover_path) in enumerate(ranked_items, start=1):
         info_text = f"🏅 第 {rank} 名\n车牌号：{aid}\n标题：{title}"
         if cover_path:
+            print(cover_path)
             cm_list.append(Node(content=[Text(info_text), Image(file=cover_path)]))
         else:
             # 封面下载失败时退化为纯文字，不中断整体输出
