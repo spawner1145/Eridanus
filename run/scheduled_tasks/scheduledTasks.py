@@ -449,6 +449,7 @@ def main(bot: ExtendBot, config):
                     continue
                 try:
                     await bot.send_group_message(group_id, intro)
+                    print(nodes)
                     await bot.send_group_message(group_id, nodes)
                     await sleep(6)
                 except Exception as e:

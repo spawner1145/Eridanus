@@ -283,7 +283,7 @@ async def call_jm_ranking(bot, event, config, mode: str = "week"):
         else:
             # 封面下载失败时退化为纯文字，不中断整体输出
             cm_list.append(Node(content=[Text(f"{info_text}\n（封面加载失败）")]))
-
+    print(cm_list)
     await bot.send(event, cm_list)
 
 
