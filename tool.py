@@ -37,7 +37,8 @@ try:
     ym = YAMLManager.get_instance()
     proxy=ym.common_config.basic_config["proxy"]["http_proxy"]
     if proxy:
-        set_proxy=input(f"检测到设置了代理{proxy}，是否要为git配置代理？输入y可确认，输入n清除代理，回车则不做修改。gitcode源不需要代理")
+        logger.warning(f"检测到设置了代理{proxy}，是否要为git配置代理？输入y可确认，输入n清除代理，回车则不做修改。gitcode源不需要代理")
+        set_proxy=input("在此输入：")
         if set_proxy=="y":
             logger.info(f"检测到代理配置，正在为 Git 配置代理: {proxy}")
             try:
