@@ -443,7 +443,7 @@ def main(bot: ExtendBot, config):
                 config.scheduled_tasks.config["scheduledTasks"]
                 .get("jm每日推送", {})
                 .get("text", f"📚 {date_str} JM 今日热门排行"))
-
+            bot.logger.info(f"向{len(groups)}个群推送")
             for group_id in groups:
                 if group_id == 0:
                     continue
