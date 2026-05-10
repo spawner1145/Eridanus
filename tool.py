@@ -155,8 +155,8 @@ def updaat(f=False, source=None, yamls:dict=None):
         yamls = {}
     sources = [
         "https://github.com/avilliai/Eridanus.git",
+        "https://gitcode.com/faasf/Eridanus.git",
         "https://github.akams.cn/https://github.com/avilliai/Eridanus.git",
-        "https://github.moeyy.xyz/https://github.com/avilliai/Eridanus",
         "https://mirror.ghproxy.com/https://github.com/avilliai/Eridanus",
         "https://ghfast.top/https://github.com/avilliai/Eridanus.git",
         "https://gh.llkk.cc/https://github.com/avilliai/Eridanus.git"
@@ -165,7 +165,7 @@ def updaat(f=False, source=None, yamls:dict=None):
         for i in sources:
             logger.info(f"{sources.index(i)}. {i}")
         logger.info("拉取bot代码\n--------------------")
-        logger.warning("0为git源，其他镜像源可能存在版本滞后现象。如拉取失败可自行为environments/MinGit/cmd/git.exe配置代理(windows)。")
+        logger.warning("0为git源,1为gitcode源，其他镜像源可能存在版本滞后现象。如拉取失败可自行为environments/MinGit/cmd/git.exe配置代理(windows)。")
         source = input("选择更新源(输入数字 )：")
 
     if source.isdigit():
