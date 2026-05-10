@@ -1,291 +1,257 @@
-# -*- coding:utf-8 -*-
-import os.path
+# -*- coding: utf-8 -*-
+"""
+jmComic 业务逻辑封装
+重构要点：
+  - 统一使用新版 jmcomic API（Feature、JmDownloader.use()）
+  - 彻底废弃全局可变类变量控制 Downloader 的旧写法
+  - 预览下载器通过工厂函数按需构造，互不影响
+  - downloadALLAndToPdf 的 filename_rule 改为合法的 'Aid'（本子ID）
+  - 消除 YAML 文件被反复读写修改 base_dir 的副作用
+"""
+
+import asyncio
+import os
 import shutil
+from datetime import date
 
 import jmcomic
 import yaml
-import asyncio
-
-from jmcomic import *
+from jmcomic import (
+    JmOption, JmAlbumDetail, JmPhotoDetail,
+    JmSearchPage, JmCategoryPage,
+    JmModuleConfig, JmMagicConstants,
+    download_album, Feature,
+)
 from PIL import Image
-import os
-import gc
-import copy
+
 from framework_common.utils.random_str import random_str
 from run.ai_generated_art.service.antiSFW import process_folder, compress_gifs
-from datetime import date
-import zipfile
 
-jm_save={}
+# ──────────────────────────────────────────────
+# 全局缓存（周/月排行等不需要每次都请求）
+# ──────────────────────────────────────────────
+_jm_cache: dict = {}
 
-class MyDownloader(jmcomic.JmDownloader):
-    start = 0
-    end = 0
-    album_index = 1
-    onlyFirstPhoto = False
-
-    def do_filter(self, detail, start=start, end=end):
-        start = self.start
-        end = self.end
-        if detail.is_album() and self.onlyFirstPhoto:
-            album: jmcomic.JmAlbumDetail = detail
-            if len(album) < self.album_index:
-                self.album_index = len(album) - 1
-            if self.album_index < 1:
-                self.album_index = 1
-            return [album[self.album_index - 1]]
-        if detail.is_photo():
-            photo: jmcomic.JmPhotoDetail = detail
-            #print(len(photo))
-            if end > len(photo):
-                end = len(photo)
-            if start > len(photo):
-                start = len(photo)
-            if start == end:
-                start = 0
-                end = len(photo)
-            return photo[start:end]
-        return detail
+_OPTION_FILE = 'run/resource_collector/jmcomic.yml'
 
 
-def queryJM(name, num=3):
-    client = jmcomic.JmOption.default().new_jm_client()
-    page: jmcomic.JmSearchPage = client.search_site(search_query=name, page=1)
-    results = []
-    for i in page.content:
-        file = downloadComic(i[0], start=1, end=2)
-        print([f"车牌号：{i[0]} \n name：{i[1]['name']}\nauthor：{i[1]['author']}", file[0]])
-        results.append([f"车牌号：{i[0]} \n name：{i[1]['name']}\nauthor：{i[1]['author']} \n部分预览图：", file[0]])
-        if len(results) > num:
-            return results
-        #print(results)
+# ──────────────────────────────────────────────
+# 内部工具
+# ──────────────────────────────────────────────
+
+def _load_option(base_dir: str | None = None) -> JmOption:
+    """
+    从配置文件加载 Option。
+    若传入 base_dir，通过代码动态覆盖，不再改写磁盘上的 YAML 文件。
+    """
+    option = jmcomic.create_option_by_file(_OPTION_FILE)
+    if base_dir is not None:
+        # 直接修改 option 对象，不碰 YAML 文件
+        option.dir_rule.base_dir = base_dir
+    return option
 
 
-def JM_search(name):
+def _make_preview_downloader(start: int, end: int, album_index: int):
+    """
+    工厂函数：每次调用都返回一个 **全新的** 预览用 Downloader 类。
+    使用局部 class 避免全局状态污染，彻底解决并发/复用时参数串用问题。
+    """
+    # 用闭包把参数绑定进去，每次调用互相独立
+    _start = start
+    _end = end
+    _album_index = album_index
+
+    class _PreviewDownloader(jmcomic.JmDownloader):
+        def do_filter(self, detail):
+            # 整本：只取第 album_index 章（1-based）
+            if detail.is_album():
+                album: JmAlbumDetail = detail
+                idx = max(0, min(_album_index - 1, len(album) - 1))
+                return [album[idx]]
+
+            # 章节：按 [start:end] 切片
+            if detail.is_photo():
+                photo: JmPhotoDetail = detail
+                s = max(0, _start)
+                e = _end if _end > 0 else len(photo)
+                e = min(e, len(photo))
+                # 防止无效区间
+                if s >= e:
+                    s, e = 0, len(photo)
+                return photo[s:e]
+
+            return detail
+
+    return _PreviewDownloader
+
+
+# ──────────────────────────────────────────────
+# 搜索 API
+# ──────────────────────────────────────────────
+
+def JM_search(name: str) -> str:
+    """关键字站内搜索，返回格式化文本（最多 30 条）。"""
     client = JmOption.default().new_jm_client()
-
-    # 分页查询，search_site就是禁漫网页上的【站内搜索】
-    page: JmSearchPage = client.search_site(search_query=f'{name}', page=1)
-    # page默认的迭代方式是page.iter_id_title()，每次迭代返回 albun_id, title
-    result = ''
-    number = 0
+    page: JmSearchPage = client.search_site(search_query=name, page=1)
+    lines = []
     for album_id, title in page:
-        # print(f'[{album_id}]: {title}')
-        result += f'[{album_id}]: {title}\n'
-        number += 1
-        if number == 30: break
-    return result
+        lines.append(f'[{album_id}]: {title}')
+        if len(lines) >= 30:
+            break
+    return '\n'.join(lines)
 
 
-def JM_search_week():
-    global jm_save
-    op = JmOption.default()
-    cl = op.new_jm_client()
-    page: JmCategoryPage = cl.week_ranking(1)
-    result = ''
+async def JM_search_id(comic_id) -> str:
+    """通过车牌号查询本子标题（返回第一条结果）。"""
+    client = JmOption.default().new_jm_client()
+    page: JmSearchPage = client.search_site(search_query=str(comic_id), page=1)
+    for _, title in page:
+        return title
+    return str(comic_id)
+
+
+def JM_search_week() -> str:
+    """本周排行，有日级缓存。"""
     today = date.today()
-    if f'{today}_week' in jm_save:
-        return jm_save[f'{today}_week']
-    for page in cl.categories_filter_gen(page=1,  # 起始页码
-                                         # 下面是分类参数
-                                         time=JmMagicConstants.TIME_WEEK,
-                                         category=JmMagicConstants.CATEGORY_ALL,
-                                         order_by=JmMagicConstants.ORDER_BY_VIEW,
-                                         ):
-        number = 0
+    cache_key = f'{today}_week'
+    if cache_key in _jm_cache:
+        return _jm_cache[cache_key]
+
+    cl = JmOption.default().new_jm_client()
+    lines = []
+    for page in cl.categories_filter_gen(
+        page=1,
+        time=JmMagicConstants.TIME_WEEK,
+        category=JmMagicConstants.CATEGORY_ALL,
+        order_by=JmMagicConstants.ORDER_BY_VIEW,
+    ):
         for aid, atitle in page:
-            result += f'[{aid}]: {atitle}\n'
-            # print(aid, atitle)
-            number += 1
-            if number == 20: break
-        break
-    jm_save[f'{today}_week'] = result
-    return result
+            lines.append(f'[{aid}]: {atitle}')
+            if len(lines) >= 20:
+                break
+        break  # 只取第一页
 
-async def JM_search_id(id):
-    client = JmOption.default().new_jm_client()
-    page: JmSearchPage = client.search_site(search_query=f'{id}', page=1)
-    result = ''
-    for album_id, title in page:
-        result += f'{title}'
-        break
+    result = '\n'.join(lines)
+    _jm_cache[cache_key] = result
     return result
 
 
+def JM_search_month() -> list:
+    """本月热门榜，返回 album_id 列表，有日级缓存。"""
+    today = date.today()
+    cache_key = f'{today}_month'
+    if cache_key in _jm_cache:
+        return _jm_cache[cache_key]
 
-
-def JM_search_month():
-    global jm_save
-    op = JmOption.default()
-    cl = op.new_jm_client()
-    page: JmCategoryPage = cl.week_ranking(1)
+    cl = JmOption.default().new_jm_client()
     result = []
-    today = date.today()
-    if f'{today}_month' in jm_save:
-        return jm_save[f'{today}_month']
-    for page in cl.categories_filter_gen(page=1,  # 起始页码
-                                         # 下面是分类参数
-                                         time=JmMagicConstants.TIME_MONTH,
-                                         category=JmMagicConstants.CATEGORY_ALL,
-                                         order_by=JmMagicConstants.ORDER_BY_VIEW,
-                                         ):
-
-        for aid, atitle in page:
+    for page in cl.categories_filter_gen(
+        page=1,
+        time=JmMagicConstants.TIME_MONTH,
+        category=JmMagicConstants.CATEGORY_ALL,
+        order_by=JmMagicConstants.ORDER_BY_VIEW,
+    ):
+        for aid, _ in page:
             result.append(aid)
-        if len(result) > 50:break
-    jm_save[f'{today}_month']=result
+        if len(result) >= 50:
+            break
+
+    _jm_cache[cache_key] = result
     return result
 
 
-def downloadComic(comic_id, start=1, end=5,anti_nsfw="black_and_white",gif_compress=False):
-    with open("run/resource_collector/jmcomic.yml", 'r', encoding='utf-8') as f: #不知道他这个options咋传的，我就修改配置文件得了。
-        result = yaml.load(f.read(), Loader=yaml.FullLoader)
-    result["dir_rule"]["base_dir"]=f"data/pictures/benzi/temp{comic_id}"
-    #临时修改
-    with open("run/resource_collector/jmcomic.yml", 'w', encoding="utf-8") as file:
-        yaml.dump(result, file, allow_unicode=True)
-    option = jmcomic.create_option_by_file('run/resource_collector/jmcomic.yml')
+# ──────────────────────────────────────────────
+# 下载 API
+# ──────────────────────────────────────────────
 
-    if not os.path.exists(f'data/pictures/benzi/temp{comic_id}'):
-        os.mkdir(f'data/pictures/benzi/temp{comic_id}')
+def downloadComic(
+    comic_id,
+    start: int = 1,
+    end: int = 5,
+    anti_nsfw: str = "black_and_white",
+    gif_compress: bool = False,
+) -> list[str]:
+    """
+    预览下载：下载本子第一章的第 start～end 张图，返回处理后的本地文件路径列表。
 
-    MyDownloader.start = start
-    MyDownloader.end = end
-    MyDownloader.onlyFirstPhoto = True
-    jmcomic.JmModuleConfig.CLASS_DOWNLOADER = MyDownloader
+    参数:
+        comic_id   : 禁漫车牌号
+        start      : 图片起始下标（1-based，含）
+        end        : 图片结束下标（1-based，不含）；0 表示全部
+        anti_nsfw  : 反 NSFW 处理方式（"black_and_white" / "gif" / "no_censor"）
+        gif_compress: 是否压缩 gif
+    """
+    temp_dir = f'data/pictures/benzi/temp{comic_id}'
+    os.makedirs(temp_dir, exist_ok=True)
 
+    # ── 1. 构造独立的 Downloader 并注册 ──────────────────────
+    # start/end 在 do_filter 中是 0-based 切片，外部传入 1-based，这里转换
+    slice_start = max(0, start - 1)  # 1→0, 0→0（防呆）
+    slice_end = end                  # end 本身就是切片右边界（不含）
+
+    PreviewDownloader = _make_preview_downloader(
+        start=slice_start,
+        end=slice_end,
+        album_index=1,  # 始终只下载第一章
+    )
+    PreviewDownloader.use()  # 注册为当前 Downloader
+
+    # ── 2. 构造 option（不修改 YAML 文件）─────────────────────
+    option = _load_option(base_dir=temp_dir)
+
+    # ── 3. 下载 ───────────────────────────────────────────────
     jmcomic.download_album(comic_id, option)
 
-    folder_path = f'data/pictures/benzi/temp{comic_id}'
-    if not os.path.exists(folder_path):
-        os.mkdir(folder_path)
-    file_names = os.listdir(folder_path)
-    #print(file_names)
-    new_files = []
+    # ── 4. 恢复默认 Downloader，避免污染后续调用 ─────────────
+    jmcomic.JmDownloader.use()
+
+    # ── 5. 后处理：反 NSFW ────────────────────────────────────
+    file_names = sorted(os.listdir(temp_dir))
+    new_files: list[str] = []
+
     if anti_nsfw == "gif":
-        asyncio.run(process_folder(input_folder=folder_path,output_folder=folder_path))
-        for filename in sorted(os.listdir(folder_path)):
+        asyncio.run(process_folder(input_folder=temp_dir, output_folder=temp_dir))
+        for filename in sorted(os.listdir(temp_dir)):
             if filename.lower().endswith('.gif'):
-                new_filename = f"data/pictures/cache/{random_str()}.gif"
-                shutil.move(os.path.join(folder_path, filename), new_filename)
-                new_files.append(new_filename)
-        if gif_compress:  # 根据gifcompress的值决定是否压缩
+                dst = f'data/pictures/cache/{random_str()}.gif'
+                shutil.move(os.path.join(temp_dir, filename), dst)
+                new_files.append(dst)
+        if gif_compress:
             asyncio.run(compress_gifs(new_files))
+
     elif anti_nsfw == "black_and_white":
-        for i in file_names:
-            # print(file_names)
-            image_raw = Image.open(f"data/pictures/benzi/temp{comic_id}/" + i)
-            
-            # convert image to black and white
-            image_black_white = image_raw.convert('1')
-            newPath = f"data/pictures/cache/{random_str()}.png"
-            new_files.append(newPath)
-            image_black_white.save(newPath)
-        # png_files = [os.path.join(folder_path, file) for file in file_names if file.lower().endswith('.png')]
-        #print(new_files)
+        for fname in file_names:
+            src = os.path.join(temp_dir, fname)
+            img = Image.open(src).convert('1')
+            dst = f'data/pictures/cache/{random_str()}.png'
+            img.save(dst)
+            new_files.append(dst)
+
     elif anti_nsfw == "no_censor":
-        for i in file_names:
-            original_file = f"data/pictures/benzi/temp{comic_id}/" + i
-            shutil.move(original_file, "data/pictures/cache/")
-            new_files.append("data/pictures/cache/"+i)
+        for fname in file_names:
+            src = os.path.join(temp_dir, fname)
+            dst = os.path.join('data/pictures/cache', fname)
+            shutil.move(src, dst)
+            new_files.append(dst)
+
     return new_files
 
 
-def downloadALLAndToPdf(comic_id, savePath):
-    download_album(str(comic_id),extra=Feature.export_pdf(
-        # 下面是自定义参数
-        pdf_dir=savePath,  # PDF 保存到 D:/my_pdfs 文件夹
-        filename_rule=str(comic_id),  # 用本子标题作为文件名
-        delete_original_file=True,  # 合并完 PDF 后删除原图
-    ))
-    return f"{savePath}/{comic_id}"
-    with open("run/resource_collector/jmcomic.yml", 'r', encoding='utf-8') as f:  # 不知道他这个options咋传的，我就修改配置文件得了。
-        result = yaml.load(f.read(), Loader=yaml.FullLoader)
-    tempResult = copy.deepcopy(result)
-    tempResult["dir_rule"]["base_dir"] = f"{savePath}/{comic_id}"
+def downloadALLAndToPdf(comic_id, save_path: str) -> str:
+    """
+    全本下载并导出为 PDF。
+    文件名格式：{save_path}/[JM{comic_id}]本子标题.pdf（由 jmcomic 自动生成）
 
-    if os.path.exists(f"{savePath}/{comic_id}"):
-        shutil.rmtree(f"{savePath}/{comic_id}")
-    if "plugins" not in tempResult:
-        tempResult["plugins"] = {}
-    if "after_photo" not in tempResult["plugins"]:
-        tempResult["plugins"]["after_photo"] = []
-    tempResult["plugins"]["after_photo"].append(
-        {"plugin": "img2pdf", "kwargs": {"filename_rule": "Pid", "pdf_dir": str(savePath)}})
-    with open("run/resource_collector/jmcomic.yml", 'w', encoding="utf-8") as file:
-        yaml.dump(tempResult, file, allow_unicode=True)
-    # 创建配置对象
-    option = jmcomic.create_option_by_file('run/resource_collector/jmcomic.yml')
-    with open("run/resource_collector/jmcomic.yml", 'w', encoding="utf-8") as file:
-        yaml.dump(result, file, allow_unicode=True)
-    # 这里需要再设置一下类变量，不然本子下载不全
-    MyDownloader.start = 0
-    MyDownloader.end = 0
-    MyDownloader.onlyFirstPhoto = True
-    jmcomic.JmModuleConfig.CLASS_DOWNLOADER = MyDownloader
-    # 使用option对象来下载本子
-    jmcomic.download_album(comic_id, option)
-    return f"{savePath}/{comic_id}"
-
-if __name__ == '__main__':
-    pass
-    option = JmOption.default()
-    client = option.new_jm_client()
-
-    aid_list = [1025640,432]
-    aid_list = [
-        9208,143092,214112,237004,247557,289824,297478,302767,315954,320226,369455,377954,378654,
-        382558,389479,400387,403172,403224,405524,414406,415654,431296,441373,469555,495255,496298,507134,509898,521050,536770,558026,578492,579627,620808,1012961,1048493,1061591,1084888
-    ]
-
-    #download_album(aid_list, option)
-    folder_path ='.'
-    subfolders = []
-    for item in os.listdir(folder_path):
-        item_path = os.path.join(folder_path, item)
-        if os.path.isdir(item_path):
-            ctime = os.path.getctime(item_path)
-            subfolders.append((item_path, ctime))
-
-    # 按创建时间排序
-    subfolders_sorted = sorted(subfolders, key=lambda x: x[1])
-    print(f'文件夹读取完成，共 {len(subfolders_sorted)} 个')
-
-    for i in range(len(subfolders_sorted)):
-        dir_path = f'{subfolders_sorted[i][0]}'
-        comic_name = subfolders_sorted[i][0].replace("./","")
-        client = JmOption.default().new_jm_client()
-        page: JmSearchPage = client.search_site(search_query=f'{comic_name}', page=1)
-        aid = None
-        for album_id, title in page:
-            aid = album_id
-            break
-        if aid is None:
-            aid = '未知id'
-        print(aid,comic_name)
-        if os.path.exists(dir_path):
-            image_files = sorted([
-                f for f in os.listdir(dir_path)
-                if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp'))
-            ])
-            images = [Image.open(os.path.join(dir_path, img)).convert('RGB') for img in image_files]
-            pdf_path = f'{aid}_{comic_name}.pdf'  # 输出的PDF文件名
-            images[0].save(pdf_path, save_all=True, append_images=images[1:])
-            for img in images:
-                img.close()
-            images.clear()
-            gc.collect()
-            shutil.rmtree(dir_path)
-        else:
-            print('文件夹不存在，跳过处理')
-
-    print('开始进行压缩处理')
-    zip_path = '/home/manshuo/manshuo/bot/Eridanus/run/resource_collector/service/jmComic/comic.zip'
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        # 遍历文件夹中的所有文件和子文件夹
-        for root, dirs, files in os.walk(folder_path):
-            for file in files:
-                file_path = os.path.join(root, file)
-                # 将文件写入zip，arcname用于保持相对路径结构
-                arcname = os.path.relpath(file_path, start=folder_path)
-                zipf.write(file_path, arcname)
+    返回值：PDF 文件完整路径（不含 .pdf 后缀，以兼容原有调用方）。
+    注意：调用方拼接路径时记得加 .pdf。
+    """
+    download_album(
+        str(comic_id),
+        extra=Feature.export_pdf(
+            pdf_dir=save_path,
+            filename_rule='Aid',          # 'Aid' = 本子 ID，合法的内置规则字段
+            delete_original_file=True,    # 导出后删除原图，节省磁盘
+        ),
+    )
+    # 返回无后缀路径以兼容调用方的 f"{r}.pdf" 拼接写法
+    return os.path.join(save_path, str(comic_id))
