@@ -96,6 +96,26 @@ def JM_search(name: str) -> str:
     return '\n'.join(lines)
 
 
+def JM_search_with_covers(
+        name: str,
+        limit: int = 10,
+        anti_nsfw: str = "obfuscate",
+        cover_workers: int = 5,
+) -> list[tuple[str, str, str | None]]:
+    """
+    带封面图的搜索，返回 [(album_id, title, cover_path_or_None), ...]。
+    """
+    client = JmOption.default().new_jm_client()
+    page: JmSearchPage = client.search_site(search_query=name, page=1)
+
+    id_title_list = []
+    for aid, title in page:
+        id_title_list.append((str(aid), title))
+        if len(id_title_list) >= limit:
+            break
+
+    # 复用已有的并发封面下载
+    return download_covers_concurrent(id_title_list, anti_nsfw=anti_nsfw, max_workers=cover_workers)
 async def JM_search_id(comic_id) -> str:
     """通过车牌号查询本子标题（返回第一条结果）。"""
     client = JmOption.default().new_jm_client()

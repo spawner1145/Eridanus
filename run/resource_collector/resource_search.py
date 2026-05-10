@@ -16,7 +16,7 @@ from run.resource_collector.service.jmComic.jmComic import (
     JM_search, JM_search_week, JM_search_month,
     JM_ranking_week, JM_ranking_today,
     download_covers_concurrent,
-    downloadComic, downloadALLAndToPdf, JM_search_id,
+    downloadComic, downloadALLAndToPdf, JM_search_id, JM_search_with_covers,
 )
 from run.resource_collector.service.zLibrary.zLib import search_book, download_book
 from run.resource_collector.service.zLibrary.zLibrary import Zlibrary
@@ -429,16 +429,60 @@ async def call_jm(bot, event, config, mode="preview", comic_id=607279, serach_to
 
         elif mode == "search":
             bot.logger.info(f"JM搜索: {serach_topic}")
+            keyword = serach_topic
+            if keyword.startswith((':', '：', ' ')):
+                keyword = keyword[1:]
+            keyword = keyword.strip()
+
+            if not keyword:
+                await bot.send(event, "请输入搜索关键字")
+                return
+
+            await bot.send(event, f"正在搜索「{keyword}」，请稍候...", True)
+
+            jm_cfg = config.resource_collector.config["JMComic"]
+            anti_nsfw = jm_cfg.get("anti_nsfw", "obfuscate")
+            limit = jm_cfg.get("ranking_limit", 10)
+            cover_workers = jm_cfg.get("cover_workers", 5)
+
+            loop = asyncio.get_running_loop()
             try:
-                context = JM_search(serach_topic)
-                if context == "":
-                    await bot.send(event, "好像没有找到你说的本子呢~~~")
-                    return {"status": "failed", "message": "没有找到相关本子"}
-                r = Node(content=[Text(context)])
-                await bot.send(event, r)
+                with ThreadPoolExecutor() as executor:
+                    results = await loop.run_in_executor(
+                        executor,
+                        JM_search_with_covers,
+                        keyword,
+                        limit,
+                        anti_nsfw,
+                        cover_workers,
+                    )
             except Exception as e:
-                bot.logger.error(e)
-                await bot.send(event, "搜索失败", True)
+                logger.error(f"jm搜索失败: {e}")
+                await bot.send(event, "搜索失败，请稍后再试", True)
+                return
+
+            if not results:
+                await bot.send(event, "好像没有找到你说的本子呢~~~")
+                return
+
+            cm_list = [
+                Node(content=[Text(
+                    f"「{keyword}」的搜索结果，共 {len(results)} 部\n"
+                    f"发送「验车+车牌号」可查看预览，「jm下载+车牌号」可下载完整PDF"
+                )])
+            ]
+            for rank, (aid, title, cover_path) in enumerate(results, start=1):
+                info_text = f"第 {rank} 条\n车牌号：{aid}\n标题：{title}"
+                if cover_path:
+                    cm_list.append(Node(content=[Text(info_text), Image(file=cover_path)]))
+                else:
+                    cm_list.append(Node(content=[Text(f"{info_text}\n（封面加载失败）")]))
+
+            try:
+                await bot.send(event, cm_list)
+            except Exception as e:
+                logger.error(f"jm搜索结果发送失败: {e}")
+                await bot.send(event, "结果发送失败", True)
 
     user_info = await get_user(event.user_id)
     if mode == "preview":
@@ -515,27 +559,65 @@ def main(bot, config):
             if user_info.permission < config.resource_collector.config["jmcomic"]["jm_comic_search_level"]:
                 await bot.send(event, "你没有权限使用该功能")
                 return
-            keyword = event.pure_text
-            index = keyword.find("搜")
-            if index != -1:
-                keyword = keyword[index + len("查询"):]
-                if ':' in keyword or ' ' in keyword or '：' in keyword:
-                    keyword = keyword[+1:]
-                context = JM_search(keyword)
-            else:
+
+            index = event.pure_text.find("搜")
+            if index == -1:
                 await bot.send(event, "指令格式错误，请使用'jm搜{关键字}'")
                 return
-            aim = context
-            logger.info(f"JM搜索: {aim}")
+            keyword = event.pure_text[index + 1:]
+            if keyword.startswith((':', '：', ' ')):
+                keyword = keyword[1:]
+            keyword = keyword.strip()
+
+            if not keyword:
+                await bot.send(event, "请输入搜索关键字")
+                return
+
+            await bot.send(event, f"正在搜索「{keyword}」，请稍候...", True)
+
+            jm_cfg = config.resource_collector.config["JMComic"]
+            anti_nsfw = jm_cfg.get("anti_nsfw", "obfuscate")
+            limit = jm_cfg.get("ranking_limit", 10)
+            cover_workers = jm_cfg.get("cover_workers", 5)
+
+            loop = asyncio.get_running_loop()
             try:
-                if context == "":
-                    await bot.send(event, "好像没有找到你说的本子呢~~~")
-                    return
-                r = Node(content=[Text(context)])
-                await bot.send(event, r)
+                with ThreadPoolExecutor() as executor:
+                    results = await loop.run_in_executor(
+                        executor,
+                        JM_search_with_covers,
+                        keyword,
+                        limit,
+                        anti_nsfw,
+                        cover_workers,
+                    )
             except Exception as e:
-                logger.error(e)
-                await bot.send(event, "寄了喵", True)
+                logger.error(f"jm搜索失败: {e}")
+                await bot.send(event, "搜索失败，请稍后再试", True)
+                return
+
+            if not results:
+                await bot.send(event, "好像没有找到你说的本子呢~~~")
+                return
+
+            cm_list = [
+                Node(content=[Text(
+                    f"「{keyword}」的搜索结果，共 {len(results)} 部\n"
+                    f"发送「验车+车牌号」可查看预览，「jm下载+车牌号」可下载完整PDF"
+                )])
+            ]
+            for rank, (aid, title, cover_path) in enumerate(results, start=1):
+                info_text = f"第 {rank} 条\n车牌号：{aid}\n标题：{title}"
+                if cover_path:
+                    cm_list.append(Node(content=[Text(info_text), Image(file=cover_path)]))
+                else:
+                    cm_list.append(Node(content=[Text(f"{info_text}\n（封面加载失败）")]))
+
+            try:
+                await bot.send(event, cm_list)
+            except Exception as e:
+                logger.error(f"jm搜索结果发送失败: {e}")
+                await bot.send(event, "结果发送失败", True)
 
     @bot.on(GroupMessageEvent)
     async def ranking_comic(event: GroupMessageEvent):
