@@ -476,8 +476,10 @@ def main(bot: ExtendBot, config):
                 if group_id == 0:
                     continue
                 try:
+                    #print(group_id)
+                    #print(intro)
                     await bot.send_group_message(group_id, intro)
-                    #print(nodes)
+                    #print(cm_list)
                     await bot.send_group_message(group_id, cm_list)
                     await sleep(6)
                 except Exception as e:
@@ -518,6 +520,8 @@ def main(bot: ExtendBot, config):
         if (event.pure_text == "测试定时任务"
                 and event.user_id == config.common_config.basic_config["master"]['id']):
             for task_name, task_info in scheduledTasks.items():
+                if task_name!="jm每日推送":
+                    continue
                 await task_executor(task_name, task_info)
 
     @bot.on(GroupMessageEvent)

@@ -398,7 +398,7 @@ class WebSocketBot:
             }
         }
         if isinstance(message[0], Node):
-            r = await self.send_private_forward_msg(group_id, message)
+            r = await self.send_group_forward_msg(group_id, message)
             return r
         return await self._call_api(data["action"], data["params"])
 
