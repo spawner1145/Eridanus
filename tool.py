@@ -37,23 +37,27 @@ try:
     ym = YAMLManager.get_instance()
     proxy=ym.common_config.basic_config["proxy"]["http_proxy"]
     if proxy:
-        logger.info(f"检测到代理配置，正在为 Git 配置代理: {proxy}")
-        try:
-            # 设置 http 和 https 代理
-            subprocess.run([git_path, "config", "--global", "http.proxy", proxy], check=True)
-            subprocess.run([git_path, "config", "--global", "https.proxy", proxy], check=True)
-            logger.info("Git 代理配置成功。")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Git 代理配置失败: {e}")
+        set_proxy=input(f"检测到设置了代理{proxy}，是否要为git配置代理？输入y可确认，输入n清除代理，回车则不做修改。gitcode源不需要代理")
+        if set_proxy=="y":
+            logger.info(f"检测到代理配置，正在为 Git 配置代理: {proxy}")
+            try:
+                # 设置 http 和 https 代理
+                subprocess.run([git_path, "config", "--global", "http.proxy", proxy], check=True)
+                subprocess.run([git_path, "config", "--global", "https.proxy", proxy], check=True)
+                logger.info("Git 代理配置成功。")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Git 代理配置失败: {e}")
+        elif set_proxy=="n":
+            try:
+                # 使用 --unset 清除代理配置，stderr=subprocess.DEVNULL 是为了忽略由于本来就没有配置代理而产生的报错
+                subprocess.run([git_path, "config", "--global", "--unset", "http.proxy"], stderr=subprocess.DEVNULL)
+                subprocess.run([git_path, "config", "--global", "--unset", "https.proxy"], stderr=subprocess.DEVNULL)
+                logger.info("Git 全局代理已清除。")
+            except Exception as e:
+                logger.warning(f"清除 Git 代理时发生异常 (通常可以忽略): {e}")
     else:
-        logger.info("未配置代理或代理为空，正在清除 Git 全局代理设置（如果存在）...")
-        try:
-            # 使用 --unset 清除代理配置，stderr=subprocess.DEVNULL 是为了忽略由于本来就没有配置代理而产生的报错
-            subprocess.run([git_path, "config", "--global", "--unset", "http.proxy"], stderr=subprocess.DEVNULL)
-            subprocess.run([git_path, "config", "--global", "--unset", "https.proxy"], stderr=subprocess.DEVNULL)
-            logger.info("Git 全局代理已清除。")
-        except Exception as e:
-            logger.warning(f"清除 Git 代理时发生异常 (通常可以忽略): {e}")
+        logger.info("未配置代理或代理为空...")
+
 except Exception as e:
     logger.error(f"无法配置 Git 代理: {e}")
 
