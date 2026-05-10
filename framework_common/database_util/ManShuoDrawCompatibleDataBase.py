@@ -11,6 +11,36 @@ from developTools.utils.logger import get_logger
 
 logger = get_logger(__name__.split('.')[-1])
 
+#获取当前时间戳
+async def date_get():
+    current_date = datetime.now()
+    timestamp = int(current_date.timestamp())
+    current_year = current_date.year
+    current_month = current_date.month
+    current_day = current_date.day
+    day = f'{current_year}_{current_month}_{current_day}'
+    month = f'{current_year}_{current_month}'
+    year = f'{current_year}'
+    return_json = {'day':day, 'month':month, 'year':year,'today':current_date,'time':timestamp}
+    return return_json
+
+#初始化数据库中的缓存操作
+async def cache_init():
+    db = await AsyncSQLiteDatabase.get_instance()
+    await db.delete_user('manshuo_cache')
+    await db.write_user('manshuo_cache', {})
+
+#获取数据库中的缓存
+async def cache_get(db, user_id = None):
+    if user_id is None:
+        return await db.read_user('manshuo_cache')
+    else:
+        data_info = await db.read_user('manshuo_cache')
+        return data_info.get(user_id,{})
+
+#保存缓存数据
+async def cache_save(db, user_id = None, data_info = None):
+    await db.write_user('manshuo_cache', {user_id:data_info})
 
 # 递归合并字典中的同名字段
 def merge_dicts(dict1, dict2):

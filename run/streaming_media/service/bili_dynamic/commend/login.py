@@ -4,7 +4,7 @@ import asyncio
 from ..data import *
 from ..utils import *
 import requests
-from .monitor import loop_cache
+from .monitor import loop_cache, check_credential
 import datetime
 from developTools.utils.logger import get_logger
 logger=get_logger('bili_dynamic')
@@ -12,6 +12,7 @@ select_client("httpx")
 
 
 async def bili_login(bot = None, event = None) -> None:
+    global loop_cache
     recall_id, cookies_check = None, ''
     day_info = await date_get()
     qr = login_v2.QrCodeLogin(platform=login_v2.QrCodeLoginChannel.WEB) # 生成二维码登录实例，平台选择网页端
@@ -34,6 +35,7 @@ async def bili_login(bot = None, event = None) -> None:
     info['cookies']['subscribe_group_id'] = ''
     info['cookies']['login_time'] = day_info['time']
     #await data_save(info)
+    loop_cache['is_refresh_data'] = True
     msg = '登录成功喵，正在处理相关数据喵'
     if bot and event:
         if recall_id: await bot.recall(recall_id['data']['message_id'])
@@ -142,7 +144,8 @@ async def bili_up_status_check():
     credential = Credential(sessdata=data_info['cookies']['sessdata'], bili_jct=data_info['cookies']['bili_jct'],
                             buvid3=data_info['cookies']['buvid3'], dedeuserid=data_info['cookies']['dedeuserid'])
     # 检测credential需不需要刷新，此处缺少相关值无法自动刷新，只能重新登录
-    if await credential.check_refresh():
+    if await check_credential(credential):
+        #print(await check_credential(credential))
         user_info['status'] = False
     return user_info
 

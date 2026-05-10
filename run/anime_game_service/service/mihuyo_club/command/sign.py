@@ -13,7 +13,36 @@ from developTools.utils.logger import get_logger
 logger=get_logger('MiHoYo')
 from developTools.message.message_components import Text, Image, At
 import traceback
+import copy
+import os
+from datetime import datetime, timedelta, time
 from .config import game_name_list, game_all_list
+from framework_common.database_util.ManShuoDrawCompatibleDataBase import AsyncSQLiteDatabase, cache_get, cache_save, cache_init
+db=asyncio.run(AsyncSQLiteDatabase.get_instance())
+
+#判断是否应该刷新了
+async def date_check(user_id = None, cache_info = None):
+    if user_id is None:
+        current_date = datetime.now()
+        timestamp = int(current_date.timestamp())
+        current_year = current_date.year
+        current_month = current_date.month
+        current_day = current_date.day
+        day = f'{current_year}_{current_month}_{current_day}'
+        month = f'{current_year}_{current_month}'
+        year = f'{current_year}'
+        return_json = {'day':day, 'month':month, 'year':year,'today':current_date,'time':timestamp}
+        return return_json
+    else:
+        if cache_info is None:
+            cache_info = await cache_get(db,'mihuyo')
+        if user_id not in cache_info:
+            return False
+        sign_time = cache_info[user_id]['sign_time']
+        dt = datetime.fromtimestamp(sign_time)
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)  # 当天零点
+        tomorrow = today + timedelta(days=1)  # 明天零点
+        return today <= dt < tomorrow
 
 async def change_default_sign_game(user_id,target,bot=None,event=None):
     user = PluginDataManager.plugin_data.users[str(user_id)]
@@ -33,6 +62,7 @@ async def change_default_sign_game(user_id,target,bot=None,event=None):
 
 async def mys_game_sign(user_id,bot=None,event=None,target='all',type='game'):
     #pprint.pprint(PluginDataManager.plugin_data.users)
+    user_id = str(user_id)
     user = PluginDataManager.plugin_data.users.get(str(user_id))
     return_json = {'message':'test','img_list':[],'text_list':[],'status':False,'text':'','manshuo_draw':[]}
     if not user or not user.accounts:
@@ -87,9 +117,44 @@ async def perform_game_sign(user, user_id=None, bot = None, event = None, target
         else:
             print(user.target_sign_game)
             target_list = [user.target_sign_game]
+        # 直接签到所有
+        target_list = game_all_list
     else:target_list = target
-    #直接签到所有
-    target_list = game_all_list
+
+    cache_info = None
+    if target_list == game_all_list:
+        # 判断是否应该刷新当天签到
+        cache_info = await cache_get(db, 'mihuyo')
+        if await date_check(user_id,cache_info):
+            #pprint.pprint(g_sign_cache)
+            if target in ['daily_sign']:
+                logger.info('命中当前缓存，直接返回')
+                return cache_info[user_id]['return_json']
+            elif type in ['game','inner']:
+                img_path = cache_info[user_id].get('img_path', None)
+                draw_list = cache_info[user_id].get('draw_list', None)
+                if img_path is None and draw_list is not None:
+                    logger.info('命中当前缓存，直接开始绘制图片')
+                    img_path = await manshuo_draw(draw_list)
+                    if bot and event:
+                        await bot.send(event, [At(qq=user_id), f" 您当天的米游社签到如下", Image(file=img_path)])
+                    else:
+                        print(img_path)
+                    cache_info[user_id]['img_path'] = img_path
+                    await cache_save(db, 'mihuyo', cache_info)
+                    return cache_info[user_id]['return_json']
+                if img_path is not None and os.path.isfile(img_path):
+                    logger.info('命中当前缓存，直接返回')
+                    if bot and event:
+                        await bot.send(event, [At(qq=user_id), f" 您当天的米游社签到如下", Image(file=img_path)])
+                    else:
+                        print(img_path)
+                    return cache_info[user_id]['return_json']
+        else:
+            if user_id in cache_info:
+                cache_info.pop(user_id)
+    #print('开始签到')
+
     failed_accounts, img_list, text_list, pure_text_list, UID = [], [], [], [], '无法获取'
     for account in user.accounts.values():
         signed = False
@@ -126,13 +191,13 @@ async def perform_game_sign(user, user_id=None, bot = None, event = None, target
             if (get_info_status and not info.is_sign) or not get_info_status:
                 sign_status, mmt_data = await signer.sign(account.platform)
                 #失败后重新延迟后重新签一次
-                if not sign_status:
-                    if not (sign_status.login_expired or sign_status.need_verify):
-                        logger.info('第一次签到失败，延迟后第二次签到')
-                        await asyncio.sleep(plugin_config.preference.sleep_time)
-                        game_record_status, records = await get_game_record(account)
-                        signer = class_type(account, records)
-                        sign_status, mmt_data = await signer.sign(account.platform)
+                # if not sign_status:
+                #     if not (sign_status.login_expired or sign_status.need_verify):
+                #         logger.info('第一次签到失败，延迟后第二次签到')
+                #         await asyncio.sleep(plugin_config.preference.sleep_time)
+                #         game_record_status, records = await get_game_record(account)
+                #         signer = class_type(account, records)
+                #         sign_status, mmt_data = await signer.sign(account.platform)
 
 
                 #第二次签后获取不到数据则继续
@@ -140,6 +205,9 @@ async def perform_game_sign(user, user_id=None, bot = None, event = None, target
                     if sign_status.login_expired:
                         message = f" 签到时服务器返回登录失效，请尝试重新登录绑定账户"
                         per_msg = f'{signer.record.nickname} 签到时服务器返回登录失效，请尝试重新登录绑定账户'
+                    elif sign_status.is_signed:
+                        message = f" 今天已签到了喵"
+                        per_msg = f'{signer.record.nickname} 今天已签到了喵'
                     elif sign_status.need_verify:
                         message = (f" 『{signer.name}』签到时可能遇到验证码拦截，"
                                    "请尝试使用命令『/账号设置』更改设备平台，若仍失败请手动前往米游社签到")
@@ -206,7 +274,7 @@ async def perform_game_sign(user, user_id=None, bot = None, event = None, target
     #print(target)
 
     if user_id is None:
-        user_id = 1270858640
+        user_id = '1270858640'
     draw_list = [
         {'type': 'basic_set', 'img_width': 1500},
         {'type': 'avatar', 'subtype': 'common', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=640"],
@@ -224,12 +292,24 @@ async def perform_game_sign(user, user_id=None, bot = None, event = None, target
                        {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_list, 'content': text_list,
                         'number_per_row': 1}
                    ]}
+
+    #将签到结果存入全局缓存
+    if cache_info is not None and user_id not in cache_info:
+        day_info = await date_check()
+        #print('将数据存入缓存')
+        #cache_info = await cache_get(db, 'mihuyo')
+        cache_info[user_id] = {'sign_time':day_info['time'],'return_json':copy.deepcopy(return_json),'img_path':None,'draw_list':copy.deepcopy(draw_list)}
+        await cache_save(db, 'mihuyo', cache_info)
+        #pprint.pprint(g_sign_cache)
     #若是每日签到则直接返回
     if target == 'daily_sign':
         return return_json
     if type == 'game':
         if len(img_list) not in [0,1]:
             img_path = await manshuo_draw(draw_list)
+            if cache_info is not None and user_id in cache_info:
+                cache_info[user_id]['img_path'] = img_path
+                await cache_save(db, 'mihuyo', cache_info)
             if bot and event:
                 await bot.send(event, [At(qq=user_id),f" 您当天的米游社签到如下", Image(file=img_path)])
             else:

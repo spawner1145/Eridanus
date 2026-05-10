@@ -501,6 +501,8 @@ class BaseApiStatus(BaseModel):
     """需要进行人机验证"""
     invalid_ds: bool = False
     """Headers DS无效"""
+    is_signed: bool = False
+    """是否已经签到过了"""
 
     def __bool__(self):
         return self.success

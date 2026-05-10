@@ -59,3 +59,7 @@ scheduledTasks:    #其他定时任务模块的内容会陆续转到这里
   epic喜加一:
     enable: true
     time: 16/40
+  jm每日推送:         # JM 今日热门排行定时推送
+    enable: true
+    time: 16/58          # 每天中午 12:00 推送
+    text: "📚 该打搅了少爷"  # 推送前缀文本

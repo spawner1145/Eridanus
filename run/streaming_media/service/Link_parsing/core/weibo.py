@@ -3,7 +3,7 @@ import httpx
 import re
 import copy
 from .login_core import ini_login_Link_Prising
-from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME
+from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME,no_draw_type
 from urllib.parse import urlparse
 from urllib.parse import parse_qs
 from datetime import datetime, timedelta
@@ -52,7 +52,7 @@ def mid2id(mid):
     result.reverse()  # 反转结果数组
     return ''.join(result)  # 将结果数组连接成字符串
 
-async def wb(url,filepath=None):
+async def wb(url,filepath=None,type_check=None):
     json_check = copy.deepcopy(json_init)
     json_check['soft_type'] = 'wb'
     json_check['status'] = True
@@ -158,15 +158,15 @@ async def wb(url,filepath=None):
         await download_img(img_url, img_path, headers=headers)
         img_context_path.append(img_path)
 
-
-    if len(img_context_path) != 1:
-        json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
-            {'type': 'avatar', 'subtype': 'common', 'img': [avatar_path], 'upshift_extra': 20,
-             'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]"], 'type_software': 'wb',}, img_context_path, [context]])
-    else:
-        json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
-            {'type': 'avatar', 'subtype': 'common', 'img': [avatar_path], 'upshift_extra': 20,
-             'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]"], 'type_software': 'wb',},
-            {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context_path, 'content': [context]}])
+    if type_check not in no_draw_type:
+        if len(img_context_path) != 1:
+            json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
+                {'type': 'avatar', 'subtype': 'common', 'img': [avatar_path], 'upshift_extra': 20,
+                 'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]"], 'type_software': 'wb',}, img_context_path, [context]])
+        else:
+            json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
+                {'type': 'avatar', 'subtype': 'common', 'img': [avatar_path], 'upshift_extra': 20,
+                 'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]"], 'type_software': 'wb',},
+                {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context_path, 'content': [context]}])
     json_check['pic_url_list'] = img_context
     return json_check

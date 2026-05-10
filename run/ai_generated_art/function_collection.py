@@ -94,7 +94,8 @@ async def _send_bot_image_with_retry(bot, event, config, prompt, max_retries=5):
                         "model": config.ai_generated_art.config["gptimage2"]["model"],
                     },
                 )
-            await bot.send(event, Image(file=resp.json()["data"][0]["url"]))
+            bot.logger.info(resp.json())
+            await bot.send(event, Image(file=resp.json()["data"][0]["url"]),True)
             bot.logger.info(f"bot图片生成成功（第{attempt}次尝试）")
             return  # 成功则退出
 
@@ -119,7 +120,7 @@ async def text2img(bot, event, config, prompt, is_about_bot=False):
         asyncio.create_task(
             _send_bot_image_with_retry(bot, event, config, prompt)
         )
-        return "genrating....please wait..."
+        #return "genrating....please wait..."
 
     else:
         apikey = config.ai_generated_art.config["gptimage2"]["apikey"]

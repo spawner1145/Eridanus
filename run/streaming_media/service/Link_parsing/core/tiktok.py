@@ -9,7 +9,7 @@ import copy
 import pprint
 from framework_common.utils.install_and_import import install_and_import
 from .login_core import ini_login_Link_Prising
-from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME
+from .common import json_init,filepath_init,COMMON_HEADER,GLOBAL_NICKNAME,no_draw_type
 from urllib.parse import urlparse
 from urllib.parse import parse_qs
 from datetime import datetime, timedelta
@@ -126,7 +126,7 @@ async def dou_transfer_other(dou_url):
 
 
 
-async def dy(url,filepath=None):
+async def dy(url,filepath=None,type_check=None):
     """
         抖音解析
     :param bot:
@@ -161,17 +161,17 @@ async def dy(url,filepath=None):
             # 截断后续操作
             title = title.replace('#', '\n[tag]#', 1)
             if '#' in title: title += '[/tag]'
-
-            if len(img_context) != 1:
-                json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
-                    {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url], 'upshift_extra': 20,
-                     'content': [f"[name]{author}[/name]\n[time]{video_time}[/time]"], 'type_software': 'dy'},
-                    img_context, [title]])
-            else:
-                json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
-                    {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url], 'upshift_extra': 20,
-                     'content': [f"[name]{author}[/name]\n[time]{video_time}[/time]"], 'type_software': 'dy', },
-                    {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': [title]}])
+            if type_check not in no_draw_type:
+                if len(img_context) != 1:
+                    json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
+                        {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url], 'upshift_extra': 20,
+                         'content': [f"[name]{author}[/name]\n[time]{video_time}[/time]"], 'type_software': 'dy'},
+                        img_context, [title]])
+                else:
+                    json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
+                        {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url], 'upshift_extra': 20,
+                         'content': [f"[name]{author}[/name]\n[time]{video_time}[/time]"], 'type_software': 'dy', },
+                        {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': [title]}])
             json_check['pic_url_list'] = img_context
             return json_check
     # logger.error(dou_url_2)
@@ -242,16 +242,17 @@ async def dy(url,filepath=None):
             context = detail.get("desc").replace('#', '\n[tag]#', 1)
             if '#' in context: context += '[/tag]'
         context += f"\n--------------\n作者简介：\n{detail['author']['signature']}"
-        if len(img_context) != 1:
-            json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
-                            {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url],'upshift_extra': 20,
-                             'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]" ], 'type_software': 'dy'},img_context,[context]])
-        else:
-            json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
-                            {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url],'upshift_extra': 20,
-                             'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]" ], 'type_software': 'dy', },
-                            {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': [context]}])
-        #print(json_check['pic_path'])
+        if type_check not in no_draw_type:
+            if len(img_context) != 1:
+                json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
+                                {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url],'upshift_extra': 20,
+                                 'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]" ], 'type_software': 'dy'},img_context,[context]])
+            else:
+                json_check['pic_path'] = await manshuo_draw([{'type': 'backdrop', 'subtype': 'one_color'},
+                                {'type': 'avatar', 'subtype': 'common', 'img': [avatar_url],'upshift_extra': 20,
+                                 'content': [f"[name]{owner_name}[/name]\n[time]{video_time}[/time]" ], 'type_software': 'dy', },
+                                {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_context, 'content': [context]}])
+            #print(json_check['pic_path'])
         json_check['pic_url_list'] = img_context
         return json_check
 
