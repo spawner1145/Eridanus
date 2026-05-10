@@ -90,7 +90,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                 user_dict.pop(uid)  # 立即清理用户数据，避免重复提交
 
 
-                max_retry = 5
+                max_retry = config.ai_generated_art.config["gptimage2"]["max_retry"] or 5
 
                 async def request_api(retries=0):
                     if file_objects:
