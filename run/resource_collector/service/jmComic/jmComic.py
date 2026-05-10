@@ -192,7 +192,7 @@ def downloadComic(comic_id, start=1, end=5,anti_nsfw="black_and_white",gif_compr
 
 
 def downloadALLAndToPdf(comic_id, savePath):
-    download_album('123',extra=Feature.export_pdf(
+    download_album(str(comic_id),extra=Feature.export_pdf(
         # 下面是自定义参数
         pdf_dir=savePath,  # PDF 保存到 D:/my_pdfs 文件夹
         filename_rule=str(comic_id),  # 用本子标题作为文件名
