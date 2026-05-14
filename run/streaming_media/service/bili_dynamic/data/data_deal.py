@@ -65,7 +65,9 @@ async def dynamic_run_is_enable(up_type='check'):
 #将数据保存到数据库中
 async def data_save(user_info):
     await db.write_user('bili_dynamic', {f'info': user_info})
-
-#将数据保存到数据库中
+#保存动态数据，不影响cookies
+async def dynamic_data_save(dynamic_info):
+    await db.write_user('bili_dynamic', {f'info': {'dynamic_info':dynamic_info}})
+#删除对应数据
 async def data_delete(upid):
     await db.delete_user_field('bili_dynamic', f'info.dynamic_info.{upid}')
