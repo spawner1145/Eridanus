@@ -9,6 +9,7 @@ import time
 import asyncio
 bili_task_lock = asyncio.Lock()
 bili_task_info = None  # 用来保存任务引用
+bili_cookies = {'user':None,'cookies':{'SESSDATA':'','bili_jct':'','buvid3':'','DedeUserID':'','ac_time_value':''}}
 
 def main(bot, config):
 
@@ -46,6 +47,34 @@ def main(bot, config):
             await bot.send(event, '您非超级管理员喵')
             return
         await bili_login(bot,event)
+
+    # B站手动登录
+    @bot.on(GroupMessageEvent)
+    async def bilibili_login_commend_by_user_record(event: GroupMessageEvent):
+        global bili_cookies
+        if bili_cookies['user'] is None:return
+        context, userid = event.pure_text, event.sender.user_id
+        if userid != bili_cookies['user']:return
+        for item in bili_cookies['cookies']:
+            if bili_cookies['cookies'][item] == '':
+                bili_cookies['cookies'][item] = context
+                if item != 'ac_time_value': return
+        await bili_login(bot, event, bili_cookies['cookies'])
+        #恢复初始化
+        bili_cookies = {'user': None, 'cookies': {'SESSDATA': '', 'bili_jct': '', 'buvid3': '', 'DedeUserID': '','ac_time_value': ''}}
+
+    #B站手动登录
+    @bot.on(GroupMessageEvent)
+    async def bilibili_login_commend_by_user(event: GroupMessageEvent):
+        context, userid=event.pure_text, event.sender.user_id
+        order_list = ['/bili login manual', ]
+        if context.lower() not in order_list: return
+        if userid != config.common_config.basic_config["master"]["id"]:
+            await bot.send(event, '您非超级管理员喵')
+            return
+        global bili_cookies
+        bili_cookies['user'] = userid
+        await bot.send(event, '开始手动传入B站凭证喵\n请依次发送SESSDATA，bili_jct，buvid3，DedeUserID以及ac_time_value')
 
     #B站账号状态检测
     @bot.on(GroupMessageEvent)
@@ -187,6 +216,7 @@ def main(bot, config):
             '[title]指令菜单：[/title]\n'
             '- [tag]登录账号[/tag]：/bili login, b站登录\n'
             '- [tag]添加订阅[/tag]：/bili add + upid,  eg: /bili add 389254364\n'
+            '- 手动登录账号：/bili login manual\n'
             '- 取消订阅：/bili remove + upid\n'
             '- 查看订阅up主们：/bili list\n'
             '- 查看当前登录账号状态：/bili status\n'

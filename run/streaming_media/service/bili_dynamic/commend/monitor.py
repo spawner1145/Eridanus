@@ -37,6 +37,27 @@ async def check_credential(credential = None):
     elif res['code'] == -101: return True
     else: return True
 
+#自动刷新当前凭证是否失效,True--刷熊成功，False--刷新失败或无法刷新
+async def upgrade_credential(data_info = None):
+    if data_info is None: data_info = await data_init()
+    if data_info['cookies']['sessdata'] == '':return False
+    credential = Credential(sessdata=data_info['cookies']['sessdata'], bili_jct=data_info['cookies']['bili_jct'],
+                            buvid3=data_info['cookies']['buvid3'], dedeuserid=data_info['cookies']['dedeuserid'],
+                            ac_time_value=data_info['cookies']['ac_time_value'])
+    await credential.refresh()
+    if await credential.check_refresh():
+        return False
+    else:
+        logger.info_func("B站凭证已刷新喵")
+        global loop_cache
+        loop_cache['is_refresh_data'] = True
+        data_info['cookies']['sessdata'] = credential.sessdata
+        data_info['cookies']['bili_jct'] = credential.bili_jct
+        data_info['cookies']['ac_time_value'] = credential.ac_time_value
+        await data_save(data_info)
+        return True
+
+
 #检测一个up的动态是否被启用
 async def bili_up_dynamic_monitor_is_enable(target = None):
     data_info = await data_init(upid=target)
@@ -257,7 +278,8 @@ async def bili_dynamic_loop_new(bot, config):
                 logger.error(f"B站动态获取群聊列表出错：{e}")
         else:
             group_list = loop_cache['group_list']
-
+        # 记录本次检测时间
+        loop_cache['check_time'] = day_info['time']
         #构建出需要检测的up列表
         #若全局变量中显示需要刷新则从数据库中重新读取数据
         if loop_cache['is_refresh_data']:
@@ -292,7 +314,6 @@ async def bili_dynamic_loop_new(bot, config):
             continue
         # 记录本次检测时间
         data_info['dynamic_info'][f'up_info']['check_time'] = day_info['time']
-        loop_cache['check_time'] = day_info['time']
         dynamic_info_list, live_info_list = {}, {}
         try:
             dynamic_info_list = await dynamic.get_dynamic_page_info(credential, dynamic.DynamicType("all"))
@@ -300,19 +321,31 @@ async def bili_dynamic_loop_new(bot, config):
             notice_flag = True
         except ResponseCodeException as e:
             msg = f"B站动态检测获取当前用户动态列表出错：{e}"
-            if e.code == -101: msg = f"B站账号未登录"
+            if e.code == -101:
+                #自动刷新一次B站凭证，刷新成功则直接下一次检测
+                if await upgrade_credential(data_info):
+                    await bot.send_friend_message(config.common_config.basic_config["master"]['id'], 'B站凭证已自动刷新喵')
+                    continue
+                msg = f"B站账号未登录，请重新登录喵"
             elif e.code == -352: msg = f"当前风控ing"
+            elif e.code == -400: msg = f"请求错误，请重新登录喵"
             if e.code != 0:
-                notice_flag, loop_cache['is_refresh_data'] = False, True
+                loop_cache['is_refresh_data'] = True
                 loop_cache['data_info'], loop_cache['credential'] = {}, ''
                 logger.error(msg)
-                if e.code == -101:
+                if e.code in [-101,-400] and notice_flag:
+                    notice_flag = False
                     await bot.send_friend_message(config.common_config.basic_config["master"]['id'],msg)
                 await asyncio.sleep(dynamic_interval_time)
+            continue
         except Exception as e:
             logger.error(f"B站动态检测获取当前用户动态列表出错：{e}")
             #检测凭证是否有效
             if await check_credential(credential):
+                # 自动刷新一次B站凭证，刷新成功则直接下一次检测
+                if await upgrade_credential(data_info):
+                    await bot.send_friend_message(config.common_config.basic_config["master"]['id'],'B站凭证已自动刷新喵')
+                    continue
                 if notice_flag:
                     await bot.send_friend_message(config.common_config.basic_config["master"]['id'],f"B站登录失效，请重新登录喵")
                     notice_flag, loop_cache['is_refresh_data'] = False, True
@@ -491,8 +524,8 @@ async def bili_dynamic_loop_new(bot, config):
         if update_flag is False:
             await asyncio.sleep(dynamic_interval_time)
             continue
-        #有新动态，那就保存数据
-        await data_save(data_info)
+        #有新动态，那就保存数据，此处修改为仅保存动态数据，避免影响cookies
+        await dynamic_data_save(data_info['dynamic_info'])
 
         #构建需要推送的人员
         #push_ups_list = list(dict.fromkeys(list(dynamic_sub_ids.keys()) + list(live_sub_result.keys())))
