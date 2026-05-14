@@ -36,7 +36,7 @@ trigger_llm:   #ai判断是否触发
   whitelist_enabled: true  # 是否启用白名单模式，启用后只有在白名单中的群聊才会触发ai回复
   whitelist:
     - 1050663831
-  reply_max_chars: 50 #插嘴最多回复字数
+  reply_max_chars: 25 #插嘴最多回复字数
   reply_max_segments: 2 #插嘴最多回几句
 
 persona:  # 人设
