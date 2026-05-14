@@ -36,6 +36,8 @@ trigger_llm:   #ai判断是否触发
   whitelist_enabled: true  # 是否启用白名单模式，启用后只有在白名单中的群聊才会触发ai回复
   whitelist:
     - 1050663831
+  reply_max_chars: 50 #插嘴最多回复字数
+  reply_max_segments: 2 #插嘴最多回几句
 
 persona:  # 人设
   name: ""  # 角色名（可选，留空则读取默认配置
@@ -55,6 +57,8 @@ context: # 上下文相关配置
   enable_impression: true   # 是否启用用户印象记忆（跨会话）
   impression_model: ""   #生成用户印象使用的模型，留空则使用llm配置中的模型。建议改成廉价快速的模型
   impression_ttl: 604800  # 7天 印象保留时间
+  group_reply_impression_count: 3 #群聊回复时调用其他n个用户印象
+  group_trigger_msgs: 10 #群聊印象更新间隔
   img_context: false   # 读取上下文中的图片（需要模型能看图，会极大增加token消耗，仅在trigger_llm的白名单群启用）
   vision_base_url: "http://api.apollodorus.xyz/v1"  # 视觉模型接口URL，留空则使用llm配置中的base_url
   vision_api_key: "xxxxx"  # 视觉模型API

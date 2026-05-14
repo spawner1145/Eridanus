@@ -13,6 +13,9 @@ MaiReply 插件主入口
   - 多会话上下文记忆（Redis 存储）
   - 群聊旁观上下文感知
   - 跨会话用户印象记忆
+  - 群聊气氛/话题印象（group_impression）
+  - 群内回复时注入最近发言者 impression
+  - trigger_llm 触发的回复严格限制长度/句数
   - 消息分割+打字延迟模拟
   - 错字生成
   - 概率触发 + focus持续对话
@@ -44,7 +47,7 @@ async def extract_message_content(event, bot) -> tuple:
     - 若含图片，content 为 list[dict]，符合 OpenAI vision 格式
     """
     text_parts = []
-    image_items = []  # {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
+    image_items = []
 
     for msg in event.message_chain:
         if isinstance(msg, Text):
@@ -62,7 +65,6 @@ async def extract_message_content(event, bot) -> tuple:
                 })
                 text_parts.append(f"图片url为{url}")
             except Exception as e:
-                # 图片获取失败时降级为文本说明
                 text_parts.append("[图片获取失败]")
 
     pure_text = "".join(text_parts).strip()
@@ -70,7 +72,6 @@ async def extract_message_content(event, bot) -> tuple:
     if not image_items:
         return pure_text, pure_text
 
-    # 构建多模态 content list
     content = []
     if pure_text:
         content.append({"type": "text", "text": pure_text})
@@ -87,18 +88,12 @@ def main(bot: ExtendBot, config: YAMLManager):
         bot.logger.warning("[MaiReply] 如要启用新版ai对话请在配置文件中将 mai_reply.enable 设置为 true 随后重启bot")
         return
     engine = ReplyEngine(config)
-
     trigger = TriggerChecker(config, engine.context, engine.emotion)
-
 
     bot.logger.info("[MaiReply] 高拟人化AI回复插件已加载")
 
     @bot.on(GroupMessageEvent)
     async def handle_group(event: GroupMessageEvent):
-        """
-        开始构式一样的权限判断
-        """
-
         text = event.pure_text or ""
 
         # 清理指令
@@ -106,45 +101,68 @@ def main(bot: ExtendBot, config: YAMLManager):
             engine.context.clear_session(event.group_id, event.user_id)
             await bot.send(event, "好的，对话记录已清除～")
             return
-        # 清理群内所有会话
         if text.strip() in ("/clearall", "清除全部对话", "清理全部对话"):
             if event.user_id != config.common_config.basic_config["master"]["id"]:
                 return
             count = engine.context.clear_all_sessions(event.group_id)
             await bot.send(event, f"已清除本群 {count} 个用户的对话记录～")
             return
+
         async def add_to_context():
+            """把消息存入旁观窗口（不触发回复时仍需感知群氛围）"""
             if event.message_chain.has(Image) or event.message_chain.has(Mface):
-                if config.mai_reply.config["context"]["img_context"] and event.group_id in config.mai_reply.config["context"]["vision_enable_group"]:
+                if (
+                    config.mai_reply.config["context"]["img_context"]
+                    and event.group_id in config.mai_reply.config["context"]["vision_enable_group"]
+                ):
                     bot.logger.info(f"[MaiReply] 消息包含图片，且已开启图片上下文，将存入旁观窗口")
                     async def img_add_to_window():
                         img_url = await get_img(event, bot)
                         path = f"data/pictures/cache/{uuid.uuid4()}.png"
                         await download_img(img_url, path)
-                        window_text = await _resolve_images(path,event.message_id)
-                        #print(window_text)
-                        engine.context.push_group_window(event.group_id, event.sender.nickname, window_text+f"url：{img_url}")
-                        r=engine.context._load_group_window(event.group_id)  # 刷新窗口内容到内存
-                        #print(r)
+                        window_text = await _resolve_images(path, event.message_id)
+                        engine.context.push_group_window(
+                            event.group_id,
+                            event.sender.nickname,
+                            window_text + f"url：{img_url}",
+                            user_id=event.user_id,  # ← 传入 user_id
+                        )
+                        engine.context._load_group_window(event.group_id)
                     asyncio.create_task(img_add_to_window())
             if text.strip():
                 try:
                     user_name = event.sender.nickname
-                    #print(clean_text)
-                    engine.context.push_group_window(event.group_id, user_name, clean_text)
+                    engine.context.push_group_window(
+                        event.group_id,
+                        user_name,
+                        clean_text,
+                        user_id=event.user_id,  # ← 传入 user_id
+                    )
+                    # 群印象计数 tick（即便不回复，也感知气氛）
+                    group_name_hint = str(event.group_id)  # 此处无法拿到群名，用 group_id 代替
+                    bot_name_hint = config.common_config.basic_config["bot"]
+                    engine.impression_updater.tick_group(
+                        event.group_id, group_name_hint, bot_name_hint
+                    )
                 except Exception:
                     pass
-        if trigger._has_at(event, bot.id):   # 艾特无论如何要回复
+
+        # ------------------------------------------------------------------ 触发判断
+        triggered_by_llm = False  # 标记是否由 trigger_llm 语义判断触发
+
+        if trigger._has_at(event, bot.id):
             should_reply = True
             pure_text, content = await extract_message_content(event, bot)
             clean_text = pure_text or "(艾特了你)"
+
         elif prefix_check(text, config.mai_reply.config["trigger"]["prefix"]):
             should_reply = True
             pure_text, content = await extract_message_content(event, bot)
             clean_text = pure_text
+
         else:
             if not config.mai_reply.config["trigger_llm"]["enable"]:
-                await add_to_context()  # 即使不触发，也把消息存入群旁观窗口（感知群聊气氛）
+                await add_to_context()
                 return
             if config.mai_reply.config["trigger_llm"]["whitelist_enabled"]:
                 if event.group_id not in config.mai_reply.config["trigger_llm"]["whitelist"]:
@@ -157,28 +175,36 @@ def main(bot: ExtendBot, config: YAMLManager):
                 pure_text=text,
             )
             pure_text, content = await extract_message_content(event, bot)
+            if should_reply:
+                triggered_by_llm = True  # ← 由 LLM 语义触发，需严格限制回复长度
 
-        bot.logger.info(f"[MaiReply] trigger={should_reply} self_id={bot.id} text={clean_text}")
+        bot.logger.info(
+            f"[MaiReply] trigger={should_reply} triggered_by_llm={triggered_by_llm} "
+            f"self_id={bot.id} text={clean_text}"
+        )
+
         if not should_reply:
-            #print("触发")
-            # 即使不回复，也把消息存入群旁观窗口（感知群聊气氛）
             await add_to_context()
             return
 
-        # 异步处理（不阻塞事件循环），传入多模态 content
-        asyncio.create_task(engine.handle(bot, event, clean_text, multimodal_content=content))
+        # 异步处理，传入 triggered_by_llm 标记
+        asyncio.create_task(
+            engine.handle(
+                bot, event, clean_text,
+                multimodal_content=content,
+                triggered_by_llm=triggered_by_llm,
+            )
+        )
 
     # ------------------------------------------------------------------ 私聊消息处理
     @bot.on(PrivateMessageEvent)
     async def handle_private(event: PrivateMessageEvent):
         text = event.pure_text or ""
 
-        # 清理指令
         if text.strip() in ("/clear", "清除对话", "清理对话"):
             engine.context.clear_session(None, event.user_id)
             await bot.send(event, "好，忘掉了～")
             return
-        # 全清指令(管理员)
         if text.strip() in ("/clearall", "清除全部对话", "清理全部对话"):
             if event.user_id != config.common_config.basic_config["master"]["id"]:
                 return
@@ -186,11 +212,11 @@ def main(bot: ExtendBot, config: YAMLManager):
             await bot.send(event, f"已清除全部 {count} 个会话记录～")
             return
 
-        # 私聊配置了不触发则跳过
         if not config.mai_reply.config.get("trigger", {}).get("private_trigger", True):
             return
 
         pure_text, content = await extract_message_content(event, bot)
+        # 私聊不传 triggered_by_llm，不限制长度
         asyncio.create_task(engine.handle(bot, event, pure_text or text, multimodal_content=content))
 
     def prefix_check(message: str, prefix: list):

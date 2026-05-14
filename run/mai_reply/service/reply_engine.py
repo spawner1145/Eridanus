@@ -1,5 +1,12 @@
-""" reply_engine.py 核心回复引擎 ——
-将所有子模块串联起来，完成一次完整的拟人化回复流程 """
+"""
+reply_engine.py 核心回复引擎 ——
+将所有子模块串联起来，完成一次完整的拟人化回复流程
+
+新增：
+- 群聊气氛印象（group_impression）的读取与注入
+- 最近发言者印象批量读取并注入 prompt
+- triggered_by_llm 标记，群内 trigger_llm 触发时限制回复长度/句数
+"""
 
 import asyncio
 import traceback
@@ -36,8 +43,6 @@ class ReplyEngine:
             cls._instance = super(ReplyEngine, cls).__new__(cls)
         return cls._instance
 
-    # --------------------------------------------------
-
     def __init__(self, config=None):
         if self._initialized:
             return
@@ -54,29 +59,24 @@ class ReplyEngine:
         self.concurrency = ConcurrencyController(config)
         self.audit_system = AuditSystem(self.llm, self.context, config)
 
-        # ---- 名称缓存 ----
-        # 结构: { cache_key: (name, expire_monotonic_time) }
         self._name_cache: dict[str, tuple[str, float]] = {}
 
         self._tools = self._load_tools()
         self.emotion.random_drift()
 
     # --------------------------------------------------
-    # 名称缓存辅助方法
+    # 名称缓存辅助
     # --------------------------------------------------
 
     def _cache_get(self, key: str) -> Optional[str]:
-        """从缓存取名称，过期或不存在返回 None。"""
         entry = self._name_cache.get(key)
         if entry and time.monotonic() < entry[1]:
             return entry[0]
         return None
 
     def _cache_set(self, key: str, value: str) -> None:
-        """写入缓存，TTL 从配置读取，默认 300 秒。"""
         ttl = self.cfg.mai_reply.config.get("concurrency", {}).get("name_cache_ttl", 300)
         now = time.monotonic()
-        # 懒清理：缓存条目过多时顺手淘汰过期项，避免无限增长
         if len(self._name_cache) > 5000:
             self._name_cache = {k: v for k, v in self._name_cache.items() if v[1] > now}
         self._name_cache[key] = (value, now + ttl)
@@ -92,10 +92,16 @@ class ReplyEngine:
                 return tools
         except Exception as e:
             traceback.print_exc()
-            pass
         return None
 
-    async def handle(self, bot, event, clean_text: str, multimodal_content=None) -> None:
+    async def handle(
+        self,
+        bot,
+        event,
+        clean_text: str,
+        multimodal_content=None,
+        triggered_by_llm: bool = False,  # ← 新增：是否由 trigger_llm 触发
+    ) -> None:
         is_group = isinstance(event, GroupMessageEvent)
         group_id: Optional[int] = getattr(event, "group_id", None) if is_group else None
         user_id: int = event.user_id
@@ -130,13 +136,22 @@ class ReplyEngine:
                 return
 
             if is_group:
-                self.context.push_group_window(group_id, user_name, final_text)
+                # 传入 user_id 以便发言者追踪
+                self.context.push_group_window(group_id, user_name, final_text, user_id=user_id)
 
             history = self.context.get_session_history(group_id, user_id)
             group_context = ""
             if is_group:
                 group_context = self.context.build_group_context_snippet(group_id, bot_name)
+
             user_impression = self.context.get_impression(user_id)
+
+            # ---- 群聊专属：气氛印象 + 最近发言者印象 ----
+            group_impression = ""
+            recent_speaker_impressions = []
+            if is_group and group_id:
+                group_impression = self.context.get_group_impression(group_id)
+                recent_speaker_impressions = self.context.get_recent_speaker_impressions(group_id)
 
             group_name = await self._get_group_name(bot, group_id) if is_group else "私聊"
             system_prompt = self.prompt_builder.build_system_prompt(
@@ -145,10 +160,12 @@ class ReplyEngine:
                 group_name=group_name,
                 group_context_snippet=group_context,
                 user_impression=user_impression,
+                is_group=is_group,
+                triggered_by_llm=triggered_by_llm,
+                group_impression=group_impression,
+                recent_speaker_impressions=recent_speaker_impressions,
             )
 
-            # 上下文截断：只保留最近 max_turns 轮（一轮=user+assistant各一条）
-            # 确保发给LLM的历史不超限，最新用户消息始终保留
             max_turns = self.cfg.mai_reply.config.get("context", {}).get("max_turns", 20)
             max_history_msgs = max_turns * 2
             trimmed_history = history[-max_history_msgs:] if len(history) > max_history_msgs else list(history)
@@ -185,25 +202,23 @@ class ReplyEngine:
             if not segments:
                 return
 
-            msg_id = getattr(event, "message_id", None)
+            # trigger_llm 触发时在处理层也做一次硬截断保险
+            if triggered_by_llm and is_group:
+                segments = self._hard_truncate_segments(segments)
 
-            # 1. 先按计划发送切分后的文本（带打字延迟）
+            msg_id = getattr(event, "message_id", None)
             await self.processor.send_with_delay(bot, event, segments, quote_message_id=msg_id)
 
-            # =================================================================
-            # 触发语音回复（后台异步，完全等同于子线程避免阻塞）
-            # =================================================================
+            # TTS
             voice_cfg = self.cfg.mai_reply.config["tts"]
             voice_prob = int(voice_cfg.get("voice_reply_probability", 0))
             translate_api_key = self.cfg.mai_reply.config["trigger_llm"]["api_key"]
             voice_cfg["translate_api_key"] = translate_api_key
             if voice_prob > 0 and random.randint(1, 100) <= voice_prob:
-                # 把切分好的 segments 还原成一整句 (使用逗号间隔以便 TTS 有自然的停顿)
                 combined_text = ".".join(segments)
-                # 使用 create_task 放入后台执行，不会阻塞后续的历史更新与心情刷新
                 asyncio.create_task(self._async_tts_and_send(bot, event, combined_text, voice_cfg))
 
-            # ---------- 更新历史
+            # 更新历史
             if isinstance(multimodal_content, list):
                 history_user_text = clean_text + " [含图片]" if clean_text else "[图片]"
             else:
@@ -216,7 +231,10 @@ class ReplyEngine:
             self.impression_updater.tick(user_id, group_id, user_name, bot_name)
             self.audit_system.tick(user_id, group_id, user_name, bot_name, bot)
 
-            # 控制台打印机器人的当前心理状态
+            # 群印象更新 tick（有群 ID 时触发）
+            if is_group and group_id:
+                self.impression_updater.tick_group(group_id, group_name, bot_name)
+
             current_score = self.emotion.get_score()
             current_mood = self.emotion.get_mood()
             current_imp = user_impression or "暂无，还不熟"
@@ -227,6 +245,7 @@ class ReplyEngine:
                 f"│ 💬 最终回复: {raw_reply}\n"
                 f"│ 📊 全局心情: {current_score}分 ({current_mood})\n"
                 f"│ 🧠 对TA印象: {current_imp}\n"
+                f"│ 🌐 trigger_llm: {triggered_by_llm}\n"
                 f"└─────────────────────────────────────────────┘"
             )
             bot.logger.info(panel)
@@ -239,29 +258,45 @@ class ReplyEngine:
                 self.context.release_lock(session_key)
             self.concurrency.release_global()
 
+    def _hard_truncate_segments(self, segments: list) -> list:
+        """
+        trigger_llm 触发时的处理层硬截断保险。
+        防止 LLM 无视 prompt 约束产生过长回复。
+        """
+        max_segs = self.prompt_builder.trigger_max_segments
+        max_chars = self.prompt_builder.trigger_max_chars
+
+        # 截断段数
+        segments = segments[:max_segs]
+
+        # 每段字数截断
+        result = []
+        total = 0
+        for seg in segments:
+            remaining = max_chars - total
+            if remaining <= 0:
+                break
+            if len(seg) > remaining:
+                seg = seg[:remaining].rstrip()
+            result.append(seg)
+            total += len(seg)
+
+        return result
+
     # =================================================================
     # 后台处理语音：翻译 -> TTS 合成 -> 发送
     # =================================================================
     async def _async_tts_and_send(self, bot, event, text: str, voice_cfg: dict):
-        """
-        后台异步执行：自动翻译 -> 调用TTS -> 组装并发送音频文件。
-        该方法被 create_task 调用，完全脱离主消息流，实现真正意义上的不阻塞。
-        """
-
         lang_type = voice_cfg.get("lang_type", "JP")
         speaker = voice_cfg.get("speaker", "MoriCalliope")
         api_key = voice_cfg.get("translate_api_key", "")
 
         translated_text = text
 
-        # 1. 翻译逻辑 (使用 aiohttp 异步请求防止网络卡顿阻塞线程)
         if api_key and lang_type.upper() in ["JP", "JA", "EN"]:
             direction = "zh2ja" if lang_type.upper() in ["JP", "JA"] else "zh2en"
             headers = {"Authorization": f"Bearer {api_key}"}
-            payload = {
-                "text": text,
-                "direction": direction
-            }
+            payload = {"text": text, "direction": direction}
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.post(
@@ -278,20 +313,17 @@ class ReplyEngine:
             except Exception as e:
                 bot.logger.error(f"[MaiReply] 翻译API请求失败: {e}")
 
-        # 2. TTS 合成发送逻辑
         try:
             from run.mai_reply.service.HoliveTTS import HoliveTTS
             tts = HoliveTTS()
             bot.logger.info(f"[MaiReply] 正在后台合成语音 | 角色: {speaker} | 文本: {translated_text}")
             save_path = f"data/voice/cache/{uuid.uuid4()}.wav"
-            # synthesize 方法内部也是异步的，耗时处理均不阻塞主进程
             audio_path = await tts.synthesize_to_file(
                 text=translated_text,
                 speaker=speaker,
                 language=lang_type.upper(),
                 save_as=save_path
             )
-
             await bot.send(event, Record(file=audio_path))
             bot.logger.info("[MaiReply] 后台语音发送完成！")
         except Exception as e:
@@ -322,7 +354,7 @@ class ReplyEngine:
         return name
 
     # ------------------------------------------------------------------
-    # 辅助：获取 Bot 名称（固定读配置，无需缓存）
+    # 辅助：获取 Bot 名称
     # ------------------------------------------------------------------
     async def _get_bot_name(self, bot) -> str:
         from framework_common.framework_util.yamlLoader import YAMLManager
@@ -335,7 +367,6 @@ class ReplyEngine:
             name = name.strip()
         except Exception:
             name = ""
-        # 人设名优先
         override = self.prompt_builder.get_bot_name(name)
         return override or name or "Bot"
 

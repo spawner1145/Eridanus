@@ -2,21 +2,22 @@
 prompt_builder.py
 Prompt 构建器 —— 组装系统提示词和用户消息
 核心理念：使用自然语言风格构建 Prompt，让回复贴近人类习惯
+
+新增：
+- 群聊气氛印象（group_impression）注入
+- 最近发言者印象批量注入
+- trigger_llm 触发时的严格回复长度/句数约束
 """
 
 import os
 import json
 import time
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict
 
 
-# 角色卡解析支持 txt / json / SillyTavern PNG 卡（仅读取文本元数据）
+# 角色卡解析支持 txt / json
 def _load_chara_file(chara_file: str) -> Optional[str]:
-    """
-    从 data/system/chara/ 目录加载角色卡
-    支持 .txt / .json
-    """
     if not chara_file:
         return None
     base_dir = os.path.join("data", "system", "chara")
@@ -32,7 +33,6 @@ def _load_chara_file(chara_file: str) -> Optional[str]:
         elif ext == ".json":
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            # SillyTavern JSON 格式
             if isinstance(data, dict):
                 desc = data.get("description") or data.get("personality") or data.get("system_prompt", "")
                 scenario = data.get("scenario", "")
@@ -53,8 +53,12 @@ class PromptBuilder:
         self._name_override: str = pcfg.get("name", "").strip()
         self._system_template: str = pcfg.get("system_prompt", "")
         self._chara_file: str = pcfg.get("chara_file", "").strip()
-        # 角色卡内容缓存（启动时加载一次）
         self._chara_content: Optional[str] = _load_chara_file(self._chara_file)
+
+        # trigger_llm 触发时的回复约束配置
+        tlcfg = config.mai_reply.config.get("trigger_llm", {})
+        self.trigger_max_chars: int = int(tlcfg.get("reply_max_chars", 60))
+        self.trigger_max_segments: int = int(tlcfg.get("reply_max_segments", 2))
 
     def get_bot_name(self, bot_name_from_config: str) -> str:
         return self._name_override or bot_name_from_config
@@ -66,27 +70,34 @@ class PromptBuilder:
         group_name: str = "私聊",
         group_context_snippet: str = "",
         user_impression: str = "",
+        # 新增参数
+        is_group: bool = False,
+        triggered_by_llm: bool = False,
+        group_impression: str = "",
+        recent_speaker_impressions: Optional[List[Dict]] = None,
     ) -> str:
         """
-        构建完整 system prompt
+        构建完整 system prompt。
+
+        新增参数说明：
+        - is_group: 是否群聊场景
+        - triggered_by_llm: 是否由 trigger_llm 触发（而非@/前缀），触发时追加严格字数约束
+        - group_impression: 对这个群的整体气氛/话题印象
+        - recent_speaker_impressions: 最近发言者的印象列表，
+          格式 [{"name": str, "user_id": int, "impression": str}, ...]
         """
-        # 优先使用角色卡内容，角色卡内容作为人设基础，其余追加
         if self._chara_content:
             base = self._chara_content
         else:
             base = self._system_template
 
-        # 时间
         now = datetime.now()
         time_str = now.strftime("%Y年%m月%d日 %H:%M")
-        # 星期
         weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
         time_str += f" {weekdays[now.weekday()]}"
 
-        # 情绪
         mood = self.emotion.get_mood()
-        #print(bot_name,user_name)
-        # 变量替换
+
         prompt = base.replace("{","{{").replace("}","}}").format(
             bot_name=bot_name,
             用户=user_name,
@@ -98,20 +109,64 @@ class PromptBuilder:
         if group_context_snippet:
             prompt += f"\n\n{group_context_snippet}"
 
-        # 追加用户印象记忆（强化态度区分指令）
+        # ---- 群聊整体气氛印象 ----
+        if is_group and group_impression:
+            prompt += f"\n\n【你对「{group_name}」这个群的整体印象】\n{group_impression}"
+
+        # ---- 最近发言者的个人印象（群聊专用）----
+        if is_group and recent_speaker_impressions:
+            lines = []
+            for item in recent_speaker_impressions:
+                name = item.get("name", "?")
+                imp = item.get("impression", "")
+                if imp:
+                    lines.append(f"- {name}：{imp}")
+            if lines:
+                prompt += (
+                    f"\n\n【你对群里最近几位发言者的主观印象】\n"
+                    + "\n".join(lines)
+                    + "\n（回复时请根据以上印象自然地调整对不同人的语气和态度）"
+                )
+
+        # ---- 当前触发用户的印象 ----
         if user_impression:
-            prompt += f"\n\n【你对 {user_name} 的主观印象与态度】\n{user_impression}\n（重要：请务必根据以上印象，动态调整你此刻对TA的说话语气！如果印象好就亲昵，如果印象差就冷淡甚至回怼！）"
+            prompt += (
+                f"\n\n【你对 {user_name} 的主观印象与态度】\n{user_impression}\n"
+                f"（重要：请务必根据以上印象，动态调整你此刻对TA的说话语气！如果印象好就亲昵，如果印象差就冷淡甚至回怼！）"
+            )
         else:
             prompt += f"\n\n【你对 {user_name} 的主观印象与态度】\n你们还不算太熟，按你正常的心情回应即可。"
 
-        # 追加拟人化输出规则
+        # ---- 拟人化输出规则 ----
         prompt += _HUMANLIKE_RULES
-        prompt=prompt.replace("{bot_name}", bot_name).replace("{用户}", user_name)
-        #print(prompt)
+
+        # ---- trigger_llm 触发的严格约束（追加在最后，优先级最高）----
+        if triggered_by_llm and is_group:
+            prompt += _build_trigger_constraint(
+                max_chars=self.trigger_max_chars,
+                max_segments=self.trigger_max_segments,
+            )
+
+        prompt = prompt.replace("{bot_name}", bot_name).replace("{用户}", user_name)
         return prompt.strip()
 
 
-# 拟人化输出规则，始终追加
+def _build_trigger_constraint(max_chars: int, max_segments: int) -> str:
+    """
+    构建 trigger_llm 触发时的严格回复约束块。
+    这段追加在 system prompt 最末尾，以确保 LLM 优先遵守。
+    """
+    return f"""
+
+【群聊插话约束（最高优先级，务必遵守）】
+你现在是「主动插入群聊」的状态，不是被人直接找你说话。
+- 总字数严格不超过 {max_chars} 字
+- 最多分 {max_segments} 条发送（用 `||` 分隔），禁止超过此数量
+- 说一两句点到为止，像正常群友随口接一句话一样，不要长篇大论
+- 不要解释、不要总结、不要说废话
+- 如果没有特别想说的，可以只发一个表情或一句极短的感叹"""
+
+
 # 拟人化输出规则，始终追加
 _HUMANLIKE_RULES = """
 
@@ -123,5 +178,5 @@ _HUMANLIKE_RULES = """
 - 不要用 markdown（没有加粗、没有#标题、没有列表）
 - 句末尽量不加句号，标点随意点，多用空格、逗号或省略号
 - 不要每句话都回应对方，有时候只说自己想说的就行
-- 回复总长度一般不超过80字，最多拆成2-4条连发
+- 回复总长度一般不超过80字，最多拆成1-4条连发(一般1-2条)
 - 不要重复之前说过的内容"""
