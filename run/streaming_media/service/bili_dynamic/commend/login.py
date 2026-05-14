@@ -11,21 +11,35 @@ logger=get_logger('bili_dynamic')
 select_client("httpx")
 
 
-async def bili_login(bot = None, event = None) -> None:
+async def bili_login(bot = None, event = None, cookies = None) -> None:
     global loop_cache
     recall_id, cookies_check = None, ''
     day_info = await date_get()
-    qr = login_v2.QrCodeLogin(platform=login_v2.QrCodeLoginChannel.WEB) # 生成二维码登录实例，平台选择网页端
-    await qr.generate_qrcode()                                          # 生成二维码
-    #print(qr.get_qrcode_terminal())                                     # 生成终端二维码文本，打印
-    #print(qr.get_qrcode_picture().url)
-    if bot and event:
-        recall_id = await bot.send(event, ['请扫描下方二维码登录喵',Image(file=qr.get_qrcode_picture().url)])
-    while not qr.has_done():                                            # 在完成扫描前轮询
-        #print(await qr.check_state())                                   # 检查状态
-        logger.info_func(f'B站二维码状态：{(await qr.check_state())}')
-        await asyncio.sleep(4)
-    cookies = qr.get_credential().get_cookies()
+    if cookies is None:
+        qr = login_v2.QrCodeLogin(platform=login_v2.QrCodeLoginChannel.WEB) # 生成二维码登录实例，平台选择网页端
+        await qr.generate_qrcode()                                          # 生成二维码
+        #print(qr.get_qrcode_terminal())                                     # 生成终端二维码文本，打印
+        #print(qr.get_qrcode_picture().url)
+        if bot and event:
+            recall_id = await bot.send(event, ['请扫描下方二维码登录喵',Image(file=qr.get_qrcode_picture().url)])
+        while not qr.has_done():                                            # 在完成扫描前轮询
+            #print(await qr.check_state())                                   # 检查状态
+            logger.info_func(f'B站二维码状态：{(await qr.check_state())}')
+            await asyncio.sleep(4)
+        cookies = qr.get_credential().get_cookies()
+    else:
+        #若直接传入了cookies，则检测该cookies是否有效
+        for item in cookies:
+            cookies_check += f'{item}={cookies[item]};'
+        resp = requests.get("https://api.bilibili.com/x/relation/tags",
+                            headers={'Cookie': cookies_check, 'User-Agent': 'Mozilla/5.0'})
+        res = resp.json()
+        if res['code'] == -101:
+            msg = '您手动传入cookies无效，请重新尝试喵'
+            if bot and event: await bot.send(event, msg)
+            else: print(msg)
+            return
+
     info = await data_init()
     info['cookies']['sessdata'] = cookies['SESSDATA']
     info['cookies']['bili_jct'] = cookies['bili_jct']
@@ -53,8 +67,6 @@ async def bili_login(bot = None, event = None) -> None:
                             headers={'Cookie': cookies_check, 'User-Agent': 'Mozilla/5.0'},
                             params={'csrf': cookies['bili_jct'] })
         res = resp.json()
-        # if res['code'] != 0:
-        #     return
         for group in res['data']:
             if group['name'] == 'Bot关注':
                 info['cookies']['subscribe_group_id'] = group['tagid']
