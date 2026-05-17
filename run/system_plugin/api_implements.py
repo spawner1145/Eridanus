@@ -39,6 +39,8 @@ def main(bot, config):
             await bot.send(event, "已修改")
             remark = event.pure_text.split("改备注")[1].strip()
             await bot.set_friend_remark(event.user_id, remark)
+        if event.pure_text=="罐头笑声":
+            await bot.send(event,Record(file="https://ma.vjshi.com/sound/2025-11-20/92130_VJshi_8dff6e7b1c7e4cdb930593f22039bd4f.mp3"))
 
     @bot.on(GroupBanNoticeEvent)
     async def _(event: GroupBanNoticeEvent):
