@@ -41,7 +41,7 @@ def main(bot, config):
             await bot.set_friend_remark(event.user_id, remark)
         if event.pure_text=="罐头笑声":
             bot.logger.info("正在发送罐头笑声")
-            await bot.send(event,Record(file="https://store.soundeffectgenerator.org/instants/surprise-crowd-sound-effect/1cd72542-crowd-laughter-short.mp3"))
+            await bot.send(event,Record(file="https://cdn.pixabay.com/download/audio/2022/09/21/audio_d8aacb968c.mp3?filename=wilrotich-crowd-laughing-07-120585.mp3"))
 
     @bot.on(GroupBanNoticeEvent)
     async def _(event: GroupBanNoticeEvent):
