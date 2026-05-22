@@ -1,5 +1,5 @@
 gpt_sovits:
-  api_base: ""  #群内获取base_url，或自建
+  api_base: "http://tts.apollodorus.xyz"  #群内获取base_url，或自建
   ref_audio_path: output/slicer_opt/13_关于西格莉卡.wav_0000000000_0000212160.wav
   ref_text:
     虽然现在不会有那么强的副作用，但阿列夫一要是能少在我脑子里。
@@ -10,7 +10,7 @@ gpt_sovits:
   temperature: 1             # float. temperature for sampling
   text_split_method: cut5  # str. text split method, see text_segmentation_method.py for details.
   batch_size: 1              # int. batch size for inference
-  speed_factor: 1.0           # float. control the speed of the synthesized audio.
+  speed_factor: 0.9           # float. control the speed of the synthesized audio.
   seed: -1                   # int. random seed for reproducibility.
   repetition_penalty: 1.35   # float. repetition penalty for T2S model.
   streaming_mode: False      # bool or int. return audio chunk by chunk.T he available options are: 0,1,2,3 or True/False (0/False: Disabled | 1/True: Best Quality, Slowest response speed (old version streaming_mode) | 2: Medium Quality, Slow response speed | 3: Lower Quality, Faster response speed )
