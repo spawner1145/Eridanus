@@ -7,7 +7,7 @@ llm:
   openai:
     api_keys:
       - xxx
-    model: gpt-5.2
+    model: gemini-2.5-pro
     base_url: http://api.apollodorus.xyz/v1   #可以去我们的开发群1050663831获取免费apikey。
     temperature: 1.1
     max_tokens: 1024
