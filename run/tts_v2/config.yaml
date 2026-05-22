@@ -1,8 +1,7 @@
 gpt_sovits:
   api_base: "http://tts.apollodorus.xyz"  #群内获取base_url，或自建
-  ref_audio_path: output/slicer_opt/13_关于西格莉卡.wav_0000000000_0000212160.wav
-  ref_text:
-    虽然现在不会有那么强的副作用，但阿列夫一要是能少在我脑子里。
+  ref_audio_path: output/slicer_opt/07_达妮娅的烦恼.wav_0000000000_0000205440.wav
+  ref_text: 虽然现在不会有那么强的副作用，但阿列夫一要是能少在我脑子里。
   speakers:
     - 达妮娅
   top_k: 15                  # int. top k sampling

@@ -60,16 +60,11 @@ class AsyncGPTSoVITSClient:
             "temperature": temperature or config.tts_v2.config["gpt_sovits"]["temperature"],
             "text_split_method": text_split_method or config.tts_v2.config["gpt_sovits"]["text_split_method"],
             "batch_size": batch_size or config.tts_v2.config["gpt_sovits"]["batch_size"],
-            "batch_threshol": 0.75,
-            "split_bucket": True,
             "speed_factor": speed_factor or config.tts_v2.config["gpt_sovits"]["speed_factor"],
-            "fragment_interval": 0.3,
-            "sample_steps": 32,
-            "super_sampling": False,
             "streaming_mode": streaming_mode or config.tts_v2.config["gpt_sovits"]["streaming_mode"],
             "seed": seed or config.tts_v2.config["gpt_sovits"]["seed"],
+            "fragment_interval": 0.4,
             "media_type": media_type,
-            "parallel_infer": True,
             "repetition_penalty": 1.35 or config.tts_v2.config["gpt_sovits"]["repetition_penalty"],
         }
         print(payload)
