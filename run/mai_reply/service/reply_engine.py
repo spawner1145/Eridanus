@@ -298,8 +298,8 @@ class ReplyEngine:
             # 去除全角括号 （...） 和半角括号 (...)
             text = re.sub(r'[（(][^）)]*[）)]', '', text)
             return text.strip()
-
-        translated_text = remove_parentheses_text(text)
+        text=remove_parentheses_text(text)
+        translated_text = text
 
         if speaker in gpt_sovits_client.speakers:
             audio_path=await gpt_sovits_client.generate_tts(text)
