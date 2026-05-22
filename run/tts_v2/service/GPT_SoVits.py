@@ -63,7 +63,7 @@ class AsyncGPTSoVITSClient:
             "speed_factor": speed_factor or config.tts_v2.config["gpt_sovits"]["speed_factor"],
             "streaming_mode": streaming_mode or config.tts_v2.config["gpt_sovits"]["streaming_mode"],
             "seed": seed or config.tts_v2.config["gpt_sovits"]["seed"],
-            "fragment_interval": 0.4,
+            "fragment_interval": 0.32,
             "media_type": media_type,
             "repetition_penalty": 1.35 or config.tts_v2.config["gpt_sovits"]["repetition_penalty"],
         }
