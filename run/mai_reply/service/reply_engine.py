@@ -9,6 +9,7 @@ reply_engine.py 核心回复引擎 ——
 """
 
 import asyncio
+import re
 import traceback
 import random
 import uuid
@@ -30,9 +31,10 @@ from run.mai_reply.service.prompt_builder import PromptBuilder
 from run.mai_reply.service.reply_processor import ReplyProcessor
 from run.mai_reply.service.impression_updater import ImpressionUpdater
 from run.mai_reply.service.concurrency import ConcurrencyController
+from run.tts_v2.service.GPT_SoVits import AsyncGPTSoVITSClient
 
 logger = get_logger(__name__)
-
+gpt_sovits_client = AsyncGPTSoVITSClient()
 
 class ReplyEngine:
     _instance = None
@@ -291,7 +293,19 @@ class ReplyEngine:
         speaker = voice_cfg.get("speaker", "MoriCalliope")
         api_key = voice_cfg.get("translate_api_key", "")
 
-        translated_text = text
+        def remove_parentheses_text(text: str) -> str:
+            """去除文本中括号（含内容）的部分，支持全角和半角括号"""
+            # 去除全角括号 （...） 和半角括号 (...)
+            text = re.sub(r'[（(][^）)]*[）)]', '', text)
+            return text.strip()
+
+        translated_text = remove_parentheses_text(text)
+
+        if speaker in gpt_sovits_client.speakers:
+            audio_path=await gpt_sovits_client.generate_tts(text)
+            await bot.send(event, Record(file=audio_path))
+            bot.logger.info("[MaiReply] 后台语音发送完成！")
+            return
 
         if api_key and lang_type.upper() in ["JP", "JA", "EN"]:
             direction = "zh2ja" if lang_type.upper() in ["JP", "JA"] else "zh2en"
