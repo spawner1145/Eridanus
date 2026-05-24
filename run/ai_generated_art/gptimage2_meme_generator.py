@@ -220,6 +220,7 @@ def main(bot: ExtendBot, config: YAMLManager):
         # 3. 收集模式
         elif uid in sticker_user_dict:
             found = False
+            print(event.message_chain)
             for mes in event.message_chain:
                 if isinstance(mes, Text):
                     sticker_user_dict[uid]["text"].append(mes.text.strip())
