@@ -12,7 +12,8 @@ from developTools.message.message_components import Image, Text, Mface, Node
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.install_and_import import install_and_import
-from framework_common.utils.utils import download_img
+from framework_common.utils.utils import download_img, get_img
+
 cv2=install_and_import("opencv-python","cv2")
 
 # --- 核心切分逻辑 (同步函数) ---
@@ -223,11 +224,16 @@ def main(bot: ExtendBot, config: YAMLManager):
                 if isinstance(mes, Text):
                     sticker_user_dict[uid]["text"].append(mes.text.strip())
                     found = True
+
                 elif isinstance(mes, Image) or isinstance(mes, Mface):
                     url = mes.url if hasattr(mes, 'url') and mes.url else mes.file
                     if url:
                         path = await download_img(url)
                         sticker_user_dict[uid]["image"].append(path)
                         found = True
+                elif get_img(event,bot):
+                    path=await download_img(get_img(event,bot))
+                    sticker_user_dict[uid]["image"].append(path)
+                    found = True
             if found:
                 await bot.send(event, "已添加")
