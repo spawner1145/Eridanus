@@ -220,7 +220,7 @@ def main(bot: ExtendBot, config: YAMLManager):
         # 3. 收集模式
         elif uid in sticker_user_dict:
             found = False
-            print(event.message_chain)
+            print("表情包制作：",event.message_chain)
             for mes in event.message_chain:
                 if isinstance(mes, Text):
                     sticker_user_dict[uid]["text"].append(mes.text.strip())
@@ -237,4 +237,4 @@ def main(bot: ExtendBot, config: YAMLManager):
                     sticker_user_dict[uid]["image"].append(path)
                     found = True
             if found:
-                await bot.send(event, "已添加")
+                await bot.send(event, "已添加",True)
