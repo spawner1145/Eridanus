@@ -12,9 +12,16 @@ from developTools.message.message_components import Image, Text, Mface, Node
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.install_and_import import install_and_import
-from framework_common.utils.utils import download_img
-cv2=install_and_import("opencv-python","cv2")
+from framework_common.utils.utils import  get_img
 
+cv2=install_and_import("opencv-python","cv2")
+async def download_img_from_url(url:str):
+    async with httpx.AsyncClient() as client:
+        r=await client.get(url)
+        path="data/pictures/cache/"+uuid.uuid4().hex[:6]+".png"
+        with open(path, "wb") as f:
+            f.write(r.content)
+        return path
 # --- 核心切分逻辑 (同步函数) ---
 def split_grid_3x3(image_bytes, output_folder):
     """
@@ -219,15 +226,24 @@ def main(bot: ExtendBot, config: YAMLManager):
         # 3. 收集模式
         elif uid in sticker_user_dict:
             found = False
+            print("表情包制作：",event.message_chain)
             for mes in event.message_chain:
                 if isinstance(mes, Text):
                     sticker_user_dict[uid]["text"].append(mes.text.strip())
                     found = True
-                elif isinstance(mes, (Image, Mface)):
+
+                elif isinstance(mes, Image) or isinstance(mes, Mface):
+                    print("触发分支")
                     url = mes.url if hasattr(mes, 'url') and mes.url else mes.file
+
                     if url:
-                        path = await download_img(url)
+                        print(url)
+                        path = await download_img_from_url(url)
                         sticker_user_dict[uid]["image"].append(path)
                         found = True
+                elif get_img(event,bot):
+                    path=await download_img_from_url(get_img(event,bot))
+                    sticker_user_dict[uid]["image"].append(path)
+                    found = True
             if found:
-                await bot.send(event, "已添加")
+                await bot.send(event, "已添加",True)

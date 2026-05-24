@@ -5,6 +5,8 @@ context_manager.py
 - SQLite 负责永久落盘（重启/缓存清理后自动恢复）
 - 写入时同时写 Redis + SQLite
 - 读取时 Redis miss 则从 SQLite 回填
+- 新增：群聊气氛印象（group_impression）存储
+- 新增：群聊最近发言者追踪（用于批量读取 impression）
 """
 
 import asyncio
@@ -79,6 +81,13 @@ class ContextManager:
         self.enable_impression: bool = ccfg.get("enable_impression", True)
         self.impression_ttl: int = ccfg.get("impression_ttl", 604800)
 
+        # 群聊印象配置
+
+        self.enable_group_impression: bool = ccfg.get("enable_impression", True)
+        self.group_impression_ttl: int = ccfg.get("impression_ttl", 604800)
+        # 构建回复时，最多读取最近 N 位发言者的 impression
+        self.group_reply_impression_count: int = ccfg.get("group_reply_impression_count", 3)
+
         db_cfg = config.mai_reply.config.get("redis", {})
         ctx_db = db_cfg.get("context_db", 5)
         imp_db = db_cfg.get("impression_db", 6)
@@ -86,7 +95,7 @@ class ContextManager:
         self._ctx_cache = create_custom_cache_manager(db_number=ctx_db, cache_ttl=self.session_ttl)
         self._imp_cache = create_custom_cache_manager(db_number=imp_db, cache_ttl=self.impression_ttl)
 
-        # SQLite 持久层路径可通过配置指定，默认放在当前目录
+        # SQLite 持久层
         sqlite_cfg = config.mai_reply.config.get("sqlite", {})
         ctx_sqlite_path  = sqlite_cfg.get("context_db_path",    "data/context_store.db")
         imp_sqlite_path  = sqlite_cfg.get("impression_db_path", "data/impression_store.db")
@@ -97,18 +106,15 @@ class ContextManager:
     # ------------------------------------------------------------------ 内部读写辅助（带双层 fallback）
 
     def _ctx_get(self, key: str) -> Optional[str]:
-        """先读 Redis；miss 则从 SQLite 回填 Redis 后返回。"""
         value = self._ctx_cache.get(key)
         if value:
             return value if isinstance(value, str) else None
-        # cache miss → 从 SQLite 恢复
         value = self._ctx_sqlite.get(key)
         if value:
             self._ctx_cache.set(key, value, ttl=self.session_ttl)
         return value
 
     def _ctx_set(self, key: str, value: str, ttl: Optional[int] = None) -> None:
-        """同时写 Redis 和 SQLite。"""
         self._ctx_cache.set(key, value, ttl=ttl or self.session_ttl)
         self._ctx_sqlite.set(key, value)
 
@@ -130,21 +136,18 @@ class ContextManager:
             self._imp_cache.set(key, value, ttl=self.impression_ttl)
         return value
 
-    def _imp_set(self, key: str, value: str) -> None:
-        self._imp_cache.set(key, value, ttl=self.impression_ttl)
+    def _imp_set(self, key: str, value: str, ttl: Optional[int] = None) -> None:
+        self._imp_cache.set(key, value, ttl=ttl or self.impression_ttl)
         self._imp_sqlite.set(key, value)
 
     # ------------------------------------------------------------------ Bot 发送消息 ID 追踪
-    # 注意：bot_msg 仅用于短效检测（24h），不需要永久持久化，仍只写 Redis。
 
     def record_bot_message(self, msg_id: str) -> None:
-        """记录 bot 发出的消息 ID，用于检测别人是否在回复 bot。保留 24h。"""
         if not msg_id:
             return
         self._ctx_cache.set(f"bot_msg:{msg_id}", "1", ttl=86400)
 
     def is_bot_message(self, msg_id: str) -> bool:
-        """判断某个群消息 ID 是否为 bot 自己发出的。"""
         if not msg_id:
             return False
         return bool(self._ctx_cache.exists(f"bot_msg:{msg_id}"))
@@ -168,10 +171,19 @@ class ContextManager:
         return f"imp:{user_id}"
 
     @staticmethod
+    def _group_impression_key(group_id: int) -> str:
+        return f"imp:group:{group_id}"
+
+    @staticmethod
+    def _group_recent_speakers_key(group_id: int) -> str:
+        """追踪群内最近发言的 user_id 列表（有序，新的在后）"""
+        return f"ctx:speakers:{group_id}"
+
+    @staticmethod
     def _lock_key(session_key: str) -> str:
         return f"lock:{session_key}"
 
-    # ------------------------------------------------------------------ 历史读写（现在有持久化）
+    # ------------------------------------------------------------------ 历史读写
 
     def _load_history(self, key: str) -> List[Dict]:
         raw = self._ctx_get(key)
@@ -205,12 +217,10 @@ class ContextManager:
         self._save_history(key, history)
 
     def clear_session(self, group_id: Optional[int], user_id: int) -> None:
-        """清空会话（Redis + SQLite 均删除）。"""
         key = self._group_key(group_id, user_id) if group_id else self._private_key(user_id)
         self._ctx_delete(key)
 
     def clear_all_sessions(self, group_id: Optional[int] = None) -> int:
-        """清空所有会话或指定群内的所有会话，返回清除数量"""
         if group_id is not None:
             pattern = f"ctx:group:{group_id}:*"
         else:
@@ -224,14 +234,54 @@ class ContextManager:
             count += 1
         return count
 
-    # ------------------------------------------------------------------ 群聊窗口（持久化）
+    # ------------------------------------------------------------------ 群聊窗口 + 发言者追踪
 
-    def push_group_window(self, group_id: int, sender_name: str, text: str) -> None:
+    def push_group_window(self, group_id: int, sender_name: str, text: str, user_id: Optional[int] = None) -> None:
         key = self._group_window_key(group_id)
         window: List[Dict] = self._load_group_window(group_id)
-        window.append({"sender": sender_name, "text": text, "ts": int(time.time())})
+        entry = {"sender": sender_name, "text": text, "ts": int(time.time())}
+        if user_id is not None:
+            entry["user_id"] = user_id
+        window.append(entry)
         window = window[-self.group_window:]
         self._ctx_set(key, json.dumps(window, ensure_ascii=False))
+
+        # 同步更新最近发言者列表（如果有 user_id）
+        if user_id is not None:
+            self._update_recent_speakers(group_id, user_id, sender_name)
+
+    def _update_recent_speakers(self, group_id: int, user_id: int, sender_name: str) -> None:
+        """维护最近发言者的有序列表（去重，新的置末尾）"""
+        key = self._group_recent_speakers_key(group_id)
+        raw = self._ctx_get(key)
+        try:
+            speakers: List[Dict] = json.loads(raw) if raw else []
+        except Exception:
+            speakers = []
+
+        # 去重：先移除旧记录
+        speakers = [s for s in speakers if s.get("user_id") != user_id]
+        speakers.append({"user_id": user_id, "name": sender_name, "ts": int(time.time())})
+        # 只保留最近 20 个，节省空间
+        speakers = speakers[-20:]
+        self._ctx_set(key, json.dumps(speakers, ensure_ascii=False))
+
+    def get_recent_speakers(self, group_id: int, limit: Optional[int] = None) -> List[Dict]:
+        """
+        获取群内最近发言的成员列表（从新到旧）。
+        每项结构：{"user_id": int, "name": str, "ts": int}
+        """
+        key = self._group_recent_speakers_key(group_id)
+        raw = self._ctx_get(key)
+        try:
+            speakers: List[Dict] = json.loads(raw) if raw else []
+        except Exception:
+            speakers = []
+        # 最新的在末尾，反转后取 limit 个
+        speakers = list(reversed(speakers))
+        if limit is not None:
+            speakers = speakers[:limit]
+        return speakers
 
     def _load_group_window(self, group_id: int) -> List[Dict]:
         key = self._group_window_key(group_id)
@@ -255,7 +305,7 @@ class ContextManager:
             lines.append(f"你说：{text}" if sender == bot_name else f"{sender}：{text}")
         return "【群里最近的聊天记录】\n" + "\n".join(lines)
 
-    # ------------------------------------------------------------------ 印象（持久化）
+    # ------------------------------------------------------------------ 用户印象
 
     def get_impression(self, user_id: int) -> str:
         if not self.enable_impression:
@@ -268,7 +318,44 @@ class ContextManager:
             return
         self._imp_set(self._impression_key(user_id), summary)
 
-    # ------------------------------------------------------------------ 分布式锁（仍只用 Redis，锁不需要持久化）
+    # ------------------------------------------------------------------ 群聊印象（新增）
+
+    def get_group_impression(self, group_id: int) -> str:
+        """获取对某个群的整体气氛/话题印象"""
+        if not self.enable_group_impression:
+            return ""
+        raw = self._imp_get(self._group_impression_key(group_id))
+        return raw if isinstance(raw, str) else ""
+
+    def update_group_impression(self, group_id: int, summary: str) -> None:
+        """更新群聊气氛/话题印象"""
+        if not self.enable_group_impression:
+            return
+        self._imp_set(
+            self._group_impression_key(group_id),
+            summary,
+            ttl=self.group_impression_ttl,
+        )
+
+    def get_recent_speaker_impressions(self, group_id: int) -> List[Dict]:
+        """
+        批量读取群内最近 group_reply_impression_count 位发言者的用户印象。
+        返回：[{"name": str, "user_id": int, "impression": str}, ...]
+        只返回实际有印象记录的成员（跳过空印象）。
+        """
+        speakers = self.get_recent_speakers(group_id, limit=self.group_reply_impression_count)
+        result = []
+        for s in speakers:
+            uid = s.get("user_id")
+            name = s.get("name", str(uid))
+            if uid is None:
+                continue
+            imp = self.get_impression(uid)
+            if imp:
+                result.append({"name": name, "user_id": uid, "impression": imp})
+        return result
+
+    # ------------------------------------------------------------------ 分布式锁
 
     async def acquire_lock(self, session_key: str, timeout: int = 30) -> bool:
         lock_key = self._lock_key(session_key)
@@ -289,6 +376,5 @@ class ContextManager:
     # ------------------------------------------------------------------ 生命周期
 
     def close(self) -> None:
-        """进程退出时调用，确保 SQLite 连接正确关闭。"""
         self._ctx_sqlite.close()
         self._imp_sqlite.close()

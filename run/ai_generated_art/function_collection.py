@@ -5,6 +5,7 @@ import re
 
 import aiofiles
 import httpx
+from openai import max_retries
 
 from developTools.message.message_components import Image
 from framework_common.database_util.User import get_user
@@ -103,7 +104,7 @@ async def _send_bot_image_with_retry(bot, event, config, prompt, max_retries=5):
             last_exception = e
             bot.logger.warning(f"bot图片生成失败（第{attempt}/{max_retries}次）: {e}")
             if attempt < max_retries:
-                await asyncio.sleep(2 ** (attempt - 1))  # 指数退避: 1s, 2s, 4s, 8s
+                await asyncio.sleep(1)  # 指数退避: 1s, 2s, 4s, 8s
 
     bot.logger.error(f"bot图片生成最终失败，已重试{max_retries}次，最后错误: {last_exception}")
 
@@ -114,11 +115,11 @@ async def text2img(bot, event, config, prompt, is_about_bot=False):
     if user.permission < permission_need:
         return
     bot.logger.info(f"用户 {event.user_id} 请求生成图片,提示词 {prompt} is_about_bot={is_about_bot}")
-
+    max_retries=config.ai_generated_art.config["gptimage2"]["max_retry"] or 5
     if is_about_bot:
         # 丢到后台运行，不阻塞上游，无需等待结果
         asyncio.create_task(
-            _send_bot_image_with_retry(bot, event, config, prompt)
+            _send_bot_image_with_retry(bot, event, config, prompt,max_retries)
         )
         #return "genrating....please wait..."
 

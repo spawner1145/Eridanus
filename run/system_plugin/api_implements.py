@@ -39,6 +39,9 @@ def main(bot, config):
             await bot.send(event, "已修改")
             remark = event.pure_text.split("改备注")[1].strip()
             await bot.set_friend_remark(event.user_id, remark)
+        if event.pure_text=="罐头笑声":
+            bot.logger.info("正在发送罐头笑声")
+            await bot.send(event,Record(file="https://cdn.pixabay.com/download/audio/2022/09/21/audio_d8aacb968c.mp3?filename=wilrotich-crowd-laughing-07-120585.mp3"))
 
     @bot.on(GroupBanNoticeEvent)
     async def _(event: GroupBanNoticeEvent):
