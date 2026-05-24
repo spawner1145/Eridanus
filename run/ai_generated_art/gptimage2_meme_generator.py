@@ -223,7 +223,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                 if isinstance(mes, Text):
                     sticker_user_dict[uid]["text"].append(mes.text.strip())
                     found = True
-                elif isinstance(mes, (Image, Mface)):
+                elif isinstance(mes, Image) or isinstance(mes, Mface):
                     url = mes.url if hasattr(mes, 'url') and mes.url else mes.file
                     if url:
                         path = await download_img(url)
