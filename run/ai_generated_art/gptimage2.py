@@ -10,6 +10,7 @@ from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.utils import get_img, download_img
 from run.ai_generated_art.function_collection import text2img
+from run.ai_generated_art.gptimage2_meme_generator import download_img_from_url
 
 
 # 假设这个函数已经在别处定义好
@@ -155,7 +156,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                 elif isinstance(mes, Image) or isinstance(mes, Mface):
                     url = mes.url if hasattr(mes, 'url') and mes.url else mes.file
                     if url:
-                        path = await download_img(url)
+                        path = await download_img_from_url(url)
                         user_dict[uid]["image"].append(path)
                         found_any = True
 
