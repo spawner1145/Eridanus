@@ -42,6 +42,10 @@ async def cache_get(db, user_id = None):
 async def cache_save(db, user_id = None, data_info = None):
     await db.write_user('manshuo_cache', {user_id:data_info})
 
+#初始化数据库中的缓存操作
+async def cache_delete(db, user_id = None, key = None):
+    await db.delete_user_field('manshuo_cache',f'{user_id}.{key}')
+
 # 递归合并字典中的同名字段
 def merge_dicts(dict1, dict2):
     merged = dict1.copy()  # 复制 dict1 的数据

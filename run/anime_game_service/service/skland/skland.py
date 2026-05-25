@@ -1,6 +1,4 @@
 from requests import RequestException
-
-from framework_common.database_util.ManShuoDrawCompatibleDataBase import AsyncSQLiteDatabase
 from run.anime_game_service.service.skland.core import *
 import json
 import asyncio
@@ -12,11 +10,39 @@ from framework_common.utils.install_and_import import install_and_import
 dateutil=install_and_import('qrcode', 'qrcode')
 import qrcode
 import pprint
+import copy
 from developTools.message.message_components import Text, Image, At
 from framework_common.manshuo_draw import *
 from run.anime_game_service.service.skland.core.exception import LoginException, RequestException, UnauthorizedException
-
+from framework_common.database_util.ManShuoDrawCompatibleDataBase import AsyncSQLiteDatabase, cache_get, cache_save, cache_delete
 db=asyncio.run(AsyncSQLiteDatabase.get_instance())
+from developTools.utils.logger import get_logger
+logger=get_logger('skland')
+
+#判断是否应该刷新了
+async def date_check(user_id = None, cache_info = None):
+    if user_id is None:
+        current_date = datetime.now()
+        timestamp = int(current_date.timestamp())
+        current_year = current_date.year
+        current_month = current_date.month
+        current_day = current_date.day
+        day = f'{current_year}_{current_month}_{current_day}'
+        month = f'{current_year}_{current_month}'
+        year = f'{current_year}'
+        return_json = {'day':day, 'month':month, 'year':year,'today':current_date,'time':timestamp}
+        return return_json
+    else:
+        if cache_info is None:
+            cache_info = await cache_get(db,'skland')
+        if user_id not in cache_info:
+            return False
+        sign_time = cache_info[user_id]['sign_time']
+        dt = datetime.fromtimestamp(sign_time)
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)  # 当天零点
+        tomorrow = today + timedelta(days=1)  # 明天零点
+        return today <= dt < tomorrow
+
 
 async def user_check(userid):
     user_info =await db.read_user(userid)
@@ -29,6 +55,8 @@ async def user_check(userid):
 
 async def qrcode_get(userid,bot=None,event=None):
     """二维码绑定森空岛账号"""
+    #清除相关缓存
+    await cache_delete(db,'skland',str(userid))
     scan_id = await SklandLoginAPI.get_scan()
     scan_url = f"hypergryph://scan_login?scanId={scan_id}"
     qr_code = qrcode.make(scan_url)
@@ -108,12 +136,12 @@ async def skland_signin(userid,bot=None,event=None):
     async def sign_in(user_info, character_info):
         """执行签到逻辑"""
         cred = CRED(cred=user_info['cred'], token=user_info['cred_token'])
-        ark_info = {'error':None, 'ark_sign_info':{}, 'zmd_sign_info':{}}
+        ark_info = {'error':None, 'ark_sign_info':{}, 'zmd_sign_info':{},'status':False}
         if 'arknights' in character_info and character_info['arknights'].get('uid') is not None:
             try:
                 ark_sign_info = await SklandAPI.ark_sign(cred, str(character_info['arknights']['uid']),
                                                          channel_master_id=str(character_info['arknights']['channel_master_id']))
-                ark_info['ark_sign_info']['info'] = ark_sign_info
+                ark_info['ark_sign_info']['info'],ark_info['status'] = ark_sign_info, True
             except (RequestException) as e:
                 ark_info['error'] = e
                 ark_info['ark_sign_info']['error'] = e
@@ -123,7 +151,7 @@ async def skland_signin(userid,bot=None,event=None):
             try:
                 zmd_sign_info = await SklandAPI.endfield_sign(cred, str(character_info['endfield']['roleid']),
                                                          server_id=character_info['endfield']['serverid'])
-                ark_info['zmd_sign_info']['info'] = zmd_sign_info
+                ark_info['zmd_sign_info']['info'],ark_info['status'] = zmd_sign_info, True
             except (RequestException) as e:
                 ark_info['error'] = e
                 ark_info['zmd_sign_info']['error'] = e
@@ -149,7 +177,18 @@ async def skland_signin(userid,bot=None,event=None):
         return_json['msg'] = msg
         return return_json
     sign_result: dict[str, ArkSignResponse] = {}
-    sing_info = await sign_in(user_info_self, character_info_self)
+    cache_info = await cache_get(db, 'skland')
+    #将缓存写入数据库
+    if await date_check(str(userid), cache_info):
+        logger.info('命中当前缓存，直接返回')
+        sing_info = cache_info[str(userid)]['sing_info']
+    else:
+        sing_info = await sign_in(user_info_self, character_info_self)
+        #只有签到成功才会写入缓存
+        if sing_info is not None and sing_info['status'] is True:
+            day_info = await date_check()
+            cache_info[str(userid)] = {'sign_time': day_info['time'], 'sing_info': copy.deepcopy(sing_info)}
+            #await cache_save(db, 'skland', cache_info)
 
     #print(sing_info)
     if sing_info is None:
@@ -195,6 +234,7 @@ async def skland_signin(userid,bot=None,event=None):
          'content': [f"[name]森空岛签到[/name]\n[time]森空岛id: {user_info_self['user_id']}[/time]"]},
          {'type': 'img', 'subtype': 'common_with_des_right', 'img': img_list, 'content': msg_list,'number_per_row':1}
          ]
+
     return return_json
 
 
@@ -278,9 +318,9 @@ async def rouge_detailed_info(userid,rg_type,game_count=None,favored=False,bot=N
 
 if __name__ == '__main__':
 
-    #asyncio.run(skland_signin(1270858640))
+    asyncio.run(skland_signin(758159883))
     #asyncio.run(qrcode_get(1270858640))
     #asyncio.run(rouge_info(1270858640))
     #asyncio.run(skland_info(942755190))
     #asyncio.run(rouge_info(1667962668,'水月'))
-    asyncio.run(rouge_detailed_info(1667962668,'界园'))
+    #asyncio.run(rouge_detailed_info(1667962668,'界园'))
