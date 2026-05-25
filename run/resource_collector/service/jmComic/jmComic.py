@@ -418,11 +418,11 @@ class OpenListClient:
         return return_json
 
 async def test():
-    base_url = "https://cache.manshuo.ink"  # 替换成实际地址
-    username = "manshuo"
+    base_url = ""  # 替换成实际地址
+    username = ""
     password = "@Wlb02122901"
-    filepath = "run/manshuo_test/data/avatar/avatar9.png"
-    folder_path = "/cache/JM"
+    filepath = ""
+    folder_path = ""
 
     client = OpenListClient(base_url, username, password)
     info = await client.login()
