@@ -44,7 +44,8 @@ async def upgrade_credential(data_info = None):
     credential = Credential(sessdata=data_info['cookies']['sessdata'], bili_jct=data_info['cookies']['bili_jct'],
                             buvid3=data_info['cookies']['buvid3'], dedeuserid=data_info['cookies']['dedeuserid'],
                             ac_time_value=data_info['cookies']['ac_time_value'])
-    await credential.refresh()
+    try: await credential.refresh()
+    except: return False
     if await credential.check_refresh():
         return False
     else:
