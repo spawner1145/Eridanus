@@ -16,9 +16,13 @@ from developTools.message.message_components import Text, Image, At
 from io import BytesIO
 from datetime import datetime, timedelta
 from PIL import Image as PImage
+from framework_common.database_util.ManShuoDrawCompatibleDataBase import AsyncSQLiteDatabase, cache_get, cache_save, cache_delete
+db=asyncio.run(AsyncSQLiteDatabase.get_instance())
 
 async def mys_login(user_id,bot=None,event=None):
     recall_id = None
+    # 清除相关缓存
+    await cache_delete(db, 'skland', str(user_id))
     user_num = len(set(PluginDataManager.plugin_data.users.values()))  # 由于加入了用户数据绑定功能，可能存在重复的用户数据对象，需要去重
     if user_num <= plugin_config.preference.max_user or plugin_config.preference.max_user in [-1, 0]:
         # 获取用户数据对象
