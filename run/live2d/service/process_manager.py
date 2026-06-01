@@ -141,10 +141,12 @@ def find_model_entry(folder_or_path):
 
 
 class Live2DProcessManager:
-    def __init__(self, config: dict, expression_endpoint: dict = None):
+    def __init__(self, config: dict, expression_endpoint: dict = None, tts_endpoint: dict = None):
         self.config = config or {}
         # 已解析好的表情控制 LLM 端点 {enable, base_url, api_key, model}，写入 runtime_config 供渲染端用
         self.expression_endpoint = expression_endpoint or {"enable": True, "base_url": "", "api_key": "", "model": "gpt-4o-mini"}
+        # 已解析好的本地语音合成端点（GPT-SoVITS），渲染端拿到文本后直接调它合成并播放
+        self.tts_endpoint = tts_endpoint or {"enable": False, "api_base": ""}
         self.proc = None
         self._lock = threading.Lock()
 
@@ -162,6 +164,8 @@ class Live2DProcessManager:
             "lip_sync_parameter_ids": self.config.get("lip_sync_parameter_ids", ["ParamMouthOpenY"]),
             # 表情/动作自动控制：渲染端收到文字回复后用快速 LLM 挑选并本地应用
             "expression": self.expression_endpoint,
+            # 本地语音合成：渲染端拿到文本（过滤括号内描写）后直接调 GPT-SoVITS /tts 合成并播放
+            "tts": self.tts_endpoint,
             # 兜底清单（渲染端优先从已加载模型直接读取可用表情/动作，读不到才用这里）
             "expr_names": expr_names,
             "motion_names": motion_names,

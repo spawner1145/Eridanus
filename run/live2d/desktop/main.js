@@ -36,6 +36,11 @@ function readRuntimeConfig() {
 let mainWindow = null;
 const runtimeConfig = readRuntimeConfig();
 
+// 桌宠窗口的固定逻辑尺寸。透明无边框窗口在 Windows 上被 setPosition 连续移动时，
+// 偶发会让窗口宽/高逐像素漂移变大（用户观察到的“拖动模型时对话框/输入条越来越长”）。
+// 这里把尺寸视为不可变量：移动只改坐标、不改尺寸；并监听 resize 把任何意外的尺寸变化拨回。
+const FIXED_SIZE = { width: runtimeConfig.window.width, height: runtimeConfig.window.height };
+
 // 命令行单实例锁，避免多次 /live2d on 拉起多个窗口
 const gotSingleLock = app.requestSingleInstanceLock();
 if (!gotSingleLock) {
@@ -86,6 +91,16 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, "index.html"));
 
+  // 尺寸守卫：任何让窗口尺寸偏离固定值的事件（移动漂移 / DPI 变化等）都立即拨回，
+  // 从根上消除“拖动时窗口变宽 → 底部输入条/对话框越来越长”。判等避免无限触发。
+  mainWindow.on("resize", () => {
+    if (!mainWindow) return;
+    const [w, h] = mainWindow.getSize();
+    if (w !== FIXED_SIZE.width || h !== FIXED_SIZE.height) {
+      mainWindow.setSize(FIXED_SIZE.width, FIXED_SIZE.height);
+    }
+  });
+
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
@@ -94,11 +109,17 @@ function createWindow() {
 // 渲染层把运行时配置取走（模型、bridge 端口、缩放等）
 ipcMain.handle("live2d:get-config", () => runtimeConfig);
 
-// 拖拽模型 → 移动窗口
+// 拖拽模型 → 移动窗口。用 setBounds 一次性给定“新坐标 + 固定尺寸”，
+// 避免 setPosition 在透明窗口上引发的尺寸漂移（拖动越久窗口越宽）。
 ipcMain.on("live2d:move-by", (_event, dx, dy) => {
   if (!mainWindow) return;
-  const [x, y] = mainWindow.getPosition();
-  mainWindow.setPosition(Math.round(x + dx), Math.round(y + dy));
+  const b = mainWindow.getBounds();
+  mainWindow.setBounds({
+    x: Math.round(b.x + dx),
+    y: Math.round(b.y + dy),
+    width: FIXED_SIZE.width,
+    height: FIXED_SIZE.height,
+  });
 });
 
 // 鼠标穿透开关：renderer 根据指针是否在模型/UI 上来切换

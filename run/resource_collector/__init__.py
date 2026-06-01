@@ -3,32 +3,57 @@ plugin_description="资源搜集(r18)"
 
 dynamic_imports = {
     "run.resource_collector.resource_search": [
-        "search_book_info", "call_asmr", "call_download_book","call_jm"
+        "search_book_info", "call_asmr", "call_download_book","jm_search","jm_download","jm_preview"
     ],
     "run.resource_collector.engine_search": ["search_net", "read_html"],
     "run.resource_collector.func_collection": ["iwara_search", "iwara_tendency"],
 }
 function_declarations=[
     {
-        "name": "call_jm",
-        "description": "jmcomic漫画查询、预览、下载。“验车”是预览的另一种称呼",
+        "name": "jm_search",
+        "description": "jmcomic漫画搜索",
         "parameters": {
             "type": "object",
             "properties": {
-                "mode": {
-                    "type": "string", "enum": ["preview","download","search"],"description": "预览和下载需要comic_id，搜索需要query_target"
-                },
-                "comic_id": {
-                    "type": "integer",
-                    "description": "漫画id。预览和下载时使用"
-                },
-                "serach_topic": {
+                "search_topic": {
                     "type": "string",
                     "description": "搜索关键字"
                 }
             },
             "required": [
-                "mode"
+                "search_topic"
+            ]
+        }
+    },
+    {
+        "name": "jm_download",
+        "description": "jmcomic漫画下载",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "comic_id": {
+                    "type": "integer",
+                    "description": "漫画id。预览和下载时使用"
+                },
+            },
+            "required": [
+                "comic_id"
+            ]
+        }
+    },
+    {
+        "name": "jm_preview",
+        "description": "jmcomic漫画预览,“验车”是预览的另一种称呼。验车xxxx必须触发此命令",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "comic_id": {
+                    "type": "integer",
+                    "description": "漫画id。预览和下载时使用"
+                },
+            },
+            "required": [
+                "comic_id"
             ]
         }
     },
@@ -66,7 +91,7 @@ function_declarations=[
     },
     {
         "name": "call_download_book",
-        "description": "从zlibrary下载书籍。",
+        "description": "从zlibrary下载书籍，一般是小说。不要用此接口下载jm漫画",
         "parameters": {
             "type": "object",
             "properties": {

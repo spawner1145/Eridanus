@@ -19,8 +19,14 @@ const state = {
   // 拖拽
   dragging: false,
   lastPointer: { x: 0, y: 0 },
+  pendingMove: { dx: 0, dy: 0, scheduled: false }, // 拖拽位移按帧合并，避免高频 setPosition 造成闪烁
+  lastSize: { w: 0, h: 0 },                        // 上次画布逻辑尺寸，用于过滤重复 resize（防止画面逐帧变大）
+  lastEmotion: null,                               // 上一次情绪：相同则不变脸
+  expressionResetTimer: 0,                         // 变脸后回到默认待机表情的定时器
   bubbleTimer: 0,
   audioContext: null,
+  audioQueue: [],     // 待播放的语音段（ArrayBuffer），按入队顺序串行播放
+  audioPlaying: false, // 队列是否正在被消费（保证同一时刻只有一段在播）
   webuiWs: null,   // 唯一连接：webui 的 /api/ws（与浏览器前端同源）
   history: [],
   ignoringMouse: true, // 与 main.js 初始 setIgnoreMouseEvents(true) 保持一致
@@ -84,10 +90,24 @@ async function loadModel(url) {
 function layoutModel() {
   if (!state.model || !state.app) return;
   state.model.scale.set(state.scale);
+  // 用 app.screen（逻辑/CSS 像素）而非 renderer.width（= 逻辑宽 × resolution 的物理像素）。
+  // 在 devicePixelRatio>1 的高 DPI 屏上，renderer.width 是物理像素，除以 2 会把模型推到
+  // 右侧甚至画面外，表现为“角色偏右、显示不全”。screen 才是 stage 坐标系所用的逻辑像素。
   state.model.position.set(
-    state.app.renderer.width / 2,
-    state.app.renderer.height / 2,
+    state.app.screen.width / 2,
+    state.app.screen.height / 2,
   );
+}
+
+// 仅在窗口逻辑尺寸真正变化时 resize，过滤拖动期间的伪 resize（防止画布逐帧变大）
+function resizeApp() {
+  if (!state.app) return;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  if (w === state.lastSize.w && h === state.lastSize.h) return;
+  state.lastSize = { w, h };
+  state.app.renderer.resize(w, h);
+  layoutModel();
 }
 
 function disposeModel() {
@@ -137,19 +157,52 @@ function smooth(prev, next, factor) {
   return prev + (next - prev) * factor;
 }
 
-// 播放音频并用 AnalyserNode 音量驱动口型（移植自 EchoBot playback.js）
-async function playAudio(src) {
+// 把一段音频排入播放队列。多段语音不再同时发声，而是按入队顺序一个接一个播放
+// （避免多条回复/多段语音叠在一起破坏沉浸感）。
+function playAudioBuffer(arrayBuf) {
+  if (!arrayBuf) return;
+  state.audioQueue.push(arrayBuf);
+  drainAudioQueue();
+}
+
+// 串行消费队列：始终只有一段在播，当前段 onended 后才取下一段。
+async function drainAudioQueue() {
+  if (state.audioPlaying) return;
+  state.audioPlaying = true;
+  try {
+    while (state.audioQueue.length) {
+      await playOneBuffer(state.audioQueue.shift());
+    }
+  } finally {
+    state.audioPlaying = false;
+  }
+}
+
+// 播放单段 ArrayBuffer 并用 AnalyserNode 音量驱动口型（移植自 EchoBot playback.js）；
+// 返回的 Promise 在该段播放结束时 resolve，供队列串行等待。
+async function playOneBuffer(arrayBuf) {
+  if (!arrayBuf) return;
+  let ctx;
   try {
     if (!state.audioContext) {
       state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
-    const ctx = state.audioContext;
+    ctx = state.audioContext;
     if (ctx.state === "suspended") await ctx.resume();
+  } catch (err) {
+    console.error("[live2d] 音频上下文初始化失败:", err);
+    return;
+  }
 
-    const resp = await fetch(src);
-    const arrayBuf = await resp.arrayBuffer();
-    const audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0));
+  let audioBuf;
+  try {
+    audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0));
+  } catch (err) {
+    console.error("[live2d] 音频解码失败:", err);
+    return;
+  }
 
+  await new Promise((resolve) => {
     const source = ctx.createBufferSource();
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 256;
@@ -171,23 +224,104 @@ async function playAudio(src) {
     source.onended = () => {
       window.cancelAnimationFrame(raf);
       state.currentMouthValue = 0;
+      resolve();
     };
 
-    source.start(0);
-    tick();
+    try {
+      source.start(0);
+      tick();
+    } catch (err) {
+      console.error("[live2d] 音频播放失败:", err);
+      resolve();
+    }
+  });
+}
+
+// 从 URL 取音频再播放（保留给图片/历史等可能的 URL 来源）
+async function playAudio(src) {
+  try {
+    const resp = await fetch(src);
+    await playAudioBuffer(await resp.arrayBuffer());
   } catch (err) {
-    console.error("[live2d] 音频播放失败:", err);
+    console.error("[live2d] 音频拉取失败:", err);
   }
+}
+
+// ---------- 本地语音合成（GPT-SoVITS /tts，参数同 run/tts_v2） ----------
+
+// 去掉括号内的描写（动作/旁白/神态），只把“真正要说出口的话”交给语音合成；
+// 气泡仍显示完整文本。覆盖全角（）、半角()、方括号【】。
+function stripParenthetical(text) {
+  return String(text || "")
+    .replace(/（[^）]*）/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/【[^】]*】/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// 调用 GPT-SoVITS /tts 合成语音，返回音频 ArrayBuffer（失败抛出，由调用方兜底）。
+// payload 与 run/tts_v2/service/GPT_SoVits.py 对齐，确保与 bot 端语音一致。
+async function synthesizeTTS(text) {
+  const cfg = state.config.tts || {};
+  if (cfg.enable === false || !cfg.api_base) return null;
+  const t = String(text || "").trim();
+  if (!t) return null;
+  const payload = {
+    text: t,
+    text_lang: cfg.target_lang || "zh",
+    ref_audio_path: cfg.ref_audio_path,
+    prompt_text: cfg.ref_text,
+    prompt_lang: cfg.ref_lang || "zh",
+    top_k: cfg.top_k,
+    top_p: cfg.top_p,
+    temperature: cfg.temperature,
+    text_split_method: cfg.text_split_method || "cut5",
+    batch_size: cfg.batch_size,
+    speed_factor: cfg.speed_factor,
+    streaming_mode: cfg.streaming_mode,
+    seed: cfg.seed,
+    fragment_interval: 0.32,
+    media_type: "wav",
+    repetition_penalty: cfg.repetition_penalty || 1.35,
+  };
+  const url = cfg.api_base.replace(/\/+$/, "") + "/tts";
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) throw new Error("TTS HTTP " + resp.status);
+  return await resp.arrayBuffer();
 }
 
 // ---------- 气泡 ----------
 
 function _showBubbleEl(durationMs) {
   bubbleEl.classList.add("visible");
+  positionBubble();
   if (state.bubbleTimer) window.clearTimeout(state.bubbleTimer);
   state.bubbleTimer = window.setTimeout(() => {
     bubbleEl.classList.remove("visible");
   }, durationMs);
+}
+
+// 把气泡放到“模型头顶上方”，并夹在窗口内。原先固定在窗口左上(left:50%/top:10px)，
+// 模型居中且缩放后会显得气泡偏左上、脱离角色；改为跟随模型实际包围盒顶部居中。
+function positionBubble() {
+  if (!state.model || !bubbleEl.classList.contains("visible")) return;
+  let b;
+  try { b = state.model.getBounds(); } catch (e) { return; }
+  const bw = bubbleEl.offsetWidth;
+  const bh = bubbleEl.offsetHeight;
+  const headX = b.x + b.width / 2;        // 模型水平中心
+  let left = headX - bw / 2;              // 气泡水平居中于头顶
+  let top = b.y - bh - 12;                // 头顶上方 12px
+  left = clamp(left, 6, Math.max(6, window.innerWidth - bw - 6));
+  top = clamp(top, 6, Math.max(6, window.innerHeight - bh - 6));
+  bubbleEl.style.left = left + "px";
+  bubbleEl.style.top = top + "px";
+  bubbleEl.style.transform = "none";      // 覆盖 CSS 里的 translateX(-50%)
 }
 
 function showBubble(text, durationMs) {
@@ -218,14 +352,27 @@ function bindModelInteractions(model) {
   });
 }
 
+function flushPendingMove() {
+  const pm = state.pendingMove;
+  pm.scheduled = false;
+  const { dx, dy } = pm;
+  pm.dx = 0;
+  pm.dy = 0;
+  if (dx || dy) window.desktop.moveBy(dx, dy);
+}
+
 function bindGlobalInteractions() {
   window.addEventListener("pointermove", (event) => {
     if (!state.dragging) return;
-    const dx = event.screenX - (state.lastPointer.screenX ?? event.screenX);
-    const dy = event.screenY - (state.lastPointer.screenY ?? event.screenY);
-    // 用屏幕坐标增量驱动窗口移动，避免窗口移动后画布坐标漂移
+    // 用屏幕坐标增量驱动窗口移动，避免窗口移动后画布坐标漂移；
+    // 同一帧内的多次 pointermove 合并为一次 moveBy，减少透明窗口高频 setPosition 的闪烁。
     if (state.lastPointer.screenX != null) {
-      window.desktop.moveBy(dx, dy);
+      state.pendingMove.dx += event.screenX - state.lastPointer.screenX;
+      state.pendingMove.dy += event.screenY - state.lastPointer.screenY;
+      if (!state.pendingMove.scheduled) {
+        state.pendingMove.scheduled = true;
+        window.requestAnimationFrame(flushPendingMove);
+      }
     }
     state.lastPointer.screenX = event.screenX;
     state.lastPointer.screenY = event.screenY;
@@ -314,10 +461,13 @@ function handleWebuiFrame(t) {
   }
 }
 
-// 逐段渲染机器人回复：文字→气泡+历史(+表情控制)；图片→缩略+历史；语音→播放驱动口型；
-// 视频/文件→气泡标签+历史。媒体统一用 file:// 直接加载（桌宠与 bot 同机，webSecurity:false）。
-function renderBotSegments(segments) {
+// 逐段渲染机器人回复：图片→缩略+历史；视频/文件→气泡标签+历史。
+// 语音不再使用 bot 下发的 record 段，而是在本地对回复文本单独合成（见下），确保 100% 出声。
+// 文字处理顺序：并发“合成语音 + 判定情绪” → 二者就绪后“同时”播语音、出文本气泡、变脸。
+async function renderBotSegments(segments) {
   const texts = [];
+  const images = [];
+  const labels = []; // 视频/文件等仅以文字标签展示
   for (const seg of segments || []) {
     if (!seg || !seg.type) continue;
     const data = seg.data || {};
@@ -327,111 +477,189 @@ function renderBotSegments(segments) {
         break;
       case "image": {
         const url = toFileUrl(data.file || data.url);
-        if (url) {
-          showBubbleImage(url);
-          addHistory("bot", "image", url);
-        }
+        if (url) images.push(url);
         break;
       }
-      case "record": {
-        const url = toFileUrl(data.file || data.url);
-        if (url) playAudio(url);
+      case "video":
+        labels.push("🎬 视频");
         break;
-      }
-      case "video": {
-        showBubble("🎬 视频");
-        addHistory("bot", "text", "🎬 视频");
+      case "file":
+        labels.push("📎 文件" + (data.name ? `：${data.name}` : ""));
         break;
-      }
-      case "file": {
-        const label = "📎 文件" + (data.name ? `：${data.name}` : "");
-        showBubble(label);
-        addHistory("bot", "text", label);
-        break;
-      }
       default:
-        break; // at / reply / face 等忽略
+        break; // record（bot 音频）/ at / reply / face 等忽略
     }
   }
-  if (texts.length) {
-    const joined = texts.join("\n");
+
+  for (const url of images) {
+    showBubbleImage(url);
+    addHistory("bot", "image", url);
+  }
+
+  const joined = texts.join("\n");
+  if (joined) {
+    const speakText = stripParenthetical(joined); // 语音只读括号外的内容
+    // 并发：本地合成语音 + 判定情绪。两者就绪后再统一触发，做到“语音/文字/表情同时”。
+    const [audioBuf, plan] = await Promise.all([
+      speakText
+        ? synthesizeTTS(speakText).catch((e) => { console.error("[live2d] TTS 合成失败:", e); return null; })
+        : Promise.resolve(null),
+      classifyEmotion(joined).catch(() => null),
+    ]);
+    if (audioBuf) playAudioBuffer(audioBuf);
     showBubble(joined);
     addHistory("bot", "text", joined);
-    controlExpression(joined);
+    if (plan) applyEmotionPlan(plan); // 变脸（含“过一会回默认”）
+  }
+
+  for (const label of labels) {
+    showBubble(label);
+    addHistory("bot", "text", label);
   }
 }
 
-// ---------- 表情/动作自动控制（渲染端调用快速模型，自适应当前模型可用项） ----------
+// ---------- 表情/动作自动控制（情绪/场景 → config.yaml 索引 → 变脸/播动作） ----------
+//
+// 流程：对话后把回复判定为某种“情绪”（emotions 索引里的 key 之一）和可选“场景”（scenes 索引），
+// 再按 runtime_config.expression.{emotions,scenes} 的绑定播放。判定优先用快速 LLM，
+// 失败/超时则退回本地关键词匹配，保证常见情绪也能触发，不再“几乎只待机”。
+//
+// 规则：情绪相对上次变化才“变脸”（情绪不变不动脸）；动作分两类——
+//   · 场景动作（如打招呼→wave）：命中即播，不受“情绪未变化”限制；
+//   · 情绪动作（如 cry→tear）：仅在情绪发生变化时随表情一起播。
 
-function availableExprMotion() {
-  // 优先从已加载模型读取真实可用项，回退 runtime_config 下发的清单
-  let exprs = [];
-  let motions = [];
+function applyExpression(name) {
+  if (!state.model) return;
   try {
-    const settings = state.model && state.model.internalModel && state.model.internalModel.settings;
-    if (settings) {
-      const exprDefs = settings.expressions || (settings.FileReferences && settings.FileReferences.Expressions);
-      if (Array.isArray(exprDefs)) exprs = exprDefs.map((e) => e.Name || e.name).filter(Boolean);
-      const motionDefs = settings.motions || (settings.FileReferences && settings.FileReferences.Motions);
-      if (motionDefs) motions = Object.keys(motionDefs);
+    if (name) {
+      state.model.expression(name);
+    } else {
+      // 空名 = 恢复默认待机：清掉当前持续表情
+      const em = state.model.internalModel
+        && state.model.internalModel.motionManager
+        && state.model.internalModel.motionManager.expressionManager;
+      if (em && typeof em.resetExpression === "function") em.resetExpression();
     }
-  } catch (e) { /* ignore */ }
-  if (!exprs.length) exprs = state.config.expr_names || [];
-  if (!motions.length) motions = state.config.motion_names || [];
-  return { exprs, motions };
+  } catch (e) { /* 某些模型缺少该表情，忽略 */ }
 }
 
-async function controlExpression(text) {
-  const cfg = state.config.expression || {};
-  if (cfg.enable === false || !cfg.base_url) return;
-  const { exprs, motions } = availableExprMotion();
-  if (!exprs.length && !motions.length) return;
-  const t = (text || "").trim();
-  if (!t) return;
-
-  let raw;
+function playMotion(group) {
+  if (!group || !state.model) return;
   try {
-    raw = await fastLLM(cfg, buildExprPrompt(t, exprs, motions));
-  } catch (e) {
-    return; // 表情控制失败不影响对话
+    state.model.motion(group, undefined, (PIXI.live2d.MotionPriority && PIXI.live2d.MotionPriority.NORMAL) || 2);
+  } catch (e) { /* ignore */ }
+}
+
+// 本地关键词兜底：LLM 不可用时也能命中最常见的情绪/场景
+function keywordClassify(text) {
+  const t = String(text || "");
+  const has = (re) => re.test(t);
+  let emotion = "";
+  let scene = "";
+  if (has(/(你好|您好|早上好|早安|中午好|下午好|晚上好|在吗|在不在|嗨|哈喽|hello|hi)/i)) scene = "greeting";
+  else if (has(/(再见|拜拜|晚安|下次见|回头见|bye|goodbye)/i)) scene = "farewell";
+  if (has(/(呜呜|哭|泪流|想哭|伤心欲绝|哽咽)/)) emotion = "cry";
+  else if (has(/(难过|委屈|失落|遗憾|抱歉|对不起|可惜|心疼)/)) emotion = "sad";
+  else if (has(/(生气|讨厌|可恶|烦死|气死|哼!|怒)/)) emotion = "angry";
+  else if (has(/(尴尬|无语|无言|裂开|社死)/)) emotion = "awkward";
+  else if (has(/(困惑|疑惑|不懂|懵|啊\?|什么意思|为什么|怎么会)/)) emotion = "confused";
+  else if (has(/(喜欢你|爱你|么么|抱抱|亲亲|宝贝|想你)/)) emotion = "love";
+  else if (has(/(害羞|脸红|不好意思|羞)/)) emotion = "shy";
+  else if (has(/(哇|居然|竟然|不会吧|天哪|震惊|惊讶)/)) emotion = "surprised";
+  else if (has(/(嘿嘿|哼哼|得意|不过如此|小意思|略略)/)) emotion = "smug";
+  else if (has(/(嘻嘻|调皮|逗你|开玩笑|吐舌|皮一下)/)) emotion = "playful";
+  else if (has(/(太棒了|耶|好开心|开心|高兴|哈哈|嘿|爽|赞)/)) emotion = "happy";
+  else if (scene === "greeting") emotion = "happy"; // 打招呼通常是愉快的
+  return { emotion, scene };
+}
+
+// 仅“判定”情绪/场景（不落地），便于与语音合成并发；返回 {emotion, scene} 或 null。
+async function classifyEmotion(text) {
+  const cfg = state.config.expression || {};
+  if (cfg.enable === false) return null;
+  const emotions = cfg.emotions || {};
+  const scenes = cfg.scenes || {};
+  const emotionKeys = Object.keys(emotions);
+  if (!emotionKeys.length) return null; // 没有配置索引则不动
+  const t = (text || "").trim();
+  if (!t) return null;
+
+  // 先尝试 LLM 判定，失败/超时/无端点则退回关键词
+  let result = null;
+  if (cfg.base_url) {
+    try {
+      const raw = await fastLLM(cfg, buildEmotionPrompt(t, emotionKeys, Object.keys(scenes)));
+      result = parseEmotionJson(raw, emotionKeys, Object.keys(scenes));
+    } catch (e) { /* 失败则走关键词兜底 */ }
   }
-  if (!raw) return;
-  const { expression, motion } = parseExprJson(raw, exprs, motions);
-  if (expression && state.model) {
-    try { state.model.expression(expression); } catch (e) { /* ignore */ }
+  if (!result || (!result.emotion && !result.scene)) {
+    result = keywordClassify(t);
   }
-  if (motion && state.model) {
-    try { state.model.motion(motion, undefined, PIXI.live2d.MotionPriority?.NORMAL ?? 2); } catch (e) { /* ignore */ }
+  let { emotion, scene } = result;
+  if (emotion && emotionKeys.indexOf(emotion) < 0) emotion = "";
+  if (scene && Object.keys(scenes).indexOf(scene) < 0) scene = "";
+  return { emotion, scene };
+}
+
+// 把判定结果落地：场景动作命中即播；情绪变化才变脸，并安排“过一会回默认表情”。
+function applyEmotionPlan(plan) {
+  const cfg = state.config.expression || {};
+  const emotions = cfg.emotions || {};
+  const scenes = cfg.scenes || {};
+  const { emotion, scene } = plan || {};
+
+  // 场景动作：命中即播（不受情绪未变化限制）
+  const sceneMotion = scene && scenes[scene] && scenes[scene].motion;
+  if (sceneMotion) playMotion(sceneMotion);
+
+  // 情绪 → 变脸（仅在情绪变化时）+ 情绪动作
+  if (emotion && emotion !== state.lastEmotion) {
+    state.lastEmotion = emotion;
+    const map = emotions[emotion] || {};
+    applyExpression(map.expression || "");
+    if (map.motion && !sceneMotion) playMotion(map.motion); // 场景动作已播则不重复
+    scheduleExpressionReset(); // 变脸后过一会恢复默认待机表情
   }
 }
 
-function buildExprPrompt(text, exprs, motions) {
+// 变脸后延时恢复默认待机表情（reset_delay_ms<=0 则不自动恢复）。
+function scheduleExpressionReset() {
+  const cfg = state.config.expression || {};
+  const delay = Number.isFinite(cfg.reset_delay_ms) ? cfg.reset_delay_ms : 6000;
+  if (delay <= 0) return;
+  if (state.expressionResetTimer) window.clearTimeout(state.expressionResetTimer);
+  state.expressionResetTimer = window.setTimeout(() => {
+    applyExpression("");      // 清掉持续表情，回到默认待机
+    state.lastEmotion = null; // 允许之后即便相同情绪也能再次触发变脸
+  }, delay);
+}
+
+function buildEmotionPrompt(text, emotionKeys, sceneKeys) {
   const parts = [
-    "你是 Live2D 形象的表情/动作控制器。根据下面这句【角色台词】的情绪和语义，",
-    "从“可用表情”和“可用动作”中各挑选最贴合的一个（不合适就留空）。",
-    "只输出一行 JSON，不要解释：{\"expression\": \"名称或空字符串\", \"motion\": \"名称或空字符串\"}",
-    "名称必须从清单里精确选取，不要自创、不要翻译。",
+    "你是 Live2D 桌宠的情绪识别器。阅读下面这句【角色台词】，判断说话者当前的情绪，并识别是否属于某种聊天场景。",
+    "只输出一行 JSON，不要任何解释：{\"emotion\":\"<情绪>\",\"scene\":\"<场景或空字符串>\"}",
+    "emotion 只能从这些英文标签里精确选一个：" + emotionKeys.join(", "),
+    "scene 只能为以下之一或空字符串：" + (sceneKeys.length ? sceneKeys.join(", ") + ", \"\"" : "\"\""),
+    "若情绪不明显请用 neutral。",
+    "【角色台词】" + text,
   ];
-  if (exprs.length) parts.push("可用表情：" + exprs.join("、"));
-  if (motions.length) parts.push("可用动作：" + motions.join("、"));
-  parts.push("【角色台词】" + text);
   return parts.join("\n");
 }
 
-function parseExprJson(raw, exprs, motions) {
-  const m = String(raw).match(/\{[^{}]*\}/);
-  if (!m) return {};
+function parseEmotionJson(raw, emotionKeys, sceneKeys) {
+  const m = String(raw || "").match(/\{[^{}]*\}/);
+  if (!m) return { emotion: "", scene: "" };
   let obj;
   try {
     obj = JSON.parse(m[0]);
   } catch (e) {
-    return {};
+    return { emotion: "", scene: "" };
   }
-  let expression = String(obj.expression || "").trim();
-  let motion = String(obj.motion || "").trim();
-  if (exprs.indexOf(expression) < 0) expression = "";
-  if (motions.indexOf(motion) < 0) motion = "";
-  return { expression, motion };
+  let emotion = String(obj.emotion || "").trim().toLowerCase();
+  let scene = String(obj.scene || "").trim().toLowerCase();
+  if (emotionKeys.indexOf(emotion) < 0) emotion = "";
+  if (sceneKeys.indexOf(scene) < 0) scene = "";
+  return { emotion, scene };
 }
 
 async function fastLLM(cfg, prompt) {
@@ -445,12 +673,17 @@ async function fastLLM(cfg, prompt) {
     max_tokens: 60,
     stream: false,
   };
-  const resp = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
-  const data = await resp.json();
+  // 加超时：避免端点缓慢/无响应时阻塞“先变脸再说话”的整条链路（语音/文字会被一直卡住）
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 2500);
   try {
+    const resp = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal: controller.signal });
+    const data = await resp.json();
     return data.choices[0].message.content;
   } catch (e) {
     return null;
+  } finally {
+    window.clearTimeout(timer);
   }
 }
 
@@ -594,11 +827,16 @@ async function boot() {
     state.lipSyncIds = state.config.lip_sync_parameter_ids;
   }
 
+  // 不用 resizeTo:window：透明无边框窗口被拖动时 Electron 偶发派发 resize，
+  // 配合 autoDensity 会让画布逐帧累积放大（用户观察到的“每次闪烁都会变长”）。
+  // 改为显式给定初始尺寸 + 受控 resize（仅在逻辑尺寸真正变化时执行）。
+  state.lastSize = { w: window.innerWidth, h: window.innerHeight };
   state.app = new PIXI.Application({
     view: canvas,
     backgroundAlpha: 0,
     antialias: true,
-    resizeTo: window,
+    width: window.innerWidth,
+    height: window.innerHeight,
     autoDensity: true,
     resolution: window.devicePixelRatio || 1,
   });
@@ -609,12 +847,13 @@ async function boot() {
     if (state.model) {
       try { state.model.update(state.app.ticker.deltaMS); } catch (e) { /* ignore */ }
     }
+    positionBubble(); // 气泡可见时持续贴着模型头顶（缩放/拖动后也跟随）
   });
 
   loadHistory();
   bindGlobalInteractions();
   setupChatUI();
-  window.addEventListener("resize", layoutModel);
+  window.addEventListener("resize", resizeApp);
 
   await loadModel(state.config.model_url);
   connectWebui();    // 唯一连接：webui 的 /api/ws（对话 + 表情/动作由回复内容在本地驱动）

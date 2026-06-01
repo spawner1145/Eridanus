@@ -88,8 +88,17 @@ class ReplyEngine:
     def _load_tools(self):
         try:
             if self.cfg.mai_reply.config.get("llm", {}).get("func_calling", False):
-                from framework_common.framework_util.func_map_loader import build_tool_map
-                tools = build_tool_map()
+                from framework_common.framework_util.func_map_loader import build_tool_map, get_tool_declarations
+                funcs = build_tool_map()
+                # 将 Gemini 格式的 declaration 列表转成 name -> decl 的索引
+                declarations = {d["name"]: d for d in get_tool_declarations() if "name" in d}
+                # 将每个工具包装为 {"func": <callable>, "declaration": <gemini_decl>}
+                tools = {}
+                for name, func in funcs.items():
+                    tools[name] = {
+                        "func": func,
+                        "declaration": declarations.get(name),  # 可能为 None（没有声明的工具）
+                    }
                 logger.info(f"[MaiReply] 已加载函数调用工具: {list(tools.keys())}")
                 return tools
         except Exception as e:

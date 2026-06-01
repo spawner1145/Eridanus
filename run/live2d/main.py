@@ -50,12 +50,55 @@ def _resolve_expr_endpoint(config):
             key = (str(aks[0]).strip() if aks else "")
     if not model:
         model = (tl.get("model") or main_llm.get("model") or "gpt-4o-mini")
-    return {"enable": enable, "base_url": base, "api_key": key, "model": model}
+    # 把情绪/场景 → 表情·动作 索引一并下发给渲染端（渲染端据此变脸/播动作）
+    return {
+        "enable": enable,
+        "base_url": base,
+        "api_key": key,
+        "model": model,
+        "emotions": live.get("emotions", {}) or {},
+        "scenes": live.get("scenes", {}) or {},
+        # 变脸后回到默认待机表情的延时（ms）；<=0 表示不自动恢复
+        "reset_delay_ms": live.get("reset_delay_ms", 6000),
+    }
+
+
+def _resolve_tts_endpoint(config):
+    """解析桌宠本地语音合成端点：复用 run/tts_v2 的 gpt_sovits 配置（与 /达妮娅说 同源）。
+    桌宠拿到文本后在本地直接调 GPT-SoVITS /tts 合成语音，确保语音 100% 触发，
+    不再依赖 onebot bot 下发的音频。live2d.config.tts 可覆盖端点/参考音频。"""
+    try:
+        g = config.tts_v2.config.get("gpt_sovits", {}) or {}
+    except Exception:
+        g = {}
+    live = (config.live2d.config.get("tts", {}) or {})
+    return {
+        "enable": live.get("enable", True),
+        "api_base": (live.get("api_base") or g.get("api_base") or "").strip(),
+        # ref_audio_path 是 TTS 服务端能访问到的路径，原样透传，不做 file:// 转换
+        "ref_audio_path": live.get("ref_audio_path") or g.get("ref_audio_path") or "",
+        "ref_text": live.get("ref_text") or g.get("ref_text") or "",
+        "target_lang": live.get("target_lang", "zh"),
+        "ref_lang": live.get("ref_lang", "zh"),
+        "top_k": g.get("top_k", 15),
+        "top_p": g.get("top_p", 1),
+        "temperature": g.get("temperature", 1),
+        "text_split_method": g.get("text_split_method", "cut5"),
+        "batch_size": g.get("batch_size", 1),
+        "speed_factor": g.get("speed_factor", 1),
+        "streaming_mode": g.get("streaming_mode", False),
+        "seed": g.get("seed", -1),
+        "repetition_penalty": g.get("repetition_penalty", 1.35),
+    }
 
 
 def main(bot: ExtendBot, config: YAMLManager):
     cfg = config.live2d.config
-    manager = Live2DProcessManager(cfg, expression_endpoint=_resolve_expr_endpoint(config))
+    manager = Live2DProcessManager(
+        cfg,
+        expression_endpoint=_resolve_expr_endpoint(config),
+        tts_endpoint=_resolve_tts_endpoint(config),
+    )
 
     def _persist_enable(value: bool):
         """改写 config.yaml 的 enable 并持久化（触发 YAMLManager 保存）。"""
@@ -71,7 +114,11 @@ def main(bot: ExtendBot, config: YAMLManager):
         threading.Thread(target=manager.restart, name="Live2DRestart", daemon=True).start()
 
     if cfg.get("enable"):
-        bot.logger.server("🔧 Live2D 桌宠已启用，bot 连接后将拉起桌面渲染窗口…")
+        # 桌宠是 webui 后端(/api/ws, 5007)的**纯客户端**，与主 bot(onebot 实现)是否连接无关。
+        # 插件 main() 在主 bot 连接之前就会被加载，这里直接拉起渲染窗口（和 webui 一样，
+        # 不依赖主 bot 连接成功）；渲染端对 webui 的连接自带断线重连，webui 尚未就绪也会自动重试。
+        bot.logger.server("🔧 Live2D 桌宠已启用，正在拉起桌面渲染窗口（不依赖主 bot 连接）…")
+        _start_async()
     else:
         bot.logger.info("[Live2D] 已加载（默认关闭，发送 /live2d on 开启）")
 
@@ -151,6 +198,8 @@ def main(bot: ExtendBot, config: YAMLManager):
 
     @bot.on(LifecycleMetaEvent)
     async def _on_lifecycle(event: LifecycleMetaEvent):
+        # 仅作兜底：桌宠已在插件加载时启动，这里在主 bot（重）连接后顺带补一次，
+        # 万一渲染进程曾异常退出可自愈。manager.start 内部有锁与 is_running 判断，重复调用安全。
         if cfg.get("enable") and not manager.is_running():
             _start_async()
 

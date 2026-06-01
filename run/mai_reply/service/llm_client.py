@@ -397,18 +397,92 @@ class LLMClient:
 
     @staticmethod
     def _build_openai_tool_defs(tools) -> List[Dict]:
-        if isinstance(tools, list): return tools
-        if isinstance(tools, dict):
-            result =[]
-            for name, val in tools.items():
-                if isinstance(val, dict) and "declaration" in val:
-                    result.append(val["declaration"])
-                elif isinstance(val, dict) and "type" in val:
-                    result.append(val)
+        """
+        将工具定义转换为 OpenAI 标准格式：
+        [{"type": "function", "function": {"name": ..., "description": ..., "parameters": {...}}}]
+
+        输入支持：
+        - 已是 OpenAI 格式的 list（直接透传）
+        - dict，值为 {"func": callable, "declaration": <Gemini 格式 decl>}（_load_tools 产出的标准结构）
+        - dict，值为已经是 OpenAI 格式的 dict（含 "type" 字段）
+        - dict，值为纯 callable（降级，仅用函数名/docstring）
+        """
+        if isinstance(tools, list):
+            return tools
+
+        if not isinstance(tools, dict):
+            return []
+
+        result = []
+        for name, val in tools.items():
+            # ── 情况 1：标准结构 {"func": ..., "declaration": <Gemini decl>} ──
+            if isinstance(val, dict) and "func" in val:
+                decl = val.get("declaration")
+                if isinstance(decl, dict):
+                    # Gemini 格式：{"name": ..., "description": ..., "parameters": {...}}
+                    params = decl.get("parameters", {"type": "object", "properties": {}})
+                    # 确保 required 字段存在（Gemini 有时省略它）
+                    if "required" not in params:
+                        params = dict(params)  # 浅拷贝，不污染原始数据
+                        params["required"] = []
+                    result.append({
+                        "type": "function",
+                        "function": {
+                            "name": decl.get("name", name),
+                            "description": decl.get("description", f"调用 {name}"),
+                            "parameters": params,
+                        }
+                    })
                 else:
-                    result.append({"type": "function", "function": {"name": name, "description": getattr(val, "__doc__", f"调用 {name}"), "parameters": {"type": "object", "properties": {}, "required":[]}}})
-            return result
-        return[]
+                    # 没有 declaration，降级用 docstring
+                    func = val["func"]
+                    result.append({
+                        "type": "function",
+                        "function": {
+                            "name": name,
+                            "description": (getattr(func, "__doc__", None) or f"调用 {name}").strip(),
+                            "parameters": {"type": "object", "properties": {}, "required": []},
+                        }
+                    })
+
+            # ── 情况 2：已是 OpenAI 格式 {"type": "function", ...} ──
+            elif isinstance(val, dict) and val.get("type") == "function":
+                result.append(val)
+
+            # ── 情况 3：旧式 {"declaration": ...} 结构（无 func 字段） ──
+            elif isinstance(val, dict) and "declaration" in val:
+                decl = val["declaration"]
+                if isinstance(decl, dict):
+                    # 可能是已包装好的 OpenAI 格式
+                    if decl.get("type") == "function":
+                        result.append(decl)
+                    else:
+                        # Gemini 格式
+                        params = decl.get("parameters", {"type": "object", "properties": {}})
+                        if "required" not in params:
+                            params = dict(params)
+                            params["required"] = []
+                        result.append({
+                            "type": "function",
+                            "function": {
+                                "name": decl.get("name", name),
+                                "description": decl.get("description", f"调用 {name}"),
+                                "parameters": params,
+                            }
+                        })
+
+            # ── 情况 4：纯 callable（最低降级） ──
+            elif callable(val):
+                result.append({
+                    "type": "function",
+                    "function": {
+                        "name": name,
+                        "description": (getattr(val, "__doc__", None) or f"调用 {name}").strip(),
+                        "parameters": {"type": "object", "properties": {}, "required": []},
+                    }
+                })
+
+        return result
 
     @staticmethod
     def _build_gemini_tool_defs(tools) -> List[Dict]:
