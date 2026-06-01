@@ -1,4 +1,4 @@
-enable: true             # 默认关闭。开启后会在桌面显示 Live2D 桌宠（或群内 /live2d on）
+enable: false             # 默认关闭。开启后会在桌面显示 Live2D 桌宠（或群内 /live2d on）
 master_only: true          # 纯桌宠模式
 model_path: data/yumi      # 自定义模型文件夹（相对项目根目录或绝对路径），优先生效。留空则用下方内置 model
 model: hiyori_pro_en       # 内置模型：desktop/models 下的文件夹名（仅当 model_path 为空时使用）
