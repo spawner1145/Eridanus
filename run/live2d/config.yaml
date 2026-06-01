@@ -1,0 +1,29 @@
+enable: true              # 默认关闭。开启后会在桌面显示 Live2D 桌宠（或群内 /live2d on）
+master_only: true          # true=仅 master 可使用 /live2d 控制指令
+model_path: data/yumi      # 自定义模型文件夹（相对项目根目录或绝对路径），优先生效。留空则用下方内置 model
+model: hiyori_pro_en       # 内置模型：desktop/models 下的文件夹名（仅当 model_path 为空时使用）
+auto_install: true         # 首次启用时若缺 node_modules 则自动执行 npm install（会下载 Electron）
+electron_mirror: "https://registry.npmmirror.com/-/binary/electron/"  # Electron 二进制下载镜像（国内加速）
+npm_registry: "https://registry.npmmirror.com/"                       # npm 源（国内加速）
+lip_sync_parameter_ids:    # 口型参数 id（不同模型可能不同）
+  - ParamMouthOpenY
+chat:                      # 桌宠聊天：作为 WS 客户端接入 webui 的 /api/ws（与前端对话同源）
+  enable: true             # 在桌宠窗口显示聊天输入框
+webui:                     # webui 对话后端（OneBot 反向 ws 集线器）。桌宠对话直接连这里，等价于浏览器前端
+  host: 127.0.0.1
+  port: 5007
+expression:                # 表情/动作控制：用一个快速模型根据回复内容挑选（自适应当前模型可用项）
+  enable: true
+  model: gpt-4o-mini       # 响应迅速的小模型
+  base_url: "http://apollodorus.xyz:8001"             # 留空则复用 mai_reply 的 trigger_llm 端点
+  api_key: "endlesswork"              # 留空则复用 mai_reply 的 trigger_llm api_key
+bridge:
+  host: 127.0.0.1
+  port: 7765
+window:
+  width: 420
+  height: 640
+  scale: 0.18              # 模型初始缩放，滚轮可实时调整
+  always_on_top: true
+  x: null                  # null=自动定位到屏幕右下角
+  y: null
