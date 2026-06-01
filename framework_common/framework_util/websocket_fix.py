@@ -17,6 +17,24 @@ class ExtendBot(WebSocketBot):
         super().__init__(uri, **kwargs)
         self.config = config
         self.id = 1000000
+
+    # ------------------------------------------------------------------
+    # 离线模式：uri 为空时跳过连接，对象保持存活
+    # ------------------------------------------------------------------
+    async def _connect(self):
+        if not self.uri:
+            self.logger.info("WebSocket URI 为空，跳过连接（离线模式）。")
+            return
+        await super()._connect()
+
+    async def _connect_and_run(self):
+        if not self.uri:
+            self.logger.info("WebSocket URI 为空，跳过连接（离线模式）。")
+            return
+        await super()._connect_and_run()
+
+    # ------------------------------------------------------------------
+
     async def _receive(self):
         """
         接收服务端消息并放入队列。
@@ -139,8 +157,6 @@ class ExtendBot(WebSocketBot):
         finally:
             self._processing_task = None
 
-
-
     async def send(self, event: EventBase, components: list[Union[MessageComponent, str]], Quote: bool = False):
         """
         构建并发送消息链。
@@ -193,4 +209,3 @@ class ExtendBot(WebSocketBot):
             await super().recall(msg['data']['message_id'])
 
         asyncio.create_task(recall_task())
-
