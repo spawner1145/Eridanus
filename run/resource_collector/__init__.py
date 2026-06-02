@@ -180,4 +180,20 @@ function_declarations=[
 
         }
     },
+    {
+        "name": "telegram_stickers_download",
+        "description": "telegram贴纸下载",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "贴纸的链接"
+                }
+            },
+            "required": [
+                "url",
+            ]
+        }
+    },
 ]
