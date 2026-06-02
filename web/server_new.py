@@ -159,7 +159,7 @@ ordered_yaml_files.update(YAML_FILES)
 
 YAML_FILES = ordered_yaml_files
 
-print(YAML_FILES)
+#print(YAML_FILES)
 
 # 初始化 YAML 解析器（支持注释）
 yaml = YAML()
