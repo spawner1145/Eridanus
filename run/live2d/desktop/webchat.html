@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+  <title>Eridanus · Live2D Chat</title>
+  <style>
+    /* 配色：桃雾 #FFC0E9(255,192,233) / 青瑶 #99A5FF(153,165,255) */
+    :root {
+      --peach: #ffc0e9;
+      --peri: #99a5ff;
+      --peach-deep: #ff9ed7;
+      --peri-deep: #7b88f0;
+      --grad: linear-gradient(120deg, #ffc0e9 0%, #c3b8ff 52%, #99a5ff 100%);
+      --ink: #4b3b59;
+      --ink-soft: #6b6388;
+      --card: rgba(255, 255, 255, 0.55);
+      --card-line: rgba(255, 255, 255, 0.7);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden;
+      font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+      color: var(--ink);
+      -webkit-user-select: none; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* 背景：角色立绘 + 一层柔和的桃雾/青瑶渐变，统一配色并提升文字可读性 */
+    body {
+      background:
+        linear-gradient(125deg, rgba(255, 192, 233, 0.32), rgba(153, 165, 255, 0.36)),
+        url("/live2dchat/asset/bg.jpg") center center / cover no-repeat;
+    }
+
+    #live2d-canvas {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      z-index: 1;
+    }
+
+    #status {
+      position: absolute; left: 24px; top: 18px; z-index: 2;
+      font-size: 12px; color: var(--ink-soft);
+      background: rgba(255, 255, 255, 0.5);
+      padding: 4px 10px; border-radius: 999px;
+      backdrop-filter: blur(6px);
+      pointer-events: none;
+    }
+
+    /* 头顶气泡：跟随模型，短暂展示最新回复 */
+    #bubble {
+      position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
+      z-index: 3; max-width: 360px;
+      padding: 11px 15px; border-radius: 16px;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--ink); font-size: 14px; line-height: 1.55;
+      box-shadow: 0 10px 28px rgba(123, 136, 240, 0.25);
+      opacity: 0; transition: opacity 0.2s ease; pointer-events: none;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    #bubble.visible { opacity: 1; }
+    #bubble::after {
+      content: ""; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%);
+      border-width: 7px 7px 0 7px; border-style: solid;
+      border-color: rgba(255, 255, 255, 0.92) transparent transparent transparent;
+    }
+    #bubble img { max-width: 200px; max-height: 200px; border-radius: 10px; display: block; }
+
+    /* 聊天卡片（毛玻璃）：桌面靠右整列，移动端为底部抽屉 */
+    .chat-shell {
+      position: fixed; z-index: 5;
+      top: 18px; right: 18px; bottom: 18px;
+      width: min(440px, 38vw); min-width: 320px;
+      display: flex; flex-direction: column;
+      background: var(--card);
+      border: 1px solid var(--card-line);
+      border-radius: 22px;
+      box-shadow: 0 18px 50px rgba(90, 80, 140, 0.28);
+      backdrop-filter: blur(20px) saturate(1.35);
+      -webkit-backdrop-filter: blur(20px) saturate(1.35);
+      overflow: hidden;
+    }
+
+    #history-panel { display: none; flex: 1; min-height: 0; flex-direction: column; }
+    #history-panel.open { display: flex; }
+
+    #history-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; color: #fff;
+      background: var(--grad);
+    }
+    #history-head .title { font-size: 15px; font-weight: 600; letter-spacing: 0.5px; }
+    #history-head .actions { display: flex; gap: 12px; }
+    #history-head button {
+      border: none; background: rgba(255, 255, 255, 0.25); color: #fff;
+      cursor: pointer; font-size: 12px; padding: 4px 12px; border-radius: 999px;
+    }
+    #history-head button:hover { background: rgba(255, 255, 255, 0.4); }
+    /* 网页版常驻显示对话，因此隐藏“关闭”（避免误关后无入口） */
+    #history-close { display: none; }
+
+    #history-log {
+      flex: 1; overflow-y: auto; padding: 16px 14px;
+      display: flex; flex-direction: column; gap: 12px;
+      scrollbar-width: thin; scrollbar-color: rgba(153, 165, 255, 0.6) transparent;
+    }
+    #history-log::-webkit-scrollbar { width: 7px; }
+    #history-log::-webkit-scrollbar-thumb { background: rgba(153, 165, 255, 0.55); border-radius: 999px; }
+    .h-line {
+      max-width: 84%; padding: 9px 13px; border-radius: 14px;
+      font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+      box-shadow: 0 4px 14px rgba(120, 120, 180, 0.12);
+    }
+    .h-user {
+      align-self: flex-end; color: #fff;
+      background: linear-gradient(135deg, var(--peri) 0%, var(--peri-deep) 100%);
+      border-bottom-right-radius: 4px;
+    }
+    .h-bot {
+      align-self: flex-start; color: var(--ink);
+      background: rgba(255, 255, 255, 0.95);
+      border-bottom-left-radius: 4px;
+    }
+    .h-line img { max-width: 100%; border-radius: 8px; display: block; cursor: pointer; }
+
+    /* 输入条：作为卡片内最后一行的 flex 行（不再用绝对定位，移动端不会跑偏） */
+    #chat-bar {
+      display: flex; gap: 8px; align-items: center;
+      padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+      border-top: 1px solid rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.4);
+    }
+    #chat-input {
+      flex: 1 1 auto; min-width: 0; height: 40px;
+      padding: 0 16px; border: 1px solid rgba(153, 165, 255, 0.4);
+      border-radius: 999px; background: rgba(255, 255, 255, 0.95);
+      font-size: 14px; color: var(--ink); outline: none;
+    }
+    #chat-input:focus { border-color: var(--peri); box-shadow: 0 0 0 3px rgba(153, 165, 255, 0.2); }
+    .bar-btn {
+      flex: 0 0 auto; height: 40px; min-width: 40px; padding: 0 18px;
+      border: none; border-radius: 999px; cursor: pointer;
+      font-size: 14px; color: #fff;
+      background: linear-gradient(135deg, var(--peach-deep) 0%, var(--peri) 100%);
+      box-shadow: 0 6px 16px rgba(123, 136, 240, 0.3);
+    }
+    .bar-btn:hover { filter: brightness(1.05); }
+    .bar-btn.ghost { background: rgba(255, 255, 255, 0.85); color: var(--ink-soft); box-shadow: none; }
+    /* 常驻显示对话，桌面端隐藏“展开记录”按钮 */
+    #history-toggle { display: none; }
+
+    /* ---------- 移动端：底部抽屉 ---------- */
+    @media (max-width: 767px) {
+      .chat-shell {
+        top: auto; left: 0; right: 0; bottom: 0;
+        width: auto; min-width: 0; height: 56vh;
+        border-radius: 22px 22px 0 0;
+      }
+      #status { left: 12px; top: 12px; }
+      #bubble { max-width: 78vw; }
+      #history-log { padding: 12px 12px; }
+    }
+
+    /* ---------- 口令门 ---------- */
+    #login-mask {
+      position: fixed; inset: 0; z-index: 20; display: none;
+      align-items: center; justify-content: center;
+      background: linear-gradient(125deg, rgba(255, 192, 233, 0.5), rgba(153, 165, 255, 0.55));
+      backdrop-filter: blur(8px);
+    }
+    #login-mask.show { display: flex; }
+    #login-box {
+      width: min(330px, 86vw); padding: 26px 24px 20px;
+      border-radius: 20px; text-align: center;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 20px 50px rgba(90, 80, 140, 0.35);
+    }
+    #login-box h3 { margin: 0 0 16px; font-size: 17px; color: var(--ink); font-weight: 700; }
+    #login-pwd {
+      width: 100%; height: 42px; padding: 0 14px;
+      border: 1px solid rgba(153, 165, 255, 0.45); border-radius: 12px;
+      font-size: 14px; outline: none; color: var(--ink);
+    }
+    #login-pwd:focus { border-color: var(--peri); box-shadow: 0 0 0 3px rgba(153, 165, 255, 0.2); }
+    #login-btn {
+      margin-top: 14px; width: 100%; height: 42px; border: none; border-radius: 12px;
+      color: #fff; font-size: 15px; cursor: pointer;
+      background: var(--grad);
+    }
+    #login-err { margin-top: 9px; min-height: 16px; font-size: 12px; color: #e3477a; }
+  </style>
+</head>
+<body>
+  <canvas id="live2d-canvas"></canvas>
+  <div id="status">正在加载 Live2D…</div>
+  <div id="bubble"></div>
+
+  <aside class="chat-shell">
+    <!-- 常驻展开作为聊天主记录（renderer 仅在 .open 时刷新历史，故初始即带 open） -->
+    <section id="history-panel" class="open">
+      <div id="history-head">
+        <span class="title">对话</span>
+        <div class="actions">
+          <button id="history-clear" type="button">清空</button>
+          <button id="history-close" type="button">关闭</button>
+        </div>
+      </div>
+      <div id="history-log"></div>
+    </section>
+    <div id="chat-bar">
+      <input id="chat-input" type="text" placeholder="聊点什么…（回车发送）" autocomplete="off" />
+      <button id="chat-send" class="bar-btn" type="button">发送</button>
+      <button id="history-toggle" class="bar-btn ghost" type="button" title="对话记录">📜</button>
+    </div>
+  </aside>
+
+  <div id="login-mask">
+    <div id="login-box">
+      <h3>请输入访问口令</h3>
+      <input id="login-pwd" type="password" placeholder="访问口令" autocomplete="current-password" />
+      <button id="login-btn" type="button">进入</button>
+      <div id="login-err"></div>
+    </div>
+  </div>
+
+  <!-- 网页版宿主 shim：renderer.js 通过 window.desktop 与宿主交互；这里提供浏览器实现。
+       isWeb:true 让 renderer 走网页分支（同源 ws、DB 历史、/api/chat/file 媒体、TTS/LLM 代理）。 -->
+  <script>
+    window.desktop = {
+      isWeb: true,
+      getConfig: function () { return fetch("/live2dchat/config").then(function (r) { return r.json(); }); },
+      saveFile: function (name, bytes) {
+        try {
+          var blob = new Blob([bytes]);
+          var a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = name || "download";
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+          return Promise.resolve({ ok: true });
+        } catch (e) { return Promise.resolve({ ok: false, error: String(e) }); }
+      },
+      moveBy: function () {},
+      setIgnoreMouse: function () {},
+      quit: function () {},
+      showContextMenu: function () {},
+    };
+  </script>
+
+  <!-- 引导：先探测 /config 是否需要口令；需要则弹口令框，通过后再按序加载渲染端。 -->
+  <script>
+    (function () {
+      var SCRIPTS = [
+        "/live2dchat/static/vendor/pixi.min.js",
+        "/live2dchat/static/vendor/live2dcubismcore.min.js",
+        "/live2dchat/static/vendor/cubism4.min.js",
+        "/live2dchat/static/renderer.js",
+      ];
+      var booted = false;
+      function loadSeq(i) {
+        if (i >= SCRIPTS.length) return;
+        var s = document.createElement("script");
+        s.src = SCRIPTS[i];
+        s.onload = function () { loadSeq(i + 1); };
+        s.onerror = function () { console.error("加载失败:", SCRIPTS[i]); };
+        document.body.appendChild(s);
+      }
+      function boot() { if (booted) return; booted = true; loadSeq(0); }
+
+      var mask = document.getElementById("login-mask");
+      var pwd = document.getElementById("login-pwd");
+      var btn = document.getElementById("login-btn");
+      var err = document.getElementById("login-err");
+
+      function showLogin() { mask.classList.add("show"); pwd.focus(); }
+      async function submit() {
+        err.textContent = "";
+        try {
+          var r = await fetch("/live2dchat/auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ password: pwd.value }),
+          });
+          if (r.ok) { mask.classList.remove("show"); boot(); return; }
+          err.textContent = "口令错误，请重试";
+        } catch (e) { err.textContent = "无法连接服务端"; }
+      }
+      btn.addEventListener("click", submit);
+      pwd.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+
+      (async function () {
+        try {
+          var r = await fetch("/live2dchat/config", { credentials: "include" });
+          if (r.status === 401) { showLogin(); return; }
+        } catch (e) { /* 探测失败也尝试启动，由 renderer 显示错误 */ }
+        boot();
+      })();
+    })();
+  </script>
+</body>
+</html>
