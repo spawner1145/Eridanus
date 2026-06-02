@@ -25,3 +25,12 @@ user_data:
 
 draw_frame: #一个自行实现的绘图框架，在这里编写必要的配置
   is_lightweight: False           #是否进行轻量化绘图，此举用于针对服务器运行能力有限的用户
+enabled: true  #关键词回复音频
+match_mode: "exact"
+audio_dir: "audio"  #音频文件存放目录
+send_as_voice: true  #用语音消息形式发送回复
+transcode_to_wav: true  #发送时转化格式
+fallback_to_original: true  #失败发送原文件
+replies:  #关键词列表
+  - 奶龙大笑
+  - 塔菲唐笑
