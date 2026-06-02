@@ -6,7 +6,7 @@ dynamic_imports = {
         "search_book_info", "call_asmr", "call_download_book","jm_search","jm_download","jm_preview"
     ],
     "run.resource_collector.engine_search": ["search_net", "read_html"],
-    "run.resource_collector.func_collection": ["iwara_search", "iwara_tendency"],
+    "run.resource_collector.func_collection": ["iwara_search", "iwara_tendency","telegram_stickers_download"],
 }
 function_declarations=[
     {
