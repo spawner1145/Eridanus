@@ -136,6 +136,30 @@ def build_yaml_file_map(run_dir):
 
 RUN_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'run'))
 YAML_FILES = build_yaml_file_map(RUN_DIR)
+YAML_FILES.pop("live2d desktop pet.config", None)
+YAML_FILES.pop("定时任务.sheduled_tasks_push_groups_ordinary", None)
+
+# 指定前置顺序
+priority_keys = [
+    "基础配置.basic_config",
+    "mai_reply 新版ai对话.config",
+    "tts_v2.config",
+    #"live2d desktop pet.config",
+]
+
+# 重新排序
+ordered_yaml_files = {}
+
+for key in priority_keys:
+    if key in YAML_FILES:
+        ordered_yaml_files[key] = YAML_FILES.pop(key)
+
+# 剩余保持原有顺序
+ordered_yaml_files.update(YAML_FILES)
+
+YAML_FILES = ordered_yaml_files
+
+print(YAML_FILES)
 
 # 初始化 YAML 解析器（支持注释）
 yaml = YAML()
