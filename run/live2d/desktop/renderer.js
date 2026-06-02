@@ -130,11 +130,11 @@ function layoutModel() {
   let cx = sw / 2;
   let cy = sh / 2;
   if (IS_WEB) {
-    // 网页版聊天布局：宽屏让模型靠左、给右侧聊天卡片留位；窄屏（移动端）模型上移、
-    // 给底部聊天面板留位。
+    // 网页版聊天布局：宽屏让模型靠左、给右侧聊天卡片留位；窄屏（移动端）默认聊天折叠，
+    // 模型基本居中（略偏上，给底部输入条留位）。
     const wide = window.innerWidth >= 768;
     cx = wide ? sw * 0.34 : sw * 0.5;
-    cy = wide ? sh * 0.5 : sh * 0.4;
+    cy = wide ? sh * 0.5 : sh * 0.46;
   }
   state.model.position.set(cx, cy);
 }
@@ -146,9 +146,33 @@ function fitModelToViewport() {
   try { b = state.model.getBounds(); } catch (e) { return; }
   if (!b || b.height <= 0) return;
   const wide = window.innerWidth >= 768;
-  const target = state.app.screen.height * (wide ? 0.82 : 0.52);
+  const target = state.app.screen.height * (wide ? 0.82 : 0.62);
   state.scale = clamp(state.scale * (target / b.height), 0.04, 1.2);
   layoutModel();
+}
+
+// 网页版：缩放按钮（桌面/移动通用）+ 双指捏合缩放（移动端）。桌宠用滚轮，无需此函数。
+function bindWebTouchAndZoom() {
+  const zoom = (delta) => { state.scale = clamp(state.scale + delta, 0.04, 1.2); layoutModel(); };
+  const zin = document.getElementById("zoom-in");
+  const zout = document.getElementById("zoom-out");
+  if (zin) zin.addEventListener("click", () => zoom(0.03));
+  if (zout) zout.addEventListener("click", () => zoom(-0.03));
+
+  const inUI = (t) => t && t.closest && t.closest(".chat-shell, #login-mask, .zoom-ctl");
+  const dist = (ts) => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
+  let pinch = 0;
+  window.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 2 && !inUI(e.target)) pinch = dist(e.touches);
+  }, { passive: true });
+  window.addEventListener("touchmove", (e) => {
+    if (e.touches.length === 2 && pinch > 0 && !inUI(e.target)) {
+      const d = dist(e.touches);
+      if (d > 0) { state.scale = clamp(state.scale * (d / pinch), 0.04, 1.2); pinch = d; layoutModel(); }
+      e.preventDefault(); // 阻止浏览器整页缩放
+    }
+  }, { passive: false });
+  window.addEventListener("touchend", (e) => { if (e.touches.length < 2) pinch = 0; });
 }
 
 // 仅在窗口逻辑尺寸真正变化时 resize，过滤拖动期间的伪 resize（防止画布逐帧变大）
@@ -1092,8 +1116,13 @@ async function boot() {
   await loadHistory();
   bindGlobalInteractions();
   setupChatUI();
-  // 网页版聊天记录常驻显示：渲染端仅在面板 .open 时随新消息刷新，这里先把已载入的历史渲染出来。
+  // 网页版：宽屏聊天记录常驻展开（右侧整列）；窄屏（移动端）默认折叠，只留输入条，
+  // 由 📜 按钮打开历史抽屉。渲染端仅在面板 .open 时随新消息刷新，故这里按宽度决定初始态。
   const hp = document.getElementById("history-panel");
+  if (IS_WEB) {
+    if (hp && window.innerWidth >= 768) hp.classList.add("open");
+    bindWebTouchAndZoom();
+  }
   if (hp && hp.classList.contains("open")) renderHistory();
   window.addEventListener("resize", resizeApp);
 
