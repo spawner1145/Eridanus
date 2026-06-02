@@ -16,6 +16,8 @@ const state = {
   lipSyncIds: ["ParamMouthOpenY"],
   internalModel: null,
   lipSyncHook: null,
+  motionManager: null,    // 当前模型的 motionManager（用于监听动作结束）
+  motionFinishHook: null, // 动作播完回到默认姿态的回调
   // 拖拽
   dragging: false,
   lastPointer: { x: 0, y: 0 },
@@ -76,6 +78,7 @@ async function loadModel(url) {
     model.anchor.set(0.5, 0.5);
     layoutModel();
     attachLipSyncHook(model);
+    attachMotionResetHook(model);
 
     bindModelInteractions(model);
     setStatus("");
@@ -112,6 +115,7 @@ function resizeApp() {
 
 function disposeModel() {
   detachLipSyncHook();
+  detachMotionResetHook();
   if (state.model) {
     try {
       state.app.stage.removeChild(state.model);
@@ -151,6 +155,43 @@ function detachLipSyncHook() {
   }
   state.internalModel = null;
   state.lipSyncHook = null;
+}
+
+// ---------- 动作结束复位 ----------
+
+// 自动发现的动作各自成组，模型没有 Idle 组，动作（如挥手 wave）播完后 MotionManager
+// 停止写参数，会把最后一帧的姿态留住（用户观察到的“挥手后手不放下”）。这里监听
+// motionFinish，在动作真正结束时把核心参数复位到默认值，回到自然待机姿态。
+function attachMotionResetHook(model) {
+  detachMotionResetHook();
+  const mm = model.internalModel && model.internalModel.motionManager;
+  if (!mm || typeof mm.on !== "function") return;
+  state.motionFinishHook = function () { resetModelPose(); };
+  mm.on("motionFinish", state.motionFinishHook);
+  state.motionManager = mm;
+}
+
+function detachMotionResetHook() {
+  if (state.motionManager && state.motionFinishHook && typeof state.motionManager.off === "function") {
+    state.motionManager.off("motionFinish", state.motionFinishHook);
+  }
+  state.motionManager = null;
+  state.motionFinishHook = null;
+}
+
+// 把核心参数复位到模型默认值并 saveParameters。复位后下一帧 update() 中 motionManager
+// 已 finished（不再写参数），expressionManager 会把当前表情重新叠加回来，呼吸/物理从中性
+// 恢复——动作残留消失而表情保留。口型由 lipSync hook 每帧单独驱动，不受影响。
+function resetModelPose() {
+  const core = state.model && state.model.internalModel && state.model.internalModel.coreModel;
+  if (!core || typeof core.getParameterCount !== "function") return;
+  try {
+    const n = core.getParameterCount();
+    for (let i = 0; i < n; i += 1) {
+      try { core.setParameterValueByIndex(i, core.getParameterDefaultValue(i)); } catch (e) { /* ignore */ }
+    }
+    if (typeof core.saveParameters === "function") core.saveParameters();
+  } catch (e) { /* ignore */ }
 }
 
 function smooth(prev, next, factor) {
@@ -341,15 +382,11 @@ function showBubbleImage(url, durationMs) {
 // ---------- 交互：拖拽移动窗口 + 滚轮缩放 ----------
 
 function bindModelInteractions(model) {
+  // 仅设光标提示；起拖改到窗口级（按包围盒判定），见 bindGlobalInteractions 的 pointerdown。
+  // PIXI 的 model pointerdown 只命中模型实际不透明像素，导致角色左右两侧透明区域
+  // “能进窗口却点不动模型”；改用包围盒后整块可拖拽，与鼠标穿透范围一致。
   model.interactive = true;
   model.cursor = "grab";
-
-  model.on("pointerdown", (event) => {
-    state.dragging = true;
-    const g = event.data.global;
-    state.lastPointer = { x: g.x, y: g.y };
-    model.cursor = "grabbing";
-  });
 }
 
 function flushPendingMove() {
@@ -362,6 +399,23 @@ function flushPendingMove() {
 }
 
 function bindGlobalInteractions() {
+  // 起拖：落在模型包围盒内（与鼠标穿透判定一致）即可拖动整窗，不再依赖 PIXI 模型像素命中。
+  // 命中输入条/历史面板时不起拖，让其正常交互。
+  window.addEventListener("pointerdown", (event) => {
+    if (event.target && event.target.closest && event.target.closest("#chat-bar, #history-panel")) return;
+    if (!isInteractiveAt(event.clientX, event.clientY)) return;
+    state.dragging = true;
+    state.lastPointer.screenX = event.screenX;
+    state.lastPointer.screenY = event.screenY;
+    if (state.model) state.model.cursor = "grabbing";
+  });
+
+  // 右键菜单：弹出原生菜单（含「关闭桌宠」）
+  window.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    window.desktop.showContextMenu();
+  });
+
   window.addEventListener("pointermove", (event) => {
     if (!state.dragging) return;
     // 用屏幕坐标增量驱动窗口移动，避免窗口移动后画布坐标漂移；
@@ -451,9 +505,10 @@ function handleWebuiFrame(t) {
       }
       break;
     case "upload_group_file": {
-      const label = "📎 文件" + (params.name ? `：${params.name}` : "");
-      showBubble(label);
-      addHistory("bot", "text", label);
+      const name = params.name || "";
+      showBubble("📎 文件" + (name ? `：${name}` : ""));
+      // 保留文件真实路径，历史里渲染成可点击另存的条目
+      addHistory("bot", "file", toFileUrl(params.file || params.url), { name });
       break;
     }
     default:
@@ -467,7 +522,8 @@ function handleWebuiFrame(t) {
 async function renderBotSegments(segments) {
   const texts = [];
   const images = [];
-  const labels = []; // 视频/文件等仅以文字标签展示
+  const files = [];  // 文件：保留真实路径，历史里可点击另存
+  const labels = []; // 视频等仅以文字标签展示
   for (const seg of segments || []) {
     if (!seg || !seg.type) continue;
     const data = seg.data || {};
@@ -483,9 +539,11 @@ async function renderBotSegments(segments) {
       case "video":
         labels.push("🎬 视频");
         break;
-      case "file":
-        labels.push("📎 文件" + (data.name ? `：${data.name}` : ""));
+      case "file": {
+        const url = toFileUrl(data.file || data.url);
+        if (url) files.push({ url, name: data.name || "" });
         break;
+      }
       default:
         break; // record（bot 音频）/ at / reply / face 等忽略
     }
@@ -494,6 +552,11 @@ async function renderBotSegments(segments) {
   for (const url of images) {
     showBubbleImage(url);
     addHistory("bot", "image", url);
+  }
+
+  for (const f of files) {
+    showBubble("📎 文件" + (f.name ? `：${f.name}` : ""));
+    addHistory("bot", "file", f.url, { name: f.name });
   }
 
   const joined = texts.join("\n");
@@ -760,13 +823,32 @@ function saveHistory() {
   } catch (e) { /* ignore */ }
 }
 
-function addHistory(role, kind, content) {
+function addHistory(role, kind, content, extra) {
   if (!state.history) state.history = [];
-  state.history.push({ role, kind, content, ts: Date.now() });
+  state.history.push({ role, kind, content, ts: Date.now(), ...(extra || {}) });
   if (state.history.length > HISTORY_MAX) state.history = state.history.slice(-HISTORY_MAX);
   saveHistory();
   const panel = document.getElementById("history-panel");
   if (panel && panel.classList.contains("open")) renderHistory();
+}
+
+// 从 URL（file:// / http / data:）取字节并弹原生保存对话框另存。
+// 渲染端 webSecurity:false，可直接 fetch 上述三类来源。
+async function downloadUrl(url, suggestedName) {
+  if (!url) return;
+  try {
+    const resp = await fetch(url);
+    const buf = await resp.arrayBuffer();
+    let name = suggestedName;
+    if (!name) {
+      const clean = String(url).split(/[?#]/)[0];
+      name = decodeURIComponent(clean.split("/").pop() || "") || "download";
+    }
+    await window.desktop.saveFile(name, new Uint8Array(buf));
+  } catch (err) {
+    console.error("[live2d] 下载失败:", err);
+    showBubble("保存失败：" + (err && err.message ? err.message : err));
+  }
 }
 
 function renderHistory() {
@@ -779,7 +861,16 @@ function renderHistory() {
     if (item.kind === "image") {
       const img = document.createElement("img");
       img.src = item.content;
+      img.style.cursor = "pointer";
+      img.title = "点击保存图片";
+      img.addEventListener("click", () => downloadUrl(item.content, item.name));
       line.appendChild(img);
+    } else if (item.kind === "file") {
+      // 文件：可点的「📎 文件名」，点击弹保存对话框另存
+      line.textContent = "📎 " + (item.name || "文件");
+      line.style.cursor = "pointer";
+      line.title = "点击保存文件";
+      line.addEventListener("click", () => downloadUrl(item.url || item.content, item.name));
     } else {
       line.textContent = item.content;
     }

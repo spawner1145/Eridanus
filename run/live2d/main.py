@@ -19,6 +19,7 @@ Live2D 桌宠插件。
     /live2d 状态               查看运行状态
 """
 
+import atexit
 import threading
 
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, LifecycleMetaEvent
@@ -99,6 +100,10 @@ def main(bot: ExtendBot, config: YAMLManager):
         expression_endpoint=_resolve_expr_endpoint(config),
         tts_endpoint=_resolve_tts_endpoint(config),
     )
+
+    # bot 正常退出时同步终止 Electron 渲染进程，避免桌宠窗口残留
+    # （manager.stop 内部已用 taskkill /T 整树终止，未运行时为空操作）。
+    atexit.register(manager.stop)
 
     def _persist_enable(value: bool):
         """改写 config.yaml 的 enable 并持久化（触发 YAMLManager 保存）。"""

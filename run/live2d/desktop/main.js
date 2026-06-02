@@ -1,5 +1,5 @@
 // Electron 主进程：创建透明、无边框、置顶的桌宠窗口
-const { app, BrowserWindow, ipcMain, screen } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, dialog, Menu } = require("electron");
 const fs = require("fs");
 const path = require("path");
 
@@ -130,6 +130,31 @@ ipcMain.on("live2d:set-ignore", (_event, ignore) => {
 
 ipcMain.on("live2d:quit", () => {
   app.quit();
+});
+
+// 渲染层把聊天里的图片/文件字节交回主进程，弹原生保存对话框另存到磁盘
+// （桌宠窗口无法像浏览器那样直接 download，故走主进程 + dialog）。
+ipcMain.handle("live2d:save-bytes", async (_event, name, bytes) => {
+  try {
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: name || "download",
+    });
+    if (canceled || !filePath) return { ok: false };
+    fs.writeFileSync(filePath, Buffer.from(bytes));
+    return { ok: true, path: filePath };
+  } catch (err) {
+    console.error("[live2d] 保存文件失败:", err);
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+});
+
+// 右键菜单：提供「关闭桌宠」手动退出入口（原生菜单不受透明窗口裁剪）。
+ipcMain.on("live2d:context-menu", () => {
+  if (!mainWindow) return;
+  const menu = Menu.buildFromTemplate([
+    { label: "关闭桌宠", click: () => app.quit() },
+  ]);
+  menu.popup({ window: mainWindow });
 });
 
 app.on("second-instance", () => {

@@ -10,4 +10,8 @@ contextBridge.exposeInMainWorld("desktop", {
   setIgnoreMouse: (ignore) => ipcRenderer.send("live2d:set-ignore", ignore),
   // 请求退出
   quit: () => ipcRenderer.send("live2d:quit"),
+  // 把字节交回主进程，弹原生保存对话框另存（聊天里的图片/文件下载）
+  saveFile: (name, bytes) => ipcRenderer.invoke("live2d:save-bytes", name, bytes),
+  // 在模型上右键时弹出原生菜单（含「关闭桌宠」）
+  showContextMenu: () => ipcRenderer.send("live2d:context-menu"),
 });
