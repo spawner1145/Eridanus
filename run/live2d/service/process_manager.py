@@ -152,11 +152,19 @@ class Live2DProcessManager:
 
     # ---------- 运行时配置 ----------
 
-    def _write_runtime_config(self):
+    def build_runtime_config(self):
+        """构建渲染端运行时配置 dict（Electron 与网页版共用）。
+
+        额外带上 model_dir / model_entry：网页版 /live2dchat/model 需要据此把模型
+        目录的贴图/动作/表情按 HTTP 发给浏览器（Electron 走 file:// 不需要）。
+        """
         model_url, expr_names, motion_names = get_model_assets(self.config)
         if model_url is None:
             logger.warning(f"未找到模型 *.model3.json：{resolve_model_dir(self.config)}")
-        runtime = {
+        model_dir = resolve_model_dir(self.config)
+        # 从 file:// URL 还原入口文件名（网页版用它拼 /live2dchat/model/<entry>）
+        model_entry = os.path.basename(model_url) if model_url else None
+        return {
             "model_url": model_url,
             "webui": self.config.get("webui", {"host": "127.0.0.1", "port": 5007}),
             "window": self.config.get("window", {}),
@@ -169,7 +177,13 @@ class Live2DProcessManager:
             # 兜底清单（渲染端优先从已加载模型直接读取可用表情/动作，读不到才用这里）
             "expr_names": expr_names,
             "motion_names": motion_names,
+            # 网页版专用：模型目录与入口文件名
+            "model_dir": model_dir,
+            "model_entry": model_entry,
         }
+
+    def _write_runtime_config(self):
+        runtime = self.build_runtime_config()
         with open(os.path.join(DESKTOP_DIR, "runtime_config.json"), "w", encoding="utf-8") as f:
             json.dump(runtime, f, ensure_ascii=False, indent=2)
 

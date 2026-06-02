@@ -1041,6 +1041,16 @@ def handle_websocket(ws):
         clients.discard(ws)
 
 
+# Live2D 网页版桌宠（/live2dchat）：路由与逻辑都在 run/live2d，这里只做注册，
+# 便于 web/ 更新后存活。webui_enable 关闭/插件未加载时，/live2dchat/config 会返回未启用。
+try:
+    from run.live2d.webchat import register_live2d_webchat
+    register_live2d_webchat(app)
+    logger.server("🔧 Live2D 网页版路由已注册：/live2dchat（需 live2d 配置 webui_enable: true）")
+except Exception as e:
+    logger.warning(f"Live2D /live2dchat 注册失败（不影响 WebUI）：{e}")
+
+
 # 启动webUI
 def start_webui():
     # 初始化用户登录信息

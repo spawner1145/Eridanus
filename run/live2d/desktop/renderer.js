@@ -6,6 +6,11 @@ const canvas = document.getElementById("live2d-canvas");
 const bubbleEl = document.getElementById("bubble");
 const statusEl = document.getElementById("status");
 
+// 宿主：Electron 桌宠由 preload 注入 window.desktop；网页版（/live2dchat）由 webchat.html
+// 注入带 isWeb:true 的 shim。IS_WEB 用来收口两端差异（拖窗/穿透/ws 地址/历史/媒体/代理）。
+const HOST = window.desktop || {};
+const IS_WEB = !!HOST.isWeb;
+
 const state = {
   config: null,
   app: null,
@@ -58,6 +63,21 @@ function toFileUrl(value) {
   return "file://" + encodeURI(p);
 }
 
+// 媒体（图片/文件）URL：桌宠走 file://（webSecurity:false 可直接加载）；网页版浏览器
+// 无法加载本地 file://，改写为 WebUI 现成的 /api/chat/file（与网页前端显示图片一致，
+// 它会把本地文件搬进 chat_files 再回传）。http/https/data/base64 两端都可直接用。
+function mediaUrl(fileOrUrl, name) {
+  const raw = fileOrUrl;
+  if (!raw) return raw;
+  if (!IS_WEB) return toFileUrl(raw);
+  if (/^https?:\/\//i.test(raw) || raw.startsWith("data:")) return raw;
+  if (raw.startsWith("base64://")) return "data:image/png;base64," + raw.slice("base64://".length);
+  const p = raw.startsWith("file://") ? raw : "file://" + raw;
+  let q = "path=" + encodeURIComponent(p);
+  if (name) q += "&name=" + encodeURIComponent(name);
+  return "/api/chat/file?" + q;
+}
+
 async function loadModel(url) {
   if (!url) {
     setStatus("未配置模型路径（model_path / model）");
@@ -66,10 +86,14 @@ async function loadModel(url) {
   setStatus("正在加载 Live2D 模型…");
 
   try {
+    // 桌宠：把本地路径转成 file://（webSecurity:false 直加载）。
+    // 网页：model_url 已是同源 HTTP 路径（/live2dchat/model/...），原样使用——
+    // 切不可再过 toFileUrl，否则会被改写成浏览器无法加载的 file:///live2dchat/...（network error）。
+    const src = IS_WEB ? url : toFileUrl(url);
     // autoUpdate:false —— pixi-live2d-display 独立打包版不会自动注册 ticker，默认 autoUpdate
     // 会因“无 ticker”而静默不更新，导致模型加载成功却不渲染（空白）。这里关掉自动更新，
     // 由 app 渲染循环手动 model.update()（见 boot 里的 ticker.add），确保稳定渲染。
-    const model = await PIXI.live2d.Live2DModel.from(toFileUrl(url), { autoInteract: false, autoUpdate: false });
+    const model = await PIXI.live2d.Live2DModel.from(src, { autoInteract: false, autoUpdate: false });
 
     disposeModel();
     state.model = model;
@@ -77,6 +101,11 @@ async function loadModel(url) {
 
     model.anchor.set(0.5, 0.5);
     layoutModel();
+    if (IS_WEB) {
+      // 网页版按视口自适应大小。立即拟合一次；再在下一帧拟合一次，兜底首帧 getBounds 尚未就绪。
+      fitModelToViewport();
+      window.requestAnimationFrame(fitModelToViewport);
+    }
     attachLipSyncHook(model);
     attachMotionResetHook(model);
 
@@ -96,10 +125,30 @@ function layoutModel() {
   // 用 app.screen（逻辑/CSS 像素）而非 renderer.width（= 逻辑宽 × resolution 的物理像素）。
   // 在 devicePixelRatio>1 的高 DPI 屏上，renderer.width 是物理像素，除以 2 会把模型推到
   // 右侧甚至画面外，表现为“角色偏右、显示不全”。screen 才是 stage 坐标系所用的逻辑像素。
-  state.model.position.set(
-    state.app.screen.width / 2,
-    state.app.screen.height / 2,
-  );
+  const sw = state.app.screen.width;
+  const sh = state.app.screen.height;
+  let cx = sw / 2;
+  let cy = sh / 2;
+  if (IS_WEB) {
+    // 网页版聊天布局：宽屏让模型靠左、给右侧聊天卡片留位；窄屏（移动端）模型上移、
+    // 给底部聊天面板留位。
+    const wide = window.innerWidth >= 768;
+    cx = wide ? sw * 0.34 : sw * 0.5;
+    cy = wide ? sh * 0.5 : sh * 0.4;
+  }
+  state.model.position.set(cx, cy);
+}
+
+// 网页版：按视口高度自动缩放模型，避免大屏上角色过小（桌宠是固定小窗，无需此步）。
+function fitModelToViewport() {
+  if (!state.model || !state.app) return;
+  let b;
+  try { b = state.model.getBounds(); } catch (e) { return; }
+  if (!b || b.height <= 0) return;
+  const wide = window.innerWidth >= 768;
+  const target = state.app.screen.height * (wide ? 0.82 : 0.52);
+  state.scale = clamp(state.scale * (target / b.height), 0.04, 1.2);
+  layoutModel();
 }
 
 // 仅在窗口逻辑尺寸真正变化时 resize，过滤拖动期间的伪 resize（防止画布逐帧变大）
@@ -305,9 +354,20 @@ function stripParenthetical(text) {
 // payload 与 run/tts_v2/service/GPT_SoVits.py 对齐，确保与 bot 端语音一致。
 async function synthesizeTTS(text) {
   const cfg = state.config.tts || {};
-  if (cfg.enable === false || !cfg.api_base) return null;
+  if (cfg.enable === false) return null;
   const t = String(text || "").trim();
   if (!t) return null;
+  // 网页版：经服务端 /live2dchat/tts 代理（密钥/参数留服务端、同源无 CORS）
+  if (IS_WEB) {
+    const resp = await fetch("/live2dchat/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: t }),
+    });
+    if (!resp.ok) throw new Error("TTS HTTP " + resp.status);
+    return await resp.arrayBuffer();
+  }
+  if (!cfg.api_base) return null;
   const payload = {
     text: t,
     text_lang: cfg.target_lang || "zh",
@@ -402,6 +462,7 @@ function bindGlobalInteractions() {
   // 起拖：落在模型包围盒内（与鼠标穿透判定一致）即可拖动整窗，不再依赖 PIXI 模型像素命中。
   // 命中输入条/历史面板时不起拖，让其正常交互。
   window.addEventListener("pointerdown", (event) => {
+    if (IS_WEB) return; // 网页版不能移动标签页，禁用拖窗
     if (event.target && event.target.closest && event.target.closest("#chat-bar, #history-panel")) return;
     if (!isInteractiveAt(event.clientX, event.clientY)) return;
     state.dragging = true;
@@ -410,8 +471,9 @@ function bindGlobalInteractions() {
     if (state.model) state.model.cursor = "grabbing";
   });
 
-  // 右键菜单：弹出原生菜单（含「关闭桌宠」）
+  // 右键菜单：桌宠弹出原生菜单（含「关闭桌宠」）；网页版保留浏览器默认右键
   window.addEventListener("contextmenu", (event) => {
+    if (IS_WEB) return;
     event.preventDefault();
     window.desktop.showContextMenu();
   });
@@ -448,17 +510,33 @@ function bindGlobalInteractions() {
     layoutModel();
   }, { passive: false });
 
-  // 鼠标穿透：移动时实时判断指针是否在模型/UI 上（forward:true 保证穿透时仍收到事件）
-  window.addEventListener("mousemove", (event) => {
-    updateMouseThrough(event.clientX, event.clientY);
-  });
+  // 鼠标穿透：移动时实时判断指针是否在模型/UI 上（forward:true 保证穿透时仍收到事件）。
+  // 网页版整页是普通页面，无穿透需求。
+  if (!IS_WEB) {
+    window.addEventListener("mousemove", (event) => {
+      updateMouseThrough(event.clientX, event.clientY);
+    });
+  }
 }
 
 // ---------- webui /api/ws：唯一连接，与浏览器前端同源的对话通道 ----------
 
 function connectWebui() {
-  const w = state.config.webui || { host: "127.0.0.1", port: 5007 };
-  const url = `ws://${w.host || "127.0.0.1"}:${w.port || 5007}/api/ws`;
+  let url;
+  if (IS_WEB) {
+    // 网页版与页面同源：用当前地址推导 ws(s)://host/api/ws。
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    url = `${proto}://${location.host}/api/ws`;
+    // 远程访问时集线器要求 auth_token（127.0.0.1 放行）；从登录 cookie 取。
+    const host = location.hostname;
+    if (host !== "127.0.0.1" && host !== "localhost") {
+      const m = document.cookie.match(/(?:^|;\s*)auth_token=([^;]+)/);
+      if (m) url += "?auth_token=" + encodeURIComponent(m[1]);
+    }
+  } else {
+    const w = state.config.webui || { host: "127.0.0.1", port: 5007 };
+    url = `ws://${w.host || "127.0.0.1"}:${w.port || 5007}/api/ws`;
+  }
   let ws;
 
   const connect = () => {
@@ -492,38 +570,40 @@ function connectWebui() {
 function handleWebuiFrame(t) {
   if (!t || !t.message) return;
   const m = t.message;
-  if (Array.isArray(m)) return;
-  const params = m.params || {};
-  switch (m.action) {
+  if (Array.isArray(m)) return; // 其它客户端的用户消息（自己输入已本地入历史），忽略
+  const segs = extractBotSegments(m);
+  if (segs.length) renderBotSegments(segs);
+}
+
+// 把一个 OneBot 动作对象摊平成 segment 数组（实时渲染与历史映射共用）。
+// upload_group_file 合成一个 file 段，统一交给 renderBotSegments / segmentsToBuckets。
+function extractBotSegments(m) {
+  const params = (m && m.params) || {};
+  switch (m && m.action) {
     case "send_group_msg":
-      renderBotSegments(params.message || []);
-      break;
-    case "send_group_forward_msg":
+      return Array.isArray(params.message) ? params.message : [];
+    case "send_group_forward_msg": {
+      const out = [];
       for (const node of params.messages || []) {
         const content = node && node.data && node.data.content;
-        if (Array.isArray(content)) renderBotSegments(content);
+        if (Array.isArray(content)) out.push(...content);
       }
-      break;
-    case "upload_group_file": {
-      const name = params.name || "";
-      showBubble("📎 文件" + (name ? `：${name}` : ""));
-      // 保留文件真实路径，历史里渲染成可点击另存的条目
-      addHistory("bot", "file", toFileUrl(params.file || params.url), { name });
-      break;
+      return out;
     }
+    case "upload_group_file":
+      return [{ type: "file", data: { file: params.file || params.url, name: params.name || "" } }];
     default:
-      break;
+      return [];
   }
 }
 
-// 逐段渲染机器人回复：图片→缩略+历史；视频/文件→气泡标签+历史。
-// 语音不再使用 bot 下发的 record 段，而是在本地对回复文本单独合成（见下），确保 100% 出声。
-// 文字处理顺序：并发“合成语音 + 判定情绪” → 二者就绪后“同时”播语音、出文本气泡、变脸。
-async function renderBotSegments(segments) {
+// 把 segment 数组分类成 文本/图片/文件/标签 桶（纯函数，无副作用）。
+// 图片/文件 URL 经 mediaUrl 适配宿主（桌宠 file://，网页 /api/chat/file）。
+function segmentsToBuckets(segments) {
   const texts = [];
   const images = [];
-  const files = [];  // 文件：保留真实路径，历史里可点击另存
-  const labels = []; // 视频等仅以文字标签展示
+  const files = [];  // {url, name}
+  const labels = []; // 视频等仅文字标签
   for (const seg of segments || []) {
     if (!seg || !seg.type) continue;
     const data = seg.data || {};
@@ -532,7 +612,7 @@ async function renderBotSegments(segments) {
         if (data.text) texts.push(String(data.text));
         break;
       case "image": {
-        const url = toFileUrl(data.file || data.url);
+        const url = mediaUrl(data.file || data.url);
         if (url) images.push(url);
         break;
       }
@@ -540,7 +620,7 @@ async function renderBotSegments(segments) {
         labels.push("🎬 视频");
         break;
       case "file": {
-        const url = toFileUrl(data.file || data.url);
+        const url = mediaUrl(data.file || data.url, data.name);
         if (url) files.push({ url, name: data.name || "" });
         break;
       }
@@ -548,6 +628,34 @@ async function renderBotSegments(segments) {
         break; // record（bot 音频）/ at / reply / face 等忽略
     }
   }
+  return { texts, images, files, labels };
+}
+
+// 把数据库历史里的一条 message 映射为历史项数组（用户消息为数组，机器人为动作对象）。
+function messageToHistoryItems(message) {
+  const items = [];
+  if (Array.isArray(message)) {
+    const { texts, images, files } = segmentsToBuckets(message);
+    for (const url of images) items.push({ role: "user", kind: "image", content: url });
+    const joined = texts.join("\n");
+    if (joined) items.push({ role: "user", kind: "text", content: joined });
+    for (const f of files) items.push({ role: "user", kind: "file", content: f.url, url: f.url, name: f.name });
+  } else if (message && typeof message === "object") {
+    const { texts, images, files, labels } = segmentsToBuckets(extractBotSegments(message));
+    for (const url of images) items.push({ role: "bot", kind: "image", content: url });
+    for (const f of files) items.push({ role: "bot", kind: "file", content: f.url, url: f.url, name: f.name });
+    const joined = texts.join("\n");
+    if (joined) items.push({ role: "bot", kind: "text", content: joined });
+    for (const lb of labels) items.push({ role: "bot", kind: "text", content: lb });
+  }
+  return items;
+}
+
+// 逐段渲染机器人回复：图片→缩略+历史；视频/文件→气泡标签+历史。
+// 语音不再使用 bot 下发的 record 段，而是在本地对回复文本单独合成（见下），确保 100% 出声。
+// 文字处理顺序：并发“合成语音 + 判定情绪” → 二者就绪后“同时”播语音、出文本气泡、变脸。
+async function renderBotSegments(segments) {
+  const { texts, images, files, labels } = segmentsToBuckets(segments);
 
   for (const url of images) {
     showBubbleImage(url);
@@ -647,9 +755,10 @@ async function classifyEmotion(text) {
   const t = (text || "").trim();
   if (!t) return null;
 
-  // 先尝试 LLM 判定，失败/超时/无端点则退回关键词
+  // 先尝试 LLM 判定，失败/超时/无端点则退回关键词。
+  // 桌宠：cfg.base_url 直连；网页：cfg.llm 标记服务端有端点 → 走 /live2dchat/llm 代理。
   let result = null;
-  if (cfg.base_url) {
+  if (cfg.base_url || cfg.llm) {
     try {
       const raw = await fastLLM(cfg, buildEmotionPrompt(t, emotionKeys, Object.keys(scenes)));
       result = parseEmotionJson(raw, emotionKeys, Object.keys(scenes));
@@ -726,6 +835,20 @@ function parseEmotionJson(raw, emotionKeys, sceneKeys) {
 }
 
 async function fastLLM(cfg, prompt) {
+  // 网页版：经服务端 /live2dchat/llm 代理（api_key 不下发浏览器）
+  if (IS_WEB) {
+    try {
+      const resp = await fetch("/live2dchat/llm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await resp.json();
+      return data.choices[0].message.content;
+    } catch (e) {
+      return null;
+    }
+  }
   const url = cfg.base_url.replace(/\/+$/, "") + "/chat/completions";
   const headers = { "Content-Type": "application/json" };
   if (cfg.api_key) headers.Authorization = "Bearer " + cfg.api_key;
@@ -804,12 +927,36 @@ function setupChatUI() {
   });
 }
 
-// ---------- 历史对话（localStorage 持久化） ----------
+// ---------- 历史对话（桌宠：localStorage；网页版：复用 WebUI 数据库） ----------
 
 const HISTORY_KEY = "live2d_history";
 const HISTORY_MAX = 300;
 
-function loadHistory() {
+async function loadHistory() {
+  if (IS_WEB) {
+    // 网页版：拉 WebUI 的对话数据库（与网页前端同一份记录）。需该浏览器已登录 WebUI
+    // 以带上 auth cookie；未登录则返回 Unauthorized，这里安静地从空历史开始。
+    try {
+      const resp = await fetch("/api/chat/get_history?start=0&end=" + (HISTORY_MAX - 1), { credentials: "include" });
+      const data = await resp.json();
+      const rows = (data && data.data) || [];
+      const items = [];
+      // 数据库按 msg_id（时间）倒序返回，这里反转为正序后逐条映射成历史项。
+      for (const row of rows.slice().reverse()) {
+        let rec;
+        try { rec = JSON.parse(row[0]); } catch (e) { continue; }
+        for (const it of messageToHistoryItems(rec.message)) {
+          it.ts = rec.message_id || 0;
+          items.push(it);
+        }
+      }
+      state.history = items.slice(-HISTORY_MAX);
+    } catch (e) {
+      console.warn("[live2d] 历史加载失败（可能未登录 WebUI）:", e);
+      state.history = [];
+    }
+    return;
+  }
   try {
     state.history = JSON.parse(window.localStorage.getItem(HISTORY_KEY) || "[]");
   } catch (e) {
@@ -818,6 +965,7 @@ function loadHistory() {
 }
 
 function saveHistory() {
+  if (IS_WEB) return; // 网页版：集线器已把消息落库，无需另存
   try {
     window.localStorage.setItem(HISTORY_KEY, JSON.stringify(state.history.slice(-HISTORY_MAX)));
   } catch (e) { /* ignore */ }
@@ -941,9 +1089,12 @@ async function boot() {
     positionBubble(); // 气泡可见时持续贴着模型头顶（缩放/拖动后也跟随）
   });
 
-  loadHistory();
+  await loadHistory();
   bindGlobalInteractions();
   setupChatUI();
+  // 网页版聊天记录常驻显示：渲染端仅在面板 .open 时随新消息刷新，这里先把已载入的历史渲染出来。
+  const hp = document.getElementById("history-panel");
+  if (hp && hp.classList.contains("open")) renderHistory();
   window.addEventListener("resize", resizeApp);
 
   await loadModel(state.config.model_url);

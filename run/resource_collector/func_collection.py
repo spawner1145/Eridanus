@@ -81,7 +81,7 @@ async def telegram_stickers_download(bot,event,config,url):
     # =========================================
     # 3. 构造合并转发消息 (折叠聊天记录)
     # =========================================
-    cmList = []
+    '''cmList = []
     for path in valid_paths:
         cmList.append(Node(content=[Image(file=path)]))
 
@@ -90,7 +90,7 @@ async def telegram_stickers_download(bot,event,config,url):
         await bot.send(event, cmList)
     except Exception as e:
         bot.logger.error(f"发送折叠消息失败: {e}")
-        await bot.send(event, "发送折叠消息失败，可能是单次转发图片数量过多被风控。")
+        await bot.send(event, "发送折叠消息失败，可能是单次转发图片数量过多被风控。")'''
 
 
 
