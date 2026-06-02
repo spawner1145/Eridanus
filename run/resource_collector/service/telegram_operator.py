@@ -29,7 +29,7 @@ async def tg_api_request(session: aiohttp.ClientSession, method: str, params: di
     """请求 TG 官方 Bot API"""
     url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/{method}"
     try:
-        async with session.get(url, params=params, proxy=PROXY,ssl=False) as resp:
+        async with session.get(url, params=params, proxy=PROXY,ssl=False,timeout=60) as resp:
             if resp.status == 200:
                 return await resp.json()
             return None
@@ -97,7 +97,7 @@ async def download_and_convert_task(session: aiohttp.ClientSession, sticker: dic
 
         # 2. 异步下载文件
         try:
-            async with session.get(download_url, proxy=PROXY,ssl=False) as resp:
+            async with session.get(download_url, proxy=PROXY,ssl=False,timeout=60) as resp:
                 if resp.status == 200:
                     with open(temp_path, 'wb') as f:
                         f.write(await resp.read())
