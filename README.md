@@ -27,7 +27,7 @@ _🎊 基于 [OneBot](https://github.com/howmanybots/onebot/blob/master/README.m
   <a href="">参与贡献</a>
 </p>
 
-
+![l2d](https://eridanus.netlify.app/l2d.png)
 
 # 部署
 [文档](https://eridanus.netlify.app)    
