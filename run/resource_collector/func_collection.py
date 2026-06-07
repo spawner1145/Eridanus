@@ -29,7 +29,7 @@ async def telegram_stickers_download(bot,event,config,url):
         return
 
     pack_name = match.group(1)
-    #await bot.send(event, f"🕒 正在向 Telegram 官方请求贴纸包 `{pack_name}` 的数据，请稍候...")
+    await bot.send(event, f"🕒 正在向 Telegram 官方请求贴纸包 `{pack_name}` 的数据，请稍候...")
 
     # 1. 获取包数据
     async with aiohttp.ClientSession() as session:
