@@ -44,7 +44,7 @@ COMPRESS_PROMPT_TEMPLATE = """以下是你（{bot_name}）对 {user_name} 积累
 
 {old_impression}
 
-请压缩到300字以内，保留最重要的性格特征、你们的关系状态和你的情感态度。直接输出压缩后的文字，不要任何前缀。"""
+请压缩到{chars}字以内，保留最重要的性格特征、你们的关系状态和你的情感态度。直接输出压缩后的文字，不要任何前缀。"""
 
 # 群聊气氛/话题印象更新
 GROUP_IMP_PROMPT_TEMPLATE = """你（{bot_name}）正在旁观一个群聊（群名：{group_name}）。
@@ -56,7 +56,7 @@ GROUP_IMP_PROMPT_TEMPLATE = """你（{bot_name}）正在旁观一个群聊（群
 你对这个群的旧印象（可能为空）：
 {old_impression}
 
-请用不超过400字更新你对这个群的整体印象。要求：
+请用不超过{chars}字更新你对这个群的整体印象。要求：
 - 第一人称（"我"），带主观感情色彩
 - 记录：这个群最近在聊什么话题、群内的整体气氛、活跃的成员和他们的风格
 - 有什么有趣的梗/黑话/群内文化需要记下来
@@ -67,7 +67,7 @@ GROUP_IMP_COMPRESS_TEMPLATE = """以下是你（{bot_name}）对群【{group_nam
 
 {old_impression}
 
-请压缩到400字以内，保留最重要的群氛围、热门话题和群内文化。直接输出压缩后的文字，不要任何前缀。"""
+请压缩到{chars}字以内，保留最重要的群氛围、热门话题和群内文化。直接输出压缩后的文字，不要任何前缀。"""
 
 
 class ImpressionUpdater:
@@ -85,7 +85,9 @@ class ImpressionUpdater:
         self.api_key = cfg.mai_reply.config["trigger_llm"]["api_key"]
         self.base_url = cfg.mai_reply.config["trigger_llm"]["base_url"]
 
+
         ccfg = cfg.mai_reply.config.get("context", {})
+        self.max_chars = int(ccfg.get("impression_max_chars", IMPRESSION_MAX_CHARS))
         self.group_imp_trigger: int = int(ccfg.get("group_trigger_msgs", GROUP_IMP_TRIGGER_MSGS))
         self.group_imp_max_chars: int = int(ccfg.get("group_max_chars", GROUP_IMP_MAX_CHARS))
        # self.enable_group_impression: bool = imp_cfg.get("enable_group_impression", True)
@@ -160,12 +162,13 @@ class ImpressionUpdater:
 
             new_impression = new_impression.strip()
 
-            if len(new_impression) > IMPRESSION_MAX_CHARS:
+            if len(new_impression) > self.max_chars:
                 compress_prompt = COMPRESS_PROMPT_TEMPLATE.format(
                     bot_name=bot_name,
                     user_name=user_name,
                     char_count=len(new_impression),
                     old_impression=new_impression,
+                    chars=self.max_chars
                 )
                 compressed = await self._call_llm(compress_prompt)
                 if compressed and compressed.strip():
@@ -218,6 +221,7 @@ class ImpressionUpdater:
                 group_name=group_name,
                 window_text=window_text,
                 old_impression=old_impression or "（暂无，刚开始旁观这个群）",
+                chars=self.group_imp_max_chars
             )
             new_impression = await self._call_llm(prompt)
             if not new_impression:
@@ -231,6 +235,7 @@ class ImpressionUpdater:
                     group_name=group_name,
                     char_count=len(new_impression),
                     old_impression=new_impression,
+                    chars=self.group_imp_max_chars
                 )
                 compressed = await self._call_llm(compress_prompt)
                 if compressed and compressed.strip():
