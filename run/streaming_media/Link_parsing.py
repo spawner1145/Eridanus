@@ -147,7 +147,7 @@ def main(bot, config):
                     await call_bili_download_video(bot, event, config)
                     return
                 else:
-                    send_context = f'该视频可下载，发送“下载视频”以推送喵'
+                    send_context = f'可“下载视频”喵'
                     if "QQ小程序" in url and config.streaming_media.config["bili_dynamic"]["is_QQ_chek"] is not True:
                         teamlist[f'{event.group_id}_recall'] = await bot.send(event, [f'{send_context}'])
                         return

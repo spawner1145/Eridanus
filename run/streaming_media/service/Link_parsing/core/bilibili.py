@@ -350,12 +350,19 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
             # 如果索引超出范围，使用 video_info['duration'] 或者其他默认值
             video_duration = video_info.get('duration', 0)
     download_url_data = await v.get_download_url(page_index=page_num)
+    #pprint.pprint(download_url_data)
     detecter = VideoDownloadURLDataDetecter(download_url_data)
-    streams = detecter.detect_best_streams()
+    streams = detecter.detect()
+    #pprint.pprint(streams)
     try:
-        video_url, audio_url = streams[0].url, streams[1].url
-        json_check['video_url']=video_url
-        json_check['audio_url']=audio_url
+        video_url, audio_url = None, None
+        for stream in streams:
+            if hasattr(stream, 'video_quality') and video_url is None:
+                video_url = stream.url
+            elif hasattr(stream, 'audio_quality') and audio_url is None:
+                audio_url = stream.url
+            if video_url and audio_url: break
+        json_check['video_url'], json_check['audio_url'] = video_url, audio_url
     except Exception as e:
         json_check['video_url'] = False
     context += f'[title]{video_title}[/title]\n[des]{video_desc} [/des]'

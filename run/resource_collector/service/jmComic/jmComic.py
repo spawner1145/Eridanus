@@ -13,6 +13,8 @@ import pprint
 import asyncio
 import os
 import httpx
+import re
+import urllib.parse
 import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
@@ -153,6 +155,10 @@ def JM_search_month() -> list:
             break
 
     _jm_month_cache[cache_key] = result
+    #每月第一天会返回一个空列表，若返回位空列表则设定默认值
+    if not result:
+        result_list = [298119,1243884,452206,317728,597511,1238381,139073,143090]
+        return result_list
     return result
 
 
@@ -323,7 +329,7 @@ class OpenListClient:
         self.client = httpx.Client()
 
     async def login(self):
-        login_url = f"{self.base_url}/api/auth/login"  # 根据实际接口修改
+        login_url = f"{self.base_url}/api/auth/login"
         data = {
             "username": self.username,
             "password": self.password
@@ -347,6 +353,26 @@ class OpenListClient:
     async def is_login(self):
         if self.token is None:return False
         else:return True
+
+    async def logout(self):
+        return_json = {'status': False, 'msg': '', 'token': self.token}
+        if not self.token:
+            return_json['msg'] = '"未登录，无需登出"'
+            return return_json
+        logpout_url = f"{self.base_url}/api/auth/login"
+        headers = {
+           'Authorization': self.token,
+        }
+        resp = self.client.get(logpout_url,headers=headers)
+        if resp.status_code != 200:
+            return_json['msg'] = resp.text
+            return return_json
+        # print(resp.status_code)
+        # if resp.json().get("code") != 200:
+        #     return_json['msg'] = resp.json().get("message")
+        #     return return_json
+        return_json['status'], return_json['msg'] = True, '成功登出喵'
+        return return_json
 
     async def check_dir(self, folder_path):
         dir_url = f"{self.base_url}/api/fs/dirs"  # 根据实际接口修改
@@ -388,9 +414,10 @@ class OpenListClient:
         timestamp = os.path.getmtime(filepath)
         dt = datetime.fromtimestamp(timestamp, timezone.utc)
         last_modified_str = dt.strftime('%a, %d %b %Y %H:%M:%S GMT')
+        encoded_filename = urllib.parse.quote(filename, safe='')
         #构建headers
         headers = {
-            'File-Path': f'{folder_path}/{filename}',
+            'File-Path': f'{folder_path}/{encoded_filename}',
             'As-Task': 'false',
             'Overwrite': 'true',
             'Last-Modified': last_modified_str,
@@ -417,10 +444,22 @@ class OpenListClient:
         return_json['status'], return_json['msg'] = True, '上传成功'
         return return_json
 
+async def get_jm_name(jm_id):
+    client = JmOption.default().new_jm_client()
+    Detail = client.get_album_detail(jm_id)
+    pprint.pprint(Detail)
+    #print(Detail.name)
+    Detail.name = Detail.name.replace('–', '-')
+    Detail.name = re.sub(r'[\\/:*?"<>|]', '_', Detail.name)
+    Detail.name = Detail.name.replace('[', '(').replace(']', ')')
+    Detail.name = re.sub(r'\s+', '_', Detail.name)
+    Detail.name = Detail.name.strip('_')
+    return Detail.name
+
 async def test():
     base_url = ""  # 替换成实际地址
     username = ""
-    password = "@Wlb02122901"
+    password = ""
     filepath = ""
     folder_path = ""
 
@@ -433,4 +472,5 @@ async def test():
 
 if __name__ == '__main__':
     pass
+    #JM_search_month()
     asyncio.run(test())

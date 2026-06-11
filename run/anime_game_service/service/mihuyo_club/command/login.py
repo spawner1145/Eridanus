@@ -63,6 +63,7 @@ async def mys_login(user_id,bot=None,event=None):
                     device_id,
                     plugin_config.preference.game_token_app_id
                 )
+                #print(login_status, query_qrcode_ret)
                 if query_qrcode_ret:
                     bbs_uid, game_token = query_qrcode_ret
                     logger.info(f"用户 {bbs_uid} 成功获取 game_token: {game_token}")
