@@ -1,4 +1,5 @@
 from bilibili_api import login_v2, sync, Credential, user, select_client
+from bilibili_api.login_v2 import QrCodeLoginEvents
 from bilibili_api.user import create_subscribe_group, set_subscribe_group,get_self_info
 import asyncio
 from ..data import *
@@ -23,8 +24,14 @@ async def bili_login(bot = None, event = None, cookies = None) -> None:
         if bot and event:
             recall_id = await bot.send(event, ['请扫描下方二维码登录喵',Image(file=qr.get_qrcode_picture().url)])
         while not qr.has_done():                                            # 在完成扫描前轮询
+            qr_status = await qr.check_state()
+            if qr_status == QrCodeLoginEvents.TIMEOUT:
+                msg = 'B站登录二维码超时，请重新尝试喵'
+                if bot and event: await bot.send(event, msg)
+                else: print(msg)
+                return
             #print(await qr.check_state())                                   # 检查状态
-            logger.info_func(f'B站二维码状态：{(await qr.check_state())}')
+            logger.info_func(f'B站二维码状态：{qr_status}')
             await asyncio.sleep(4)
         cookies = qr.get_credential().get_cookies()
     else:

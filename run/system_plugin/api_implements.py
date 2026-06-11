@@ -82,9 +82,11 @@ def main(bot, config):
         if event.pure_text == "禁言我":
             await bot.mute(event.group_id, event.sender.user_id, 60)
         if event.pure_text == "测试":
-            r = Node(content=[Text("你好，我是机器人！")])
-            await bot.send(event, r)
-            await bot.send(event, Record(file="file://D:/python/Manyana/data/autoReply/voiceReply/a1axataxaWaQaia.wav"))
+            test_select = ['你测你🐎呢？','测测你的','给你一拳!','你才是有问题的那个喵']
+            await bot.send(event, random.choice(test_select))
+            #r = Node(content=[Text("你好，我是机器人！")])
+            #await bot.send(event, r)
+            #await bot.send(event, Record(file="file://D:/python/Manyana/data/autoReply/voiceReply/a1axataxaWaQaia.wav"))
 
     @bot.on(PrivateMessageEvent)
     async def FriendMesHandler(event: PrivateMessageEvent):
