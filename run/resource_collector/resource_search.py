@@ -667,7 +667,8 @@ def main(bot, config):
                 logger.error(e)
                 await bot.send(event, "无效输入 int，指令格式如下\n验车【车牌号】\n如：验车604142", True)
                 return
-            await jm_search(bot, event, config, comic_id)
+            await jm_preview(bot,event,config,comic_id)
+            #await jm_search(bot, event, config, comic_id)
             #await call_jm(bot, event, config, mode="preview", comic_id=comic_id)
 
     @bot.on(GroupMessageEvent)
