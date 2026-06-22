@@ -223,7 +223,17 @@ async def get_user_data(steam_id: int, proxy='http://127.0.0.1:7890'):
 
     return result
 
-
+async def date_get():
+    current_date = datetime.now()
+    timestamp = int(current_date.timestamp())
+    current_year = current_date.year
+    current_month = current_date.month
+    current_day = current_date.day
+    day = f'{current_year}_{current_month}_{current_day}'
+    month = f'{current_year}_{current_month}'
+    year = f'{current_year}'
+    return_json = {'day':day, 'month':month, 'year':year,'today':current_date,'time':timestamp}
+    return return_json
 
 async def test():
     proxies = {
