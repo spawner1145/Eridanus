@@ -12,8 +12,6 @@ import asyncio
 from PIL import Image, ImageDraw, ImageFont
 import time
 from io import BytesIO
-from run.streaming_media.service.Link_parsing.core.login_core import ini_login_Link_Prising
-from run.streaming_media.service.bilibili.BiliCooikeManager import get_bili_cookies
 import random
 import pprint
 import traceback

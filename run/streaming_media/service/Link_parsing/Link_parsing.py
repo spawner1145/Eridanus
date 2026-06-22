@@ -20,7 +20,7 @@ linking_cache = {}
 import time
 from run.streaming_media.service.Link_parsing.core.common import json_init
 
-async def link_prising(url,filepath=None,proxy=None,type=None,credential_bili=None,re_prising=False):
+async def link_prising(url,filepath=None,proxy=None,type=None,credential_bili=None,re_prising=False,absorb_color=False,up_info_get=False):
     json_check = copy.deepcopy(json_init)
     link_prising_json=None
     try:
@@ -53,7 +53,7 @@ async def link_prising(url,filepath=None,proxy=None,type=None,credential_bili=No
         match url:
             case url if 'bili' in url or 'b23' in url:
                 logger.info(f"解析bilibili链接:{url}")
-                link_prising_json = await bilibili(url, filepath=filepath,type=type,credential_bili=None)
+                link_prising_json = await bilibili(url, filepath=filepath,type=type,credential_bili=None,absorb_color=absorb_color,up_info_get=up_info_get)
             case url if 'douyin' in url:
                 logger.info(f"解析抖音链接:{url}")
                 link_prising_json = await dy(url, filepath=filepath,type_check=type)
@@ -86,7 +86,7 @@ async def link_prising(url,filepath=None,proxy=None,type=None,credential_bili=No
     except Exception as e:
         json_check['status'] = False
         json_check['reason'] = str(e)
-        #traceback.print_exc()
+        traceback.print_exc()
         return json_check
     if link_prising_json is not None:
         if type == 'dynamic_check':
@@ -150,14 +150,11 @@ if __name__ == "__main__":#测试用，不用管
     url = 'https://weibo.com/6625787085/5245617985290482'
     url = 'https://x.com/hn_luotianyi712/status/2003787316100509941?s=46'
     url = 'https://x.com/h_ta6_h_h_ta6_h/status/2004134080229908552?s=46'
-    url = 'https://live.bilibili.com/32461978'
-    info = asyncio.run(link_prising(url))
+    url = 'https://www.bilibili.com/video/BV1mrjN6qE4C/?spm_id_from=333.1387.upload.video_card.click'
+    url = 'https://t.bilibili.com/1215102971694546962'
+    url = 'https://live.bilibili.com/25248835'
+    #url = 'https://b23.tv/27jIZzf'
+    info = asyncio.run(link_prising(url,absorb_color=True,up_info_get=True))
     pprint.pprint(info)
-    #asyncio.run(youxi_pil_new_text())
 
-
-    url='44 【来抄作业✨早秋彩色衬衫叠穿｜时髦知识分子风 - 杨意子_ | 小红书 - 你的生活指南】 😆 Inw56apL6vWYuoS 😆 https://www.xiaohongshu.com/discovery/item/64c0e9c0000000001201a7de?source=webshare&xhsshare=pc_web&xsec_token=AB8GfF7dOtdlB0n_mqoz61fDayAXpCqWbAz9xb45p6huE=&xsec_source=pc_share'
-    url='79 【感谢大数据！椰青茉莉也太太太好喝了吧 - 胖琪琪 | 小红书 - 你的生活指南】 😆 78VORl9ln3YDBKi 😆 https://www.xiaohongshu.com/discovery/item/63dcee03000000001d022015?source=webshare&xhsshare=pc_web&xsec_token=ABJoHbAtOG98_7RnFR3Mf2MuQ1JC8tRVlzHPAG5BGKdCc=&xsec_source=pc_share'
-    #asyncio.run(xiaohongshu(url))
-    #asyncio.run(link_prising(url))
 
