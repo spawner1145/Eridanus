@@ -10,6 +10,22 @@ import threading
 
 
 
+#检测是否需要启动的函数，距离bot启动一分钟后就不允许重新启动循环
+async def dynamic_run_is_enable(up_type='check',db=None):
+    if db is None: return True
+    user_info = await db.read_user('bili_dynamic')
+    upid = 'up_info'
+    is_enable = True
+    day_info = await date_get()
+    user_info.setdefault(upid, {})
+    if up_type == 'bot_up':
+        user_info[upid]['computer_up_time'] = day_info['time']
+        await db.write_user('bili_dynamic', user_info)
+        return
+    if day_info['time'] - user_info[upid]['computer_up_time'] > 60:
+        is_enable = False
+    return is_enable
+
 def main(bot, config):
     # 初始化 Redis 数据库实例
     db=asyncio.run(AsyncSQLiteDatabase.get_instance())
@@ -21,7 +37,7 @@ def main(bot, config):
     async def _(event: GroupMessageEvent):
         nonlocal monitor_activated
         if not monitor_activated:
-            if config.anime_game_service.config['steamsnooping']['is_snooping']:
+            if config.anime_game_service.config['steamsnooping']['is_snooping'] and await dynamic_run_is_enable(db=db):
                 bot.logger.info(f"bot开始视奸群友的Steam啦！")
                 monitor_activated = True
                 await asyncio.to_thread(

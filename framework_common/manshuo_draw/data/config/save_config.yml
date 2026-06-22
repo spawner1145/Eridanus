@@ -176,6 +176,7 @@ avatar:
   is_name: Ture                   #是否在头像右侧旁添加名字
   is_blurred: true
   is_shadow: true
+  shadow_color: (0, 0, 0)
 
   software_list:
     - {'type': 'bilibili', 'background': data/img/type_software/bili.png, 'right_icon': data/img/type_software/bili_icon.png}

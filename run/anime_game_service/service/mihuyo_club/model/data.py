@@ -104,8 +104,11 @@ class BBSCookies(BaseModelWithSetter, BaseModelWithUpdate):
     """保存stoken_v2，方便后续使用"""
 
     cookie_token: Optional[str] = None
+    cookie_token_v2: Optional[str] = None
+    aliyungf_tc: Optional[str] = None
     login_ticket: Optional[str] = None
     ltoken: Optional[str] = None
+    ltoken_v2: Optional[str] = None
     mid: Optional[str] = None
 
     def __init__(self, **data: Any):

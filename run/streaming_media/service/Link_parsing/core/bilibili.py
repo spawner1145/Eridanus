@@ -10,12 +10,21 @@ from developTools.utils.logger import get_logger
 logger=get_logger()
 import json
 from framework_common.manshuo_draw.manshuo_draw import manshuo_draw
+from framework_common.utils.utils import download_img
+from framework_common.utils.random_str import random_str
+import aiofiles
+from io import BytesIO
+from PIL import Image as PilImage
+import numpy as np
+from sklearn.cluster import KMeans
 import asyncio
 import sys
 import time
 from bilibili_api import video, live, article
+import colorsys
 import pprint
 from bilibili_api import dynamic
+from bilibili_api import login_v2, sync, search, user
 from bilibili_api.opus import Opus
 from bilibili_api.video import VideoDownloadURLDataDetecter
 from .bili import bili_init,av_to_bv,download_b,info_search_bili
@@ -30,7 +39,32 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
-async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=None):
+async def get_dominant_color(img_url, k=4, image_resize=(100, 100)):
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(img_url)
+        resp.raise_for_status()
+    image = PilImage.open(BytesIO(resp.content))
+    image = image.resize(image_resize)
+
+    img_np = np.array(image).reshape(-1, 3)
+    kmeans = KMeans(n_clusters=k)
+    kmeans.fit(img_np)
+
+    counts = np.bincount(kmeans.labels_)
+    dominant = kmeans.cluster_centers_[np.argmax(counts)]
+    dominant_color = tuple(int(c) for c in dominant)
+    lighten_factor = 0.7
+    r, g, b = [x / 255.0 for x in dominant_color]
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    # 调整明度，使颜色变浅，明度上限1
+    l = min(1.0, l + (1.0 - l) * lighten_factor)
+    r_l, g_l, b_l = colorsys.hls_to_rgb(h, l, s)
+    dominant_rgba = (int(r_l * 255), int(g_l * 255), int(b_l * 255), 255)
+
+    return dominant_color, dominant_rgba
+
+
+async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=None,absorb_color=False,up_info_get=False):
     """
         哔哩哔哩解析
     :param bot:
@@ -58,6 +92,9 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
     desc=None
     avatar_json=None
     url_reg = r"(http:|https:)\/\/(space|www|live).bilibili.com\/[A-Za-z\d._?%&+\-=\/#]*"
+    back_main_color, back_main_color_rgba, description_color = (194, 228, 255), (235, 239, 253), (255, 255, 255, 255)
+    shadow_color = (0, 0, 0)
+    header_img, right_icon = 'data/img/type_software/bili.png', 'data/img/type_software/bili_icon.png'
     b_short_rex = r"(https?://(?:b23\.tv|bili2233\.cn)/[A-Za-z\d._?%&+\-=\/#]+)"
     # 处理短号、小程序问题
     if "b23.tv" in url or "bili2233.cn" in url or "QQ小程序" in url :
@@ -111,6 +148,12 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
             owner_cover=dynamic_info['item']['modules']['module_author']['face']
             owner_name=dynamic_info['item']['modules']['module_author']['name']
             pub_time=dynamic_info['item']['modules']['module_author']['pub_time']
+            #pprint.pprint(dynamic_info['item']['modules']['module_author'])
+            #是否获取头图
+            if up_info_get:
+                u = user.User(dynamic_info['item']['modules']['module_author']['mid'])
+                up_info = await u.get_user_info()
+                header_img = await download_img('https://i0.hdslb.com/' + up_info['top_photo'],"data/pictures/cache/")
             if orig_check ==1:
                 #avatar_json = await info_search_bili(dynamic_info, is_opus, filepath=filepath,card_url_list=card_url_list)
                 #print('非转发')
@@ -119,7 +162,7 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
                     opus_paragraphs = dynamic_info['item']['modules']['module_dynamic']['major']['opus']
                     text_list_check = ''
                     pics_context=[]
-                    #print(json.dumps(opus_paragraphs, indent=4))
+                    #print(json.dumps(opus_paragraphs['summary']['rich_text_nodes'], indent=4))
 
 
                     for text_check in opus_paragraphs['summary']['rich_text_nodes']:
@@ -130,6 +173,10 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
                             text_list_check += f"[tag]{text_check['orig_text']}[/tag]"
                         elif text_check['type'] == 'RICH_TEXT_NODE_TYPE_TEXT':
                             text_list_check += text_check['orig_text']
+                        elif text_check['type'] == 'RICH_TEXT_NODE_TYPE_WEB':
+                            text_list_check += f"[tag]{text_check['orig_text']}[/tag]"
+                        elif text_check['type'] == 'RICH_TEXT_NODE_TYPE_BV':
+                            text_list_check += f"[tag]{text_check['orig_text']}[/tag]"
                     #print(text_list_check)
                     if dynamic_info['item']['type'] == 'DYNAMIC_TYPE_ARTICLE':
                         type_software = 'BiliBili 专栏'
@@ -162,31 +209,42 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
                     image_list = [cover]
                     context += f"[title]{title}[/title]\n[des]{desc}[/des]"
                     type_software = 'BiliBili 投稿'
+                if absorb_color and image_list:
+                    back_main_color, back_main_color_rgba = await get_dominant_color(image_list[0])
+                    description_color, shadow_color = back_main_color_rgba, back_main_color
                 if len(image_list) == 1 and type_software in {'直播',}:
-                    manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
-                            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
-                             'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
-                             'type_software': 'bilibili', },
-                            {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list, 'label': [type_software],
-                             'content': [context]}]
-                elif len(image_list) == 1 and type_software in {'BiliBili 投稿'}:
-                    manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
-                            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
-                             'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
-                             'type_software': 'bilibili', },
-                            {'type': 'img', 'subtype': 'common_with_des', 'img': image_list, 'label': [type_software],
-                             'content': [context]}]
-                else:
-                    manshuo_draw_json=[{'type': 'backdrop', 'subtype': 'one_color'},
+                    manshuo_draw_json=[{'type': 'basic_set', 'debug': False, 'font_title_color': (0,0,0),
+                         'backdrop_color': {'color1': back_main_color_rgba},'shadow_font_color':back_main_color},
+                        {'type': 'backdrop', 'subtype': 'one_color','color':back_main_color},
                         {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                          'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
-                         'type_software': 'bilibili'},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
+                         'background':header_img,'right_icon':right_icon,'shadow_color':shadow_color },
+                        {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list, 'label': [type_software],
+                         'content': [context],'description_color':description_color}]
+                elif len(image_list) == 1 and type_software in {'BiliBili 投稿'}:
+                    manshuo_draw_json=[{'type': 'basic_set', 'debug': False, 'font_title_color': (0,0,0),
+                         'backdrop_color': {'color1': back_main_color_rgba},'shadow_font_color':back_main_color},
+                            {'type': 'backdrop', 'subtype': 'one_color','color':back_main_color},
+                            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
+                             'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
+                             'background':header_img,'right_icon':right_icon,'shadow_color':shadow_color },
+                            {'type': 'img', 'subtype': 'common_with_des', 'img': image_list, 'label': [type_software],
+                             'content': [context],'description_color':description_color}]
+                else:
+                    manshuo_draw_json=[{'type': 'basic_set', 'debug': False, 'font_title_color': (0,0,0),
+                         'backdrop_color': {'color1': back_main_color_rgba},'shadow_font_color':back_main_color},
+                        {'type': 'backdrop', 'subtype': 'one_color','color':back_main_color},
+                        {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
+                         'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],'shadow_color':shadow_color,
+                         'background':header_img,'right_icon':right_icon,},{'type': 'text','content': [context]},
+                        {'type': 'img','img': image_list,'description_color':description_color}]
                 #pprint.pprint(manshuo_draw_json)
                 if is_twice is not True:
                     if type not in no_draw_type:
                         json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
                     json_check['time'] = pub_time
                     json_check['pic_url_list'] = image_list
+                    json_check['content'] = {'text': context, 'opus_type': dynamic_info['item']['type'], 'type':'dynamic'}
                     return json_check
                 return manshuo_draw_json
             elif orig_check ==2:
@@ -230,26 +288,32 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
                         manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
                             {'type': 'avatar', 'subtype': 'common', 'img': [orig_owner_cover], 'upshift_extra': 20,
                              'content': [f"[name]{orig_owner_name}[/name]\n[time]{orig_pub_time}[/time]"],
-                             'type_software': 'bilibili', 'label': label_list},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
+                             'background':header_img,'right_icon':right_icon, 'label': label_list},{'type': 'text','content': [context]},{'type': 'img','img': image_list}]
                     else:
-                        manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
+                        manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color',},
                             {'type': 'avatar', 'subtype': 'common', 'img': [orig_owner_cover], 'upshift_extra': 20,
                              'content': [f"[name]{orig_owner_name}[/name]\n[time]{orig_pub_time}[/time]"],
-                             'type_software': 'bilibili', },
+                             'background':header_img,'right_icon':right_icon, },
                             {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list,
                              'content': [context]}]
                     return manshuo_draw_json
 
                 orig_url= 'orig_url:'+'https://t.bilibili.com/' + orig_context['id_str']
                 manshuo_draw_json2=await bilibili(orig_url,f'{filepath}orig_',is_twice=True)
-
-                manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
+                back_main_color, back_main_color_rgba = (194, 228, 255), (235, 239, 253)
+                # if absorb_color and image_list:
+                #     back_main_color, back_main_color_rgba = await get_dominant_color(image_list[0])
+                manshuo_draw_json = [
+                    {'type': 'basic_set', 'debug': False, 'font_title_color': (0,0,0),
+                     'backdrop_color': {'color1': back_main_color_rgba}},
+                    {'type': 'backdrop', 'subtype': 'one_color', 'color': back_main_color},
                     {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                      'content': [f"[name]{owner_name}[/name]  [time]{pub_time}[/time]"],'avatar_size':50,
                      'label': label_list}, {'type': 'text','content': [text_list_check]}]
                 if type not in no_draw_type:
                     json_check['pic_path'] = await manshuo_draw(await add_append_img(manshuo_draw_json,manshuo_draw_json2,layer=2))
                 json_check['time'] = pub_time
+                json_check['content'] = {'text': text_list_check, 'opus_type': dynamic_info['item']['type'], 'type':'dynamic'}
                 return json_check
 
         return None
@@ -259,7 +323,7 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
         room_id = re.search(r'\/(\d+)$', url).group(1)
         room = live.LiveRoom(room_display_id=int(room_id))
         data_get_url_context=await room.get_room_info()
-
+        #pprint.pprint(data_get_url_context)
         room_info = data_get_url_context['room_info']
         title, cover, keyframe = room_info['title'], room_info['cover'], room_info['keyframe']
         owner_name,owner_cover = data_get_url_context['anchor_info']['base_info']['uname'], data_get_url_context['anchor_info']['base_info']['face']
@@ -275,17 +339,29 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
             live_status, live_start_time = room_info['live_status'], room_info['live_start_time']
             pub_time = datetime.fromtimestamp(live_start_time).astimezone().strftime("%Y-%m-%d %H:%M:%S")
         else:pub_time='暂未开启直播'
-        manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
+        if absorb_color:
+            back_main_color, back_main_color_rgba = await get_dominant_color(cover)
+            description_color, shadow_color = back_main_color_rgba, back_main_color
+        #是否获取头图
+        if up_info_get:
+            u = user.User(room_info['uid'])
+            up_info = await u.get_user_info()
+            header_img = await download_img('https://i0.hdslb.com/' + up_info['top_photo'], "data/pictures/cache/")
+        manshuo_draw_json = [
+            {'type': 'basic_set', 'debug': False, 'font_title_color': (0,0,0),
+             'backdrop_color': {'color1': back_main_color_rgba},'shadow_font_color':back_main_color},
+            {'type': 'backdrop', 'subtype': 'one_color', 'color': back_main_color},
             {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
              'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
-             'type_software': 'bilibili', },
+             'background':header_img,'right_icon':right_icon, 'shadow_color':shadow_color},
             {'type': 'img', 'subtype': 'common_with_des_right', 'img': [cover],'label': ['直播'],
-             'content': [context]}]
+             'content': [context],'description_color':description_color}]
 
         if is_twice is not True:
             if type not in no_draw_type:
                 json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
             json_check['pic_url_list'].append(cover)
+            json_check['content'] = {'text': context, 'type':'live'}
             return json_check
         return manshuo_draw_json
     # 专栏识别
@@ -366,17 +442,30 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
     except Exception as e:
         json_check['video_url'] = False
     context += f'[title]{video_title}[/title]\n[des]{video_desc} [/des]'
-    manshuo_draw_json = [{'type': 'backdrop', 'subtype': 'one_color'},
+    if absorb_color:
+        back_main_color, back_main_color_rgba = await get_dominant_color(video_cover)
+        description_color, shadow_color = back_main_color_rgba, back_main_color
+        #print(back_main_color, back_main_color_rgba)
+    # 是否获取头图
+    if up_info_get:
+        u = user.User(video_info['owner']['mid'])
+        up_info = await u.get_user_info()
+        header_img = await download_img('https://i0.hdslb.com/' + up_info['top_photo'], "data/pictures/cache/")
+    manshuo_draw_json = [
+        {'type': 'basic_set', 'debug': False, 'font_title_color': (0,0,0),
+         'backdrop_color': {'color1': back_main_color_rgba},'shadow_font_color':back_main_color},
+        {'type': 'backdrop', 'subtype': 'one_color', 'color': back_main_color},
         {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover_url], 'upshift_extra': 20,
          'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
-         'type_software': 'bilibili', },
+         'background':header_img,'right_icon':right_icon, 'shadow_color':shadow_color},
         {'type': 'img', 'subtype': 'common_with_des', 'img': [video_cover],'label': ['视频'],
-         'content': [context]}]
+         'content': [context],'description_color':description_color}]
 
     if is_twice is not True:
         if type not in no_draw_type:
             json_check['pic_path'] = await manshuo_draw(manshuo_draw_json)
         json_check['pic_url_list'].append(video_cover)
+        json_check['content'] = {'text': context, 'type':'video'}
         return json_check
     return manshuo_draw_json
 
