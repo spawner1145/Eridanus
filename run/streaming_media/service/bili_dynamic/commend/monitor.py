@@ -456,7 +456,9 @@ async def bili_dynamic_loop_new(bot, config):
                     elif loop_cache['need_repush_dynamic'][new_dynamic_id]['is_danger'] % 6 == 0:
                         logger.error(f"动态id: {new_dynamic_id} 已风控，尝试后将等待一段时间后重试")
                 push_groups_success = []
-                dynamic_info_prising = await link_prising(f'https://t.bilibili.com/{new_dynamic_id}',credential_bili=credential)
+                dynamic_info_prising = await link_prising(f'https://t.bilibili.com/{new_dynamic_id}',credential_bili=credential,
+                                                         absorb_color=config.streaming_media.config["bili_dynamic"]["is_absorb_color"],
+                                                         up_info_get=config.streaming_media.config["bili_dynamic"]["is_fetch_up_info"])
                 if dynamic_info_prising['status']:
                     for group_id in loop_cache['need_repush_dynamic'][new_dynamic_id]['push_groups']:
                         if group_id not in group_list: continue
@@ -495,7 +497,9 @@ async def bili_dynamic_loop_new(bot, config):
                         continue
                     elif loop_cache['need_repush_live'][living_room_id]['is_danger'] % 6 == 0:
                         logger.error(f"直播房间id: {living_room_id} 已风控，尝试后将等待一段时间后重试")
-                living_info_prising = await link_prising(f'https://live.bilibili.com/{living_room_id}', credential_bili=credential)
+                living_info_prising = await link_prising(f'https://live.bilibili.com/{living_room_id}', credential_bili=credential,
+                                                         absorb_color=config.streaming_media.config["bili_dynamic"]["is_absorb_color"],
+                                                         up_info_get=config.streaming_media.config["bili_dynamic"]["is_fetch_up_info"])
                 pprint.pprint(living_info_prising)
                 up_id, push_groups_success = loop_cache['need_repush_live'][living_room_id]['up_id'], []
                 if living_info_prising['status']:
@@ -541,8 +545,18 @@ async def bili_dynamic_loop_new(bot, config):
             room_id = user_info['living_info']['room_id']
             #进行动态推送
             if up_id in dynamic_sub_ids and user_info['is_push']:
-                dynamic_info_prising = await link_prising(f'https://t.bilibili.com/{new_dynamic_id}',credential_bili=credential)
+                dynamic_info_prising = await link_prising(f'https://t.bilibili.com/{new_dynamic_id}',credential_bili=credential,
+                                                         absorb_color=config.streaming_media.config["bili_dynamic"]["is_absorb_color"],
+                                                         up_info_get=config.streaming_media.config["bili_dynamic"]["is_fetch_up_info"])
                 if dynamic_info_prising['code'] == -352: dynamic_info_prising['is_danger'] = 0
+                #检测动态是否为视频
+                if config.streaming_media.config["bili_dynamic"]["is_only_send_video"] and dynamic_info_prising['status'] and dynamic_info_prising['content']['type'] == 'dynamic':
+                    if dynamic_info_prising['content']['opus_type'] != 'DYNAMIC_TYPE_AV':
+                        dynamic_info_prising['status'] = False
+                # 此处检测是否为二游中奖通知，进行过滤
+                if config.streaming_media.config["bili_dynamic"]["is_filter_winning"] and dynamic_info_prising['status'] and dynamic_info_prising['content']['type'] == 'dynamic':
+                    if dynamic_info_prising['content']['type']['text'].startswith(('恭喜@',)):
+                        dynamic_info_prising['status'] = False
                 if dynamic_info_prising['status']:
                     for group_id in user_info['push_groups']:
                         if group_id not in group_list: continue
@@ -564,7 +578,9 @@ async def bili_dynamic_loop_new(bot, config):
 
             #进行直播推送
             if up_id in live_sub_result and user_info['living_info']['is_push']:
-                living_info_prising = await link_prising(f'https://live.bilibili.com/{room_id}',credential_bili=credential,re_prising=live_sub_result[up_id]['is_end_live'])
+                living_info_prising = await link_prising(f'https://live.bilibili.com/{room_id}',credential_bili=credential,re_prising=live_sub_result[up_id]['is_end_live'],
+                                                         absorb_color=config.streaming_media.config["bili_dynamic"]["is_absorb_color"],
+                                                         up_info_get=config.streaming_media.config["bili_dynamic"]["is_fetch_up_info"])
                 #pprint.pprint(living_info_prising)
                 if living_info_prising['code'] == -352: living_info_prising['is_danger'] = 0
                 if living_info_prising['status']:

@@ -161,6 +161,8 @@ class SaltConfig(BaseModel):
     SALT_PARAMS: str = "xV8v4Qu54lUKrEYFZkJhB8cuOh9Asafs"
     '''4X - Android 设备传入url参数生成 DS 所需的 salt'''
     SALT_PROD: str = "JwYDpKvLj6MrMqqYU6jTKF17KNO2PXoS"
+    SALT_BBS: str = "b0EofkfMKq2saWV9fwux18J5vzcFTlex"
+    '''BBS App 接口专用createVerification/verifyVerification'''
     '''PROD - 账号相关'''
 
 

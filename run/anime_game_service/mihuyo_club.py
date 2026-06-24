@@ -18,7 +18,9 @@ def main(bot, config):
         if event.message_chain.has(At) and event.message_chain.has(Text):
             userid, context = event.message_chain.get(At)[0].qq, event.message_chain.get(Text)[0].text
         if context.lower() in order_list:
-            await mys_login(userid, bot, event)
+            # await bot.send(event, f'当前该功能维护ing，无法登录喵')
+            # return
+            await mys_login_new(userid, bot, event)
 
     #米游社签到
     @bot.on(GroupMessageEvent)

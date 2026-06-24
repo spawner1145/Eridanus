@@ -148,7 +148,6 @@ async def backdrop_process(params, canves, limit=(0, 0)):
 
     try:
         # 调整背景图像尺寸
-        # 调整背景图像尺寸
         if background_img.width > limit_x and background_img.height > limit_y:
             new_img = background_img.resize(
                 (int(limit_x), int(limit_x * background_img.height / background_img.width)))
@@ -190,7 +189,7 @@ async def backdrop_process(params, canves, limit=(0, 0)):
         if params['is_shadow']:
             width, height = background_img.size
             center_x, center_y = width // 2, height // 2
-            shadow_color = (0, 0, 0)
+            shadow_color = eval(str(params['shadow_color']))
 
             # 创建遮罩 - 使用更高效的方法
             mask = Image.new("L", (width, height), 0)
@@ -214,7 +213,9 @@ async def backdrop_process(params, canves, limit=(0, 0)):
             mask.putdata([pixel for row in pixels for pixel in row])
 
             # 创建阴影图层
-            shadow = Image.new("RGBA", background_img.size, shadow_color + (0,))
+            r,g,b = shadow_color
+            shadow_color_rgba = (r,g,b,0)
+            shadow = Image.new("RGBA", background_img.size, shadow_color_rgba)
             shadow.putalpha(mask)
             mask.close()  # 立即清理mask
 

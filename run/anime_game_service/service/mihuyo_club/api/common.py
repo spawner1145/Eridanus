@@ -6,6 +6,7 @@ import traceback
 import httpx
 import tenacity
 import pprint
+import uuid
 from pydantic import ValidationError, BaseModel
 from requests.utils import dict_from_cookiejar
 
@@ -157,6 +158,27 @@ HEADERS_BBS_API = {
     "Connection": "keep-alive",
     "x-rpc-device_model": plugin_env.device_config.X_RPC_DEVICE_MODEL_MOBILE
 }
+# 用于 createVerification/verifyVerification
+HEADERS_BBS_VERIFICATION = {
+    "Host": "bbs-api.miyoushe.com",
+    "DS": None,
+    "Accept": "*/*",
+    "x-rpc-device_id": None,
+    "x-rpc-verify_key": "bll8iq97cem8",
+    "x-rpc-client_type": "2",
+    "x-rpc-channel": plugin_env.device_config.X_RPC_CHANNEL_ANDROID,
+    "Accept-Language": "zh-CN,zh-Hans;q=0.9",
+    "Accept-Encoding": "gzip",
+    "Referer": "https://app.mihoyo.com",
+    "x-rpc-device_name": plugin_env.device_config.X_RPC_DEVICE_NAME_ANDROID,
+    "x-rpc-app_version": plugin_env.device_config.X_RPC_APP_VERSION,
+    "User-Agent": plugin_env.device_config.USER_AGENT_ANDROID_OTHER,
+    "Connection": "Keep-Alive",
+    "x-rpc-device_model": plugin_env.device_config.X_RPC_DEVICE_MODEL_ANDROID,
+    "x-rpc-sys_version": plugin_env.device_config.X_RPC_SYS_VERSION_ANDROID,
+    "Content-Type": "application/json; charset=UTF-8",
+}
+
 HEADERS_MYB = {
     "Host": "api-takumi.mihoyo.com",
     "Origin": "https://webstatic.mihoyo.com",
@@ -1619,15 +1641,15 @@ async def create_verification(
     :param account: 用户账户数据
     :param retry: 是否允许重试
     """
-    headers = HEADERS_BBS_API.copy()
+    headers = HEADERS_BBS_VERIFICATION.copy()
     try:
         async for attempt in get_async_retry(retry):
             with attempt:
-                device_id = account.device_id_ios if account else generate_device_id()
+                device_id = account.device_id_android  if account else generate_device_id()
                 headers["x-rpc-device_id"] = device_id
                 headers["x-rpc-device_fp"] = account.device_fp if account and account.device_fp else \
                     generate_fp_locally()
-                headers["DS"] = generate_ds()
+                headers["DS"] = generate_ds(salt=plugin_env.salt_config.SALT_BBS)
                 async with httpx.AsyncClient() as client:
                     res = await client.get(
                         URL_CREATE_VERIFICATION,
@@ -1661,7 +1683,7 @@ async def verify_verification(
     :param account: 用户账户数据
     :param retry: 是否允许重试
     """
-    headers = HEADERS_BBS_API.copy()
+    headers = HEADERS_BBS_VERIFICATION.copy()
     try:
         async for attempt in get_async_retry(retry):
             with attempt:
@@ -1670,11 +1692,11 @@ async def verify_verification(
                     "geetest_challenge": mmt_data.challenge,
                     "geetest_validate": geetest_result.validate,
                 }
-                device_id = account.device_id_ios if account else generate_device_id()
+                device_id = account.device_id_android if account else generate_device_id()
                 headers["x-rpc-device_id"] = device_id
                 headers["x-rpc-device_fp"] = account.device_fp if account and account.device_fp else \
                     generate_fp_locally()
-                headers["DS"] = generate_ds()
+                headers["DS"] = generate_ds(salt=plugin_env.salt_config.SALT_BBS)
                 async with httpx.AsyncClient() as client:
                     res = await client.post(
                         URL_VERIFY_VERIFICATION,
@@ -1710,19 +1732,28 @@ async def fetch_game_token_qrcode(
     :param retry: 是否允许重试
     :return 其中 ``Tuple[str, str]`` 为二维码URL和用于查询二维码扫描状态的 ``token``
     """
+    uuid_d = uuid.uuid4()
+    headers = {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0",
+        "x-rpc-app_id": "bll8iq97cem8",
+        'x-rpc-device_fp': f'38d80bb76ee47',
+        "x-rpc-device_id": f"{uuid_d}"
+    }
     try:
         async for attempt in get_async_retry(retry):
             with attempt:
                 content = {
                     "app_id": app_id,
-                    "device": device_id,
+                    "device": str(device_id)
                 }
                 async with httpx.AsyncClient() as client:
                     res = await client.post(
                         URL_FETCH_GAME_TOKEN_QRCODE,
                         json=content,
-                        timeout=plugin_config.preference.timeout
+                        timeout=plugin_config.preference.timeout,
+                        headers=headers
                     )
+                pprint.pprint(res.json())
                 api_result = ApiResultHandler(res.json())
                 #print(api_result)
                 if api_result.retcode == 0:
@@ -1773,7 +1804,7 @@ async def query_game_token_qrcode(
                         json=content,
                         timeout=plugin_config.preference.timeout
                     )
-                #print(res.json())
+                pprint.pprint(res.json())
                 api_result = ApiResultHandler(res.json())
                 if api_result.retcode == 0:
                     if api_result.data["stat"] == "Init":
