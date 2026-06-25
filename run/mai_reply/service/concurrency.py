@@ -47,12 +47,6 @@ class ConcurrencyController:
         self._semaphore.release()
 
     async def merge_or_process(self, session_key: str, text: str) -> Optional[str]:
-        """
-        消息合并窗口：
-        如果在 merge_window_ms 内收到了同一会话的多条消息，
-        则合并为一条处理（取最新的那条）。
-        返回最终应该处理的文本，如果当前消息被合并掉了则返回 None。
-        """
         if self.merge_window_ms <= 0:
             return text
 
@@ -61,10 +55,14 @@ class ConcurrencyController:
 
         async with self._pending_lock:
             if session_key in self._pending:
-                self._pending[session_key]["text"] = text
+                # 【关键修复 1】：把直接覆盖改为追加合并！
+                old_text = self._pending[session_key]["text"]
+                merged_text = f"{old_text}\n{text}" if old_text else text
+
                 self._pending[session_key]["event"].set()
                 new_event = asyncio.Event()
-                self._pending[session_key] = {"text": text, "event": new_event}
+                # 存入合并后的文本
+                self._pending[session_key] = {"text": merged_text, "event": new_event}
                 local_event = new_event
             else:
                 self._pending[session_key] = {"text": text, "event": event}

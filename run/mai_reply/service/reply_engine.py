@@ -161,7 +161,14 @@ class ReplyEngine:
                     break
 
         await self.concurrency.acquire_global()
+        lock_acquired = False  # 初始化锁状态变量
         try:
+            # 【关键修复 3】：恢复被误删的 Redis 锁，防止同一个用户的上下文数据库写冲突
+            lock_timeout = self.cfg.mai_reply.config.get("concurrency", {}).get("lock_timeout", 30)
+            lock_acquired = await self.context.acquire_lock(session_key, lock_timeout)
+            if not lock_acquired:
+                return
+
             # 被旧 Task 抢占后到这里时，如果自身已被 cancel，直接退出
             if current_task.cancelled():
                 return
@@ -297,6 +304,8 @@ class ReplyEngine:
         finally:
             # 任务结束（无论正常/取消/异常）时从抢占表注销自身，并释放全局信号量
             await self.concurrency.unregister_task(session_key, current_task)
+            if lock_acquired:
+                self.context.release_lock(session_key)
             self.concurrency.release_global()
 
     def _hard_truncate_segments(self, segments: list) -> list:
