@@ -140,6 +140,10 @@ class ContextManager:
         self._imp_cache.set(key, value, ttl=ttl or self.impression_ttl)
         self._imp_sqlite.set(key, value)
 
+    def _imp_delete(self, key: str) -> None:
+        self._imp_cache.delete(key)
+        self._imp_sqlite.delete(key)
+
     # ------------------------------------------------------------------ Bot 发送消息 ID 追踪
 
     def record_bot_message(self, msg_id: str) -> None:
@@ -318,6 +322,10 @@ class ContextManager:
             return
         self._imp_set(self._impression_key(user_id), summary)
 
+    def clear_impression(self, user_id: int) -> None:
+        """清除对某个用户的印象记忆（Redis + SQLite 双层同步删除）"""
+        self._imp_delete(self._impression_key(user_id))
+
     # ------------------------------------------------------------------ 群聊印象（新增）
 
     def get_group_impression(self, group_id: int) -> str:
@@ -336,6 +344,10 @@ class ContextManager:
             summary,
             ttl=self.group_impression_ttl,
         )
+
+    def clear_group_impression(self, group_id: int) -> None:
+        """清除某个群的气氛/话题印象（Redis + SQLite 双层同步删除）"""
+        self._imp_delete(self._group_impression_key(group_id))
 
     def get_recent_speaker_impressions(self, group_id: int) -> List[Dict]:
         """

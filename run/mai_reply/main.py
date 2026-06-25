@@ -171,13 +171,17 @@ def main(bot: ExtendBot, config: YAMLManager):
         # 清理指令
         if text.strip() in ("/clear", "清除对话", "清理对话"):
             engine.context.clear_session(event.group_id, event.user_id)
-            await bot.send(event, "好的，对话记录已清除～")
+            engine.context.clear_impression(event.user_id)
+            if hasattr(event,"group_id"):
+                engine.context.clear_group_impression(event.group_id)
+            await bot.send(event, "好的，对话记录和印象已清除～")
             return
         if text.strip() in ("/clearall", "清除全部对话", "清理全部对话"):
             if event.user_id != config.common_config.basic_config["master"]["id"]:
                 return
             count = engine.context.clear_all_sessions(event.group_id)
-            await bot.send(event, f"已清除本群 {count} 个用户的对话记录～")
+            engine.context.clear_group_impression(event.group_id)
+            await bot.send(event, f"已清除本群 {count} 个用户的对话记录及群印象～")
             return
 
         async def add_to_context():
@@ -275,6 +279,7 @@ def main(bot: ExtendBot, config: YAMLManager):
 
         if text.strip() in ("/clear", "清除对话", "清理对话"):
             engine.context.clear_session(None, event.user_id)
+            engine.context.clear_impression(event.user_id)
             await bot.send(event, "好，忘掉了～")
             return
         if text.strip() in ("/clearall", "清除全部对话", "清理全部对话"):
