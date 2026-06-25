@@ -37,65 +37,70 @@ def get_best_aspect_ratio(image_path: str) -> str:
 
 
 async def image_edit(bot, event, config, img_url, prompt):
-    user = await get_user(event.user_id)
-    permission_need = config.ai_generated_art.config["gptimage2"]["权限要求"]
-    if user.permission < permission_need:
-        return
+    async def _image_edit_tas(bot, event, config, img_url, prompt):
+        user = await get_user(event.user_id)
+        permission_need = config.ai_generated_art.config["gptimage2"]["权限要求"]
+        if user.permission < permission_need:
+            return
 
-    image_path = await download_img(img_url)
-    aim_url = "http://api.apollodorus.xyz/v1/images/edits"
+        image_path = await download_img(img_url)
+        aim_url = "http://api.apollodorus.xyz/v1/images/edits"
 
-    apikey = config.ai_generated_art.config["gptimage2"]["apikey"]
-    headers = {"Authorization": f"Bearer {apikey}"}
+        apikey = config.ai_generated_art.config["gptimage2"]["apikey"]
+        headers = {"Authorization": f"Bearer {apikey}"}
 
-    #configured_ratio = config.ai_generated_art.config["gptimage2"].get("aspect_ratio")
-    aspect_ratio = get_best_aspect_ratio(image_path)
+        #configured_ratio = config.ai_generated_art.config["gptimage2"].get("aspect_ratio")
+        aspect_ratio = get_best_aspect_ratio(image_path)
 
-    data = {
-        "prompt": prompt,
-        "aspect_ratio": aspect_ratio,
-        "model": config.ai_generated_art.config["gptimage2"]["model"],
-        "resolution": config.ai_generated_art.config["gptimage2"]["resolution"] or "1K",
-    }
+        data = {
+            "prompt": prompt,
+            "aspect_ratio": aspect_ratio,
+            "model": config.ai_generated_art.config["gptimage2"]["model"],
+            "resolution": config.ai_generated_art.config["gptimage2"]["resolution"] or "1K",
+        }
 
-    max_retries = 5
-    last_error = None
+        max_retries = 5
+        last_error = None
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            # 每次重试都重新打开文件，避免文件流已读完
-            with open(image_path, "rb") as f:
-                file_objects = [("images", (os.path.basename(image_path), f, "image/png"))]
-                async with httpx.AsyncClient() as client:
-                    resp = await client.post(
-                        aim_url,
-                        headers=headers,
-                        files=file_objects,
-                        data=data,
-                        timeout=None
-                    )
+        for attempt in range(1, max_retries + 1):
+            try:
+                # 每次重试都重新打开文件，避免文件流已读完
+                with open(image_path, "rb") as f:
+                    file_objects = [("images", (os.path.basename(image_path), f, "image/png"))]
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.post(
+                            aim_url,
+                            headers=headers,
+                            files=file_objects,
+                            data=data,
+                            timeout=None
+                        )
 
-            if resp.status_code == 200:
-                res_json = resp.json()
-                result_url = res_json["data"][0]["url"]
-                await bot.send(event, [Image(file=result_url)])
-                return
+                if resp.status_code == 200:
+                    res_json = resp.json()
+                    result_url = res_json["data"][0]["url"]
+                    await bot.send(event, [Image(file=result_url)])
+                    return
 
-            # 4xx 客户端错误不重试（参数有误重试也没用）
-            if 400 <= resp.status_code < 500:
-                await bot.send(event, f"请求失败 ({resp.status_code}): {resp.text}")
-                return
+                # 4xx 客户端错误不重试（参数有误重试也没用）
+                if 400 <= resp.status_code < 500:
+                    await bot.send(event, f"请求失败 ({resp.status_code}): {resp.text}")
+                    return
 
-            last_error = f"HTTP {resp.status_code}: {resp.text}"
+                last_error = f"HTTP {resp.status_code}: {resp.text}"
 
-        except (httpx.TimeoutException, httpx.NetworkError) as e:
-            last_error = str(e)
+            except (httpx.TimeoutException, httpx.NetworkError) as e:
+                last_error = str(e)
 
-        if attempt < max_retries:
-            wait = 2 ** (attempt - 1)  # 1s, 2s, 4s, 8s
-            await asyncio.sleep(wait)
+            if attempt < max_retries:
+                wait = 2 ** (attempt - 1)  # 1s, 2s, 4s, 8s
+                await asyncio.sleep(wait)
 
-    await bot.send(event, f"请求失败，已重试 {max_retries} 次，最后错误：{last_error}")
+        await bot.send(event, f"请求失败，已重试 {max_retries} 次，最后错误：{last_error}")
+
+    asyncio.create_task(
+        _send_bot_image_with_retry(_image_edit_tas(bot, event, config, img_url, prompt))
+    )
 
 
 async def _send_bot_image_with_retry(bot, event, config, prompt, max_retries=5):
