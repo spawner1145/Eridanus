@@ -149,9 +149,16 @@ class ReplyEngine:
         final_text = await self.concurrency.preempt_and_register(
             session_key, final_text, current_task
         )
-        # 同步更新 multimodal_content（非多模态时保持与 final_text 一致）
+
+        # 【修改点 1】：修复多模态消息(带图片)时，合并后的文本没有注入到 content 列表里的问题
         if not is_multimodal:
             multimodal_content = final_text
+        else:
+            # 如果是多模态结构（列表），需要遍历把里面 type 为 text 的部分替换成合并后的文本
+            for part in multimodal_content:
+                if isinstance(part, dict) and part.get("type") == "text":
+                    part["text"] = final_text
+                    break
 
         await self.concurrency.acquire_global()
         try:
@@ -249,9 +256,10 @@ class ReplyEngine:
 
             # 更新历史（只有真正发出回复才更新，被抢占的任务不写历史）
             if isinstance(multimodal_content, list):
-                history_user_text = clean_text + " [含图片]" if clean_text else "[图片]"
+                history_user_text = final_text + " [含图片]" if final_text else "[图片]"
             else:
-                history_user_text = clean_text
+                history_user_text = final_text
+
             self.context.append_to_session(group_id, user_id, history_user_text, raw_reply)
 
             if is_group:

@@ -106,7 +106,8 @@ class ConcurrencyController:
                     # 合并：把旧问题带进来，让 bot 知道之前在说什么
                     if old_text and old_text != new_text:
                         merged_text = f"{old_text}\n{new_text}"
-            self._active_tasks[session_key] = (new_task, new_text)
+            self._active_tasks[session_key] = (new_task, merged_text)
+
             return merged_text
 
     async def unregister_task(self, session_key: str, task: asyncio.Task) -> None:
