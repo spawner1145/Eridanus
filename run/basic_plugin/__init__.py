@@ -51,7 +51,7 @@ function_declarations=[
     },
     {
         "name": "call_image_search",
-        "description": "按照用户要求搜索给定图片的来源，当且仅当用户要求搜索时才可触发。",
+        "description": "按照用户要求搜索给定图片的来源，如果用户没有要求，不要主动搜索",
         "parameters": {
             "type": "object",
             "properties": {

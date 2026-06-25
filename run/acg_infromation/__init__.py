@@ -38,7 +38,7 @@ function_declarations=[
     },
     {
         "name": "call_character_identify",
-        "description": "按照用户要求识别图片中的人物",
+        "description": "识别图片中的人物。如果用户没有要求，不要主动识别",
         "parameters": {
             "type": "object",
             "properties": {
