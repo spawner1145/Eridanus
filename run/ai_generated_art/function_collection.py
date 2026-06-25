@@ -48,8 +48,8 @@ async def image_edit(bot, event, config, img_url, prompt):
     apikey = config.ai_generated_art.config["gptimage2"]["apikey"]
     headers = {"Authorization": f"Bearer {apikey}"}
 
-    configured_ratio = config.ai_generated_art.config["gptimage2"].get("aspect_ratio")
-    aspect_ratio = configured_ratio if configured_ratio else get_best_aspect_ratio(image_path)
+    #configured_ratio = config.ai_generated_art.config["gptimage2"].get("aspect_ratio")
+    aspect_ratio = get_best_aspect_ratio(image_path)
 
     data = {
         "prompt": prompt,
