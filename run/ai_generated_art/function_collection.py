@@ -13,12 +13,12 @@ from framework_common.utils.utils import download_img
 from run.auto_reply.main import bot_name
 
 
-async def image_edit(bot,event,config,prompt,image_url):
+async def image_edit(bot,event,config,prompt,img_url):
     user=await get_user(event.user_id)
     permission_need=config.ai_generated_art.config["gptimage2"]["权限要求"]
     if user.permission<permission_need:
         return
-    image_path=await download_img(image_url)
+    image_path=await download_img(img_url)
     aim_url="http://api.apollodorus.xyz/v1/images/edits"
 
     file_objects = []
