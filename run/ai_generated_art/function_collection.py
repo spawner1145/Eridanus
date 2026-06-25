@@ -13,7 +13,7 @@ from framework_common.utils.utils import download_img
 from run.auto_reply.main import bot_name
 
 
-async def image_edit(bot,event,config,prompt,img_url):
+async def image_edit(bot,event,config,img_url,prompt):
     user=await get_user(event.user_id)
     permission_need=config.ai_generated_art.config["gptimage2"]["权限要求"]
     if user.permission<permission_need:
