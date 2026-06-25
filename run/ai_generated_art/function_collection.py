@@ -99,7 +99,7 @@ async def image_edit(bot, event, config, img_url, prompt):
         await bot.send(event, f"请求失败，已重试 {max_retries} 次，最后错误：{last_error}")
 
     asyncio.create_task(
-        _send_bot_image_with_retry(_image_edit_tas(bot, event, config, img_url, prompt))
+        _image_edit_tas(bot, event, config, img_url, prompt)
     )
 
 
