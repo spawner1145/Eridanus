@@ -213,6 +213,7 @@ async def mys_login_new(user_id,bot=None,event=None):
             check_qr_url = "https://passport-api.miyoushe.com/account/ma-cn-passport/web/queryQRLoginStatus"
             async with httpx.AsyncClient() as client:
                 r = await client.post(url=check_qr_url, headers=headers, json={"ticket": qrcode_ticket})
+                cookies_check = r.cookies
                 data: dict = r.json()
                 cookies_json = json.dumps(dict(r.cookies), indent=4)
                 record = data["retcode"]
@@ -258,8 +259,36 @@ async def mys_login_new(user_id,bot=None,event=None):
             fp_status, account.device_fp = await get_device_fp(uuid_d)
             if fp_status:
                 logger.info(f"用户 {bbs_uid} 成功获取 device_fp: {account.device_fp}")
+            #开始获取Stoken
+            # mihoyobbs_version = '2.99.1'
+            # mihoyobbs_Client_type_web = '5'
+            # Stoken_headers = {
+            #     'Accept': 'application/json, text/plain, */*',
+            #     'DS': "",
+            #     "x-rpc-channel": "miyousheluodi",
+            #     'Origin': 'https://webstatic.mihoyo.com',
+            #     'x-rpc-app_version': mihoyobbs_version,
+            #     'User-Agent': 'Mozilla/5.0 (Linux; Android 12; Unspecified Device) AppleWebKit/537.36 (KHTML, like Gecko) '
+            #                   f'Version/4.0 Chrome/103.0.5060.129 Mobile Safari/537.36 miHoYoBBS/{mihoyobbs_version}',
+            #     'x-rpc-client_type': mihoyobbs_Client_type_web,
+            #     'Referer': '',
+            #     'Accept-Encoding': 'gzip, deflate',
+            #     'Accept-Language': 'zh-CN,en-US;q=0.8',
+            #     'X-Requested-With': 'com.mihoyo.hyperion',
+            #     "Cookie": f'{cookies_check}',
+            #     'x-rpc-device_id': f"{uuid_d}"
+            # }
+            # Stoken_url = f"https://api-takumi.mihoyo.com/auth/api/getMultiTokenByLoginTicket"
+            # async with httpx.AsyncClient() as client:
+            #     r = await client.get(url=Stoken_url, headers=Stoken_headers,params={"login_ticket": qrcode_ticket, "token_types": "3", "uid": bbs_uid})
+            #     stoken_data = r.json()
+            #
+            # pprint.pprint(stoken_data)
+            # if stoken_data["retcode"] == 0:
+            #     return data["data"]["list"][0]["token"]
 
             cookies_save.cookie_token, cookies_save.cookie_token_v2 = cookies['cookie_token'], cookies['cookie_token_v2']
+            #cookies_save.stoken_v2 = cookies['ltoken_v2']
             cookies_save.ltoken, cookies_save.ltoken_v2 = cookies['ltoken'], cookies['ltoken_v2']
             cookies_save.stuid, cookies_save.ltuid, cookies_save.account_id, cookies_save.login_uid = bbs_uid, bbs_uid, bbs_uid, bbs_uid
             cookies_save.mid = cookies['account_mid_v2']

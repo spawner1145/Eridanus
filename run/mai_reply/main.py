@@ -29,7 +29,7 @@ import base64
 import uuid
 
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
-from developTools.message.message_components import Text, Image, Mface
+from developTools.message.message_components import Text, Image, Mface, At
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.utils import download_img, get_img

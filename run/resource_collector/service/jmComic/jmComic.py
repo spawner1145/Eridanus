@@ -465,10 +465,11 @@ async def test():
 
     client = OpenListClient(base_url, username, password)
     info = await client.login()
-    pprint.pprint(info)
-    #await client.check_dir(folder_path)
-    info = await client.upload_file(filepath, folder_path)
-    pprint.pprint(info)
+    await client.logout()
+    # pprint.pprint(info)
+    # #await client.check_dir(folder_path)
+    # info = await client.upload_file(filepath, folder_path)
+    # pprint.pprint(info)
 
 if __name__ == '__main__':
     pass
