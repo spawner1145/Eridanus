@@ -110,7 +110,9 @@ backdrop:
   img:
     background: None        #请输入您的背景路径或url
     is_blurred: true
-    is_shadow: false
+    is_shadow: false                 #是否将背景图片模糊阴影化
+    shadow_max_alpha: 120       #阴影的最大透明度
+    shadow_intensity: 1.0       #阴影的变淡速度
 
 
 text:
@@ -131,6 +133,13 @@ img:
     must_required_keys: {'img': null, 'content': null}
     description_color: (255,255,255,255)  #放置介绍区域的颜色
     max_des_length: 300
+
+  common_with_des_bili:
+    must_required_keys: { 'img': null, 'content': null, 'info': null }
+    description_color: (255,255,255,255)  #放置介绍区域的颜色
+    max_des_length: 300
+    shadow_max_alpha: 170       #阴影的最大透明度
+    shadow_intensity: 0.97       #阴影的变淡速度
 
   common_with_des_right:
     must_required_keys: {'img': null, 'content': null}
@@ -175,7 +184,9 @@ avatar:
   judge_flag: default #此处判断头像的背景处理方式，目前有：'common'平铺样式、'list'列表样式、'default'自动判断
   is_name: Ture                   #是否在头像右侧旁添加名字
   is_blurred: true
-  is_shadow: true
+  is_shadow: true                 #是否将背景图片模糊阴影化
+  shadow_max_alpha: 120       #阴影的最大透明度
+  shadow_intensity: 1.0       #阴影的变淡速度
   shadow_color: (0, 0, 0)
 
   software_list:
