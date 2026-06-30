@@ -552,11 +552,11 @@ async def bili_dynamic_loop_new(bot, config):
                 #检测动态是否为视频
                 if config.streaming_media.config["bili_dynamic"]["is_only_send_video"] and dynamic_info_prising['status'] and dynamic_info_prising['content']['type'] == 'dynamic':
                     if dynamic_info_prising['content']['opus_type'] != 'DYNAMIC_TYPE_AV':
-                        dynamic_info_prising['status'] = False
+                        continue
                 # 此处检测是否为二游中奖通知，进行过滤
                 if config.streaming_media.config["bili_dynamic"]["is_filter_winning"] and dynamic_info_prising['status'] and dynamic_info_prising['content']['type'] == 'dynamic':
-                    if dynamic_info_prising['content']['type']['text'].startswith(('恭喜@',)):
-                        dynamic_info_prising['status'] = False
+                    if dynamic_info_prising['content']['opus_type'] == 'DYNAMIC_TYPE_FORWARD' and dynamic_info_prising['content']['text'].strip().startswith('恭喜@'):
+                        continue
                 if dynamic_info_prising['status']:
                     for group_id in user_info['push_groups']:
                         if group_id not in group_list: continue

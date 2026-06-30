@@ -193,6 +193,8 @@ async def dy(url,filepath=None,type_check=None):
     api_url = generate_x_bogus_url(api_url, headers)  # 如果请求失败直接返回
     async with httpx.AsyncClient(headers=headers, timeout=10) as client:
         response = await client.get(api_url)
+        # print(response.status_code)
+        # print(response.text)
         detail=response.json()
         if detail is None:
             logger.info(f"{GLOBAL_NICKNAME}识别：抖音，解析失败！")

@@ -26,7 +26,7 @@ import pprint
 from bilibili_api import dynamic
 from bilibili_api import login_v2, sync, search, user
 from bilibili_api.opus import Opus
-from bilibili_api.video import VideoDownloadURLDataDetecter
+from bilibili_api.video import VideoDownloadURLDataDetecter, VideoQuality
 from .bili import bili_init,av_to_bv,download_b,info_search_bili
 from .common import name_qq_list,card_url_list,add_append_img,download_video,get_file_size_mb,download_img
 try:
@@ -39,29 +39,92 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
-async def get_dominant_color(img_url, k=4, image_resize=(100, 100)):
+
+async def get_dominant_color(img_url,absorb_color=False, k=4, image_resize=(100, 100)):
+    if absorb_color is False or img_url is None:
+        return_json = {'back_rgb': (194, 228, 255), 'layer_rgba': (235, 239, 253),
+                       'font_title_rgb': (0,0,0), 'font_des_rgb': (148,148,148),
+                       'img_des_rgba':(255, 255, 255, 255),'avatar_shadow_color':(0, 0, 0),
+                       'avatar_shadow_max_alpha':120, 'avatar_shadow_intensity': 1,
+                       'label_color':(251,114,153,255)}
+        return return_json
     async with httpx.AsyncClient() as client:
         resp = await client.get(img_url)
         resp.raise_for_status()
     image = PilImage.open(BytesIO(resp.content))
-    image = image.resize(image_resize)
-
+    image = image.resize(image_resize).convert('RGB')
     img_np = np.array(image).reshape(-1, 3)
     kmeans = KMeans(n_clusters=k)
     kmeans.fit(img_np)
 
     counts = np.bincount(kmeans.labels_)
-    dominant = kmeans.cluster_centers_[np.argmax(counts)]
-    dominant_color = tuple(int(c) for c in dominant)
-    lighten_factor = 0.7
-    r, g, b = [x / 255.0 for x in dominant_color]
+    cluster_centers = kmeans.cluster_centers_.astype(int)
+
+    # # 计算加权分数 = 频数 * 饱和度，选最大
+    # weights = []
+    # for i in range(k):
+    #     r, g, b = cluster_centers[i] / 255
+    #     h, l, s = colorsys.rgb_to_hls(r, g, b)
+    #     weight = counts[i] * s  # 饱和度加权频数
+    #     weights.append(weight)
+    #
+    # dominant_idx = np.argmax(weights)
+    # dominant_rgb = tuple(int(c) for c in cluster_centers[dominant_idx])
+
+    BLACK = np.array([0, 0, 0])
+    WHITE = np.array([255, 255, 255])
+
+    weights = []
+    for i in range(k):
+        color = cluster_centers[i]
+        r, g, b = color / 255
+        h, l, s = colorsys.rgb_to_hls(r, g, b)
+        count = counts[i]
+
+        # 计算RGB空间与黑白的欧氏距离
+        dist_black = np.linalg.norm(color - BLACK) / np.linalg.norm(WHITE - BLACK)  # 归一化距离0~1
+        dist_white = np.linalg.norm(color - WHITE) / np.linalg.norm(WHITE - BLACK)  # 归一化距离0~1
+        closest_dist = min(dist_black, dist_white)  # 越小表示越接近黑或白
+        # 计算衰减系数：距离越接近0，权重越低，最低0.7
+        # 这里用线性缩放，也可以根据需求改成非线性函数
+        decay_factor = 0.3 + 0.7 * closest_dist  # closest_dist=0时0.7，closest_dist=1时1.0
+        weight = count * s * decay_factor  # 饱和度加权频数，再乘以衰减
+        weights.append(weight)
+
+    dominant_idx = np.argmax(weights)
+    dominant_rgb = tuple(int(c) for c in cluster_centers[dominant_idx])
+
+
+
+
+    r,g,b = dominant_rgb
+    dominant_rgba = (r,g,b,255)
+    # 生成浅色的rgba
+    lighten_factor = 0.45
+    r, g, b = [x / 255.0 for x in dominant_rgb]
     h, l, s = colorsys.rgb_to_hls(r, g, b)
-    # 调整明度，使颜色变浅，明度上限1
     l = min(1.0, l + (1.0 - l) * lighten_factor)
     r_l, g_l, b_l = colorsys.hls_to_rgb(h, l, s)
-    dominant_rgba = (int(r_l * 255), int(g_l * 255), int(b_l * 255), 255)
-
-    return dominant_color, dominant_rgba
+    dominant_rgba_deal = (int(r_l * 255), int(g_l * 255), int(b_l * 255), 255)  # alpha=200
+    #print(dominant_rgb, dominant_rgba)
+    font_title_rgb, font_des_rgb = (0, 0, 0), (148, 148, 148),
+    #判断字体需不需要反转颜色
+    r, g, b, a = dominant_rgba_deal
+    check_font_rgb = 0.299 * r + 0.587 * g + 0.114 * b
+    if check_font_rgb < 140: font_title_rgb = (255, 255, 255)
+    if check_font_rgb < 195: font_des_rgb = (255, 255, 255)
+    label_color = dominant_rgba
+    r, g, b, a = label_color
+    #print(0.299 * r + 0.587 * g + 0.114 * b)
+    if 0.299 * r + 0.587 * g + 0.114 * b > 180:
+        label_color = (251,114,153,255)
+    return_json = {'back_rgb': dominant_rgb, 'layer_rgba': dominant_rgba_deal,
+                   'font_title_rgb': font_title_rgb, 'font_des_rgb': font_des_rgb,
+                   'img_des_rgba': dominant_rgba_deal, 'avatar_shadow_color': dominant_rgb,
+                    'avatar_shadow_max_alpha':200, 'avatar_shadow_intensity': 1.2,
+                    'label_color':label_color}
+    #pprint.pprint(return_json)
+    return return_json
 
 
 async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=None,absorb_color=False,up_info_get=False):
@@ -92,10 +155,9 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
     desc=None
     avatar_json=None
     url_reg = r"(http:|https:)\/\/(space|www|live).bilibili.com\/[A-Za-z\d._?%&+\-=\/#]*"
-    back_main_color, back_main_color_rgba, description_color = (194, 228, 255), (235, 239, 253), (255, 255, 255, 255)
-    shadow_color = (0, 0, 0)
     header_img, right_icon = 'data/img/type_software/bili.png', 'data/img/type_software/bili_icon.png'
     b_short_rex = r"(https?://(?:b23\.tv|bili2233\.cn)/[A-Za-z\d._?%&+\-=\/#]+)"
+    des_draw_type, des_draw_info = 'common_with_des', {}
     # 处理短号、小程序问题
     if "b23.tv" in url or "bili2233.cn" in url or "QQ小程序" in url :
         b_short_url = re.search(b_short_rex, url.replace("\\", ""))[0]
@@ -162,7 +224,7 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
                     opus_paragraphs = dynamic_info['item']['modules']['module_dynamic']['major']['opus']
                     text_list_check = ''
                     pics_context=[]
-                    #print(json.dumps(opus_paragraphs['summary']['rich_text_nodes'], indent=4))
+                    #print(json.dumps(opus_paragraphs, indent=4))
 
 
                     for text_check in opus_paragraphs['summary']['rich_text_nodes']:
@@ -209,35 +271,44 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
                     image_list = [cover]
                     context += f"[title]{title}[/title]\n[des]{desc}[/des]"
                     type_software = 'BiliBili 投稿'
-                if absorb_color and image_list:
-                    back_main_color, back_main_color_rgba = await get_dominant_color(image_list[0])
-                    description_color, shadow_color = back_main_color_rgba, back_main_color
+                    #pprint.pprint(paragraphs)
+                    if up_info_get:
+                        des_draw_type = 'common_with_des_bili'
+                        des_draw_info = {'duration': paragraphs['duration_text'], 'view': paragraphs['stat']['play'],
+                               'danmaku': paragraphs['stat']['danmaku'], 'type': 'dynamic_video'}
+                color_info = await get_dominant_color(image_list[0] if image_list else None,absorb_color=absorb_color)
                 if len(image_list) == 1 and type_software in {'直播',}:
-                    manshuo_draw_json=[{'type': 'basic_set', 'debug': False, 'font_title_color': (0,0,0),
-                         'backdrop_color': {'color1': back_main_color_rgba},'shadow_font_color':back_main_color},
-                        {'type': 'backdrop', 'subtype': 'one_color','color':back_main_color},
+                    manshuo_draw_json=[{'type': 'basic_set', 'debug': False,
+                        'font_title_color': color_info['font_title_rgb'],'font_des_color': color_info['font_des_rgb'],
+                         'backdrop_color': {'color1': color_info['layer_rgba']},'shadow_font_color':color_info['back_rgb']},
+                        {'type': 'backdrop', 'subtype': 'one_color','color':color_info['back_rgb']},
                         {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                          'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
-                         'background':header_img,'right_icon':right_icon,'shadow_color':shadow_color },
-                        {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list, 'label': [type_software],
-                         'content': [context],'description_color':description_color}]
+                         'background':header_img,'right_icon':right_icon,'shadow_color':color_info['avatar_shadow_color'],
+                         'shadow_max_alpha':color_info['avatar_shadow_max_alpha'],'shadow_intensity':color_info['avatar_shadow_intensity']},
+                        {'type': 'img', 'subtype': 'common_with_des_right', 'img': image_list, 'label': [type_software],'label_color':color_info['label_color'],
+                         'content': [context],'description_color':color_info['img_des_rgba']}]
                 elif len(image_list) == 1 and type_software in {'BiliBili 投稿'}:
-                    manshuo_draw_json=[{'type': 'basic_set', 'debug': False, 'font_title_color': (0,0,0),
-                         'backdrop_color': {'color1': back_main_color_rgba},'shadow_font_color':back_main_color},
-                            {'type': 'backdrop', 'subtype': 'one_color','color':back_main_color},
-                            {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
-                             'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
-                             'background':header_img,'right_icon':right_icon,'shadow_color':shadow_color },
-                            {'type': 'img', 'subtype': 'common_with_des', 'img': image_list, 'label': [type_software],
-                             'content': [context],'description_color':description_color}]
-                else:
-                    manshuo_draw_json=[{'type': 'basic_set', 'debug': False, 'font_title_color': (0,0,0),
-                         'backdrop_color': {'color1': back_main_color_rgba},'shadow_font_color':back_main_color},
-                        {'type': 'backdrop', 'subtype': 'one_color','color':back_main_color},
+                    manshuo_draw_json=[{'type': 'basic_set', 'debug': False,
+                         'font_title_color': color_info['font_title_rgb'],'font_des_color': color_info['font_des_rgb'],
+                         'backdrop_color': {'color1': color_info['layer_rgba']},'shadow_font_color':color_info['back_rgb']},
+                        {'type': 'backdrop', 'subtype': 'one_color','color':color_info['back_rgb']},
                         {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
-                         'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],'shadow_color':shadow_color,
-                         'background':header_img,'right_icon':right_icon,},{'type': 'text','content': [context]},
-                        {'type': 'img','img': image_list,'description_color':description_color}]
+                         'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
+                         'background':header_img,'right_icon':right_icon,'shadow_color':color_info['avatar_shadow_color'],
+                         'shadow_max_alpha':color_info['avatar_shadow_max_alpha'],'shadow_intensity':color_info['avatar_shadow_intensity'] },
+                        {'type': 'img', 'subtype': des_draw_type, 'img': image_list, 'label': [type_software],'label_color':color_info['label_color'],
+                         'content': [context],'description_color':color_info['img_des_rgba'],'info':[des_draw_info]}]
+                else:
+                    manshuo_draw_json=[{'type': 'basic_set', 'debug': False,
+                        'font_title_color': color_info['font_title_rgb'],'font_des_color': color_info['font_des_rgb'],
+                         'backdrop_color': {'color1': color_info['layer_rgba']},'shadow_font_color':color_info['back_rgb']},
+                        {'type': 'backdrop', 'subtype': 'one_color','color':color_info['back_rgb']},
+                        {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
+                         'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],'shadow_color':color_info['avatar_shadow_color'],
+                         'background':header_img,'right_icon':right_icon,},{'type': 'text','content': [context],
+                         'shadow_max_alpha':color_info['avatar_shadow_max_alpha'],'shadow_intensity':color_info['avatar_shadow_intensity']},
+                        {'type': 'img','img': image_list,'description_color':color_info['img_des_rgba']}]
                 #pprint.pprint(manshuo_draw_json)
                 if is_twice is not True:
                     if type not in no_draw_type:
@@ -300,13 +371,10 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
 
                 orig_url= 'orig_url:'+'https://t.bilibili.com/' + orig_context['id_str']
                 manshuo_draw_json2=await bilibili(orig_url,f'{filepath}orig_',is_twice=True)
-                back_main_color, back_main_color_rgba = (194, 228, 255), (235, 239, 253)
-                # if absorb_color and image_list:
-                #     back_main_color, back_main_color_rgba = await get_dominant_color(image_list[0])
                 manshuo_draw_json = [
                     {'type': 'basic_set', 'debug': False, 'font_title_color': (0,0,0),
-                     'backdrop_color': {'color1': back_main_color_rgba}},
-                    {'type': 'backdrop', 'subtype': 'one_color', 'color': back_main_color},
+                     'backdrop_color': {'color1': (235, 239, 253)}},
+                    {'type': 'backdrop', 'subtype': 'one_color', 'color': (194, 228, 255)},
                     {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
                      'content': [f"[name]{owner_name}[/name]  [time]{pub_time}[/time]"],'avatar_size':50,
                      'label': label_list}, {'type': 'text','content': [text_list_check]}]
@@ -339,23 +407,22 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
             live_status, live_start_time = room_info['live_status'], room_info['live_start_time']
             pub_time = datetime.fromtimestamp(live_start_time).astimezone().strftime("%Y-%m-%d %H:%M:%S")
         else:pub_time='暂未开启直播'
-        if absorb_color:
-            back_main_color, back_main_color_rgba = await get_dominant_color(cover)
-            description_color, shadow_color = back_main_color_rgba, back_main_color
         #是否获取头图
         if up_info_get:
             u = user.User(room_info['uid'])
             up_info = await u.get_user_info()
             header_img = await download_img('https://i0.hdslb.com/' + up_info['top_photo'], "data/pictures/cache/")
+        color_info = await get_dominant_color(cover,absorb_color=absorb_color)
         manshuo_draw_json = [
-            {'type': 'basic_set', 'debug': False, 'font_title_color': (0,0,0),
-             'backdrop_color': {'color1': back_main_color_rgba},'shadow_font_color':back_main_color},
-            {'type': 'backdrop', 'subtype': 'one_color', 'color': back_main_color},
+            {'type': 'basic_set', 'debug': False, 'font_title_color': color_info['font_title_rgb'],'font_des_color': color_info['font_des_rgb'],
+             'backdrop_color': {'color1': color_info['layer_rgba']},'shadow_font_color':color_info['back_rgb']},
+            {'type': 'backdrop', 'subtype': 'one_color', 'color': color_info['back_rgb']},
             {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover], 'upshift_extra': 20,
              'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
-             'background':header_img,'right_icon':right_icon, 'shadow_color':shadow_color},
-            {'type': 'img', 'subtype': 'common_with_des_right', 'img': [cover],'label': ['直播'],
-             'content': [context],'description_color':description_color}]
+             'background':header_img,'right_icon':right_icon, 'shadow_color':color_info['avatar_shadow_color'],
+            'shadow_max_alpha':color_info['avatar_shadow_max_alpha'],'shadow_intensity':color_info['avatar_shadow_intensity']},
+            {'type': 'img', 'subtype': 'common_with_des_right', 'img': [cover],'label': ['直播'],'label_color':color_info['label_color'],
+             'content': [context],'description_color':color_info['img_des_rgba']}]
 
         if is_twice is not True:
             if type not in no_draw_type:
@@ -385,12 +452,12 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
     if 'favlist' in url and BILI_SESSDATA != '':
         logger.info('收藏夹未做识别，跳过，欢迎催更')
         return None
-
-
-
     try:
         video_id = re.search(r"video\/[^\?\/ ]+", url)[0].split('/')[1]
-        v = video.Video(video_id, credential=credential)
+        if credential_bili is not None:
+            v = video.Video(video_id, credential=credential_bili)
+        else:
+            v = video.Video(video_id, credential=credential)
         video_info = await v.get_info()
     except Exception as e:
         logger.info('无法获取视频内容，该进程已退出')
@@ -430,11 +497,19 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
     detecter = VideoDownloadURLDataDetecter(download_url_data)
     streams = detecter.detect()
     #pprint.pprint(streams)
+    #这里获取的视频链接最高不超过1080P
     try:
         video_url, audio_url = None, None
+        if credential_bili is not None:
+            for stream in streams:
+                if hasattr(stream, 'video_quality') and video_url is None and stream.video_quality == VideoQuality._1080P:
+                    video_url = stream.url
+                    #print(stream.video_quality)
+                    break
         for stream in streams:
             if hasattr(stream, 'video_quality') and video_url is None:
                 video_url = stream.url
+                #print(stream.video_quality)
             elif hasattr(stream, 'audio_quality') and audio_url is None:
                 audio_url = stream.url
             if video_url and audio_url: break
@@ -442,24 +517,26 @@ async def bilibili(url,filepath=None,is_twice=None,type=None,credential_bili=Non
     except Exception as e:
         json_check['video_url'] = False
     context += f'[title]{video_title}[/title]\n[des]{video_desc} [/des]'
-    if absorb_color:
-        back_main_color, back_main_color_rgba = await get_dominant_color(video_cover)
-        description_color, shadow_color = back_main_color_rgba, back_main_color
-        #print(back_main_color, back_main_color_rgba)
     # 是否获取头图
     if up_info_get:
         u = user.User(video_info['owner']['mid'])
         up_info = await u.get_user_info()
         header_img = await download_img('https://i0.hdslb.com/' + up_info['top_photo'], "data/pictures/cache/")
+        des_draw_type = 'common_with_des_bili'
+    color_info = await get_dominant_color(video_cover, absorb_color=absorb_color)
+    #获取播放量信息，用以增加新的标识
+    des_draw_info = {'duration':video_info['duration'], 'view':video_info['stat']['view'], 'coin': video_info['stat']['coin'],
+            'danmaku':video_info['stat']['danmaku'] ,'share':video_info['stat']['share'],'type':'video'}
     manshuo_draw_json = [
-        {'type': 'basic_set', 'debug': False, 'font_title_color': (0,0,0),
-         'backdrop_color': {'color1': back_main_color_rgba},'shadow_font_color':back_main_color},
-        {'type': 'backdrop', 'subtype': 'one_color', 'color': back_main_color},
+        {'type': 'basic_set', 'debug': False,'font_title_color': color_info['font_title_rgb'],'font_des_color': color_info['font_des_rgb'],
+         'backdrop_color': {'color1': color_info['layer_rgba']},'shadow_font_color':color_info['back_rgb']},
+        {'type': 'backdrop', 'subtype': 'one_color', 'color': color_info['back_rgb']},
         {'type': 'avatar', 'subtype': 'common', 'img': [owner_cover_url], 'upshift_extra': 20,
          'content': [f"[name]{owner_name}[/name]\n[time]{pub_time}[/time]"],
-         'background':header_img,'right_icon':right_icon, 'shadow_color':shadow_color},
-        {'type': 'img', 'subtype': 'common_with_des', 'img': [video_cover],'label': ['视频'],
-         'content': [context],'description_color':description_color}]
+         'background':header_img,'right_icon':right_icon, 'shadow_color':color_info['avatar_shadow_color'],
+        'shadow_max_alpha':color_info['avatar_shadow_max_alpha'],'shadow_intensity':color_info['avatar_shadow_intensity']},
+        {'type': 'img', 'subtype': des_draw_type, 'img': [video_cover],'label': ['视频'],'label_color':color_info['label_color'],
+         'content': [context],'description_color':color_info['img_des_rgba'],'info':[des_draw_info]}]
 
     if is_twice is not True:
         if type not in no_draw_type:

@@ -122,7 +122,8 @@ def main(bot, config):
         if url.strip().startswith(('下载视频', '下载图片','/bili ')): return
         link_prising_json = await link_prising(url, filepath='data/pictures/cache/', proxy=proxy, type=type_link,
                                                absorb_color=config.streaming_media.config["bili_dynamic"]["is_absorb_color"],
-                                               up_info_get=config.streaming_media.config["bili_dynamic"]["is_fetch_up_info"])
+                                               up_info_get=config.streaming_media.config["bili_dynamic"]["is_fetch_up_info"],
+                                               credential_bili=config.streaming_media.config["bili_dynamic"]["is_download_high_quality"])
         send_context = f'{botname}识别结果：'
         if link_prising_json['status']:
             bot.logger.info('链接解析成功，开始推送~~')
