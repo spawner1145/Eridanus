@@ -1,5 +1,6 @@
 gpt_sovits:
   api_base: ""  #群内获取base_url，或自建
+  api_key: ""   # 留空=直连真实服务端(api_base指向api_v2.py地址)；非空=经过api网关(api_base指向网关地址，鉴权用Bearer api_key)
   ref_audio_path: output/slicer_opt/output.wav_0009342720_0009558400.wav
   ref_text: 怎么啊？如果有你在也不放心，那就干脆给我也装个限制器或者炸弹喽。
   speakers:
@@ -7,7 +8,7 @@ gpt_sovits:
   top_k: 15                  # int. top k sampling
   top_p: 1                   # float. top p sampling
   temperature: 1             # float. temperature for sampling
-  text_split_method: cut5  # str. text split method, see text_segmentation_method.py for details.
+  text_split_method: cut1  # str. text split method, see text_segmentation_method.py for details.
   batch_size: 1              # int. batch size for inference
   speed_factor: 0.91           # float. control the speed of the synthesized audio.
   seed: -1                   # int. random seed for reproducibility.

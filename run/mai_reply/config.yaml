@@ -61,7 +61,7 @@ context: # 上下文相关配置
   group_reply_impression_count: 3 #群聊回复时调用其他n个用户印象
   group_trigger_msgs: 10 #群聊印象更新间隔
   group_max_chars: 600 #群聊印象最大字数
-  img_context: false   # 读取上下文中的图片（需要模型能看图，会极大增加token消耗，仅在trigger_llm的白名单群启用）
+  img_context: false   # 已几乎弃用。读取上下文中的图片（需要模型能看图，会极大增加token消耗，仅在trigger_llm的白名单群启用）
   vision_base_url: "http://api.apollodorus.xyz/v1"  # 视觉模型接口URL，留空则使用llm配置中的base_url
   vision_api_key: "xxxxx"  # 视觉模型API
   vision_model: "grok-4"  # 能读图的模型
