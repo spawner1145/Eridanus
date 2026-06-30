@@ -4,6 +4,7 @@ from .text_deal import basic_img_draw_text
 from .common import crop_to_square
 import math
 import gc
+import copy
 import weakref
 from collections.abc import Iterable
 import pprint
@@ -193,7 +194,8 @@ async def backdrop_process(params, canves, limit=(0, 0)):
 
             # 创建遮罩 - 使用更高效的方法
             mask = Image.new("L", (width, height), 0)
-            max_alpha, intensity = 100, 0.8
+            #这里默认减小，若传入参数则使用传入参数
+            max_alpha, intensity = params['shadow_max_alpha'], params['shadow_intensity']
             max_distance = math.sqrt(center_x ** 2 + center_y ** 2)
 
             # 批量处理像素而不是逐个处理
@@ -213,8 +215,8 @@ async def backdrop_process(params, canves, limit=(0, 0)):
             mask.putdata([pixel for row in pixels for pixel in row])
 
             # 创建阴影图层
-            r,g,b = shadow_color
-            shadow_color_rgba = (r,g,b,0)
+            r, g, b = shadow_color
+            shadow_color_rgba = (r, g, b, 0)
             shadow = Image.new("RGBA", background_img.size, shadow_color_rgba)
             shadow.putalpha(mask)
             mask.close()  # 立即清理mask
@@ -353,6 +355,64 @@ async def label_process(params, img, number_count, new_width):
                 label_canvas.close()
             except:
                 pass
+
+
+
+# 图片底边相关信息绘制
+async def img_bottom_bili_info_process(params, img):
+    if params['number_count'] >= len(params['info']) or params['info'][params['number_count']] == '':
+        return img
+    info = params['info'][params['number_count']]
+    if info['type'] == 'video':
+        for item in info:
+            if not isinstance(info[item], int):continue
+            if item in ['duration']:
+                info[item] = f"{info[item] // 60:02d}:{info[item] % 60:02d}"
+                continue
+            if info[item] < 1000: info[item] = info[item]
+            elif info[item] < 10000: info[item] = f'{info[item] // 1000}千'
+            elif info[item] >= 10000: info[item] = f'{info[item] // 10000}万'
+        info_text = f"{info['view']}播放    {info['danmaku']}弹幕    {info['coin']}硬币    {info['share']}分享"
+    elif info['type'] == 'dynamic_video':
+        info_text = f"{info['view']}播放    {info['danmaku']}弹幕"
+    #print(info_text)
+    img = img.convert("RGBA")
+    width, height = img.size
+    shadow = Image.new("L", (width, height))  # 单通道灰度图，作为alpha蒙版
+    max_alpha, intensity = params['shadow_max_alpha'], params['shadow_intensity']
+    max_alpha,intensity = 170, 0.985
+    for y in range(height):
+        distance_from_bottom = height - y - 1
+        # 阴影不透明度按指数衰减
+        opacity = max_alpha * intensity ** distance_from_bottom
+        opacity = max(0, min(max_alpha, int(opacity)))
+        for x in range(width):
+            shadow.putpixel((x, y), opacity)
+
+    black_layer = Image.new("RGBA", (width, height), (0, 0, 0, 255))
+    black_layer.putalpha(shadow)
+
+    result = Image.alpha_composite(img, black_layer)
+    img.close()
+    black_layer.close()
+    img = result
+    #开始绘制文字
+    width, height = img.size
+    params_ = copy.deepcopy(params)
+    params_['font_des_color'], params_['font_des_size'] = (255, 255, 255), 25
+    font_des = ImageFont.truetype(params_['font_des'], params_['font_des_size'])
+    bbox = font_des.getbbox(f" 时长：{info['duration']} ")
+    des_width = bbox[2] - bbox[0]
+    img_result = await basic_img_draw_text(img, f'[des] {info_text} [/des]',params_ ,
+                                            box=(params['padding'] * 1.3, height - params['font_des_size'] - params['padding']),
+                                            limit_box=(width, height), ellipsis=False)
+    img = img_result['canvas']
+    img_result = await basic_img_draw_text(img, f'[des] 时长：{info["duration"]} [/des]',params_ ,
+                                            box=(width - params['padding'] * 2 - des_width, height - params['font_des_size'] - params['padding']),
+                                            limit_box=(width, height), ellipsis=False)
+    img = img_result['canvas']
+    return img
+
 
 
 # 以下函数为模块内关系处理函数

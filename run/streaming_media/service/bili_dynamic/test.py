@@ -9,7 +9,7 @@ from framework_common.manshuo_draw import *
 async def test():
     #await data_delete(7071924)
     await bili_login()
-    #info = await data_init()
+    info = await data_init()
 
     #pprint.pprint(info)
     # print(await check_credential())

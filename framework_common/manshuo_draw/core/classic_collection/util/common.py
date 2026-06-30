@@ -105,18 +105,26 @@ def get_abs_path(path,is_dir=False):
 async def crop_to_square(img_list):
     """
     将一个 Pillow 图像对象裁剪为居中的正方形。
+    新增长宽比判断，若为长图则为顶部裁剪，非长图则为中间裁剪
     """
     img_processed_list = []
     for image in img_list:
         width, height = image.size
         # 计算短边的边长，即正方形的边长
         side_length = min(width, height)
-
-        # 计算裁剪区域（左、上、右、下）
-        left = (width - side_length) // 2
-        top = (height - side_length) // 2
-        right = left + side_length
-        bottom = top + side_length
+        #长图则为顶部裁剪
+        if height / width >= 3:
+            left = 0
+            top = 0
+            right = width
+            bottom = width
+        else:
+            # 非长图则为中间裁剪
+            # 计算裁剪区域（左、上、右、下）
+            left = (width - side_length) // 2
+            top = (height - side_length) // 2
+            right = left + side_length
+            bottom = top + side_length
 
         # 裁剪图像
         cropped_image = image.crop((left, top, right, bottom))

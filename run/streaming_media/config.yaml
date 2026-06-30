@@ -3,12 +3,13 @@ bili_dynamic:     #B站解析与推送相关设置
   dynamic_interval: 30 #动态检查间隔时间，单位为秒
   is_only_master: false #是否仅允许master订阅
   is_only_send_video: false #是否仅推送订阅up的投稿视频，其他动态一概不推送
-  is_filter_winning: false #是否过滤中奖通知，此选项意在减少二游动态的部分推送
+  is_filter_winning: true #是否过滤中奖通知，此选项意在减少二游动态的部分推送
   is_absorb_color: true #是否吸取主图颜色，吸取后背景将变换为主图印象色
   is_fetch_up_info: true #是否获取up信息并显示在解析里
   is_QQ_chek: false #当有qq小程序视频链接时，是否发送卡片，设定为False后只会发送文字，避免刷屏
   linking_prising_video_text: '可“下载视频”喵' #链接解析后随图片一起发送的文字
   linking_prising_picture_text: '可“下载图片”喵' #链接解析后随图片一起发送的文字
+  is_download_high_quality: True   #B站视频下载是否下载高清视频,最高1080P，打开后需‘/bili login’登录你的b站账户，否则只能获取到480P
 
 网易云卡片:    #绘制网易云歌曲分享卡片
   enable: false

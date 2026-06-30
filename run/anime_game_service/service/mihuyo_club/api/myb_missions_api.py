@@ -124,7 +124,7 @@ class BaseMission:
             async for attempt in retrying:
                 with attempt:
                     headers = HEADERS_OLD.copy()
-                    headers["x-rpc-device_id"] = self.account.device_id_android
+                    headers["x-rpc-device_id"] = self.account.device_id_ios
                     headers["DS"] = generate_ds(data=content)
                     async with httpx.AsyncClient() as client:
                         res = await client.post(
@@ -138,7 +138,7 @@ class BaseMission:
                     if api_result.login_expired:
                         logger.error(
                             f"米游币任务 - 讨论区签到: 用户 {self.account.display_name} 登录失效")
-                        logger.debug(f"网络请求返回: {res.text}")
+                        logger.info(f"网络请求返回: {res.text}")
                         return MissionStatus(login_expired=True), None
                     elif api_result.invalid_ds:
                         logger.error(

@@ -32,7 +32,7 @@ import uuid
 from PIL import Image as PILImage
 
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
-from developTools.message.message_components import Text, Image, Mface, Reply
+from developTools.message.message_components import Text, Image, Mface, At, Reply
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.utils import download_img, get_img
