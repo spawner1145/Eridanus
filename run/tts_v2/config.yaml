@@ -1,5 +1,6 @@
 gpt_sovits:
   api_base: ""  #群内获取base_url，或自建
+  api_key: ""   # 留空=直连真实服务端(api_base指向api_v2.py地址)；非空=经过api网关(api_base指向网关地址，鉴权用Bearer api_key)
   ref_audio_path: output/slicer_opt/output.wav_0009342720_0009558400.wav
   ref_text: 怎么啊？如果有你在也不放心，那就干脆给我也装个限制器或者炸弹喽。
   speakers:
