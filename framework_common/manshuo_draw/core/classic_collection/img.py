@@ -110,6 +110,35 @@ class ImageModule:
         return {'canvas': self.pure_backdrop, 'canvas_bottom': self.current_y, 'upshift': self.upshift, 'downshift': self.downshift,
                 'json_img_left_module':self.json_img_left_module,'without_draw':self.without_draw_and_jump}
 
+    async def common_with_des_bili(self):
+        await init(self.__dict__)#对该模块进行初始化
+        # 对每个图片进行单独处理
+        for img in self.processed_img:
+            if self.img_height_limit_module <= 0: break
+            img = await per_img_limit_deal(self.__dict__,img)
+            #在这里对img做处理
+            img = await img_bottom_bili_info_process(self.__dict__,img)
+            img_des_canvas = Image.new("RGBA", (img.width, img.height + self.max_des_length), eval(str(self.description_color)))
+            img_des_canvas.paste(img, (0, 0),mask=img.convert("RGBA").split()[3])
+            if self.max_des_length + img.height > self.img_height_limit_module:
+                self.max_des_length = self.img_height_limit_module - img.height
+                if self.max_des_length < 0: self.max_des_length = 0
+            img_des_canvas_info=await basic_img_draw_text(img_des_canvas,self.content[self.number_count],self.__dict__,
+                                                                     box=(self.padding , img.height + self.padding),
+                                                                     limit_box=(self.new_width, self.max_des_length + img.height))
+            des_length = self.max_des_length + img.height
+            if int(img_des_canvas_info['canvas_bottom'] + self.padding_up) < des_length:
+                des_length=int(img_des_canvas_info['canvas_bottom'] + self.padding_up)
+            img = img_des_canvas_info['canvas'].crop((0, 0, img.width, des_length))
+            #加入label绘制
+            img = await label_process(self.__dict__,img,self.number_count,self.new_width)
+            # 对每个图像进行处理
+            self.pure_backdrop = await img_process(self.__dict__,self.pure_backdrop, img, self.x_offset, self.current_y, self.upshift)
+            await per_img_deal(self.__dict__, img)  # 处理每个图片的位置关系
+        await final_img_deal(self.__dict__)  # 处理最后的位置关系
+        return {'canvas': self.pure_backdrop, 'canvas_bottom': self.current_y, 'upshift': self.upshift, 'downshift': self.downshift,
+                'json_img_left_module':self.json_img_left_module,'without_draw':self.without_draw_and_jump}
+
 
     async def common_with_des_right(self):
         await init(self.__dict__)#对该模块进行初始化

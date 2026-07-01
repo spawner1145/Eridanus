@@ -88,8 +88,17 @@ class ReplyEngine:
     def _load_tools(self):
         try:
             if self.cfg.mai_reply.config.get("llm", {}).get("func_calling", False):
-                from framework_common.framework_util.func_map_loader import build_tool_map
-                tools = build_tool_map()
+                from framework_common.framework_util.func_map_loader import build_tool_map, get_tool_declarations
+                funcs = build_tool_map()
+                # 将 Gemini 格式的 declaration 列表转成 name -> decl 的索引
+                declarations = {d["name"]: d for d in get_tool_declarations() if "name" in d}
+                # 将每个工具包装为 {"func": <callable>, "declaration": <gemini_decl>}
+                tools = {}
+                for name, func in funcs.items():
+                    tools[name] = {
+                        "func": func,
+                        "declaration": declarations.get(name),  # 可能为 None（没有声明的工具）
+                    }
                 logger.info(f"[MaiReply] 已加载函数调用工具: {list(tools.keys())}")
                 return tools
         except Exception as e:
@@ -119,22 +128,49 @@ class ReplyEngine:
         user_name = await self._get_user_name(bot, event, user_id, group_id)
         bot_name = await self._get_bot_name(bot)
 
-        # ---------- 消息合并窗口
+        # ---------- 消息合并窗口（多条短时消息合并为一条）
         session_key = self.context.session_key_for(group_id, user_id)
-        if isinstance(multimodal_content, list):
+        is_multimodal = isinstance(multimodal_content, list)
+        if is_multimodal:
+            # 多模态消息跳过合并窗口，直接处理
             final_text = clean_text
         else:
             final_text = await self.concurrency.merge_or_process(session_key, clean_text)
             if final_text is None:
+                # 被合并窗口吸收，本条消息作废（更新的消息会继续处理）
                 return
             multimodal_content = final_text
 
+        # ---------- 抢占式并发控制
+        # 将当前协程包装为 Task，注册到抢占器。
+        # 如果该会话已有正在处理的旧 Task，旧 Task 会被 cancel()，
+        # 同时旧消息文本与新消息文本合并后作为本次实际处理内容。
+        current_task = asyncio.current_task()
+        final_text = await self.concurrency.preempt_and_register(
+            session_key, final_text, current_task
+        )
+
+        # 【修改点 1】：修复多模态消息(带图片)时，合并后的文本没有注入到 content 列表里的问题
+        if not is_multimodal:
+            multimodal_content = final_text
+        else:
+            # 如果是多模态结构（列表），需要遍历把里面 type 为 text 的部分替换成合并后的文本
+            for part in multimodal_content:
+                if isinstance(part, dict) and part.get("type") == "text":
+                    part["text"] = final_text
+                    break
+
         await self.concurrency.acquire_global()
-        lock_acquired = False
+        lock_acquired = False  # 初始化锁状态变量
         try:
+            # 【关键修复 3】：恢复被误删的 Redis 锁，防止同一个用户的上下文数据库写冲突
             lock_timeout = self.cfg.mai_reply.config.get("concurrency", {}).get("lock_timeout", 30)
             lock_acquired = await self.context.acquire_lock(session_key, lock_timeout)
             if not lock_acquired:
+                return
+
+            # 被旧 Task 抢占后到这里时，如果自身已被 cancel，直接退出
+            if current_task.cancelled():
                 return
 
             if is_group:
@@ -185,6 +221,11 @@ class ReplyEngine:
                 retries=3
             )
 
+            # LLM 调用完成后，再次确认自己没有被更新的 Task 抢占取消
+            if current_task.cancelled():
+                logger.info(f"[MaiReply] 任务在 LLM 返回后被抢占，丢弃本次回复（user={user_id}）")
+                return
+
             if not raw_reply:
                 bot.logger.warning("[MaiReply] LLM 返回空回复，清理上下文后重试一次")
                 retry_messages = [{"role": "user", "content": user_content}]
@@ -220,11 +261,12 @@ class ReplyEngine:
                 combined_text = ".".join(segments)
                 asyncio.create_task(self._async_tts_and_send(bot, event, combined_text, voice_cfg))
 
-            # 更新历史
+            # 更新历史（只有真正发出回复才更新，被抢占的任务不写历史）
             if isinstance(multimodal_content, list):
-                history_user_text = clean_text + " [含图片]" if clean_text else "[图片]"
+                history_user_text = final_text + " [含图片]" if final_text else "[图片]"
             else:
-                history_user_text = clean_text
+                history_user_text = final_text
+
             self.context.append_to_session(group_id, user_id, history_user_text, raw_reply)
 
             if is_group:
@@ -252,10 +294,16 @@ class ReplyEngine:
             )
             bot.logger.info(panel)
 
+        except asyncio.CancelledError:
+            # 被新消息抢占时正常取消，不报错
+            logger.info(f"[MaiReply] 任务被新消息抢占，已取消（user={user_id}）")
+            raise  # 必须重新抛出，让 asyncio 正确标记任务状态
         except Exception as e:
             bot.logger.error(f"[MaiReply] 回复出错: {e}", exc_info=True)
             traceback.print_exc()
         finally:
+            # 任务结束（无论正常/取消/异常）时从抢占表注销自身，并释放全局信号量
+            await self.concurrency.unregister_task(session_key, current_task)
             if lock_acquired:
                 self.context.release_lock(session_key)
             self.concurrency.release_global()

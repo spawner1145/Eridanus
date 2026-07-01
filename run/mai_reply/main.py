@@ -26,10 +26,13 @@ MaiReply 插件主入口
 
 import asyncio
 import base64
+import io
 import uuid
 
+from PIL import Image as PILImage
+
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
-from developTools.message.message_components import Text, Image, Mface
+from developTools.message.message_components import Text, Image, Mface, At, Reply
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 from framework_common.utils.utils import download_img, get_img
@@ -39,17 +42,87 @@ from run.mai_reply.service.trigger import TriggerChecker
 from run.mai_reply.service.reply_engine import ReplyEngine
 
 
+def compress_image_to_b64(file_path: str, quality: int = 70) -> str:
+    """
+    将本地图片用 Pillow 压缩后返回 JPEG base64 字符串。
+    统一转 RGB（兼容 PNG 透明通道），quality 控制压缩质量（0-95）。
+    """
+    with PILImage.open(file_path) as img:
+        img = img.convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality)
+        return base64.b64encode(buf.getvalue()).decode("utf-8")
+
+
 async def extract_message_content(event, bot) -> tuple:
     """
     从消息链中提取文本和图片，构建 OpenAI 多模态 content 列表。
     返回 (pure_text: str, content: str | list)
     - 若无图片，content 为纯字符串（与原逻辑兼容）
     - 若含图片，content 为 list[dict]，符合 OpenAI vision 格式
+
+    新增：自动检测消息链中的 Reply 组件，通过 bot.get_msg() 拉取被引用消息，
+    提取其中的图片一并注入 content，让 LLM 能"看到"用户引用的图。
     """
     text_parts = []
     image_items = []
 
+    # ── 第一步：检测 Reply 组件，拉取被引用消息中的图片 ──
     for msg in event.message_chain:
+        if isinstance(msg, Reply):
+            try:
+                quoted_msg = await bot.get_msg(int(msg.id))
+                # get_msg 通常返回 {"data": {"message": [...], ...}} 或直接返回事件对象
+                # 兼容两种结构
+                quoted_chain = None
+                if isinstance(quoted_msg, dict):
+                    quoted_chain = quoted_msg.get("data", {}).get("message") or quoted_msg.get("message")
+                elif hasattr(quoted_msg, "message_chain"):
+                    quoted_chain = quoted_msg.message_chain
+                elif hasattr(quoted_msg, "message"):
+                    quoted_chain = quoted_msg.message
+
+                if not quoted_chain:
+                    continue
+
+                # 遍历引用消息的组件，只摘取图片
+                for qmsg in quoted_chain:
+                    # 兼容组件对象和原始 dict 两种格式
+                    if isinstance(qmsg, (Image, Mface)):
+                        img_url = getattr(qmsg, "url", None) or getattr(qmsg, "file", None)
+                    elif isinstance(qmsg, dict):
+                        qtype = qmsg.get("type", "")
+                        if qtype in ("image", "mface"):
+                            data = qmsg.get("data", {})
+                            img_url = data.get("url") or data.get("file")
+                        else:
+                            continue
+                    else:
+                        continue
+
+                    if not img_url:
+                        continue
+
+                    try:
+                        q_path = f"data/pictures/cache/{uuid.uuid4()}.png"
+                        await download_img(img_url, q_path)
+                        b64 = compress_image_to_b64(q_path)
+                        image_items.append({
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{b64}"}
+                        })
+                        text_parts.append(f"[引用消息中包含图片，url：{img_url}]")
+                    except Exception:
+                        text_parts.append("[引用图片获取失败]")
+
+            except Exception:
+                # 拉取引用消息失败时静默跳过，不影响主流程
+                pass
+
+    # ── 第二步：处理当前消息本身的文本和图片 ──
+    for msg in event.message_chain:
+        if isinstance(msg, Reply):
+            continue  # 已在上方处理
         if isinstance(msg, Text):
             text_parts.append(msg.text)
         elif isinstance(msg, (Image, Mface)):
@@ -57,14 +130,13 @@ async def extract_message_content(event, bot) -> tuple:
                 url = await get_img(event, bot)
                 path = f"data/pictures/cache/{uuid.uuid4()}.png"
                 await download_img(url, path)
-                with open(path, "rb") as f:
-                    b64 = base64.b64encode(f.read()).decode("utf-8")
+                b64 = compress_image_to_b64(path)
                 image_items.append({
                     "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{b64}"}
+                    "image_url": {"url": f"data:image/jpeg;base64,{b64}"}
                 })
                 text_parts.append(f"图片url为{url}")
-            except Exception as e:
+            except Exception:
                 text_parts.append("[图片获取失败]")
 
     pure_text = "".join(text_parts).strip()
@@ -99,13 +171,17 @@ def main(bot: ExtendBot, config: YAMLManager):
         # 清理指令
         if text.strip() in ("/clear", "清除对话", "清理对话"):
             engine.context.clear_session(event.group_id, event.user_id)
-            await bot.send(event, "好的，对话记录已清除～")
+            engine.context.clear_impression(event.user_id)
+            if hasattr(event,"group_id"):
+                engine.context.clear_group_impression(event.group_id)
+            await bot.send(event, "好的，对话记录和印象已清除～")
             return
         if text.strip() in ("/clearall", "清除全部对话", "清理全部对话"):
             if event.user_id != config.common_config.basic_config["master"]["id"]:
                 return
             count = engine.context.clear_all_sessions(event.group_id)
-            await bot.send(event, f"已清除本群 {count} 个用户的对话记录～")
+            engine.context.clear_group_impression(event.group_id)
+            await bot.send(event, f"已清除本群 {count} 个用户的对话记录及群印象～")
             return
 
         async def add_to_context():
@@ -203,6 +279,7 @@ def main(bot: ExtendBot, config: YAMLManager):
 
         if text.strip() in ("/clear", "清除对话", "清理对话"):
             engine.context.clear_session(None, event.user_id)
+            engine.context.clear_impression(event.user_id)
             await bot.send(event, "好，忘掉了～")
             return
         if text.strip() in ("/clearall", "清除全部对话", "清理全部对话"):

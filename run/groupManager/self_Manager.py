@@ -82,6 +82,9 @@ async def call_operate_blandwhite(bot, event, config, target_id, type):
 
 
 async def call_operate_user_blacklist(bot, event, config, target_user_id, status):
+    if str(target_user_id)==str(config.common_config.basic_config["master"]['id']):
+        return {"msg": "你不能拉黑自己的管理员！"}
+
     user_info = await get_user(event.user_id, event.sender.nickname)
     if user_info.permission >= config.common_config.basic_config["user_handle_logic_operate_level"]:
         if status:

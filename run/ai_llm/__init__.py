@@ -1,4 +1,4 @@
-plugin_description = "AI LLM Plugin"
+plugin_description = "AI LLM 旧版ai对话"
 
 # 动态导入列表
 dynamic_imports = {

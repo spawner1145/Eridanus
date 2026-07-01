@@ -74,6 +74,7 @@ def build_tool_map():
         except Exception as e:
             logger.error(f"❌ 处理模块 {module_name} 时出错: {e}")
             traceback.print_exc()
+
     return tools
 
 

@@ -1,5 +1,11 @@
+import asyncio
 import os.path
+import re
 import traceback
+from pathlib import Path
+
+import aiohttp
+
 from developTools.event.events import GroupMessageEvent
 from developTools.message.message_components import Text, Node, File, Image
 from framework_common.database_util.User import get_user
@@ -8,6 +14,84 @@ from framework_common.utils.utils import delay_recall
 from framework_common.utils.zip import compress_files, sanitize_filename
 from framework_common.utils.zip_2_pwd_version import compress_files_with_pwd
 from run.resource_collector.service.iwara.iwara1 import search_videos, download_specific_video, fetch_video_info
+from run.resource_collector.service.telegram_operator import tg_api_request, download_and_convert_task, create_zip_sync
+
+
+async def telegram_stickers_download(bot,event,config,url):
+    text = url
+    CACHE_DIR = Path("data/pictures/cache")
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+    match = re.search(r"addstickers/([^/]+)", text)
+    if not match:
+        await bot.send(event,"参数错误！请发送完整的链接，例如：下载tg贴纸 https://t.me/addstickers/moe_sticker_bot")
+        return
+
+    pack_name = match.group(1)
+    await bot.send(event, f"🕒 正在向 Telegram 官方请求贴纸包 `{pack_name}` 的数据，请稍候...")
+
+    # 1. 获取包数据
+    async with aiohttp.ClientSession() as session:
+        pack_data = await tg_api_request(session, "getStickerSet", {"name": pack_name})
+
+        if not pack_data or not pack_data.get("ok"):
+            await bot.send(event, "❌ 获取贴纸数据失败，包名不存在或网络不通（国内机器请检查代理）。")
+            return
+
+        stickers = pack_data["result"].get("stickers", [])
+        title = pack_data["result"].get("title", pack_name)
+
+        if not stickers:
+            await bot.send(event, f"「{title}」贴纸包为空！")
+            return
+
+        #await bot.send(event, f"✅ 读取到「{title}」，共 {len(stickers)} 张，开始下载转换...")
+
+        # 2. 并发下载与转换 (限制5个并发)
+        sem = asyncio.Semaphore(5)
+        tasks = [
+            download_and_convert_task( session, st, idx, sem)
+            for idx, st in enumerate(stickers)
+        ]
+        results = await asyncio.gather(*tasks)
+
+    valid_paths = [path for path in results if path is not None]
+
+    if not valid_paths:
+        await bot.send(event, "⚠️ 全部贴纸下载或转换失败！")
+        return
+
+    bot.logger.info(f"成功转换完成贴纸: {valid_paths}")
+    await bot.send(event, f"🎉 处理完成，成功转换 {len(valid_paths)} 张，正在生成压缩包和折叠消息...")
+    # =========================================
+    # 4. 生成 ZIP 压缩包并作为文件发送
+    # =========================================
+    zip_path = CACHE_DIR / f"{pack_name}.zip"
+    try:
+        loop = asyncio.get_running_loop()
+        # 放入线程池执行压缩，防止阻塞主线程
+        await loop.run_in_executor(None, create_zip_sync, valid_paths, zip_path)
+
+        if zip_path.exists():
+            await bot.send(event, File(file=str(zip_path.absolute())))
+    except Exception as e:
+        bot.logger.error(f"打包发送压缩文件失败: {e}")
+        await bot.send(event, "打包发送压缩文件失败，请检查运行日志。")
+    # =========================================
+    # 3. 构造合并转发消息 (折叠聊天记录)
+    # =========================================
+    '''cmList = []
+    for path in valid_paths:
+        cmList.append(Node(content=[Image(file=path)]))
+
+    try:
+        # 提示：如果贴纸多于 100 张，部分平台可能会限制单条合并转发的节点数，一般情况可以直接发
+        await bot.send(event, cmList)
+    except Exception as e:
+        bot.logger.error(f"发送折叠消息失败: {e}")
+        await bot.send(event, "发送折叠消息失败，可能是单次转发图片数量过多被风控。")'''
+
 
 
 async def iwara_search(bot:ExtendBot,event:GroupMessageEvent,config,aim:str,operation:str):

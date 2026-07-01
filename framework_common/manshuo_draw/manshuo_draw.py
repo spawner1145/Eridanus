@@ -38,11 +38,16 @@ if __name__ == '__main__':
     ]
 
     contents2=[
-        {'type': 'basic_set', 'debug': False,'img_width':1500,'img_height':1000,},
-        {'type': 'avatar', 'subtype': 'common', 'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg'],'upshift_extra':25,'layer':1,
-         'content':[ f"[name]今日发言排行榜[/name]\n[time]2025年 05月27日 20:32[/time]"] },
-        {'type': 'img', 'subtype': 'common_with_des_right', 'img': [f"https://q1.qlogo.cn/g?b=qq&nk=1280433782&s=640",],
-         'content': [f"[title]漫朔_manshuo[/title]这部分是测manshuo！"], 'number_per_row': 2},
+        {'type': 'basic_set', 'debug': True,'img_width':1500,'img_height':1000,},
+        {'type': 'img', 'subtype': 'common_test', 'layer': 1,
+         'img': ['data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
+                 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
+                 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
+                 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
+                 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
+                 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
+                 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',
+                 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg', 'data/cache/manshuo.jpg',]},
     ]
 
     content_test=[
@@ -55,7 +60,7 @@ if __name__ == '__main__':
          'img':['data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg','data/cache/manshuo.jpg',]},
         {'type': 'img', 'subtype': 'common_with_des_right', 'jump_next_page': True, 'layer': 4,
          'img': ['framework_common/manshuo_draw/data/cache/manshuo.jpg',
-                 '/home/manshuo/manshuo/bot/Eridanus/framework_common/manshuo_draw/data/cache/manshuo.jpg'],
+                 'data/cache/manshuo.jpg'],
          'content': ['这里是manshuo[title]！这部分是测manshuo！[/title]这manshuo！[des]这里是介绍[/des]', 'hello'],
           },
         {'type': 'img', 'subtype': 'common','layer': 3,
@@ -64,5 +69,8 @@ if __name__ == '__main__':
     ]
 
 
-    asyncio.run(manshuo_draw(content_test))
+
+
+    img_path = asyncio.run(manshuo_draw(contents2))
+    print(img_path)
     #asyncio.run(test())

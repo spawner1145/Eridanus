@@ -65,6 +65,13 @@ class DualBotManager:
                             pass
 
                         if event_obj:
+                            # 标记事件来自副Bot：所有事件最终都在主Bot的事件总线上处理，
+                            # 处理函数拿到的 bot 恒为主Bot，因此把“发自副Bot”这一来源信息打到
+                            # 事件对象上，供下游(如 JM)据此跳过仅面向公开平台的脱敏处理。
+                            try:
+                                event_obj.from_secondary = bool(getattr(self.secondary_bot, "is_secondary", True))
+                            except Exception:
+                                pass
                             # 将副Bot接收到的事件转发给主Bot的事件总线处理
                             asyncio.create_task(self.primary_bot.event_bus.emit(event_obj))
                         else:

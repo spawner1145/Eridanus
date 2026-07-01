@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Eridanus Live2D</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    }
+
+    #live2d-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 头顶气泡：展示最新回复文字 / 媒体缩略，短暂出现 */
+    #bubble {
+      position: absolute;
+      left: 50%;
+      top: 10px;
+      transform: translateX(-50%);
+      max-width: 88%;
+      padding: 8px 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.94);
+      color: #222;
+      font-size: 13px;
+      line-height: 1.5;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      pointer-events: none;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    #bubble.visible { opacity: 1; }
+    #bubble::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -7px;
+      transform: translateX(-50%);
+      border-width: 7px 7px 0 7px;
+      border-style: solid;
+      border-color: rgba(255, 255, 255, 0.94) transparent transparent transparent;
+    }
+    /* 头顶预览（图片/PDF 等文件缩略）：缩小为小尺寸缩略图，避免遮住角色的脸 */
+    #bubble img { max-width: 96px; max-height: 96px; border-radius: 8px; display: block; }
+
+    /* 底部紧凑输入条 */
+    #chat-bar {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    #chat-input {
+      flex: 1;
+      min-width: 0;
+      height: 30px;
+      box-sizing: border-box;
+      padding: 0 12px;
+      border: none;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.9);
+      font-size: 13px;
+      outline: none;
+    }
+    .bar-btn {
+      height: 30px;
+      min-width: 30px;
+      padding: 0 10px;
+      border: none;
+      border-radius: 16px;
+      background: rgba(120, 170, 255, 0.92);
+      color: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+    .bar-btn.ghost { background: rgba(255, 255, 255, 0.85); color: #555; }
+    .bar-btn:hover { filter: brightness(1.05); }
+
+    /* 历史对话面板（默认隐藏） */
+    #history-panel {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 50px;
+      top: 10px;
+      display: none;
+      flex-direction: column;
+      background: rgba(20, 22, 28, 0.92);
+      border-radius: 12px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+    }
+    #history-panel.open { display: flex; }
+    #history-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      color: #fff;
+      font-size: 13px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    #history-head .actions { display: flex; gap: 8px; }
+    #history-head button {
+      border: none; background: transparent; color: #9fc0ff;
+      cursor: pointer; font-size: 12px;
+    }
+    #history-log {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .h-line { max-width: 88%; padding: 6px 10px; border-radius: 10px; font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+    .h-user { align-self: flex-end; background: rgba(120, 170, 255, 0.92); color: #fff; }
+    .h-bot { align-self: flex-start; background: rgba(255, 255, 255, 0.92); color: #222; }
+    .h-line img { max-width: 100%; border-radius: 6px; display: block; }
+    .h-time { font-size: 10px; opacity: 0.55; margin-top: 2px; }
+
+    #status {
+      position: absolute;
+      left: 50%;
+      bottom: 48px;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.85);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="live2d-canvas"></canvas>
+  <div id="bubble"></div>
+  <div id="status">正在加载 Live2D…</div>
+
+  <section id="history-panel">
+    <div id="history-head">
+      <span>对话记录</span>
+      <div class="actions">
+        <button id="history-clear" type="button">清空</button>
+        <button id="history-close" type="button">关闭</button>
+      </div>
+    </div>
+    <div id="history-log"></div>
+  </section>
+
+  <div id="chat-bar">
+    <input id="chat-input" type="text" placeholder="聊点什么…（回车发送）" autocomplete="off" />
+    <button id="chat-send" class="bar-btn" type="button">发送</button>
+    <button id="history-toggle" class="bar-btn ghost" type="button" title="对话记录">📜</button>
+  </div>
+
+  <!-- 顺序：pixi -> cubismcore -> cubism4 -->
+  <script src="./vendor/pixi.min.js"></script>
+  <script src="./vendor/live2dcubismcore.min.js"></script>
+  <script src="./vendor/cubism4.min.js"></script>
+  <script src="./renderer.js"></script>
+</body>
+</html>

@@ -8,12 +8,19 @@ from framework_common.manshuo_draw import *
 
 async def test():
     #await data_delete(7071924)
+    await bili_login()
     info = await data_init()
-    pprint.pprint(info['cookies'])
-    # ccokies = {'SESSDATA':'58e68f79%2C1794278289%2C4da52%2A52',
-    #            'bili_jct':'c9a6e5e8c58fea82484671e82da58cec',
-    #            'buvid3':'0F8A09DC-F0A6-3969-887D-D7D122380DB579618infoc','DedeUserID':'3493087821170873',
-    #            'ac_time_value':'6de37dd0b96491ecf588c242d63946c2'}
+
+    #pprint.pprint(info)
+    # print(await check_credential())
+    # print(await upgrade_credential())
+
+
+    # ccokies = {'SESSDATA':'463b26c8%2C1794365986%2C876d4%2A52CjDxgTHlKdaFsGqeX-v-fBPYXZCa8rCCI_vhI1C-yXq8a44efxe2RuwpY2lQ_JuxfPwSVkhvaVlnVlZkSnJTMTNsakZPRFd1LTVuenZ0alBNc3ctZXEteHRSYXNzcHZuNEI1czRjQVFtSzNBQ1BxV3lVdTNyZUdDN0d3Y0VGbmhsdGtfcW9NNjJBIIEC',
+    #            'bili_jct':'ff5e105f80c5fad516603af667d69c1a',
+    #            'buvid3':'89C2F9EF-D0FB-D8B9-AB6E-DEDEF242F79317738infoc',
+    #            'DedeUserID':'3493087821170873',
+    #            'ac_time_value':'3c98e48025ae85c16cca738d2a7d5352'}#ps:
     # await bili_login(cookies=ccokies)
     # data_info = await data_init()
     # credential = Credential(sessdata=data_info['cookies']['sessdata'], bili_jct=data_info['cookies']['bili_jct'],

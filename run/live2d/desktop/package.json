@@ -1,0 +1,13 @@
+{
+  "name": "eridanus-live2d-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Eridanus Live2D desktop pet renderer (Electron + PIXI + Cubism)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^31.0.0"
+  }
+}

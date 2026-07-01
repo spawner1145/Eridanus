@@ -1,0 +1,56 @@
+enable: false             # 默认关闭。开启后会在桌面显示 Live2D 桌宠（或群内 /live2d on）
+webui_enable: false        # 开启后浏览器访问 http://localhost:5007/live2dchat 即网页版桌宠（与 WebUI、桌宠共用对话后端/上下文）
+webui_password: "eridanus"
+master_only: true          # 纯桌宠模式
+model_path: data/yumi      # 自定义模型文件夹（相对项目根目录或绝对路径），优先生效。留空则用下方内置 model
+model: hiyori_pro_en       # 内置模型：desktop/models 下的文件夹名（仅当 model_path 为空时使用）
+auto_install: true         # 首次启用时若缺 node_modules 则自动执行 npm install（会下载 Electron）
+electron_mirror: "https://registry.npmmirror.com/-/binary/electron/"  # Electron 二进制下载镜像（国内加速）
+npm_registry: "https://registry.npmmirror.com/"                       # npm 源（国内加速）
+lip_sync_parameter_ids:    # 口型参数 id（不同模型可能不同）
+  - ParamMouthOpenY
+chat:                      # 桌宠聊天：作为 WS 客户端接入 webui 的 /api/ws（与前端对话同源）
+  enable: true             # 在桌宠窗口显示聊天输入框
+webui:                     # webui 对话后端（OneBot 反向 ws 集线器）。桌宠对话直接连这里，等价于浏览器前端
+  host: 127.0.0.1
+  port: 5007
+tts:                       # 桌宠本地语音合成（GPT-SoVITS）：拿到文本后本地合成并播放，确保 100% 出声，
+  enable: true             # false=不合成语音（只显示文字气泡）
+  api_base: ""             # 留空=复用 tts_v2 的 api_base
+  ref_audio_path: ""       # 留空=复用 tts_v2 的参考音频（服务端可访问的路径）
+  ref_text: ""             # 留空=复用 tts_v2 的参考文本
+expression:                # 表情/动作控制：对话后用一个快速模型把回复判定为某种“情绪/场景”，再按下方索引变脸/播动作
+  enable: true
+  reset_delay_ms: 6000     # 变脸后过这么久(ms)恢复默认待机表情；<=0 表示不自动恢复
+  model: gpt-4o-mini       # 响应迅速的小模型
+  base_url: ""             # 留空则复用 mai_reply 的 trigger_llm 端点
+  api_key: ""              # 留空则复用 mai_reply 的 trigger_llm api_key
+
+  emotions: # ↓↓↓ 情绪/场景 → 表情·动作 索引（已绑定到当前模型 data/yumi 的真实可用项；换模型后需按新模型的表情/动作名重写）↓↓↓规则：对话后先判定情绪（emotions 里的 key 之一）；情绪较上一次发生变化才“变脸”，未变化不动。expression=持续表情（脸），空字符串表示恢复默认待机；motion=一次性动作动画。
+    neutral:   { expression: "",     motion: "" }    # 平静/无明显情绪 → 恢复待机
+    happy:     { expression: 猫猫嘴,  motion: "" }    # 开心/愉快
+    excited:   { expression: 星星眼,  motion: wave }  # 兴奋/激动
+    love:      { expression: 爱心眼,  motion: "" }    # 喜爱/亲昵/撒娇
+    shy:       { expression: 猫猫嘴,  motion: "" }    # 害羞/不好意思
+    playful:   { expression: 舌头伸出, motion: "" }   # 调皮/卖萌/吐舌
+    smug:      { expression: 歪嘴,    motion: "" }    # 得意/坏笑/不屑
+    sad:       { expression: 泪汪汪,  motion: "" }    # 难过/委屈/失落
+    cry:       { expression: 眼泪,    motion: tear }  # 哭/伤心
+    angry:     { expression: 黑脸,    motion: "" }    # 生气/不满
+    awkward:   { expression: 黑脸,    motion: "" }    # 尴尬/无语
+    confused:  { expression: 蚊香眼,  motion: "" }    # 困惑/眩晕/懵
+    surprised: { expression: 星星眼,  motion: "" }    # 惊讶/惊喜
+
+  scenes:
+    greeting:  { motion: wave }     # 打招呼/问候/见面（你好、早上好、嗨…）
+    farewell:  { motion: wave }     # 告别/再见
+bridge:
+  host: 127.0.0.1
+  port: 7765
+window:
+  width: 420
+  height: 640
+  scale: 0.18              # 模型初始缩放，滚轮可实时调整
+  always_on_top: true
+  x: null                  # null=自动定位到屏幕右下角
+  y: null

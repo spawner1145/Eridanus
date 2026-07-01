@@ -25,6 +25,8 @@ iwara:
   iwara_gray_layer: true #是否开启iwara灰度图功能
   zip_file: false #是否压缩文件
   zip_password: "123456" #压缩密码
+telegram_stickers:  #tg表情包
+  bot_token: ""   #tgbot token，自己搜教程
 JMComic:                  #禁漫相关功能设置
   anti_nsfw: obfuscate   #防吞策略，可选gif、black_and_white、no_censor、obfuscate
   gif_compress: false     #gif模式下是否压缩
@@ -41,3 +43,10 @@ JMComic:                  #禁漫相关功能设置
     - 带着你的苦命鸳鸯实大变去罢！
   ranking_limit: 10      # 榜单显示条数，默认 10
   cover_workers: 5       # 封面并发下载线程数，默认 5
+  pdg_compress: False     #是否压缩PDF,本功能需要手动安装Ghostscript，请自行百度
+  openlist: #下载后的jm本子是否上传至openlist
+    enable: False                          #是否启用
+    base_url: "" #你的openlist网址
+    username: ''                   #快填，枫与岚会偷走你的openlist账号密码！
+    password: ""
+    upload_dir: ""               #上传至openlist的目录，此目录可不存在，上传后会递归创建目录

@@ -9,12 +9,15 @@ jmComic 业务逻辑封装
   - 消除 YAML 文件被反复读写修改 base_dir 的副作用
   - 排行榜函数每次实时请求，无缓存
 """
-
+import pprint
 import asyncio
 import os
+import httpx
+import re
+import urllib.parse
 import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
+import hashlib
 import jmcomic
 from jmcomic import (
     JmOption, JmAlbumDetail, JmPhotoDetail,
@@ -31,7 +34,8 @@ from run.resource_collector.service.img_obfuscation import download_cover_bw, ob
 _OPTION_FILE = 'run/resource_collector/jmcomic.yml'
 
 # 月榜仍保留缓存，因为它只用于「随机本子」，不需要实时性，且数据量大
-from datetime import date
+from datetime import date,datetime,timezone
+
 _jm_month_cache: dict = {}
 
 
@@ -151,6 +155,10 @@ def JM_search_month() -> list:
             break
 
     _jm_month_cache[cache_key] = result
+    #每月第一天会返回一个空列表，若返回位空列表则设定默认值
+    if not result:
+        result_list = [298119,1243884,452206,317728,597511,1238381,139073,143090]
+        return result_list
     return result
 
 
@@ -309,3 +317,161 @@ def downloadALLAndToPdf(comic_id, save_path: str) -> str:
         ),
     )
     return os.path.join(save_path, str(comic_id))
+
+
+#上传下载文件至openlist指定文件夹中
+class OpenListClient:
+    def __init__(self, base_url, username, password):
+        self.base_url = base_url
+        self.username = username
+        self.password = password
+        self.token = None
+        self.client = httpx.Client()
+
+    async def login(self):
+        login_url = f"{self.base_url}/api/auth/login"
+        data = {
+            "username": self.username,
+            "password": self.password
+        }
+        resp = self.client.post(login_url, json=data)
+        resp.raise_for_status()
+        #pprint.pprint(resp.json())
+        return_json = {'status':True,'msg':'','token':None}
+        if resp.status_code != 200:
+            return_json['msg'] = resp.text
+            return return_json
+        if resp.json().get("code") != 200:
+            return_json = {'status': False, 'msg': resp.json().get("message"), 'token': None}
+            return return_json
+            #raise Exception("登录失败，未获取到访问令牌，返回：{}".format(resp.json().get("message")))
+        #print("登录成功，token:", self.token)
+        self.token = resp.json()['data'].get("token")
+        return_json = {'status': True, 'msg': '登录成功', 'token': self.token}
+        return return_json
+
+    async def is_login(self):
+        if self.token is None:return False
+        else:return True
+
+    async def logout(self):
+        return_json = {'status': False, 'msg': '', 'token': self.token}
+        if not self.token:
+            return_json['msg'] = '"未登录，无需登出"'
+            return return_json
+        logpout_url = f"{self.base_url}/api/auth/login"
+        headers = {
+           'Authorization': self.token,
+        }
+        resp = self.client.get(logpout_url,headers=headers)
+        if resp.status_code != 200:
+            return_json['msg'] = resp.text
+            return return_json
+        # print(resp.status_code)
+        # if resp.json().get("code") != 200:
+        #     return_json['msg'] = resp.json().get("message")
+        #     return return_json
+        return_json['status'], return_json['msg'] = True, '成功登出喵'
+        return return_json
+
+    async def check_dir(self, folder_path):
+        dir_url = f"{self.base_url}/api/fs/dirs"  # 根据实际接口修改
+        data = {
+            "username": self.username,
+            "password": self.password
+        }
+        headers = {
+           'Authorization': self.token,
+           'Content-Type': 'application/json'
+        }
+        resp = self.client.post(dir_url, json=data,headers=headers)
+        resp.raise_for_status()
+        pprint.pprint(resp.json())
+        if resp.json().get("code") != 200:
+            raise Exception("登录失败，未获取到访问令牌，返回：{}".format(resp.json().get("message")))
+        self.token = resp.json()['data'].get("token")
+        if not self.token:
+            raise Exception("登录失败，未获取到访问令牌")
+        print("登录成功，token:", self.token)
+
+    async def upload_file(self, filepath, folder_path):
+        return_json = {'status': False, 'msg': '', 'token': self.token}
+        if not self.token:
+            return_json['msg'] = '"未登录，请先调用 login()"'
+            return return_json
+        upload_url = f"{self.base_url}/api/fs/put"  # 根据实际接口修改
+        # 计算文件哈希
+        md5 = hashlib.md5()
+        sha1 = hashlib.sha1()
+        sha256 = hashlib.sha256()
+        with open(filepath, 'rb') as f:
+            while chunk := f.read(8192):
+                md5.update(chunk)
+                sha1.update(chunk)
+                sha256.update(chunk)
+        md5_hash, sha1_hash, sha256_hash = md5.hexdigest(), sha1.hexdigest(), sha256.hexdigest()
+        filename = os.path.basename(filepath)
+        timestamp = os.path.getmtime(filepath)
+        dt = datetime.fromtimestamp(timestamp, timezone.utc)
+        last_modified_str = dt.strftime('%a, %d %b %Y %H:%M:%S GMT')
+        encoded_filename = urllib.parse.quote(filename, safe='')
+        #构建headers
+        headers = {
+            'File-Path': f'{folder_path}/{encoded_filename}',
+            'As-Task': 'false',
+            'Overwrite': 'true',
+            'Last-Modified': last_modified_str,
+            'X-File-Md5': md5_hash,
+            'X-File-Sha1': sha1_hash,
+            'X-File-Sha256': sha256_hash,
+            'Authorization': self.token,
+            'Content-Type': 'application/octet-stream'
+        }
+        #files = { "file": open(filepath, "rb") }
+        # 读取文件内容
+        with open(filepath, 'rb') as f:
+            payload = f.read()
+        resp = self.client.request('PUT',upload_url, headers=headers, content=payload, timeout = 300)
+        if resp.status_code != 200:
+            return_json['msg'] = resp.text
+            if resp.status_code == 413: return_json['msg'] = '文件过大，上传失败喵'
+            return return_json
+        if resp.json().get("code") != 200:
+            return_json['msg'] = resp.json().get("message")
+            if resp.json().get("code") == 403:return_json['msg'] = f'权限不足，{resp.json().get("message")}'
+            return return_json
+        resp.raise_for_status()
+        return_json['status'], return_json['msg'] = True, '上传成功'
+        return return_json
+
+async def get_jm_name(jm_id):
+    client = JmOption.default().new_jm_client()
+    Detail = client.get_album_detail(jm_id)
+    pprint.pprint(Detail)
+    #print(Detail.name)
+    Detail.name = Detail.name.replace('–', '-')
+    Detail.name = re.sub(r'[\\/:*?"<>|]', '_', Detail.name)
+    Detail.name = Detail.name.replace('[', '(').replace(']', ')')
+    Detail.name = re.sub(r'\s+', '_', Detail.name)
+    Detail.name = Detail.name.strip('_')
+    return Detail.name
+
+async def test():
+    base_url = ""  # 替换成实际地址
+    username = ""
+    password = ""
+    filepath = ""
+    folder_path = ""
+
+    client = OpenListClient(base_url, username, password)
+    info = await client.login()
+    await client.logout()
+    # pprint.pprint(info)
+    # #await client.check_dir(folder_path)
+    # info = await client.upload_file(filepath, folder_path)
+    # pprint.pprint(info)
+
+if __name__ == '__main__':
+    pass
+    #JM_search_month()
+    asyncio.run(test())

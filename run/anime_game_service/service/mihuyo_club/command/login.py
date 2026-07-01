@@ -1,5 +1,8 @@
 import asyncio
 import json
+import uuid
+import httpx
+import pprint
 from typing import Union
 from framework_common.manshuo_draw import *
 import traceback
@@ -16,9 +19,13 @@ from developTools.message.message_components import Text, Image, At
 from io import BytesIO
 from datetime import datetime, timedelta
 from PIL import Image as PImage
+from framework_common.database_util.ManShuoDrawCompatibleDataBase import AsyncSQLiteDatabase, cache_get, cache_save, cache_delete
+db=asyncio.run(AsyncSQLiteDatabase.get_instance())
 
 async def mys_login(user_id,bot=None,event=None):
     recall_id = None
+    # 清除相关缓存
+    await cache_delete(db, 'skland', str(user_id))
     user_num = len(set(PluginDataManager.plugin_data.users.values()))  # 由于加入了用户数据绑定功能，可能存在重复的用户数据对象，需要去重
     if user_num <= plugin_config.preference.max_user or plugin_config.preference.max_user in [-1, 0]:
         # 获取用户数据对象
@@ -59,6 +66,7 @@ async def mys_login(user_id,bot=None,event=None):
                     device_id,
                     plugin_config.preference.game_token_app_id
                 )
+                #print(login_status, query_qrcode_ret)
                 if query_qrcode_ret:
                     bbs_uid, game_token = query_qrcode_ret
                     logger.info(f"用户 {bbs_uid} 成功获取 game_token: {game_token}")
@@ -163,3 +171,129 @@ async def mys_login(user_id,bot=None,event=None):
     else:
         if bot: await bot.send(event, '⚠️目前可支持使用用户数已经满啦~')
 
+
+async def mys_login_new(user_id,bot=None,event=None):
+    recall_id = None
+    # 清除相关缓存
+    await cache_delete(db, 'skland', str(user_id))
+    user_num = len(set(PluginDataManager.plugin_data.users.values()))  # 由于加入了用户数据绑定功能，可能存在重复的用户数据对象，需要去重
+    if user_num <= plugin_config.preference.max_user or plugin_config.preference.max_user in [-1, 0]:
+        # 获取用户数据对象
+        PluginDataManager.plugin_data.users.setdefault(user_id, UserData())
+        user = PluginDataManager.plugin_data.users[user_id]
+        if bot:recall_id = await bot.send(event, '正在获取登录二维码，请稍后喵')
+        else:print('正在获取登录二维码，请稍后喵')
+        uuid_d = uuid.uuid4()
+        headers = {
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0",
+            "x-rpc-app_id": "bll8iq97cem8",
+            'x-rpc-device_fp': f'38d80bb76ee47',
+            "x-rpc-device_id": f"{uuid_d}"
+        }
+        creat_qr_url = "https://passport-api.miyoushe.com/account/ma-cn-passport/web/createQRLogin"
+        async with httpx.AsyncClient() as client:
+            r = await client.post(url=creat_qr_url, headers=headers)
+            data = r.json()
+            #await create_qr(data["data"]['url'], user_id)
+            qrcode_url, qrcode_ticket = data["data"]['url'], data["data"]["ticket"]
+            image_bytes = generate_qr_img(qrcode_url)
+            base64_data = base64.b64encode(image_bytes).decode("utf-8")
+            img_path = await manshuo_draw([{'type': 'img', 'img': [base64_data]}])
+            #print(img_path)
+            if bot and event:
+                msg = [At(qq=user_id),
+                       " 请用米游社App扫描下面的二维码进行登录\n二维码有效时间两分钟，请不要扫描他人的登录二维码进行绑定~",
+                       Image(file=img_path)]
+                recall_id = await bot.send(event, msg)
+            else:
+                recall_id = None
+                print(img_path)
+
+        while True:
+            check_qr_url = "https://passport-api.miyoushe.com/account/ma-cn-passport/web/queryQRLoginStatus"
+            async with httpx.AsyncClient() as client:
+                r = await client.post(url=check_qr_url, headers=headers, json={"ticket": qrcode_ticket})
+                cookies_check = r.cookies
+                data: dict = r.json()
+                cookies_json = json.dumps(dict(r.cookies), indent=4)
+                record = data["retcode"]
+                status_data: dict = data.get("data", {})
+                if status_data == None:
+                    status = None
+                else:
+                    status = status_data.get("status", None)
+                #print(status)
+                if record == -3501:
+                    if bot: await bot.send(event, [At(qq=user_id), f" 扫码超时喵，请重新绑定喵 "])
+                    else:print(f" 扫码超时喵，请重新绑定喵 ")
+                    break
+                elif record == -3505:
+                    if bot: await bot.send(event, [At(qq=user_id), f" 您已取消扫码喵"])
+                    break
+                if status != "Confirmed":
+                    await asyncio.sleep(1)
+                    continue
+            if recall_id: await bot.recall(recall_id['data']['message_id'])
+            #print('扫码成功，开始创建游戏数据')
+            cookies = json.loads(cookies_json)
+            #pprint.pprint(cookies)
+
+            #开始创建保存数据
+            bbs_uid = cookies['account_id']
+            cookies_save = BBSCookies()
+            cookies_save.bbs_uid = bbs_uid
+            account = PluginDataManager.plugin_data.users[str(user_id)].accounts.get(bbs_uid)
+            """当前的账户数据对象"""
+            if not account or not account.cookies:
+                user.accounts.update({
+                    bbs_uid: UserAccount(
+                        phone_number=None,
+                        cookies=cookies_save,
+                        device_id_ios=str(uuid_d),
+                        device_id_android=generate_device_id())
+                })
+                account = user.accounts[bbs_uid]
+            else:
+                account.cookies.update(cookies_save)
+
+            fp_status, account.device_fp = await get_device_fp(uuid_d)
+            if fp_status:
+                logger.info(f"用户 {bbs_uid} 成功获取 device_fp: {account.device_fp}")
+            #开始获取Stoken
+            # mihoyobbs_version = '2.99.1'
+            # mihoyobbs_Client_type_web = '5'
+            # Stoken_headers = {
+            #     'Accept': 'application/json, text/plain, */*',
+            #     'DS': "",
+            #     "x-rpc-channel": "miyousheluodi",
+            #     'Origin': 'https://webstatic.mihoyo.com',
+            #     'x-rpc-app_version': mihoyobbs_version,
+            #     'User-Agent': 'Mozilla/5.0 (Linux; Android 12; Unspecified Device) AppleWebKit/537.36 (KHTML, like Gecko) '
+            #                   f'Version/4.0 Chrome/103.0.5060.129 Mobile Safari/537.36 miHoYoBBS/{mihoyobbs_version}',
+            #     'x-rpc-client_type': mihoyobbs_Client_type_web,
+            #     'Referer': '',
+            #     'Accept-Encoding': 'gzip, deflate',
+            #     'Accept-Language': 'zh-CN,en-US;q=0.8',
+            #     'X-Requested-With': 'com.mihoyo.hyperion',
+            #     "Cookie": f'{cookies_check}',
+            #     'x-rpc-device_id': f"{uuid_d}"
+            # }
+            # Stoken_url = f"https://api-takumi.mihoyo.com/auth/api/getMultiTokenByLoginTicket"
+            # async with httpx.AsyncClient() as client:
+            #     r = await client.get(url=Stoken_url, headers=Stoken_headers,params={"login_ticket": qrcode_ticket, "token_types": "3", "uid": bbs_uid})
+            #     stoken_data = r.json()
+            #
+            # pprint.pprint(stoken_data)
+            # if stoken_data["retcode"] == 0:
+            #     return data["data"]["list"][0]["token"]
+
+            cookies_save.cookie_token, cookies_save.cookie_token_v2 = cookies['cookie_token'], cookies['cookie_token_v2']
+            #cookies_save.stoken_v2 = cookies['ltoken_v2']
+            cookies_save.ltoken, cookies_save.ltoken_v2 = cookies['ltoken'], cookies['ltoken_v2']
+            cookies_save.stuid, cookies_save.ltuid, cookies_save.account_id, cookies_save.login_uid = bbs_uid, bbs_uid, bbs_uid, bbs_uid
+            cookies_save.mid = cookies['account_mid_v2']
+            cookies_save.aliyungf_tc = cookies['aliyungf_tc']
+            account.cookies.update(cookies_save)
+            PluginDataManager.write_plugin_data()
+            if bot: await bot.send(event, [At(qq=user_id), f" 欢迎，米游社用户： （{bbs_uid}） "])
+            break

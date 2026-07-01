@@ -6,13 +6,21 @@ from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 
 from run.ai_voice.service.tts import TTS
+from run.tts_v2.service.GPT_SoVits import AsyncGPTSoVITSClient
 
 Tts=TTS()
+gpt_sovits_client = AsyncGPTSoVITSClient()
 async def call_tts(bot,event,config,text,speaker=None,mood="中立"):
 
     # 获取默认模式和 speaker
     mode = config.ai_voice.config["tts"]["tts_engine"]
     speaker = speaker or config.ai_voice.config["tts"][mode]["speaker"]
+    if speaker in gpt_sovits_client.speakers:
+        audio_path = await gpt_sovits_client.generate_tts(text)
+        await bot.send(event, Record(file=audio_path))
+        bot.logger.info("[MaiReply] 后台语音发送完成！")
+
+        return
 
     # 获取所有 speakers
     all_speakers = (await call_all_speakers(bot, event, config))["speakers"]
@@ -81,6 +89,7 @@ async def get_all_speakers(bot,event,config):
                    )
 
 def main(bot: ExtendBot,config: YAMLManager):
+
     @bot.on(GroupMessageEvent)
     async def tts(event: GroupMessageEvent):
         if "说" in event.pure_text and event.pure_text.startswith("/"):

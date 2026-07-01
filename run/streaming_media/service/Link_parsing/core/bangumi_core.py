@@ -7,8 +7,6 @@ import httpx
 import re
 import copy
 from run.streaming_media.service.Link_parsing.core.common import json_init
-from urllib.parse import urlparse
-from urllib.parse import parse_qs
 from datetime import datetime, timedelta
 from developTools.utils.logger import get_logger
 logger=get_logger()
@@ -256,7 +254,7 @@ async def bangumi_PILimg(text=None,img_context=None,filepath=None,proxy=None,typ
 
 
 
-async def main():
+async def main_test():
     #data = await bangumi_subject_post_json(target='败犬女主太多了',type=2)
     calendar_json_init,week=await claendar_bangumi_get_json()
     print(week)
@@ -264,4 +262,4 @@ async def main():
 
 # 运行异步任务
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main_test())

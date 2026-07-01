@@ -18,6 +18,9 @@ class AsyncGPTSoVITSClient:
         :param base_url: api_v2.py 服务端地址 (例如: http://123.45.67.89:9880)
         """
         self.speakers=config.tts_v2.config["gpt_sovits"]["speakers"]
+        self.api_key = config.tts_v2.config["gpt_sovits"].get("api_key", "") or ""
+        # api_key 非空 => 经过 api 网关；为空 => 直连真实服务端
+        self.use_gateway = self.api_key != ""
 
     async def generate_tts(
         self,
@@ -49,6 +52,9 @@ class AsyncGPTSoVITSClient:
         if output_save_path is None:
             output_save_path = "data/voice/cache/" + uuid.uuid4().hex + ".wav"
 
+        # 完整推理参数：直连真实服务端时原样使用；
+        # 经过网关时，网关会用其中和白名单同名的字段覆盖网关自己的默认值，
+        # 未传的字段网关会自动补全（参考音频/prompt等）。
         payload = {
             "text": target_text,
             "text_lang": target_lang,
@@ -67,17 +73,26 @@ class AsyncGPTSoVITSClient:
             "media_type": media_type,
             "repetition_penalty": 1.35 or config.tts_v2.config["gpt_sovits"]["repetition_penalty"],
         }
+
+        base_url = config.tts_v2.config["gpt_sovits"]["api_base"]
+        if self.use_gateway:
+            url = f"{base_url}/gptsovits/tts"
+            headers = {"Authorization": f"Bearer {self.api_key}"}
+        else:
+            url = f"{base_url}/tts"
+            headers = None
+
         print(payload)
-        print(f"正在请求 TTS: {target_text[:20]}...")
-        base_url=config.tts_v2.config["gpt_sovits"]["api_base"]
+        print(f"正在请求 TTS ({'网关' if self.use_gateway else '直连'}): {target_text[:20]}...")
+
         async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{base_url}/tts", json=payload
-            ) as resp:
+            async with session.post(url, json=payload, headers=headers) as resp:
                 if resp.status != 200:
-                    error = await resp.text()
+                    try:
+                        error = await resp.json()
+                    except Exception:
+                        error = await resp.text()
                     raise Exception(f"TTS 请求失败! HTTP {resp.status}: {error}")
-                #print(resp.text)
 
                 out_dir = os.path.dirname(output_save_path)
                 if out_dir:
@@ -89,6 +104,8 @@ class AsyncGPTSoVITSClient:
         return output_save_path
 
     async def set_gpt_weights(self, weights_path: str):
+        if self.use_gateway:
+            raise Exception("当前为api网关模式，网关未提供 set_gpt_weights 接口，无法切换GPT模型")
         base_url=config.tts_v2.config["gpt_sovits"]["api_base"]
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -101,6 +118,8 @@ class AsyncGPTSoVITSClient:
                 print(f"GPT 模型已切换: {weights_path}")
 
     async def set_sovits_weights(self, weights_path: str):
+        if self.use_gateway:
+            raise Exception("当前为api网关模式，网关未提供 set_sovits_weights 接口，无法切换SoVITS模型")
         base_url = config.tts_v2.config["gpt_sovits"]["api_base"]
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -111,7 +130,3 @@ class AsyncGPTSoVITSClient:
                 if resp.status != 200:
                     raise Exception(f"切换 SoVITS 模型失败: {data}")
                 print(f"SoVITS 模型已切换: {weights_path}")
-
-
-
-

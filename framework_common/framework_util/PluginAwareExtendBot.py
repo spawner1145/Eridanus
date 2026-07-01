@@ -222,6 +222,7 @@ class PluginManager:
         self._yaml_reload_excluded_plugins: Set[str] = {
             'resource_collector',
             'scheduled_tasks',
+            'live2d',
         }
         """
         内存监控

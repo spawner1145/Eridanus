@@ -27,7 +27,7 @@ _🎊 基于 [OneBot](https://github.com/howmanybots/onebot/blob/master/README.m
   <a href="">参与贡献</a>
 </p>
 
-
+</p>
 
 # 部署
 [文档](https://eridanus.netlify.app)    
@@ -85,5 +85,6 @@ Eridanus 采用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/
   <img src="https://contrib.rocks/image?repo=AOrbitron/Eridanus" />
 </a>
 
+> Live2D 模型作者：[【免费模型】这么可爱的小狗免费带回家！](https://www.bilibili.com/video/BV1LM41137vK)
 
 [![Star History Chart](https://api.star-history.com/svg?repos=AOrbitron/Eridanus&type=Date)](https://www.star-history.com/#AOrbitron/Eridanus&Date)

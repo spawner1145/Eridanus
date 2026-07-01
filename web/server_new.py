@@ -136,6 +136,30 @@ def build_yaml_file_map(run_dir):
 
 RUN_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'run'))
 YAML_FILES = build_yaml_file_map(RUN_DIR)
+YAML_FILES.pop("live2d desktop pet.config", None)
+YAML_FILES.pop("定时任务.sheduled_tasks_push_groups_ordinary", None)
+
+# 指定前置顺序
+priority_keys = [
+    "基础配置.basic_config",
+    "mai_reply 新版ai对话.config",
+    "tts_v2.config",
+    #"live2d desktop pet.config",
+]
+
+# 重新排序
+ordered_yaml_files = {}
+
+for key in priority_keys:
+    if key in YAML_FILES:
+        ordered_yaml_files[key] = YAML_FILES.pop(key)
+
+# 剩余保持原有顺序
+ordered_yaml_files.update(YAML_FILES)
+
+YAML_FILES = ordered_yaml_files
+
+#print(YAML_FILES)
 
 # 初始化 YAML 解析器（支持注释）
 yaml = YAML()
@@ -1015,6 +1039,16 @@ def handle_websocket(ws):
         # 总有人看见红色就害怕，干脆不要了，不搞这么多提示
         # logger.server("WebSocket 客户端断开连接")
         clients.discard(ws)
+
+
+# Live2D 网页版桌宠（/live2dchat）：路由与逻辑都在 run/live2d，这里只做注册，
+# 便于 web/ 更新后存活。webui_enable 关闭/插件未加载时，/live2dchat/config 会返回未启用。
+try:
+    from run.live2d.webchat import register_live2d_webchat
+    register_live2d_webchat(app)
+    logger.server("🔧 Live2D 网页版路由已注册：/live2dchat（需 live2d 配置 webui_enable: true）")
+except Exception as e:
+    logger.warning(f"Live2D /live2dchat 注册失败（不影响 WebUI）：{e}")
 
 
 # 启动webUI
