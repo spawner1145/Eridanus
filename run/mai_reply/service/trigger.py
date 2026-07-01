@@ -98,7 +98,7 @@ class TriggerChecker:
         current_mood = self.emotion.get_mood()
         current_score = self.emotion.get_score()
 
-        prompt = f"""你是一个聊天机器人的“潜意识判断中枢”。
+        prompt = f"""你是一个聊天机器人的“Eridanus潜意识判断中枢”。
 任务：根据上下文判断是否要回话，并评估这句话对机器人心情的影响。
 
 【机器人当前状态】
