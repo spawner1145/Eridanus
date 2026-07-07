@@ -100,7 +100,7 @@ function_declarations=[
     },
     {
         "name": "call_send_mface",
-        "description": "根据当前聊天内容选择一张表情包，只可从给定列表选取，只可选择一张。不要频繁调用，不要通过send函数发送表情包。",
+        "description": "根据当前聊天内容选择一张表情包，只可从给定列表选取，只可选择一张。不要通过send函数发送表情包。即使用户没有要求，也要时不时调用此函数，能增强角色扮演效果和趣味性。可以将此函数视为概率触发的'被动技能'",
         "parameters": {
             "type": "object",
             "properties": {
