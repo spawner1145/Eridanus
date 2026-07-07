@@ -33,7 +33,7 @@ class TriggerChecker:
         pcfg = config.mai_reply.config.get("persona", {})
         self.bot_persona_name: str = pcfg.get("name", "").strip()
         aliases = tcfg.get("aliases", [])
-        self.aliases: list = aliases if isinstance(aliases, list) else [aliases]
+        self.aliases: list = aliases if isinstance(aliases, list) else[aliases]
 
         hlcfg = config.mai_reply.config.get("human_like", {})
         self.base_ignore_prob: int = int(hlcfg.get("ignore_probability", 15))
@@ -66,18 +66,16 @@ class TriggerChecker:
         user_id = event.user_id
         text = pure_text.strip()
 
-        # 机器人对外展示的统一称呼：人设名优先，没有就用协议昵称
-        bot_display_name = self.bot_persona_name or bot_name
-
         # 提取硬件级别的判定因子
-        is_at = self._has_at(event=event, bot_self_id=bot_self_id)
+        #print(bot_self_id)
+        is_at = self._has_at(event=event,bot_self_id= bot_self_id)
         is_reply = self._is_reply_to_bot(event, bot_self_id)
 
         # 净化文本（去除残留的@字符）
         clean_text = self._remove_at_segments(event, text, bot_name, bot_self_id)
         if not clean_text:
             return False, text  # 无法提取文本时，默认不回复，但返回原始文本以供记录
-
+        #print(is_at)
         if is_at:
             return True, clean_text
         # 私聊直接放行（如果配置允许）
@@ -87,51 +85,31 @@ class TriggerChecker:
         # =========================================================
         # 1. 组装极致拟人化的上下文 (群气氛 + 历史对话 + 当前心情)
         # =========================================================
-        # 获取近期群氛围（原始文本，"你说：" 是固定前缀，代表机器人自己）
-        group_context_raw = ""
+        # 获取近期群氛围
+        group_context = ""
         if group_id:
-            group_context_raw = self.ctx.build_group_context_snippet(group_id, bot_name)
-
-        # 关键信号：机器人是否是这段群聊里最后一个发言的人（即用户是否在紧跟着接话）
-        last_speaker_is_bot, last_bot_utterance = self._extract_last_bot_utterance(group_context_raw)
-
-        # 为了不让 LLM 把"你说"和后面历史记录里的"assistant"当成两个不同的身份，
-        # 统一替换成人设名展示，身份线索更一致
-        group_context_display = (
-            group_context_raw.replace("你说：", f"{bot_display_name}：") if group_context_raw else ""
-        )
+            group_context = self.ctx.build_group_context_snippet(group_id, bot_name)
 
         # 获取和当前用户的最近几句对话 (截取最后 4 条，防止 token 浪费)
         history = self.ctx.get_session_history(group_id, user_id)[-4:]
-        history_str = (
-            "\n".join(
-                f"{bot_display_name if msg['role'] in ('assistant', 'bot') else msg['role']}: {msg['content']}"
-                for msg in history
-            )
-            if history
-            else "无最近聊天记录"
-        )
+        history_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in history]) if history else "无最近聊天记录"
 
         # 获取全局心情
         current_mood = self.emotion.get_mood()
         current_score = self.emotion.get_score()
 
-        prompt = f"""你是聊天机器人"{bot_display_name}"的"潜意识判断中枢"。
+        prompt = f"""你是一个聊天机器人的“潜意识判断中枢”。
 任务：根据上下文判断是否要回话，并评估这句话对机器人心情的影响。
 
 【机器人当前状态】
-名字/别名：{bot_display_name} / {self.aliases}
+名字/别名：{self.bot_persona_name or bot_name} / {self.aliases}
 当前心情状态：{current_mood} (心情分数：{current_score}，-100为极差，100为极好)
 
 【外界环境上下文】
-{group_context_display}
+{group_context}
 -----------------
 近期与该用户的对话记录：
 {history_str}
-
-【关键信号】
-机器人（{bot_display_name}）是否是这段群聊里最后一个发言的人：{"是" if last_speaker_is_bot else "否"}
-{f'机器人刚才说的话："{last_bot_utterance}"' if last_speaker_is_bot else ""}
 
 【当前事件】
 用户是否明确@了机器人：{is_at}
@@ -139,11 +117,7 @@ class TriggerChecker:
 用户当前发送的文本："{clean_text}"
 
 【判断逻辑】
-1. 回复意愿判断：被@、被回复、提到名字、接抛梗、被提问时应当回复。
-   特别注意：如果"机器人是否是最后一个发言的人"为是，用户紧跟着发的是附和、吐槽、玩梗、简短感叹
-   （如"666"“笑死”“绝了”“草”“蚌埠住了”等），即使没有@、没有引用，也应视为在回应机器人刚才说的话，判断为回复。
-   只有当用户的话明显是在跟别的群友对话、和机器人刚才说的内容完全无关时，才判断为不回复。
-   但在机器人心情极差（分数<-40）时，如果对方态度不好，哪怕被@也可以判断为不回复。
+1. 回复意愿判断：被@、被回复、提到名字、接抛梗、被提问时应当回复。但在机器人心情极差（分数<-40）时，如果对方态度不好，哪怕被@也可以判断为不回复。如果是群友间无关的闲聊，判断为不回复。
 2. 情绪波动打分：这句话让机器人产生的心情变化，给出一个 -10 到 +10 的整数。夸奖/善意给正数，辱骂/命令/恶心给负数，无关紧要给 0。
 
 【强制输出格式】
@@ -152,10 +126,10 @@ class TriggerChecker:
 
         payload = {
             "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages":[{"role": "user", "content": prompt}],
             "temperature": 0.1,
             "max_tokens": 20,
-            "stream": self.use_stream,
+            "stream": self.use_stream
         }
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
 
@@ -168,17 +142,13 @@ class TriggerChecker:
             # =========================================================
             result_text = ""
             if self.use_stream:
-                async with self.http_client.stream(
-                    "POST", f"{self.base_url}/chat/completions", json=payload, headers=headers, timeout=1000
-                ) as resp:
+                async with self.http_client.stream("POST", f"{self.base_url}/chat/completions", json=payload, headers=headers,timeout=1000) as resp:
                     resp.raise_for_status()
                     async for line in resp.aiter_lines():
                         line = line.strip()
-                        if not line or not line.startswith("data: "):
-                            continue
+                        if not line or not line.startswith("data: "): continue
                         data_str = line[6:]
-                        if data_str == "[DONE]":
-                            break
+                        if data_str == "[DONE]": break
                         try:
                             data = json.loads(data_str)
                             delta = data["choices"][0].get("delta", {})
@@ -210,7 +180,7 @@ class TriggerChecker:
         except Exception as e:
             logger.error(f"[Trigger LLM] 请求失败: {e}")
             traceback.print_exc()
-            # 兜底降级：网络波动时回退到硬件因子（这里也把"紧跟接话"纳入兜底判断）
+            # 兜底降级：网络波动时回退到硬件因子
             llm_decision = is_at or is_reply
 
         # =========================================================
@@ -227,10 +197,6 @@ class TriggerChecker:
             # 心情极好，比较积极 (降低已读不回概率)
             dynamic_ignore_prob = max(0, dynamic_ignore_prob - 10)
 
-        # 如果对方明显是紧跟着机器人刚才的话接茬，装死不回会显得很怪，适当降低已读不回概率
-        if last_speaker_is_bot:
-            dynamic_ignore_prob = max(0, dynamic_ignore_prob - 8)
-
         # 最终决定
         if llm_decision:
             # 没被明确艾特或回复时，依据此刻动态心情概率，决定要不要“冷暴力已读不回”
@@ -242,32 +208,11 @@ class TriggerChecker:
 
         # 虽然 LLM 判定不需要理他，但如果设定了随机插嘴概率，就偶尔接一茬
         if self.random_probability > 0 and random.randint(1, 100) <= self.random_probability:
-            return True, clean_text
+             return True, clean_text
 
         return False, clean_text
 
-    # --- 底层辅助判断方法 ---
-    @staticmethod
-    def _extract_last_bot_utterance(group_context: str) -> Tuple[bool, str]:
-        """
-        判断群聊上下文里最后一条发言是否来自机器人自己（固定前缀 "你说："），
-        如果是，提取出她刚说的内容（去掉 || 分段符，方便塞进 prompt）。
-
-        只看"最后一行"是为了严格判定"紧跟着接话"——如果她说完之后，
-        中间已经有别的群友插话，这里会判定为 False，交给 LLM 正常按语义判断，
-        避免把"接别人的话"误判成"接机器人的话"。
-        """
-        if not group_context:
-            return False, ""
-        lines = [l for l in group_context.strip().split("\n") if l.strip()]
-        if not lines:
-            return False, ""
-        last_line = lines[-1]
-        if last_line.startswith("你说："):
-            content = last_line.split("：", 1)[1].replace("||", " ").strip()
-            return True, content
-        return False, ""
-
+    # --- 底层辅助判断方法保持不变 ---
     def _is_reply_to_bot(self, event, bot_self_id: int) -> bool:
         if not hasattr(event, "message") or not event.message:
             return False
@@ -281,7 +226,7 @@ class TriggerChecker:
                     try:
                         if int(str(qq_val).strip()) == bot_self_id:
                             return True
-                    except Exception:
+                    except:
                         pass
 
                 msg_id = data.get("id") or data.get("message_id") or getattr(seg, "id", None) or getattr(seg, "message_id", None)
@@ -290,11 +235,14 @@ class TriggerChecker:
         return False
 
     @staticmethod
-    def _has_at(event, bot_self_id: int) -> bool:
+    def _has_at( event, bot_self_id: int) -> bool:
+        #print(event)
         if not hasattr(event, "group_id"):
+            #print("不是群消息")
             return False
 
         if not event.message_chain.has(At):
+            #print("消息中没有At")
             return False
         if event.message_chain.get(At)[0].qq in [bot_self_id, 1000000]:
             return True
@@ -308,9 +256,9 @@ class TriggerChecker:
         if event.message_chain.has(At):
             if event.message_chain.get(At)[0].qq in [bot_self_id, 1000000]:
                 logger.info(f"[TriggerChecker] 消息中包含@机器人自己的At，原始文本: '{text}'，已替换为 '@{bot_name}'")
-                text = f"@{bot_name}" + text
+                text = f"@{bot_name}"+text
             else:
-                text = f"@{event.message_chain.get(At)[0].name}" + text
+                text = f"@{event.message_chain.get(At)[0].name}"+text
         if not event.message_chain.has(Text) and not event.message_chain.has(At):
             logger.warning(f"[TriggerChecker] 无法提取文本内容，消息链中既没有 Text 也没有 At，原始消息链: {event.message_chain}")
             return None

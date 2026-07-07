@@ -12,7 +12,7 @@ import itertools
 import json
 import traceback
 import inspect
-from typing import List, Dict, Optional, Any, AsyncGenerator, Tuple
+from typing import List, Dict, Optional, Any, AsyncGenerator, Tuple, Callable, Awaitable
 
 import httpx
 
@@ -71,7 +71,8 @@ class LLMClient:
         stream: Optional[bool] = None,
         bot=None,
         event=None,
-        model=None
+        model=None,
+        on_intermediate_text: Optional[Callable[[str], Awaitable[None]]] = None,
     ) -> Optional[str]:
         """
         发送对话请求。
@@ -80,22 +81,22 @@ class LLMClient:
         should_stream = self.use_stream if stream is None else stream
 
         if should_stream:
-            return await self._chat_stream_with_retries(messages, system_prompt, tools, retries, bot, event,model)
+            return await self._chat_stream_with_retries(messages, system_prompt, tools, retries, bot, event, model, on_intermediate_text)
         else:
-            return await self._chat_non_stream_with_retries(messages, system_prompt, tools, retries, bot, event,model)
+            return await self._chat_non_stream_with_retries(messages, system_prompt, tools, retries, bot, event, model, on_intermediate_text)
 
     # ==================================================================
     # 流式 (Stream) 执行引擎 (内部消费生成器，合并后返回)
     # ==================================================================
-    async def _chat_stream_with_retries(self, messages, system_prompt, tools, retries, bot, event,model=None) -> Optional[str]:
+    async def _chat_stream_with_retries(self, messages, system_prompt, tools, retries, bot, event, model=None, on_intermediate_text=None) -> Optional[str]:
         for attempt in range(retries):
             try:
                 full_text = ""
                 if self.provider == "gemini":
-                    async for chunk in self._chat_gemini_stream(messages, system_prompt, tools, bot, event,model):
+                    async for chunk in self._chat_gemini_stream(messages, system_prompt, tools, bot, event, model, on_intermediate_text):
                         full_text += chunk
                 else:
-                    async for chunk in self._chat_openai_stream(messages, system_prompt, tools, bot, event,model):
+                    async for chunk in self._chat_openai_stream(messages, system_prompt, tools, bot, event, model, on_intermediate_text):
                         full_text += chunk
 
                 return full_text.strip() if full_text else None
@@ -107,7 +108,7 @@ class LLMClient:
                     raise e
         return None
 
-    async def _chat_openai_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None,model=None) -> AsyncGenerator[str, None]:
+    async def _chat_openai_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None, model=None, on_intermediate_text=None) -> AsyncGenerator[str, None]:
         api_key = next(self._oa_key_cycle)
         url = f"{self._oa_base_url}/chat/completions"
 
@@ -140,6 +141,7 @@ class LLMClient:
 
                 is_tool_call = False
                 tool_calls_dict = {}
+                round_text = ""
 
                 async for line in resp.aiter_lines():
                     line = line.strip()
@@ -154,6 +156,7 @@ class LLMClient:
                         delta = choices[0].get("delta", {})
 
                         if "content" in delta and delta["content"]:
+                            round_text += delta["content"]
                             yield delta["content"]
 
                         if "tool_calls" in delta and delta["tool_calls"]:
@@ -180,8 +183,11 @@ class LLMClient:
                 if not is_tool_call:
                     return
 
+                if round_text.strip() and on_intermediate_text:
+                    await on_intermediate_text(round_text)
+
                 tool_calls_list =[tool_calls_dict[k] for k in sorted(tool_calls_dict.keys())]
-                full_messages.append({"role": "assistant", "content": None, "tool_calls": tool_calls_list})
+                full_messages.append({"role": "assistant", "content": round_text or None, "tool_calls": tool_calls_list})
                 tool_results, should_continue = await self._execute_openai_tool_calls(tool_calls_list, tools, bot, event)
 
                 if not should_continue:
@@ -192,7 +198,7 @@ class LLMClient:
                 temp_signal=True
                 full_messages.extend(tool_results)
 
-    async def _chat_gemini_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None,model=None) -> AsyncGenerator[str, None]:
+    async def _chat_gemini_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None, model=None, on_intermediate_text=None) -> AsyncGenerator[str, None]:
         api_key = next(self._gm_key_cycle)
         model=self._gm_model if not model else model
         url = f"{self._gm_base_url}/v1beta/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
@@ -217,6 +223,7 @@ class LLMClient:
 
                 is_tool_call = False
                 func_call_parts_accum =[]
+                round_text_parts = []
 
                 async for line in resp.aiter_lines():
                     line = line.strip()
@@ -230,6 +237,7 @@ class LLMClient:
 
                         for part in parts:
                             if "text" in part:
+                                round_text_parts.append(part["text"])
                                 yield part["text"]
                             elif "functionCall" in part:
                                 is_tool_call = True
@@ -240,7 +248,15 @@ class LLMClient:
                 if not is_tool_call:
                     return
 
-                contents.append({"role": "model", "parts": func_call_parts_accum})
+                round_text = "".join(round_text_parts)
+                if round_text.strip() and on_intermediate_text:
+                    await on_intermediate_text(round_text)
+
+                model_parts = []
+                if round_text:
+                    model_parts.append({"text": round_text})
+                model_parts.extend(func_call_parts_accum)
+                contents.append({"role": "model", "parts": model_parts})
                 response_parts, should_continue = await self._execute_gemini_function_calls(func_call_parts_accum, tools, bot, event)
 
                 if not should_continue:
@@ -251,13 +267,13 @@ class LLMClient:
     # ==================================================================
     # 非流式 (Non-Stream) 传统执行引擎
     # ==================================================================
-    async def _chat_non_stream_with_retries(self, messages, system_prompt, tools, retries, bot, event,model=None) -> Optional[str]:
+    async def _chat_non_stream_with_retries(self, messages, system_prompt, tools, retries, bot, event, model=None, on_intermediate_text=None) -> Optional[str]:
         for attempt in range(retries):
             try:
                 if self.provider == "gemini":
-                    return await self._chat_gemini_non_stream(messages, system_prompt, tools, bot, event,model)
+                    return await self._chat_gemini_non_stream(messages, system_prompt, tools, bot, event, model, on_intermediate_text)
                 else:
-                    return await self._chat_openai_non_stream(messages, system_prompt, tools, bot, event,model)
+                    return await self._chat_openai_non_stream(messages, system_prompt, tools, bot, event, model, on_intermediate_text)
             except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(1.5 * (attempt + 1))
@@ -266,7 +282,7 @@ class LLMClient:
                     raise e
         return None
 
-    async def _chat_openai_non_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None,model=None) -> Optional[str]:
+    async def _chat_openai_non_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None, model=None, on_intermediate_text=None) -> Optional[str]:
         api_key = next(self._oa_key_cycle)
         url = f"{self._oa_base_url}/chat/completions"
         full_messages =[{"role": "system", "content": system_prompt}] if system_prompt else[]
@@ -274,6 +290,7 @@ class LLMClient:
         tool_defs = self._build_openai_tool_defs(tools) if tools else None
         temp_signal=False
         temp_model=model if model else self._oa_model
+        accumulated_text = ""
         for _round in range(10):
             payload: Dict[str, Any] = {
                 "model": temp_model, "messages": full_messages,
@@ -294,24 +311,31 @@ class LLMClient:
             finish_reason = choice.get("finish_reason", "")
 
             if finish_reason != "tool_calls" or not message.get("tool_calls"):
-                return (message.get("content") or "").strip() or None
+                final_text = accumulated_text + (message.get("content") or "")
+                return final_text.strip() or None
+
+            text_before_tool = message.get("content") or ""
+            if text_before_tool.strip() and on_intermediate_text:
+                await on_intermediate_text(text_before_tool)
+            accumulated_text += text_before_tool
 
             full_messages.append(message)
             tool_results, should_continue = await self._execute_openai_tool_calls(message["tool_calls"], tools, bot, event)
 
             if not should_continue:
-                return None
+                return accumulated_text.strip() or None
             temp_signal=True
             full_messages.extend(tool_results)
         return None
 
-    async def _chat_gemini_non_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None,model=None) -> Optional[str]:
+    async def _chat_gemini_non_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None, model=None, on_intermediate_text=None) -> Optional[str]:
         api_key = next(self._gm_key_cycle)
         temp_model=model if model else self._gm_model
         url = f"{self._gm_base_url}/v1beta/models/{temp_model}:generateContent?key={api_key}"
         contents = self._build_gemini_contents(messages)
         gemini_tools = self._build_gemini_tool_defs(tools) if tools else None
         temp_signal=False
+        accumulated_text = ""
         for _round in range(10):
             payload: Dict[str, Any] = {
                 "contents": contents,
@@ -331,13 +355,19 @@ class LLMClient:
             text_parts =[p for p in parts if "text" in p]
 
             if not func_call_parts:
-                return "".join(p["text"] for p in text_parts).strip() or None
+                final_text = accumulated_text + "".join(p["text"] for p in text_parts)
+                return final_text.strip() or None
 
-            contents.append({"role": "model", "parts": func_call_parts})
+            text_before_tool = "".join(p["text"] for p in text_parts)
+            if text_before_tool.strip() and on_intermediate_text:
+                await on_intermediate_text(text_before_tool)
+            accumulated_text += text_before_tool
+
+            contents.append({"role": "model", "parts": text_parts + func_call_parts})
             response_parts, should_continue = await self._execute_gemini_function_calls(func_call_parts, tools, bot, event)
 
             if not should_continue:
-                return None
+                return accumulated_text.strip() or None
             temp_signal=True
             contents.append({"role": "user", "parts": response_parts})
         return None

@@ -62,6 +62,13 @@ class SQLitePersistence:
         self._conn.execute("DELETE FROM kv_store WHERE key = ?", (key,))
         self._conn.commit()
 
+    def keys_like(self, pattern: str) -> List[str]:
+        sql_pattern = pattern.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_").replace("*", "%")
+        rows = self._conn.execute(
+            "SELECT key FROM kv_store WHERE key LIKE ? ESCAPE '\\'", (sql_pattern,)
+        ).fetchall()
+        return [row[0] for row in rows]
+
     def close(self) -> None:
         self._conn.close()
 
@@ -122,6 +129,15 @@ class ContextManager:
         self._ctx_cache.delete(key)
         self._ctx_sqlite.delete(key)
 
+    def _ctx_keys(self, pattern: str) -> List[str]:
+        keys = set()
+        try:
+            keys.update(key.decode("utf-8") if isinstance(key, bytes) else str(key) for key in self._ctx_cache.get_keys(pattern))
+        except Exception:
+            pass
+        keys.update(self._ctx_sqlite.keys_like(pattern))
+        return sorted(keys)
+
     def _ctx_exists(self, key: str) -> bool:
         if self._ctx_cache.exists(key):
             return True
@@ -143,6 +159,15 @@ class ContextManager:
     def _imp_delete(self, key: str) -> None:
         self._imp_cache.delete(key)
         self._imp_sqlite.delete(key)
+
+    def _imp_keys(self, pattern: str) -> List[str]:
+        keys = set()
+        try:
+            keys.update(key.decode("utf-8") if isinstance(key, bytes) else str(key) for key in self._imp_cache.get_keys(pattern))
+        except Exception:
+            pass
+        keys.update(self._imp_sqlite.keys_like(pattern))
+        return sorted(keys)
 
     # ------------------------------------------------------------------ Bot 发送消息 ID 追踪
 
@@ -224,16 +249,47 @@ class ContextManager:
         key = self._group_key(group_id, user_id) if group_id else self._private_key(user_id)
         self._ctx_delete(key)
 
+    def clear_user_all_sessions(self, user_id: int) -> int:
+        patterns = [
+            self._private_key(user_id),
+            f"ctx:group:*:{user_id}",
+        ]
+        keys = set()
+        for pattern in patterns:
+            keys.update(self._ctx_keys(pattern))
+
+        count = 0
+        for key in keys:
+            self._ctx_delete(key)
+            count += 1
+        return count
+
     def clear_all_sessions(self, group_id: Optional[int] = None) -> int:
         if group_id is not None:
-            pattern = f"ctx:group:{group_id}:*"
+            patterns = [f"ctx:group:{group_id}:*"]
         else:
-            pattern = "ctx:*"
-        keys = self._ctx_cache.get_keys(pattern)
+            patterns = ["ctx:private:*", "ctx:group:*"]
+
+        keys = set()
+        for pattern in patterns:
+            keys.update(self._ctx_keys(pattern))
+
         count = 0
         for key in keys:
             if key.startswith("lock:"):
                 continue
+            self._ctx_delete(key)
+            count += 1
+        return count
+
+    def clear_all_group_windows(self, group_id: Optional[int] = None) -> int:
+        patterns = [self._group_window_key(group_id), self._group_recent_speakers_key(group_id)] if group_id is not None else ["ctx:gwin:*", "ctx:speakers:*"]
+        keys = set()
+        for pattern in patterns:
+            keys.update(self._ctx_keys(pattern))
+
+        count = 0
+        for key in keys:
             self._ctx_delete(key)
             count += 1
         return count
@@ -326,6 +382,16 @@ class ContextManager:
         """清除对某个用户的印象记忆（Redis + SQLite 双层同步删除）"""
         self._imp_delete(self._impression_key(user_id))
 
+    def clear_all_user_impressions(self) -> int:
+        keys = self._imp_keys("imp:*")
+        count = 0
+        for key in keys:
+            if key.startswith("imp:group:"):
+                continue
+            self._imp_delete(key)
+            count += 1
+        return count
+
     # ------------------------------------------------------------------ 群聊印象（新增）
 
     def get_group_impression(self, group_id: int) -> str:
@@ -348,6 +414,14 @@ class ContextManager:
     def clear_group_impression(self, group_id: int) -> None:
         """清除某个群的气氛/话题印象（Redis + SQLite 双层同步删除）"""
         self._imp_delete(self._group_impression_key(group_id))
+
+    def clear_all_group_impressions(self) -> int:
+        keys = self._imp_keys("imp:group:*")
+        count = 0
+        for key in keys:
+            self._imp_delete(key)
+            count += 1
+        return count
 
     def get_recent_speaker_impressions(self, group_id: int) -> List[Dict]:
         """

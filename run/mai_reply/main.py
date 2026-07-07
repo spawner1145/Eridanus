@@ -20,13 +20,14 @@ MaiReply 插件主入口
   - 错字生成
   - 概率触发 + focus持续对话
   - 高并发安全（信号量 + 会话锁 + 消息合并）
-  - /clear 清除对话历史
+  - /clear 清除当前会话，/init 清除指定用户的全局会话
   - 函数调用（兼容 Eridanus func_calling 体系）
 """
 
 import asyncio
 import base64
 import io
+import re
 import uuid
 
 from PIL import Image as PILImage
@@ -164,24 +165,118 @@ def main(bot: ExtendBot, config: YAMLManager):
 
     bot.logger.info("[MaiReply] 高拟人化AI回复插件已加载")
 
+    def is_master(user_id: int) -> bool:
+        master = config.common_config.basic_config["master"]["id"]
+        if isinstance(master, (list, tuple, set)):
+            return str(user_id) in {str(item) for item in master}
+        return str(user_id) == str(master)
+
+    def get_command_text(event) -> str:
+        if getattr(event, "message_chain", None) and event.message_chain.has(Text):
+            return "".join(msg.text for msg in event.message_chain.get(Text)).strip()
+        return (event.pure_text or "").strip()
+
+    def parse_clear_target(event, command: str) -> int | None:
+        if getattr(event, "message_chain", None) and event.message_chain.has(At):
+            target = int(event.message_chain.get(At)[0].qq)
+            if target != 0:
+                return target
+
+        text = get_command_text(event)
+        patterns = [
+            rf"^{re.escape(command)}\s+(\d{{5,12}})\s*$",
+            rf"^{re.escape(command)}(\d{{5,12}})\s*$",
+        ]
+        for pattern in patterns:
+            match = re.match(pattern, text)
+            if match:
+                return int(match.group(1))
+        return None
+
+    def has_at_target(event) -> bool:
+        if not getattr(event, "message_chain", None) or not event.message_chain.has(At):
+            return False
+        return int(event.message_chain.get(At)[0].qq) != 0
+
+    def command_matches(text: str, command: str, has_at_target: bool) -> bool:
+        if text == command or text.startswith(command + " "):
+            return True
+        if not has_at_target or not text.startswith(command):
+            return False
+
+        suffix = text[len(command):]
+        if command == "/clear" and suffix.startswith("all"):
+            return False
+        if command == "/init" and suffix.startswith("all"):
+            return False
+        return True
+
+    async def handle_clear_command(event, is_group: bool) -> bool:
+        text = get_command_text(event)
+        group_id = getattr(event, "group_id", None) if is_group else None
+        has_target_at = has_at_target(event)
+
+        if text in ("/clearall", "清除全部对话", "清理全部对话"):
+            if not is_master(event.user_id):
+                return True
+            count = engine.context.clear_all_sessions(group_id)
+            if is_group:
+                engine.context.clear_all_group_windows(group_id)
+                engine.context.clear_group_impression(group_id)
+                await bot.send(event, f"已清除本群 {count} 个用户的对话记录及群印象～")
+            else:
+                await bot.send(event, f"已清除全部 {count} 个会话记录～")
+            return True
+
+        if text in ("/initall", "初始化全部对话", "重置全部对话"):
+            if not is_master(event.user_id):
+                return True
+            session_count = engine.context.clear_all_sessions()
+            window_count = engine.context.clear_all_group_windows()
+            user_imp_count = engine.context.clear_all_user_impressions()
+            group_imp_count = engine.context.clear_all_group_impressions()
+            await bot.send(
+                event,
+                f"已初始化全部记录：会话 {session_count} 条，群窗口 {window_count} 条，用户印象 {user_imp_count} 条，群印象 {group_imp_count} 条～",
+            )
+            return True
+
+        clear_aliases = ("/clear", "清除对话", "清理对话")
+        init_aliases = ("/init", "初始化对话", "重置对话")
+
+        for command in clear_aliases:
+            if command_matches(text, command, has_target_at):
+                parsed_target_id = parse_clear_target(event, command)
+                target_id = parsed_target_id or event.user_id
+                if target_id != event.user_id and not is_master(event.user_id):
+                    return True
+                engine.context.clear_session(group_id, target_id)
+                engine.context.clear_impression(target_id)
+                if is_group:
+                    await bot.send(event, f"已清除 {target_id} 在本群的对话记录和印象～")
+                else:
+                    await bot.send(event, "好，忘掉了～" if target_id == event.user_id else f"已清除 {target_id} 的私聊记录和印象～")
+                return True
+
+        for command in init_aliases:
+            if command_matches(text, command, has_target_at):
+                parsed_target_id = parse_clear_target(event, command)
+                target_id = parsed_target_id or event.user_id
+                if target_id != event.user_id and not is_master(event.user_id):
+                    return True
+                count = engine.context.clear_user_all_sessions(target_id)
+                engine.context.clear_impression(target_id)
+                await bot.send(event, f"已初始化 {target_id} 在所有群和私聊中的对话记录，共 {count} 条，并清除了用户印象～")
+                return True
+
+        return False
+
     @bot.on(GroupMessageEvent)
     async def handle_group(event: GroupMessageEvent):
         text = event.pure_text or ""
 
         # 清理指令
-        if text.strip() in ("/clear", "清除对话", "清理对话"):
-            engine.context.clear_session(event.group_id, event.user_id)
-            engine.context.clear_impression(event.user_id)
-            if hasattr(event,"group_id"):
-                engine.context.clear_group_impression(event.group_id)
-            await bot.send(event, "好的，对话记录和印象已清除～")
-            return
-        if text.strip() in ("/clearall", "清除全部对话", "清理全部对话"):
-            if event.user_id != config.common_config.basic_config["master"]["id"]:
-                return
-            count = engine.context.clear_all_sessions(event.group_id)
-            engine.context.clear_group_impression(event.group_id)
-            await bot.send(event, f"已清除本群 {count} 个用户的对话记录及群印象～")
+        if await handle_clear_command(event, is_group=True):
             return
 
         async def add_to_context():
@@ -277,16 +372,7 @@ def main(bot: ExtendBot, config: YAMLManager):
     async def handle_private(event: PrivateMessageEvent):
         text = event.pure_text or ""
 
-        if text.strip() in ("/clear", "清除对话", "清理对话"):
-            engine.context.clear_session(None, event.user_id)
-            engine.context.clear_impression(event.user_id)
-            await bot.send(event, "好，忘掉了～")
-            return
-        if text.strip() in ("/clearall", "清除全部对话", "清理全部对话"):
-            if event.user_id != config.common_config.basic_config["master"]["id"]:
-                return
-            count = engine.context.clear_all_sessions()
-            await bot.send(event, f"已清除全部 {count} 个会话记录～")
+        if await handle_clear_command(event, is_group=False):
             return
 
         if not config.mai_reply.config.get("trigger", {}).get("private_trigger", True):

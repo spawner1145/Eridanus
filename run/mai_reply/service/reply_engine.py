@@ -212,13 +212,31 @@ class ReplyEngine:
             user_content = multimodal_content if multimodal_content is not None else clean_text
             messages.append({"role": "user", "content": user_content})
 
+            msg_id = getattr(event, "message_id", None)
+            sent_reply_parts: list[str] = []
+            sent_reply_segments: list[str] = []
+
+            async def send_intermediate_text(text: str) -> None:
+                if current_task.cancelled():
+                    return
+                segments = self.processor.process(text)
+                if triggered_by_llm and is_group:
+                    segments = self._hard_truncate_segments(segments)
+                if not segments:
+                    return
+                quote_id = None if sent_reply_segments else msg_id
+                await self.processor.send_with_delay(bot, event, segments, quote_message_id=quote_id)
+                sent_reply_parts.append(text)
+                sent_reply_segments.extend(segments)
+
             raw_reply = await self.llm.chat(
                 messages=messages,
                 system_prompt=system_prompt,
                 tools=self._tools,
                 bot=bot,
                 event=event,
-                retries=3
+                retries=3,
+                on_intermediate_text=send_intermediate_text,
             )
 
             # LLM 调用完成后，再次确认自己没有被更新的 Task 抢占取消
@@ -235,30 +253,42 @@ class ReplyEngine:
                     tools=self._tools,
                     bot=bot,
                     event=event,
-                    retries=2
+                    retries=2,
+                    on_intermediate_text=send_intermediate_text,
                 )
                 if not raw_reply:
                     bot.logger.warning("[MaiReply] 重试后仍为空，放弃本次回复")
                     return
 
-            segments = self.processor.process(raw_reply)
+            sent_prefix = "".join(sent_reply_parts)
+            final_reply_text = raw_reply or ""
+            remaining_reply = final_reply_text
+            if sent_prefix and final_reply_text.startswith(sent_prefix):
+                remaining_reply = final_reply_text[len(sent_prefix):]
+            elif sent_prefix and final_reply_text.startswith(sent_prefix.strip()):
+                remaining_reply = final_reply_text[len(sent_prefix.strip()):]
+
+            segments = self.processor.process(remaining_reply)
             if not segments:
-                return
+                if not sent_reply_segments:
+                    return
+                segments = []
 
             # trigger_llm 触发时在处理层也做一次硬截断保险
             if triggered_by_llm and is_group:
                 segments = self._hard_truncate_segments(segments)
 
-            msg_id = getattr(event, "message_id", None)
-            await self.processor.send_with_delay(bot, event, segments, quote_message_id=msg_id)
+            if segments:
+                await self.processor.send_with_delay(bot, event, segments, quote_message_id=None if sent_reply_segments else msg_id)
 
             # TTS
             voice_cfg = self.cfg.mai_reply.config["tts"]
             voice_prob = int(voice_cfg.get("voice_reply_probability", 0))
             translate_api_key = self.cfg.mai_reply.config["trigger_llm"]["api_key"]
             voice_cfg["translate_api_key"] = translate_api_key
+            all_sent_segments = sent_reply_segments + segments
             if voice_prob > 0 and random.randint(1, 100) <= voice_prob:
-                combined_text = ".".join(segments)
+                combined_text = ".".join(all_sent_segments)
                 asyncio.create_task(self._async_tts_and_send(bot, event, combined_text, voice_cfg))
 
             # 更新历史（只有真正发出回复才更新，被抢占的任务不写历史）
@@ -267,10 +297,10 @@ class ReplyEngine:
             else:
                 history_user_text = final_text
 
-            self.context.append_to_session(group_id, user_id, history_user_text, raw_reply)
+            self.context.append_to_session(group_id, user_id, history_user_text, final_reply_text)
 
             if is_group:
-                self.context.push_group_window(group_id, bot_name, raw_reply)
+                self.context.push_group_window(group_id, bot_name, final_reply_text)
 
             self.impression_updater.tick(user_id, group_id, user_name, bot_name)
             self.audit_system.tick(user_id, group_id, user_name, bot_name, bot)
@@ -286,7 +316,7 @@ class ReplyEngine:
             panel = (
                 f"\n┌──────── MaiReply 机器人状态监控 ────────┐\n"
                 f"│ 👤 交互对象: {user_name} ({user_id})\n"
-                f"│ 💬 最终回复: {raw_reply}\n"
+                f"│ 💬 最终回复: {final_reply_text}\n"
                 f"│ 📊 全局心情: {current_score}分 ({current_mood})\n"
                 f"│ 🧠 对TA印象: {current_imp}\n"
                 f"│ 🌐 trigger_llm: {triggered_by_llm}\n"
