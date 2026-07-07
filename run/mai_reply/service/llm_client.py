@@ -30,6 +30,7 @@ class LLMClient:
 
         # 是否在底层使用流式请求防超时
         self.use_stream: bool = lcfg.get("stream", False)
+        self.max_tool_rounds: int = int(lcfg.get("max_tool_rounds", 10))
 
         # --- OpenAI 兼容配置
         oa = lcfg.get("openai", {})
@@ -118,8 +119,7 @@ class LLMClient:
         full_messages.extend(messages)
         tool_defs = self._build_openai_tool_defs(tools) if tools else None
 
-        temp_signal=False
-        for _round in range(10):
+        for _round in range(self.max_tool_rounds):
             payload = {
                 "model": self._oa_model if not model else model,
                 "messages": full_messages,
@@ -127,7 +127,7 @@ class LLMClient:
                 "max_tokens": self._oa_max_tokens,
                 "stream": True
             }
-            if tool_defs and not temp_signal:
+            if tool_defs:
                 payload["tools"] = tool_defs
                 payload["tool_choice"] = "auto"
 
@@ -192,10 +192,6 @@ class LLMClient:
 
                 if not should_continue:
                     return
-                """
-                有返回值，那就只再调用一次
-                """
-                temp_signal=True
                 full_messages.extend(tool_results)
 
     async def _chat_gemini_stream(self, messages: List[Dict], system_prompt: str, tools=None, bot=None, event=None, model=None, on_intermediate_text=None) -> AsyncGenerator[str, None]:
@@ -205,15 +201,14 @@ class LLMClient:
 
         gemini_tools = self._build_gemini_tool_defs(tools) if tools else None
         contents = self._build_gemini_contents(messages)
-        temp_signal=False
-        for _round in range(10):
+        for _round in range(self.max_tool_rounds):
             payload = {
                 "contents": contents,
                 "generationConfig": {"temperature": self._gm_temperature, "maxOutputTokens": self._gm_max_tokens},
             }
             if system_prompt:
                 payload["system_instruction"] = {"parts":[{"text": system_prompt}]}
-            if gemini_tools and not temp_signal:
+            if gemini_tools:
                 payload["tools"] = gemini_tools
 
             http = await self._get_http()
@@ -261,7 +256,6 @@ class LLMClient:
 
                 if not should_continue:
                     return
-                temp_signal=True
                 contents.append({"role": "user", "parts": response_parts})
 
     # ==================================================================
@@ -288,20 +282,18 @@ class LLMClient:
         full_messages =[{"role": "system", "content": system_prompt}] if system_prompt else[]
         full_messages.extend(messages)
         tool_defs = self._build_openai_tool_defs(tools) if tools else None
-        temp_signal=False
         temp_model=model if model else self._oa_model
         accumulated_text = ""
-        for _round in range(10):
+        for _round in range(self.max_tool_rounds):
             payload: Dict[str, Any] = {
                 "model": temp_model, "messages": full_messages,
                 "temperature": self._oa_temperature, "max_tokens": self._oa_max_tokens,
             }
-            if tool_defs and not temp_signal:
+            if tool_defs:
                 payload["tools"] = tool_defs
                 payload["tool_choice"] = "auto"
 
             http = await self._get_http()
-            print(messages)
             resp = await http.post(url, json=payload, headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},timeout=360)
             resp.raise_for_status()
             data = resp.json()
@@ -324,7 +316,6 @@ class LLMClient:
 
             if not should_continue:
                 return accumulated_text.strip() or None
-            temp_signal=True
             full_messages.extend(tool_results)
         return None
 
@@ -334,15 +325,14 @@ class LLMClient:
         url = f"{self._gm_base_url}/v1beta/models/{temp_model}:generateContent?key={api_key}"
         contents = self._build_gemini_contents(messages)
         gemini_tools = self._build_gemini_tool_defs(tools) if tools else None
-        temp_signal=False
         accumulated_text = ""
-        for _round in range(10):
+        for _round in range(self.max_tool_rounds):
             payload: Dict[str, Any] = {
                 "contents": contents,
                 "generationConfig": {"temperature": self._gm_temperature, "maxOutputTokens": self._gm_max_tokens},
             }
             if system_prompt: payload["system_instruction"] = {"parts": [{"text": system_prompt}]}
-            if gemini_tools and not temp_signal: payload["tools"] = gemini_tools
+            if gemini_tools: payload["tools"] = gemini_tools
 
             http = await self._get_http()
             resp = await http.post(url, json=payload, headers={"Content-Type": "application/json"},timeout=360)
@@ -368,7 +358,6 @@ class LLMClient:
 
             if not should_continue:
                 return accumulated_text.strip() or None
-            temp_signal=True
             contents.append({"role": "user", "parts": response_parts})
         return None
 
@@ -564,7 +553,10 @@ class LLMClient:
                     content = json.dumps(ret, ensure_ascii=False) if not isinstance(ret, str) else ret
                 except Exception as e:
                     traceback.print_exc()
-                    logger.error(f"[MaiReply] 执行工具 {func_name} 时发生系统异常: {e}")
+                    logger.error(
+                        f"[MaiReply] 执行工具 {func_name} 时发生系统异常: {e!r}",
+                        exc_info=True,
+                    )
                     content = json.dumps({"error": str(e)}, ensure_ascii=False)
                     # 【防刷屏死循环机制】遇到崩溃级别的异常，直接强制中断
                     should_continue = False
@@ -604,7 +596,10 @@ class LLMClient:
 
                     result = ret if isinstance(ret, dict) else {"result": str(ret)}
                 except Exception as e:
-                    logger.error(f"[MaiReply] 执行工具 {func_name} 时发生系统异常: {e}")
+                    logger.error(
+                        f"[MaiReply] 执行工具 {func_name} 时发生系统异常: {e!r}",
+                        exc_info=True,
+                    )
                     result = {"error": str(e)}
                     # 【防刷屏死循环机制】遇到崩溃级别的异常，直接强制中断
                     should_continue = False
