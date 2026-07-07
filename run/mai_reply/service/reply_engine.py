@@ -27,6 +27,7 @@ from run.mai_reply.service.audit_censor import AuditSystem
 from run.mai_reply.service.context_manager import ContextManager
 from run.mai_reply.service.emotion_system import EmotionSystem
 from run.mai_reply.service.llm_client import LLMClient
+from run.mai_reply.service.mcp_client import MCPManager
 from run.mai_reply.service.prompt_builder import PromptBuilder
 from run.mai_reply.service.reply_processor import ReplyProcessor
 from run.mai_reply.service.impression_updater import ImpressionUpdater
@@ -60,6 +61,7 @@ class ReplyEngine:
         self.impression_updater = ImpressionUpdater(self.llm, self.context)
         self.concurrency = ConcurrencyController(config)
         self.audit_system = AuditSystem(self.llm, self.context, config)
+        self.mcp_manager = MCPManager(config)
 
         self._name_cache: dict[str, tuple[str, float]] = {}
 
@@ -86,6 +88,7 @@ class ReplyEngine:
     # --------------------------------------------------
 
     def _load_tools(self):
+        tools = {}
         try:
             if self.cfg.mai_reply.config.get("llm", {}).get("func_calling", False):
                 from framework_common.framework_util.func_map_loader import build_tool_map, get_tool_declarations
@@ -93,16 +96,31 @@ class ReplyEngine:
                 # 将 Gemini 格式的 declaration 列表转成 name -> decl 的索引
                 declarations = {d["name"]: d for d in get_tool_declarations() if "name" in d}
                 # 将每个工具包装为 {"func": <callable>, "declaration": <gemini_decl>}
-                tools = {}
                 for name, func in funcs.items():
                     tools[name] = {
                         "func": func,
                         "declaration": declarations.get(name),  # 可能为 None（没有声明的工具）
                     }
-                logger.info(f"[MaiReply] 已加载函数调用工具: {list(tools.keys())}")
-                return tools
         except Exception as e:
             traceback.print_exc()
+
+        try:
+            skill_tools = self.prompt_builder.skill_loader.get_tool_map()
+            if skill_tools:
+                tools.update(skill_tools)
+        except Exception:
+            traceback.print_exc()
+
+        try:
+            mcp_tools = self.mcp_manager.get_tool_map()
+            if mcp_tools:
+                tools.update(mcp_tools)
+        except Exception:
+            traceback.print_exc()
+
+        if tools:
+            logger.info(f"[MaiReply] 已加载函数调用工具: {list(tools.keys())}")
+            return tools
         return None
 
     async def handle(
@@ -202,6 +220,7 @@ class ReplyEngine:
                 triggered_by_llm=triggered_by_llm,
                 group_impression=group_impression,
                 recent_speaker_impressions=recent_speaker_impressions,
+                user_text=final_text,
             )
 
             max_turns = self.cfg.mai_reply.config.get("context", {}).get("max_turns", 20)

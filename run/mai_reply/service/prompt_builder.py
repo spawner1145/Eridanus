@@ -15,6 +15,8 @@ import time
 from datetime import datetime
 from typing import Optional, List, Dict
 
+from run.mai_reply.service.skill_loader import SkillLoader
+
 
 # 角色卡解析支持 txt / json
 def _load_chara_file(chara_file: str) -> Optional[str]:
@@ -54,6 +56,7 @@ class PromptBuilder:
         self._system_template: str = pcfg.get("system_prompt", "")
         self._chara_file: str = pcfg.get("chara_file", "").strip()
         self._chara_content: Optional[str] = _load_chara_file(self._chara_file)
+        self.skill_loader = SkillLoader(config)
 
         # trigger_llm 触发时的回复约束配置
         tlcfg = config.mai_reply.config.get("trigger_llm", {})
@@ -75,6 +78,7 @@ class PromptBuilder:
         triggered_by_llm: bool = False,
         group_impression: str = "",
         recent_speaker_impressions: Optional[List[Dict]] = None,
+        user_text: str = "",
     ) -> str:
         """
         构建完整 system prompt。
@@ -139,6 +143,11 @@ class PromptBuilder:
 
         # ---- 拟人化输出规则 ----
         prompt += _HUMANLIKE_RULES
+
+        # ---- 动态 Skills 注入 ----
+        skill_section = self.skill_loader.build_prompt_section(user_text)
+        if skill_section:
+            prompt += skill_section
 
         # ---- trigger_llm 触发的严格约束（追加在最后，优先级最高）----
         if triggered_by_llm and is_group:
