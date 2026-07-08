@@ -54,22 +54,26 @@ async def link_prising(url,filepath=None,proxy=None,type=None,credential_bili=No
             return linking_cache[url]['info']
         linking_cache.pop(url)
     #是否从数据库获取B站凭证并用于解析,定义一个全局变量，不要重复从数据库读取
-    global credential_bili_global
-    if credential_bili is True:
-        if credential_bili_global is None:
-            user_info = await db.read_user('bili_dynamic')
-            if 'info' in user_info and 'cookies' in user_info['info']:
-                data_info = user_info['info']
-                credential_bili = Credential(sessdata=data_info['cookies']['sessdata'], bili_jct=data_info['cookies']['bili_jct'],
-                                        buvid3=data_info['cookies']['buvid3'], dedeuserid=data_info['cookies']['dedeuserid'], )
-                credential_bili_global = credential_bili
-            else: credential_bili = None
-        else:
-            credential_bili = credential_bili_global
+
     try:
         match url:
             case url if 'bili' in url or 'b23' in url:
                 logger.info(f"解析bilibili链接:{url}")
+                global credential_bili_global
+                if credential_bili is True:
+                    if credential_bili_global is None:
+                        user_info = await db.read_user('bili_dynamic')
+                        if 'info' in user_info and 'cookies' in user_info['info']:
+                            data_info = user_info['info']
+                            credential_bili = Credential(sessdata=data_info['cookies']['sessdata'],
+                                                         bili_jct=data_info['cookies']['bili_jct'],
+                                                         buvid3=data_info['cookies']['buvid3'],
+                                                         dedeuserid=data_info['cookies']['dedeuserid'], )
+                            credential_bili_global = credential_bili
+                        else:
+                            credential_bili = None
+                    else:
+                        credential_bili = credential_bili_global
                 link_prising_json = await bilibili(url, filepath=filepath,type=type,credential_bili=credential_bili,absorb_color=absorb_color,up_info_get=up_info_get)
             case url if 'douyin' in url:
                 logger.info(f"解析抖音链接:{url}")
