@@ -45,49 +45,6 @@ persona:  # 人设
   system_prompt: ""   #系统提示词（留空则使用默认角色卡内容）建议在角色卡里写好system prompt，这里留空即可。
   chara_file: "猫娘.txt"  #角色文件名，放在data/system/chara文件夹内。如开启 gptimage2接管sd，建议使用【猫娘gptimage2.txt】
 
-skills:  # LLM Skill 风格技能包动态加载。放在skills目录下
-  enable: true
-  skills_dir: "skills"
-  include_catalog: true          # 是否把所有可用 skill 的 name/description 注入 prompt，方便模型知道能触发什么
-  llm_select: true               # 是否允许模型先看元数据，再通过 load_skill/read_skill_file/run_skill_script 函数按需加载
-  enable_skill_tools: true       # 是否注册 skill 相关函数调用工具
-  auto_trigger: true             # 是否根据本轮用户文本自动预加载 skill 正文，作为模型选择机制的兜底
-  always_load: []                # 总是加载的 skill 名称列表，例如 ["my-skill"]
-  max_loaded_skills: 3           # 单轮最多加载几个 skill 正文
-  max_skill_chars: 240000          # 单个 SKILL.md 正文最大注入字符数，防止上下文爆炸
-  max_file_chars: 240000          # read_skill_file / run_skill_script 输出最大注入字符数
-  reload_interval_seconds: 100    # 扫描 skills 文件夹的最小间隔，支持运行中热更新
-  allow_script_execution: false   # 是否允许执行 skill 包 scripts/ 下的脚本，默认关闭更安全
-  script_timeout_seconds: 20
-  allowed_script_extensions:
-    - ".py"
-
-mcp:  # MCP stdio server 配置。启动后会把 MCP tools 暴露为 mcp__server__tool 函数调用工具
-  enable: false
-  startup_timeout_seconds: 60
-  tool_call_timeout_seconds: 120
-  mcpServers:
-    godot:
-      command: "npx"
-      args:
-        - "@coding-solo/godot-mcp"
-      env:
-        GODOT_PATH: "D:/SteamLibrary/steamapps/common/Godot Engine/godot.windows.opt.tools.64.exe"
-        DEBUG: "true"
-
-    another_server:
-      command: "python"
-      args:
-        - "path/to/server.py"
-      env:
-        SOME_KEY: "some-value"
-
-    filesystem:
-      command: "npx"
-      args:
-        - "@modelcontextprotocol/server-filesystem"
-        - "D:/some/allowed/path"
-
 tts:
   voice_reply_probability: 30 # 回复时附带语音的概率（0=关闭，1-100=概率）。需要配置voice_model和相关参数
   speaker: natuki  # api.apollodorus.xyz提供的语音模型说话人
@@ -155,3 +112,46 @@ redis: # 上下文存储db编号（避免和其他插件冲突）
 sqlite:
   context_db_path:    "data/database/context_store.db"
   impression_db_path: "data/database/impression_store.db"
+
+skills:  # LLM Skill 风格技能包动态加载。放在skills目录下
+  enable: false
+  skills_dir: "skills"
+  include_catalog: true          # 是否把所有可用 skill 的 name/description 注入 prompt，方便模型知道能触发什么
+  llm_select: true               # 是否允许模型先看元数据，再通过 load_skill/read_skill_file/run_skill_script 函数按需加载
+  enable_skill_tools: true       # 是否注册 skill 相关函数调用工具
+  auto_trigger: true             # 是否根据本轮用户文本自动预加载 skill 正文，作为模型选择机制的兜底
+  always_load: []                # 总是加载的 skill 名称列表，例如 ["my-skill"]
+  max_loaded_skills: 3           # 单轮最多加载几个 skill 正文
+  max_skill_chars: 240000          # 单个 SKILL.md 正文最大注入字符数，防止上下文爆炸
+  max_file_chars: 240000          # read_skill_file / run_skill_script 输出最大注入字符数
+  reload_interval_seconds: 100    # 扫描 skills 文件夹的最小间隔，支持运行中热更新
+  allow_script_execution: false   # 是否允许执行 skill 包 scripts/ 下的脚本，默认关闭更安全
+  script_timeout_seconds: 20
+  allowed_script_extensions:
+    - ".py"
+
+mcp:  # MCP stdio server 配置。启动后会把 MCP tools 暴露为 mcp__server__tool 函数调用工具
+  enable: false
+  startup_timeout_seconds: 60
+  tool_call_timeout_seconds: 120
+  mcpServers:
+    godot:
+      command: "npx"
+      args:
+        - "@coding-solo/godot-mcp"
+      env:
+        GODOT_PATH: "D:/SteamLibrary/steamapps/common/Godot Engine/godot.windows.opt.tools.64.exe"
+        DEBUG: "true"
+
+    another_server:
+      command: "python"
+      args:
+        - "path/to/server.py"
+      env:
+        SOME_KEY: "some-value"
+
+    filesystem:
+      command: "npx"
+      args:
+        - "@modelcontextprotocol/server-filesystem"
+        - "D:/some/allowed/path"

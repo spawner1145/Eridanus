@@ -33,15 +33,16 @@ def main(bot, config):
     #print(steam_api_key)
 
     monitor_activated = False
+
     @bot.on(GroupMessageEvent)
-    async def _(event: GroupMessageEvent):
+    async def _(event):
         nonlocal monitor_activated
         if not monitor_activated:
             if config.anime_game_service.config['steamsnooping']['is_snooping'] and await dynamic_run_is_enable(db=db):
                 bot.logger.info(f"bot开始视奸群友的Steam啦！")
                 monitor_activated = True
-                await asyncio.to_thread(
-                    lambda: asyncio.run(steamsnoopall(bot, config, db, steam_api_key))
+                asyncio.create_task(
+                    steamsnoopall(bot, config, db, steam_api_key)
                 )
 
 
