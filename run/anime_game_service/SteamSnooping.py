@@ -30,10 +30,20 @@ def main(bot, config):
     # 初始化 Redis 数据库实例
     db=asyncio.run(AsyncSQLiteDatabase.get_instance())
     steam_api_key=config.anime_game_service.config['steamsnooping']['steam_api_key']
-    asyncio.create_task(
-        steamsnoopall(bot, config, db, steam_api_key)
-    )
+    #print(steam_api_key)
 
+    monitor_activated = False
+
+    @bot.on(GroupMessageEvent)
+    async def _(event):
+        nonlocal monitor_activated
+        if not monitor_activated:
+            if config.anime_game_service.config['steamsnooping']['is_snooping'] and await dynamic_run_is_enable(db=db):
+                bot.logger.info(f"bot开始视奸群友的Steam啦！")
+                monitor_activated = True
+                asyncio.create_task(
+                    steamsnoopall(bot, config, db, steam_api_key)
+                )
 
 
     #绑定一个steamid
