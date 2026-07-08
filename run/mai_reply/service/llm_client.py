@@ -133,6 +133,8 @@ class LLMClient:
 
             http = await self._get_http()
             #print(full_messages)
+            #traceback.print_stack()
+            api_key=api_key.strip()
             async with http.stream(
                 "POST", url, json=payload,
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},timeout=360
