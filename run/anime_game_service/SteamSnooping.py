@@ -9,7 +9,7 @@ from run.anime_game_service.service.SteamSnooping import *
 import threading
 
 
-dynamic_run_is_enable = False
+
 #检测是否需要启动的函数，距离bot启动一分钟后就不允许重新启动循环
 async def dynamic_run_is_enable(up_type='check',db=None):
     if db is None: return True
@@ -33,11 +33,11 @@ def main(bot, config):
     #print(steam_api_key)
 
     monitor_activated = False
-
+    dynamic_run_is_enabled = False
 
     @bot.on(GroupMessageEvent)
     async def _(event):
-        nonlocal monitor_activated
+        nonlocal monitor_activated,dynamic_run_is_enabled
         if not monitor_activated:
             if config.anime_game_service.config['steamsnooping']['is_snooping']:
                 bot.logger.info(f"bot开始视奸群友的Steam啦！")
@@ -45,6 +45,8 @@ def main(bot, config):
                 asyncio.create_task(
                     steamsnoopall(bot, config, db, steam_api_key)
                 )
+        if not dynamic_run_is_enabled:
+            await dynamic_run_is_enable(db=db)
 
 
     #绑定一个steamid
