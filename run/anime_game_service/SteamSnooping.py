@@ -46,6 +46,7 @@ def main(bot, config):
                     steamsnoopall(bot, config, db, steam_api_key)
                 )
         if not dynamic_run_is_enabled:
+            dynamic_run_is_enabled = True
             await dynamic_run_is_enable(db=db)
 
 
