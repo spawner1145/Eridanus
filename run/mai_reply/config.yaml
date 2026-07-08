@@ -46,7 +46,7 @@ persona:  # 人设
   chara_file: "猫娘.txt"  #角色文件名，放在data/system/chara文件夹内。如开启 gptimage2接管sd，建议使用【猫娘gptimage2.txt】
 
 skills:  # LLM Skill 风格技能包动态加载。放在skills目录下
-  enable: true
+  enable: false
   skills_dir: "skills"
   include_catalog: true          # 是否把所有可用 skill 的 name/description 注入 prompt，方便模型知道能触发什么
   llm_select: true               # 是否允许模型先看元数据，再通过 load_skill/read_skill_file/run_skill_script 函数按需加载
