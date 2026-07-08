@@ -3,6 +3,7 @@ import random
 import re
 import string
 from io import BytesIO
+import os
 
 import httpx
 
@@ -13,16 +14,28 @@ from .base import BaseTool
 class ImageProcessor(BaseTool):
     def __init__(self):
         super().__init__(__class__.__name__)
-    async def Image2Base64(self,url: str)->str:
-        """将图片转化为base64"""
-        async with httpx.AsyncClient(timeout=9000) as client:
-            response = await client.get(url)
-            if response.status_code == 200:
+    async def Image2Base64(self, url: str) -> str:
+        """
+        将图片转为base64，支持网络URL、本地文件路径、data:image base64字符串
+        """
+        if url.startswith("data:image"):
+            match = re.match(r"data:image/(.*?);base64,(.+)", url)
+            if not match:
+                raise ValueError("Invalid Data URI format")
+            _, base64_data = match.groups()
+            return base64_data
+        if not url.startswith(("http://", "https://")):
+            if not os.path.isfile(url):
+                raise FileNotFoundError(f"本地图片不存在：{url}")
+            with open(url, "rb") as f:
+                image_bytes = f.read()
+        else:
+            async with httpx.AsyncClient(timeout=9000) as client:
+                response = await client.get(url)
+                if response.status_code != 200:
+                    raise Exception(f"图片下载失败，状态码：{response.status_code}")
                 image_bytes = response.content
-                encoded_string = base64.b64encode(image_bytes).decode('utf-8')
-                return encoded_string
-            else:
-                raise Exception(f"Failed to retrieve image: {response.status_code}")
+        return base64.b64encode(image_bytes).decode("utf-8")
     async def download_img(self,url, path=None, gray_layer=False, proxy=None, headers=None)->str:
         """下载一张图片"""
         if path is None:
