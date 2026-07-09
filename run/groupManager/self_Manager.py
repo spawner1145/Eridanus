@@ -2,6 +2,7 @@ import asyncio
 import base64
 import os
 import random
+import re
 import time
 from asyncio import sleep
 import shutil
@@ -14,10 +15,62 @@ from framework_common.database_util.User import get_user
 
 from developTools.utils.logger import get_logger
 from framework_common.framework_util.websocket_fix import ExtendBot
+from run.groupManager import group_audit_rules
+from run.mai_reply.service.simple_chat import simplified_chat
 
 logger = get_logger()
 
+JOIN_AUDIT_PROMPT_TEMPLATE = """你是QQ群「{group_id}」的加群审核员。
 
+本群设置的加群条件如下：
+{rule}
+
+现在有用户申请加入本群，申请信息如下：
+申请人QQ号：{user_id}
+申请理由：{comment}
+
+请你严格依据上面的加群条件，判断该申请人是否符合要求，不要臆测规则以外的内容。
+请先用一两句话简要说明你的判断依据，然后在回复的【最后一行】严格按以下格式输出结论，不要有多余文字：
+
+如果符合条件、可以同意加群，输出：[JOIN: TRUE] 附上一句简短理由
+如果不符合条件、应当拒绝，输出：[JOIN: FALSE] 附上一句简短理由
+
+注意：最后一行必须且只能包含 [JOIN: TRUE] 或 [JOIN: FALSE] 其中之一，后面跟简短理由，不要输出其他格式。
+"""
+
+
+async def judge_group_join(bot, config, group_id, user_id, comment, rule_text):
+    try:
+        model = config.mai_reply.config["trigger_llm"]["model"]
+        api_key = config.mai_reply.config["trigger_llm"]["api_key"]
+        base_url = config.mai_reply.config["trigger_llm"]["base_url"]
+
+        prompt = JOIN_AUDIT_PROMPT_TEMPLATE.format(
+            group_id=group_id, user_id=user_id, comment=comment or "（未填写）", rule=rule_text,
+        )
+
+        summary = await simplified_chat(
+            base_url,
+            [{"role": "user", "content": prompt}],
+            model=model,
+            api_key=api_key,
+            system_prompt="你是一个严格、客观的QQ群加群审核员，只依据给定条件做判断，不做无关联想。",
+        )
+
+        bot.logger.info_func(f"[加群审核] 群{group_id} 用户{user_id} AI审核结果：{summary}")
+
+        if not summary:
+            raise ValueError("AI 未返回内容")
+
+        match = re.search(r"\[JOIN:\s*(TRUE|FALSE)\]\s*(.*)", summary, re.IGNORECASE)
+        if not match:
+            raise ValueError("AI 返回内容未包含有效的 JOIN 判定标识")
+
+        return match.group(1).upper(), match.group(2).strip()
+
+    except Exception as e:
+        bot.logger.error(f"[加群审核] AI 判断失败或格式不符，回退人工处理：{e}")
+        return None, None
 async def delete_old_files_async(folder_path):
     """
     异步删除文件夹中过期的文件
@@ -212,8 +265,12 @@ async def garbage_collection(bot, event, config):
     return f"本次清理了 {total_size:.2f} MB 的缓存"
 
 
-async def report_to_master(bot, event, config,msg):
+async def report_to_master(bot: ExtendBot, event, config,msg):
+    if bot.id ==3552663628:
+        await bot.send_group_message(1050663831, f"用户：{event.user_id}\n{msg}")
+        #群u爱看
     await bot.send_friend_message(config.common_config.basic_config["master"]['id'],msg)
+
     return {"status": "ok"}
 
 async def send(bot, event, config, message, delay=0):
@@ -369,16 +426,69 @@ def main(bot:ExtendBot, config):
                     await bot.send_friend_message(event.user_id, f"你没有足够权限邀请bot加入该群")
                     await bot.send_friend_message(config.common_config.basic_config["master"]['id'],
                                                   f"收到来自{event.user_id}的群邀请，{event.group_id}({event.comment}) 拒绝（用户权限不足）")
+
         elif event.sub_type == "add":
+            bot.logger.info_func(f"收到加群申请，{event.group_id} {event.comment}")
+
             if event.group_id in config.common_config.censor_group["blacklist"]:
                 pass
+                return
+
+            rule_text = await group_audit_rules.get_rule(event.group_id)
+
+            if not rule_text:
+                # 该群没配置审核条件，走原来的人工通知逻辑
+                await bot.send_group_message(
+                    event.group_id,
+                    f"有新的加群请求，请尽快处理\n申请人：{event.user_id}\n{event.comment}"
+                )
+                return
+
+            # 该群配置了审核条件，交给AI判断
+            decision, reason = await judge_group_join(
+                bot, config, event.group_id, event.user_id, event.comment, rule_text
+            )
+
+            if decision == "TRUE":
+                await bot.set_group_add_request(event.flag, True, "同意加群")
+                await bot.send_group_message(
+                    event.group_id,
+                    f"新成员 {event.user_id} 已通过AI自动审核加入本群\n{reason or '理由：符合本群加群条件'}\n请求原始信息：\n{event.comment}"
+                )
+            elif decision == "FALSE":
+                await bot.set_group_add_request(event.flag, False, "不符合加群条件")
+                await bot.send_group_message(
+                    event.group_id,
+                    f"已拒绝 {event.user_id} 的加群申请\n{reason or '理由：不符合本群加群条件'}\n请求原始信息：\n{event.comment}"
+                )
             else:
-                bot.logger.info_func(f"收到加群申请，{event.group_id} {event.comment}同意")
-                await bot.send_group_message(event.group_id,
-                                             f"有新的加群请求，请尽快处理\n申请人：{event.user_id}\n{event.comment}")
+                # 兜底：AI没给出可解析结论，机器人不做任何处理，通知群内人工处理
+                await bot.send_group_message(
+                    event.group_id,
+                    f"有新的加群请求，请尽快处理\n申请人：{event.user_id}\n{event.comment}"
+                )
 
     @bot.on(GroupMessageEvent)
-    async def black_and_white_handler(event):
+    async def GroupMessageHandler(event: GroupMessageEvent):
+        if event.pure_text.startswith("加群审核设置"):
+            user_d = await bot.get_group_member_info(event.group_id, event.user_id)
+            if user_d["data"]["role"] in ["admin", "owner"]:
+                rule = event.pure_text.replace("加群审核设置", "", 1).strip()
+                if not rule:
+                    await bot.send(event,
+                                   "请在“加群审核设置”后面写明本群的加群条件，例如：\n加群审核设置 申请理由需说明来意，禁止纯数字/广告理由\n如需清除设置请发送：加群审核设置 清除")
+                    return
+                if rule in ("清除", "取消", "删除"):
+                    removed = await group_audit_rules.remove_rule(event.group_id)
+                    await bot.send(event, "已清除本群的加群审核设置" if removed else "本群未设置加群审核条件")
+                    return
+                await group_audit_rules.set_rule(event.group_id, rule, operator_id=event.user_id)
+                await bot.send(event, f"已设置本群加群审核条件：\n{rule}\n此后加群申请将由AI依据该条件自动审核")
+            else:
+                await bot.send(event, "只有群管理员/群主可以设置加群审核条件")
+
+    @bot.on(GroupMessageEvent)
+    async def black_and_white_handler(event: GroupMessageEvent):
         await _handler(event)
 
     @bot.on(PrivateMessageEvent)
