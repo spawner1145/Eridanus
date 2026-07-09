@@ -266,8 +266,8 @@ async def garbage_collection(bot, event, config):
 
 
 async def report_to_master(bot: ExtendBot, event, config,msg):
-    #await bot.send_friend_message(config.common_config.basic_config["master"]['id'],msg)
-    await bot.send_group_message(1050663831,f"用户：{event.user_id}\n{msg}")
+    await bot.send_friend_message(config.common_config.basic_config["master"]['id'],msg)
+    #await bot.send_group_message(1050663831,f"用户：{event.user_id}\n{msg}")
     return {"status": "ok"}
 
 async def send(bot, event, config, message, delay=0):
