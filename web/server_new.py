@@ -23,6 +23,9 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from developTools.utils.logger import get_logger
 from framework_common.utils.install_and_import import install_and_import
 from framework_common.database_util.User import get_user, update_user   # 更新用户数据用
+from framework_common.framework_util.function_control import (
+    list_all_functions, save_disabled, list_all_skills, save_disabled_skills,
+)
 from userdb_query import get_users_range, get_users_count, search_users_by_id, get_user_signed_days
 from chatdb_manage import get_msg, update_msg, delete_specified_msg, delete_all_msg, get_file_storage, update_file_storage
 
@@ -465,6 +468,60 @@ def search_yaml_keys():
     except Exception as e:
         logger.error(f"搜索YAML键名时出错: {str(e)}")
         return jsonify({"error": f"搜索时出错: {str(e)}"})
+
+
+@app.route("/api/functions/list", methods=["GET"])
+@auth
+def list_functions():
+    """列出所有插件声明的函数及启用状态（供函数管理界面使用）"""
+    try:
+        return jsonify({"plugins": list_all_functions()})
+    except Exception as e:
+        logger.error(f"列出函数失败: {e}")
+        return jsonify({"error": f"列出函数失败: {e}"})
+
+
+@app.route("/api/functions/save", methods=["POST"])
+@auth
+def save_functions():
+    """保存被禁用的函数名列表。body: {"disabled": ["name", ...]}"""
+    data = request.get_json(silent=True) or {}
+    disabled = data.get("disabled", [])
+    if not isinstance(disabled, list) or not all(isinstance(x, str) for x in disabled):
+        return jsonify({"error": "disabled 必须是字符串列表"})
+    try:
+        save_disabled(disabled)
+        return jsonify({"message": "保存成功"})
+    except Exception as e:
+        logger.error(f"保存函数开关失败: {e}")
+        return jsonify({"error": f"保存失败: {e}"})
+
+
+@app.route("/api/skills/list", methods=["GET"])
+@auth
+def list_skills():
+    """列出所有 skill 包及启用状态（供功能管理界面使用）"""
+    try:
+        return jsonify({"skills": list_all_skills()})
+    except Exception as e:
+        logger.error(f"列出 skill 失败: {e}")
+        return jsonify({"error": f"列出 skill 失败: {e}"})
+
+
+@app.route("/api/skills/save", methods=["POST"])
+@auth
+def save_skills():
+    """保存被禁用的 skill 名列表。body: {"disabled": ["name", ...]}"""
+    data = request.get_json(silent=True) or {}
+    disabled = data.get("disabled", [])
+    if not isinstance(disabled, list) or not all(isinstance(x, str) for x in disabled):
+        return jsonify({"error": "disabled 必须是字符串列表"})
+    try:
+        save_disabled_skills(disabled)
+        return jsonify({"message": "保存成功"})
+    except Exception as e:
+        logger.error(f"保存 skill 开关失败: {e}")
+        return jsonify({"error": f"保存失败: {e}"})
 
 
 @app.route("/api/pull", methods=["POST"])

@@ -9,12 +9,15 @@ async def anime_trace(image_source) -> list[str, str, bool]:
     """
     url = "https://api.animetrace.com/v1/search"
     data = {
-        "is_multi": 0,
+        "is_multi": "0",
         "model": "animetrace_high_beta",
-        "ai_detect": "True",
+        "ai_detect": "1",
     }
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36 Edg/114.0.1823.67",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0",
+        "Origin": "https://www.animetrace.com",
+        "Referer": "https://www.animetrace.com/",
+        "Accept": "application/json, text/plain, */*",
     }
     ai_work = False
 
@@ -32,7 +35,7 @@ async def anime_trace(image_source) -> list[str, str, bool]:
                         files = {"file": (os.path.basename(image_source), f, "image/jpeg")}
                         res = await client.post(url=url, headers=headers, data=data, files=files, timeout=30)
                 content = res.json()
-                if content["ai"]:
+                if content.get("ai"):
                     ai_work = True
                 if data["model"] == "animetrace_high_beta":
                     a = "anime"
@@ -40,8 +43,7 @@ async def anime_trace(image_source) -> list[str, str, bool]:
                     a = "galgame"
                 str_result = f"角色识别|{a}模型搜索结果：\n"
                 for result in content["data"][0]["character"]:
-                    #print(result)
-                    str_result += f"{result['work']} ({result['character']}%)\n"
+                    str_result += f"{result['work']} ({result['character']})\n"
                     if content["data"][0]["character"].index(result) > 2:
                         break
                 return str_result
@@ -57,6 +59,5 @@ async def anime_trace(image_source) -> list[str, str, bool]:
 
 # Example usage
 if __name__ == "__main__":
-    # Replace 'test.jpg' with the path to an actual image file
-    anime_res = asyncio.run(anime_trace("D:\BlueArchive\Eridanus\img.png"))
+    anime_res = asyncio.run(anime_trace("img.png"))
     print(anime_res)
