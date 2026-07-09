@@ -456,10 +456,10 @@ def main(bot:ExtendBot, config):
                     f"新成员 {event.user_id} 已通过AI自动审核加入本群\n{reason or '理由：符合本群加群条件'}\n请求原始信息：\n{event.comment}"
                 )
             elif decision == "FALSE":
-                await bot.set_group_add_request(event.flag, False, "不符合加群条件")
+                #await bot.set_group_add_request(event.flag, False, "不符合加群条件")
                 await bot.send_group_message(
                     event.group_id,
-                    f"已拒绝 {event.user_id} 的加群申请\n{reason or '理由：不符合本群加群条件'}\n请求原始信息：\n{event.comment}"
+                    f"已忽略 {event.user_id} 的加群申请\n{reason or '理由：不符合本群加群条件'}\n请求原始信息：\n{event.comment}"
                 )
             else:
                 # 兜底：AI没给出可解析结论，机器人不做任何处理，通知群内人工处理
