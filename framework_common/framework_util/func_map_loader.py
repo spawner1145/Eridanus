@@ -1,4 +1,5 @@
 import os
+import sys
 import importlib
 import traceback
 
@@ -42,6 +43,44 @@ for root, dirs, files in os.walk(PLUGIN_DIR):
             logger.error(f"❌ 无法导入 {module_name}: {e}")
             traceback.print_exc()
             continue
+
+def rescan():
+    """重新扫描 run/*，重建 dynamic_imports 与 all_function_declarations。
+
+    func_map 在模块导入时构建一次；当运行期新增/修改了带 tool 的插件（如 ai_code_generator
+    生成的 tool），调用本函数即可让新 tool 进入 build_tool_map()/get_tool_declarations()。
+    对新增/改动的模块做 importlib.reload，保证读到磁盘上的最新 dynamic_imports/function_declarations。
+    """
+    dynamic_imports.clear()
+    all_function_declarations.clear()
+
+    for root, dirs, files in os.walk(PLUGIN_DIR):
+        if "__init__.py" not in files:
+            continue
+        module_name = root.replace(os.sep, ".")
+        try:
+            if module_name in sys.modules:
+                module = importlib.reload(sys.modules[module_name])
+            else:
+                module = importlib.import_module(module_name)
+
+            if hasattr(module, "dynamic_imports"):
+                if isinstance(module.dynamic_imports, dict):
+                    dynamic_imports.update(module.dynamic_imports)
+                elif isinstance(module.dynamic_imports, list):
+                    func_names = [f.__name__ for f in module.dynamic_imports if callable(f)]
+                    dynamic_imports[module_name] = func_names
+
+            if hasattr(module, "function_declarations") and isinstance(module.function_declarations, list):
+                all_function_declarations.extend(module.function_declarations)
+        except Exception as e:
+            logger.error(f"❌ rescan 无法导入 {module_name}: {e}")
+            traceback.print_exc()
+            continue
+
+    logger.info(f"[func_map] rescan 完成：{len(dynamic_imports)} 个模块，{len(all_function_declarations)} 条声明")
+    return len(all_function_declarations)
+
 
 def build_tool_map():
     tools = {}

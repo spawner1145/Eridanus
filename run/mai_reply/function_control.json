@@ -1,0 +1,7 @@
+{
+  "disabled": [
+    "anime_game_service_func_collection",
+    "call_bangumi_search"
+  ],
+  "disabled_skills": []
+}

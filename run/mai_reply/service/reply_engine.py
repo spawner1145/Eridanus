@@ -21,6 +21,7 @@ from typing import Optional
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
 from developTools.message.message_components import Record
 from framework_common.database_util.User import get_user
+from framework_common.framework_util.function_control import load_disabled
 from framework_common.utils.system_logger import get_logger
 from run.mai_reply.service.audit_censor import AuditSystem
 
@@ -32,10 +33,55 @@ from run.mai_reply.service.prompt_builder import PromptBuilder
 from run.mai_reply.service.reply_processor import ReplyProcessor
 from run.mai_reply.service.impression_updater import ImpressionUpdater
 from run.mai_reply.service.concurrency import ConcurrencyController
-from run.tts_v2.service.GPT_SoVits import AsyncGPTSoVITSClient
 
 logger = get_logger(__name__)
-gpt_sovits_client = AsyncGPTSoVITSClient()
+
+# 不在模块级固定持有 tts_v2 的客户端实例：那样 tts_v2 热重载后，mai_reply 仍握着旧实例/旧配置
+# （历史 bug：“tts_v2 配置更新了，但 mai_reply 这边用的还是旧变量”）。改为惰性获取——
+# 每次从当前 sys.modules 取最新的 AsyncGPTSoVITSClient 类；仅当类对象本身变化（tts_v2 代码被
+# 热重载）时才重建实例。配置层面再由该客户端的 property 实时读取，双重保证不会用到过期值。
+_gpt_sovits_client = None
+_gpt_sovits_cls = None
+
+
+def _get_gpt_sovits_client():
+    """惰性获取 tts_v2 客户端，兼容 tts_v2 的配置/代码热重载。失败返回 None。"""
+    global _gpt_sovits_client, _gpt_sovits_cls
+    try:
+        from run.tts_v2.service.GPT_SoVits import AsyncGPTSoVITSClient as _Cls
+    except Exception as e:
+        logger.warning(f"[MaiReply] 获取 tts_v2 客户端失败: {e}")
+        return None
+    if _gpt_sovits_client is None or _gpt_sovits_cls is not _Cls:
+        _gpt_sovits_client = _Cls()
+        _gpt_sovits_cls = _Cls
+    return _gpt_sovits_client
+
+
+def refresh_tools():
+    """在运行期新增/改动带 tool 的插件后调用：重扫 func_map 并重建已实例化 ReplyEngine 的工具缓存。
+
+    ReplyEngine 是单例，工具在 __init__ 时缓存到 self._tools。这里先 func_map_loader.rescan()
+    让新 tool 进入 func_map，再刷新单例缓存；_active_tools() 每轮已实时读取 function_control，
+    故下一条对话即可用上新 tool（并可在「功能管理」里开关）。返回当前可用工具数（失败返回 -1）。
+    """
+    try:
+        from framework_common.framework_util.func_map_loader import rescan
+        rescan()
+    except Exception as e:
+        logger.warning(f"[MaiReply] refresh_tools: func_map rescan 失败: {e}")
+
+    inst = ReplyEngine._instance
+    if inst is None:
+        return 0
+    try:
+        inst._tools = inst._load_tools()
+        count = len(inst._tools or {})
+        logger.info(f"[MaiReply] refresh_tools: 工具缓存已刷新，共 {count} 个")
+        return count
+    except Exception as e:
+        logger.warning(f"[MaiReply] refresh_tools: 刷新工具缓存失败: {e}")
+        return -1
 
 class ReplyEngine:
     _instance = None
@@ -66,6 +112,7 @@ class ReplyEngine:
         self._name_cache: dict[str, tuple[str, float]] = {}
 
         self._tools = self._load_tools()
+        self._last_disabled = frozenset()  # 上次过滤所用的禁用集合，仅用于变更时打日志
         self.emotion.random_drift()
 
     # --------------------------------------------------
@@ -122,6 +169,35 @@ class ReplyEngine:
             logger.info(f"[MaiReply] 已加载函数调用工具: {list(tools.keys())}")
             return tools
         return None
+
+    def _active_tools(self):
+        """发给 LLM 前按 function_control.json 的禁用列表过滤工具。
+
+        用时读取（mtime 缓存），因此在「函数管理」界面切换开关后，下一条对话即生效，
+        无需依赖整插件热重载。
+        """
+        if not self._tools:
+            return self._tools
+        try:
+            disabled = load_disabled()
+        except Exception:
+            return self._tools
+
+        if not disabled:
+            if self._last_disabled:
+                logger.info("[MaiReply] 函数开关：已恢复全部工具")
+                self._last_disabled = frozenset()
+            return self._tools
+
+        active = {k: v for k, v in self._tools.items() if k not in disabled}
+        snapshot = frozenset(disabled)
+        if snapshot != self._last_disabled:
+            removed = [k for k in self._tools if k in disabled]
+            logger.info(
+                f"[MaiReply] 函数开关：已禁用 {removed}，本次可用工具 {len(active)}/{len(self._tools)}"
+            )
+            self._last_disabled = snapshot
+        return active
 
     async def handle(
         self,
@@ -248,10 +324,11 @@ class ReplyEngine:
                 sent_reply_parts.append(text)
                 sent_reply_segments.extend(segments)
 
+            active_tools = self._active_tools()
             raw_reply = await self.llm.chat(
                 messages=messages,
                 system_prompt=system_prompt,
-                tools=self._tools,
+                tools=active_tools,
                 bot=bot,
                 event=event,
                 retries=3,
@@ -269,7 +346,7 @@ class ReplyEngine:
                 raw_reply = await self.llm.chat(
                     messages=retry_messages,
                     system_prompt=system_prompt,
-                    tools=self._tools,
+                    tools=active_tools,
                     bot=bot,
                     event=event,
                     retries=2,
@@ -398,8 +475,9 @@ class ReplyEngine:
         text=remove_parentheses_text(text)
         translated_text = text
 
-        if speaker in gpt_sovits_client.speakers:
-            audio_path=await gpt_sovits_client.generate_tts(text)
+        client = _get_gpt_sovits_client()
+        if client and speaker in client.speakers:
+            audio_path = await client.generate_tts(text)
             await bot.send(event, Record(file=audio_path))
             bot.logger.info("[MaiReply] 后台语音发送完成！")
             return

@@ -17,6 +17,8 @@ webchat_state.set_runtime() 交接过来；这里在请求时读取。
 import functools
 import os
 import secrets
+import sys
+import time
 
 from flask import jsonify, request, send_from_directory, abort, Response, make_response
 
@@ -36,16 +38,150 @@ _TOKENS = set()
 _COOKIE = "live2d_token"
 
 
+def _load_yaml(path):
+    try:
+        import yaml
+        with open(path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
+
+def _build_runtime_from_files():
+    """直接从配置文件构建运行时（自愈兜底）。
+
+    正常情况下 run/live2d 插件加载时会调用 set_runtime 把运行时交接过来；但插件加载
+    顺序/失败/重载等都可能让交接缺失，页面就会“未配置模型路径”。这里在请求时按需从
+    config.yaml 兜底重建，使 /live2dchat 不再依赖插件 main() 是否跑过。
+    """
+    from run.live2d.service.process_manager import get_model_assets, resolve_model_dir
+
+    run_dir = os.path.dirname(PLUGIN_DIR)  # run/
+    live = _load_yaml(os.path.join(PLUGIN_DIR, "config.yaml"))
+    tts_v2 = (_load_yaml(os.path.join(run_dir, "tts_v2", "config.yaml")).get("gpt_sovits", {}) or {})
+    mai = _load_yaml(os.path.join(run_dir, "mai_reply", "config.yaml"))
+
+    # 模型（get_model_assets / resolve_model_dir 接受普通 dict）
+    model_url, expr_names, motion_names = get_model_assets(live)
+    model_dir = resolve_model_dir(live)
+    model_entry = os.path.basename(model_url) if model_url else ""
+
+    # 表情 LLM 端点：live2d.expression 优先，否则复用 mai_reply 的 trigger_llm / 主 llm
+    exp = live.get("expression", {}) or {}
+    base_url = (exp.get("base_url") or "").strip()
+    api_key = (exp.get("api_key") or "").strip()
+    model = (exp.get("model") or "").strip()
+    tl = (mai.get("trigger_llm") or {}) if mai else {}
+    main_llm = (((mai.get("llm") or {}).get("openai")) or {}) if mai else {}
+    if not base_url:
+        base_url = (tl.get("base_url") or main_llm.get("base_url") or "").strip()
+    if not api_key:
+        api_key = (tl.get("api_key") or "").strip()
+        if not api_key:
+            aks = main_llm.get("api_keys") or []
+            api_key = str(aks[0]).strip() if aks else ""
+    if not model:
+        model = (tl.get("model") or main_llm.get("model") or "gpt-4o-mini")
+
+    # 本地语音端点：live2d.tts 优先，否则复用 tts_v2 的 gpt_sovits
+    lt = live.get("tts", {}) or {}
+    api_base = (lt.get("api_base") or tts_v2.get("api_base") or "").strip()
+
+    runtime = {
+        "model_url": model_url,
+        "window": live.get("window", {}),
+        "chat": live.get("chat", {"enable": True}),
+        "lip_sync_parameter_ids": live.get("lip_sync_parameter_ids", ["ParamMouthOpenY"]),
+        "expression": {
+            "enable": exp.get("enable", True),
+            "base_url": base_url,
+            "api_key": api_key,
+            "model": model,
+            "emotions": exp.get("emotions", {}) or {},
+            "scenes": exp.get("scenes", {}) or {},
+            "reset_delay_ms": exp.get("reset_delay_ms", 6000),
+        },
+        "tts": {
+            "enable": lt.get("enable", True),
+            "api_base": api_base,
+            "ref_audio_path": lt.get("ref_audio_path") or tts_v2.get("ref_audio_path") or "",
+            "ref_text": lt.get("ref_text") or tts_v2.get("ref_text") or "",
+            "target_lang": lt.get("target_lang", "zh"),
+            "ref_lang": lt.get("ref_lang", "zh"),
+            "top_k": tts_v2.get("top_k", 15),
+            "top_p": tts_v2.get("top_p", 1),
+            "temperature": tts_v2.get("temperature", 1),
+            "text_split_method": tts_v2.get("text_split_method", "cut5"),
+            "batch_size": tts_v2.get("batch_size", 1),
+            "speed_factor": tts_v2.get("speed_factor", 1),
+            "streaming_mode": tts_v2.get("streaming_mode", False),
+            "seed": tts_v2.get("seed", -1),
+            "repetition_penalty": tts_v2.get("repetition_penalty", 1.35),
+        },
+        "expr_names": expr_names,
+        "motion_names": motion_names,
+        "model_dir": model_dir,
+        "model_entry": model_entry,
+    }
+    return runtime, model_dir, model_entry, (live.get("webui_password") or ""), bool(live.get("webui_enable"))
+
+
+def _ensure_state():
+    """确保运行时已就绪：插件已交接则直接用；否则按配置文件兜底重建（幂等，仅首次构建）。"""
+    st = get_state()
+    if st.get("enabled") and st.get("runtime"):
+        return st
+    try:
+        runtime, model_dir, model_entry, password, enabled = _build_runtime_from_files()
+        if enabled:
+            from framework_common.framework_util.live2d_webchat_state import set_runtime
+            set_runtime(runtime, model_dir, model_entry, password=password)
+    except Exception as e:
+        print("[live2d] /live2dchat 运行时兜底构建失败:", e)
+    return get_state()
+
+
+def _webui_authenticated():
+    """复用 WebUI 登录态：请求带有效 auth_token（server_new.auth_info）即视为已登录。
+
+    嵌入 React WebUI 的 /live2dchat 页面与主站同源，浏览器已带 auth_token cookie。
+    这样已登录用户无需再输 Live2D 口令。通过扫描 sys.modules 找到定义了
+    auth_info(dict) 且带 ip_whitelist 的 WebUI 服务模块，避免与 server_new 硬耦合/循环导入。
+    """
+    at = request.cookies.get("auth_token")
+    now = int(time.time())
+    for mod in list(sys.modules.values()):
+        auth_info = getattr(mod, "auth_info", None)
+        if not isinstance(auth_info, dict) or not hasattr(mod, "ip_whitelist"):
+            continue
+        try:
+            if request.remote_addr in (getattr(mod, "ip_whitelist", None) or []):
+                return True
+        except Exception:
+            pass
+        try:
+            if at and auth_info.get(at, 0) >= now:
+                return True
+        except Exception:
+            pass
+        return False  # 命中 WebUI 服务模块但未通过校验
+    return False
+
+
 def _require_token(func):
     """口令门：webui_password 非空时，数据路由需带有效 live2d_token cookie。
 
     页面本身（/live2dchat）与静态资源不鉴权——页面会先探测 /config，401 则弹口令框。
+    已登录 WebUI 的用户（带有效 auth_token）直接放行，无需再输 Live2D 口令。
     """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        _ensure_state()  # 先确保运行时/口令已就绪（首请求兜底重建），再做口令校验
         pwd = (get_state().get("password") or "").strip()
         if not pwd:
             return func(*args, **kwargs)  # 未设口令 = 开放
+        if _webui_authenticated():
+            return func(*args, **kwargs)  # 复用 WebUI 登录态
         token = request.cookies.get(_COOKIE)
         if token and token in _TOKENS:
             return func(*args, **kwargs)
@@ -58,6 +194,7 @@ def register_live2d_webchat(app):
 
     @app.route("/live2dchat/auth", methods=["POST"])
     def live2dchat_auth():
+        _ensure_state()
         pwd = (get_state().get("password") or "").strip()
         if not pwd:
             return jsonify({"ok": True})  # 未设口令，直接放行
@@ -117,7 +254,7 @@ def register_live2d_webchat(app):
     def live2dchat_model(p):
         # 不鉴权：与桌宠一致（模型文件非机密），且确保 pixi 加载贴图/动作时不受 cookie
         # 转发差异影响。页面已在口令门之后才加载渲染端，/config 与代理仍鉴权。
-        st = get_state()
+        st = _ensure_state()
         model_dir = st.get("model_dir")
         if not model_dir or not os.path.isdir(model_dir):
             abort(404)

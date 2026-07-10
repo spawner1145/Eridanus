@@ -118,7 +118,7 @@ class LLMClient:
             full_messages.append({"role": "system", "content": system_prompt})
         full_messages.extend(messages)
         tool_defs = self._build_openai_tool_defs(tools) if tools else None
-
+        #print(tool_defs)
         for _round in range(self.max_tool_rounds):
             payload = {
                 "model": self._oa_model if not model else model,

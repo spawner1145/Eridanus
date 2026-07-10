@@ -76,6 +76,8 @@ def main(bot, config):
             name = event.pure_text.split("改群名")[1].strip()
             await bot.set_group_name(event.group_id, name)
         if event.pure_text.startswith("我要头衔"):
+            await bot.send(event,"你要牛魔")
+            return
             title = event.pure_text.split("我要头衔")[1].strip()
             await bot.set_group_special_title(event.group_id, event.sender.user_id, title)
             await bot.send(event, "已设置头衔！")

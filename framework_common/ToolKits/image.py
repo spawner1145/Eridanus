@@ -60,7 +60,7 @@ class ImageProcessor(BaseTool):
         else:
             proxies = None
 
-        async with httpx.AsyncClient(proxies=proxies, headers=headers) as client:
+        async with httpx.AsyncClient(proxies=proxies, headers=headers,timeout=60) as client:
             response = await client.get(url)
 
             if gray_layer:

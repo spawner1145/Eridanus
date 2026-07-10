@@ -1,539 +1,342 @@
-import os
-import random
-import re
-import json
+import ast
 import asyncio
+import re
 import shutil
-from typing import Dict, Any, List, Union
 from pathlib import Path
+from typing import Dict, Any, List
 
 from framework_common.utils.system_logger import get_logger
-from run.ai_llm.service.schemaReplyCore import schemaReplyCore
+
 logger = get_logger("ai_AIPluginGenerator")
+
 
 class AIPluginGenerator:
     def __init__(self, base_path: str = "run"):
-        """
-        AI插件代码生成器
-
-        Args:
-            base_path: 插件生成的基础路径
-        """
-
+        """AI 插件 / tool 代码生成器。base_path 为插件生成目录（run）。"""
         self.base_path = Path(base_path)
         self.base_path.mkdir(exist_ok=True)
-
-        # SDK使用指南模板
         self.sdk_guide = self._build_sdk_guide()
 
+    # ------------------------------------------------------------------ #
+    # SDK 指南（发给模型的“知识”）——覆盖 事件插件 与 function-calling tool 两类产物
+    # ------------------------------------------------------------------ #
     def _build_sdk_guide(self) -> str:
-        """构建SDK使用指南"""
-        return """
-# SDK使用指南
+        return r'''
+# Eridanus 插件 / Tool 开发 SDK 指南
 
-## 项目结构要求
-插件必须按以下结构组织：
-```
-run/
-├─plugin_name/
-│ ├─plugin_name.py  # 主插件文件
-│ ├─__init__.py     # 必须包含plugin_description和entrance_func
-```
+Eridanus 有两类可生成产物：
+- **事件插件（plugin）**：注册 `@bot.on(事件)` 处理器，响应群/私聊消息、通知等（如 “收到 ping 回复 pong”）。
+- **函数调用工具（tool）**：给 AI 对话插件 mai_reply 使用的能力。AI 判断需要时自动调用；调用结果回给模型。
+两者可共存（both）。
 
-## __init__.py模板
+## 目录结构
+```
+run/<plugin_name>/
+├─ __init__.py          # 必需。plugin_description；若含 tool，还要 dynamic_imports + function_declarations
+├─ main.py              # 事件插件入口（tool-only 可不生成，main_code 置空）
+├─ func_collection.py   # tool 实现（仅 tool/both 时生成，tool_code 置空则不生成）
+└─ config.yaml          # 可选。需要配置项时生成
+```
+插件目录名用小写下划线命名（如 weather_query）。
+
+## __init__.py
+- 纯插件：
 ```python
-plugin_description = "具体插件名称和功能描述"
-
-
+plugin_description = "天气查询：发送 天气 城市 返回该城市天气"
 ```
+- 含 tool：额外声明 dynamic_imports（模块路径 → 函数名列表）与 function_declarations（发给大模型的函数签名）：
+```python
+plugin_description = "素数工具：判断整数是否为素数"
 
-## 主插件文件模板
+dynamic_imports = {
+    "run.prime_tool.func_collection": ["is_prime"],
+}
+
+function_declarations = [
+    {
+        "name": "is_prime",
+        "description": "判断一个整数是否为素数。当用户询问某数是否为质数/素数时调用。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "n": {"type": "integer", "description": "要判断的整数"}
+            },
+            "required": ["n"],
+        },
+    },
+]
+```
+注意：dynamic_imports 的 key 必须是 `run.<plugin_name>.func_collection` 这种真实可导入的模块路径；
+value 里的函数名必须与 func_collection.py 中的函数名、以及 function_declarations 里的 name 完全一致。
+
+## main.py（事件插件入口）
+入口固定为 `def main(bot, config):`，在其中用装饰器注册处理器。**处理函数必须是 async**。
 ```python
 from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
+from developTools.message.message_components import Text, Image, At
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
 
+
 def main(bot: ExtendBot, config: YAMLManager):
     @bot.on(GroupMessageEvent)
-    async def handle_group_message(event: GroupMessageEvent):
-        # 群消息处理逻辑
-        if event.pure_text == "触发词":
-            await bot.send(event, "回复内容")
+    async def _(event: GroupMessageEvent):
+        if event.pure_text == "ping":
+            await bot.send(event, "pong")
 
-    @bot.on(PrivateMessageEvent) 
-    async def handle_private_message(event: PrivateMessageEvent):
-        # 私聊消息处理逻辑
+    @bot.on(PrivateMessageEvent)
+    async def _(event: PrivateMessageEvent):
         pass
 ```
 
-## 常用事件类型
-class MessageEvent(BaseModel):
-    事件基类
+## func_collection.py（tool 实现）
+每个 tool 是一个 **async 函数**，签名固定按需声明 `bot`、`event`、`config`，其余参数与 function_declarations
+的 parameters 对应。框架按“形参名”注入：若形参里有 `bot`/`event`/`config` 就会被自动传入，其余来自模型。
+函数可以直接用 `await bot.send(event, ...)` 发消息；**返回值（字符串/可 JSON 化对象）会作为工具结果回传给模型**，
+所以建议 return 一段简短结果文本，便于模型继续对话。
+```python
+from framework_common.framework_util.websocket_fix import ExtendBot
+from framework_common.framework_util.yamlLoader import YAMLManager
 
-    post_type: Literal["message"]
-    sub_type: str
-    user_id: int
-    message_type: str
-    message_id: int
-    message: List[Dict[str, Any]]  # Change the type hint here
-    original_message: Optional[list] = None
-    _raw_message: str
-    font: int
-    sender: Sender
-    to_me: bool = False
-    reply: Optional[Reply] = None
 
-    processed_message: List[Dict[str, Union[str, Dict]]] = []
+async def is_prime(n: int, bot: ExtendBot = None, event=None, config: YAMLManager = None):
+    """判断 n 是否为素数。"""
+    n = int(n)
+    if n < 2:
+        return f"{n} 不是素数"
+    for i in range(2, int(n ** 0.5) + 1):
+        if n % i == 0:
+            return f"{n} 不是素数（可被 {i} 整除）"
+    return f"{n} 是素数"
+```
+tool 无需在 main.py 注册，也无需重启：生成后框架会自动重扫并注册，随后可在 WebUI「功能管理」里开关。
 
-    message_chain: MessageChain=[]
-    pure_text: str = ""
-
-    model_config = ConfigDict(extra="allow",arbitrary_types_allowed=True)
-
-- GroupMessageEvent: 群消息事件
-- PrivateMessageEvent: 私聊消息事件
-
-class GroupUploadNoticeEvent(NoticeEvent):
-    群文件上传事件
-
-    notice_type: Literal["group_upload"]
-    user_id: int
-    group_id: int
-    file: File
-群管理员变动
-
-class GroupAdminNoticeEvent(NoticeEvent):
-    群管理员变动
-
-    notice_type: Literal["group_admin"]
-    sub_type: str
-    user_id: int
-    group_id: int
-群成员减少事件
-
-class GroupDecreaseNoticeEvent(NoticeEvent):
-    群成员减少事件
-
-    notice_type: Literal["group_decrease"]
-    sub_type: str
-    user_id: int
-    group_id: int
-    operator_id: int
-群成员增加事件
-
-class GroupIncreaseNoticeEvent(NoticeEvent):
-    群成员增加事件
-
-    notice_type: Literal["group_increase"]
-    sub_type: str
-    user_id: int
-    group_id: int
-    operator_id: int
-群禁言事件
-
-class GroupBanNoticeEvent(NoticeEvent):
-    群禁言事件
-
-    notice_type: Literal["group_ban"]
-    sub_type: str
-    user_id: int
-    group_id: int
-    operator_id: int
-    duration: int
-好友添加事件
-
-class FriendAddNoticeEvent(NoticeEvent):
-    好友添加事件
-
-    notice_type: Literal["friend_add"]
-    user_id: int
-群消息撤回事件
-
-class GroupRecallNoticeEvent(NoticeEvent):
-    群消息撤回事件
-
-    notice_type: Literal["group_recall"]
-    user_id: int
-    group_id: int
-    operator_id: int
-    message_id: int
-好友消息撤回事件
-
-class FriendRecallNoticeEvent(NoticeEvent):
-    好友消息撤回事件
-
-    notice_type: Literal["friend_recall"]
-    user_id: int
-    message_id: int
-戳一戳提醒事件
-
-class PokeNotifyEvent(NotifyEvent):
-    戳一戳提醒事件
-
-    sub_type: Literal["poke"]
-    target_id: int
-    group_id: Optional[int] = None
-    raw_info: list =None
-群红包运气王提醒事件
-
-class LuckyKingNotifyEvent(NotifyEvent):
-    群红包运气王提醒事件
-
-    sub_type: Literal["lucky_king"]
-    target_id: int
-资料卡被赞事件
-
-class ProfileLikeEvent(NotifyEvent):
-    sub_type: Literal["profile_like"]
-    operator_id: int
-    operator_nick: str
-    times: int
-群荣誉变更提醒事件
-
-class HonorNotifyEvent(NotifyEvent):
-    群荣誉变更提醒事件
-
-    sub_type: Literal["honor"]
-    honor_type: str
-好友申请
-
-class FriendRequestEvent(RequestEvent):
-    加好友请求事件
-
-    request_type: Literal["friend"]
-    user_id: int
-    flag: str
-    comment: Optional[str] = None
-加群请求/邀请事件
-
-class GroupRequestEvent(RequestEvent):
-    加群请求/邀请事件
-
-    request_type: Literal["group"]
-    sub_type: str
-    group_id: int
-    user_id: int
-    flag: str
-    comment: Optional[str] = None
-
-__all__ = [
-    "MessageEvent",
-    "PrivateMessageEvent",
-    "GroupMessageEvent",
-    "NoticeEvent",
-    "GroupUploadNoticeEvent",
-    "GroupAdminNoticeEvent",
-    "GroupDecreaseNoticeEvent",
-    "GroupIncreaseNoticeEvent",
-    "GroupBanNoticeEvent",
-    "FriendAddNoticeEvent",
-    "GroupRecallNoticeEvent",
-    "FriendRecallNoticeEvent",
-    "NotifyEvent",
-    "PokeNotifyEvent",
-    "ProfileLikeEvent",
-    "LuckyKingNotifyEvent",
-    "HonorNotifyEvent",
-    "RequestEvent",
-    "FriendRequestEvent",
-    "GroupRequestEvent",
-    "MetaEvent",
-    "LifecycleMetaEvent",
-    "HeartbeatMetaEvent",
-    "startUpMetaEvent"
-]
-
-## 事件属性
+## 事件对象常用属性
 - event.pure_text: 纯文本内容
-- event.user_id: 发送者ID
-- event.group_id: 群组ID（群消息）
-- event.message_id: 消息ID
+- event.user_id: 发送者 QQ
+- event.group_id: 群号（群消息）
+- event.message_id: 消息 id
 - event.sender: 发送者信息
 
-## Bot常用方法
-- await bot.send(event, message): 发送消息
-- await bot.send_group_message(group_id, message): 发送群消息
-- await bot.send_friend_message(user_id, message): 发送私聊消息
-- await bot.recall(message_id): 撤回消息
-- await bot.mute(group_id, user_id, duration): 禁言
-- await bot.group_poke(group_id, user_id): 戳一戳
-- await bot.set_qq_avatar(self,file: str): file: http://，base64://,file://均可
-- await bot.set_group_add_request(self,flag: str,approve: bool,reason: str):
-        "
-        处理加群请求
-        :param flag: 请求id
-        :param approve:
-        :param reason:
-        :return:
-        "
-- await bot.set_group_card(self,group_id: int,user_id: int,card: str): 设置群名片
-- await bot.set_group_special_title(self,group_id: int,user_id: int,special_title: str): 设置群头衔
-- await bot.send_group_sign(self,group_id: int): 发送群签到
-- await bot.send_group_notice(self,group_id: int,content: str,image: str): 发送群公告
-
+## Bot 常用方法（均为 async）
+- await bot.send(event, 消息)                      # 消息可为字符串，或消息组件列表
+- await bot.send_group_message(group_id, 消息)
+- await bot.send_friend_message(user_id, 消息)
+- await bot.recall(message_id)                     # 撤回
+- await bot.mute(group_id, user_id, duration)      # 禁言（秒）
+- await bot.send_group_sign(group_id)              # 群签到
 
 ## 消息组件
 ```python
-from developTools.message.message_components import Text, Image, At, Reply,Card
-
-# 文本消息
-Text("文本内容")
-
-# 图片消息  
-Image(file="图片路径或Url") #只需要传入file参数即可，其他参数无需传入
-
-# @某人
-At(qq=user_id)
-
-# 回复消息
-Reply(id=message_id)
-
-Card(audio="音频url", title="标题", image="封面")
-#message_chain仅支持文本和图片同时存在，其他消息组件之间相互不兼容。
+from developTools.message.message_components import Text, Image, At, Record, File, Reply, Node, Music, Video, Face
+Text("文本")
+Image(file="http:// 或 file:// 或 base64:// 或本地路径")   # 只需传 file
+At(qq=123456)
+Record(file="音频url/路径")     # 语音
+File(file="文件路径", name="名称")
+Reply(id=message_id)            # 引用回复
+Music(type="163", id=歌曲id)    # 音乐卡片
+# 发送示例：
+await bot.send(event, [Text("看图："), Image(file=url)])
+await bot.send(event, "纯文本也行")
 ```
 
-## 配置文件使用
+## 读取配置（config.yaml）
+配置按“插件目录名 + 文件名(去 .yaml)”访问：`config.<plugin_name>.<yaml文件名>[key]`。
+config.yaml 的文件名是 config，所以：
+```python
+api_key = config.weather_query.config["api_key"]
 ```
-# 从config中读取配置
-value = config.{module_name}{config_name}[key]
-如插件名称为weather_plugin，配置文件名为config.yaml，假设此时配置文件内容为
-api_key: your_api_key
-则读取方式为：
-api_key = config.weather_plugin.config[‘api_key’]
 
-
-```
-## 导入非python标准库
+## 使用第三方库（自动安装并导入）
 ```python
 from framework_common.utils.install_and_import import install_and_import
-module = install_and_import(package_name, import_name) 
-#然后进行进一步的导入
+httpx = install_and_import("httpx")          # pip 名与 import 名相同
+bs4 = install_and_import("beautifulsoup4", "bs4")   # 不同则给出 import 名
 ```
 
-## 注意事项
-1. 所有插件都必须有main函数作为入口点
-2. 事件处理函数必须是异步函数
-3. 插件名称应该具有描述性
-4. 使用event.pure_text进行文本匹配
-5. 发送消息时可以使用字符串或消息组件列表
-"""
+## 硬性要求
+1. 代码必须完整可运行，禁止省略号/伪代码。
+2. 所有事件处理函数与 tool 函数都必须是 async。
+3. 目录名、dynamic_imports 的函数名、function_declarations 的 name、func_collection.py 的函数名，四者必须一致。
+4. 用户要求“重新生成/修改”时，plugin_name 必须与上次一致。
+5. 用到非标准库时，必须用 install_and_import。
+6. tool-only 时 main_code 置空字符串；纯事件插件时 tool_code 置空字符串、__init__ 不写 dynamic_imports/function_declarations。
+'''
 
-    async def generate_plugin(self, ai_response: Dict[str, Any], plugin_name: str = None) -> Dict[str, Any]:
-        """
-        根据需求生成插件代码
-
-        Args:
-            ai_response: AI返回的字典结果（已经是解析后的格式）
-            plugin_name: 插件名称（如果不提供则使用AI返回的名称）
-
-        Returns:
-            包含生成结果的字典
-        """
-        try:
-            # 检查AI返回是否有效
-            if ai_response is None:
-                return {
-                    "success": False,
-                    "error": "AI返回结果为空",
-                    "plugin_name": plugin_name or "unknown"
-                }
-
-            # 验证AI返回的字典格式
-            if not isinstance(ai_response, dict):
-                return {
-                    "success": False,
-                    "error": f"AI返回结果格式错误，期望字典类型，实际为: {type(ai_response)}",
-                    "plugin_name": plugin_name or "unknown",
-                    "raw_response": str(ai_response)
-                }
-
-            # 验证必需字段
-            required_fields = ["plugin_name", "plugin_description", "main_code", "init_code"]
-            missing_fields = [field for field in required_fields if field not in ai_response]
-
-            if missing_fields:
-                return {
-                    "success": False,
-                    "error": f"AI返回结果缺少必需字段: {', '.join(missing_fields)}",
-                    "plugin_name": plugin_name or ai_response.get("plugin_name", "unknown"),
-                    "raw_response": ai_response
-                }
-
-            # 如果指定了插件名称，则覆盖AI返回的名称
-            if plugin_name:
-                ai_response["plugin_name"] = plugin_name
-
-            # 创建插件文件
-            plugin_path = self._create_plugin_files(ai_response)
-
-            # 返回成功结果
-            result = ai_response.copy()
-            result["success"] = True
-            result["plugin_path"] = str(plugin_path)
-
-            return result
-
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"生成插件时出错: {str(e)}",
-                "plugin_name": plugin_name or ai_response.get("plugin_name", "unknown") if ai_response else "unknown",
-                "raw_response": ai_response if ai_response else None
-            }
+    # ------------------------------------------------------------------ #
+    # Schema / Prompt
+    # ------------------------------------------------------------------ #
+    def _get_plugin_schema(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string",
+                    "enum": ["plugin", "tool", "both"],
+                    "description": "产物类型：plugin=事件插件；tool=AI 函数调用工具；both=两者都要。",
+                },
+                "plugin_name": {
+                    "type": "string",
+                    "description": "插件目录名（小写下划线，如 prime_tool）。",
+                },
+                "plugin_description": {
+                    "type": "string",
+                    "description": "插件功能描述，简洁清晰。",
+                },
+                "init_code": {
+                    "type": "string",
+                    "description": "__init__.py 完整代码。必含 plugin_description；含 tool 时还要 dynamic_imports 与 function_declarations。",
+                },
+                "main_code": {
+                    "type": "string",
+                    "description": "main.py 完整代码（含 def main(bot, config) 与事件处理器）。kind=tool 时置为空字符串。",
+                },
+                "tool_code": {
+                    "type": "string",
+                    "description": "func_collection.py 完整代码（被 dynamic_imports 引用的 async tool 函数）。kind=plugin 时置为空字符串。",
+                },
+                "config": {
+                    "type": "string",
+                    "description": "config.yaml 示例内容（YAML）。不需要配置则返回空字符串。",
+                },
+                "usage_instructions": {
+                    "type": "string",
+                    "description": "使用说明（触发方式 / 配置 / 示例）。",
+                },
+            },
+            "required": [
+                "kind", "plugin_name", "plugin_description",
+                "init_code", "main_code", "tool_code", "config", "usage_instructions",
+            ],
+        }
 
     def _build_ai_prompt(self, requirement: str, plugin_name: str = None) -> str:
-        """构建发送给AI的提示词"""
-        name_instruction = f"插件名称必须是: {plugin_name}" if plugin_name else "请为插件起一个合适的名称"
-
-        return f"""
-你是一个专业的Python插件开发助手。请严格按照以下SDK指南开发一个QQ机器人插件。
+        name_instruction = f"插件名称必须是: {plugin_name}" if plugin_name else "请为插件起一个合适的小写下划线名称"
+        return f"""你是资深的 Eridanus 机器人插件工程师。请严格依据下面的 SDK 指南完成开发需求。
 
 {self.sdk_guide}
 
 ## 开发需求
 {requirement}
 
-## 开发要求
+## 输出要求
 {name_instruction}
-
-请严格按照Schema格式返回结果，包含以下字段：
-- plugin_name: 插件目录名称（使用下划线，如：weather_plugin）
-- plugin_description: 插件功能描述
-- main_code: 主插件文件的完整Python代码
-- init_code: __init__.py文件的完整代码
-- config: 配置文件示例（如果需要，否则返回空JSON对象字符串）
-- usage_instructions: 插件使用说明
-
-注意：
-1. 代码必须完整可用，不能有省略
-2. 必须使用提供的SDK接口
-3. 插件名称使用下划线命名法
-4. 确保所有import语句正确
-5. config.yaml如果不需要配置，请生成一个空的key value对
-6. 当用户要求重新生成或修改时，新的插件名必须和先前生成的插件名保持一致
-**7. 如果使用了非python标准库，必须使用如下方式导入。此方式可以自动安装并导入依赖包。
-from framework_common.utils.install_and_import import install_and_import
-module = install_and_import(package_name, import_name) 
-
+判断该需求更适合做“事件插件(plugin)”、“AI 函数调用工具(tool)”还是“both”，并在 kind 字段说明。
+- 若是给 AI 对话使用的能力（查询/计算/检索等，由 AI 需要时调用），应生成 tool（func_collection.py + __init__ 的 dynamic_imports/function_declarations）。
+- 若是响应具体聊天指令/事件，应生成事件插件（main.py）。
+严格按 schema 返回 JSON，字段：kind, plugin_name, plugin_description, init_code, main_code, tool_code, config, usage_instructions。
+未使用的代码字段（如 tool-only 的 main_code）返回空字符串。所有代码必须完整、可直接运行。
 """
 
-    def _create_plugin_files(self, parsed_result: Dict[str, Any]) -> Path:
-        """创建插件文件"""
-        plugin_name = parsed_result["plugin_name"]
+    # ------------------------------------------------------------------ #
+    # 生成 / 写盘 / 校验
+    # ------------------------------------------------------------------ #
+    async def generate_plugin(self, ai_response: Dict[str, Any], plugin_name: str = None) -> Dict[str, Any]:
+        if ai_response is None:
+            return {"success": False, "error": "AI 返回结果为空", "plugin_name": plugin_name or "unknown"}
+        if not isinstance(ai_response, dict):
+            return {"success": False, "error": f"AI 返回格式错误，期望 dict，实际 {type(ai_response)}",
+                    "plugin_name": plugin_name or "unknown", "raw_response": str(ai_response)}
+
+        required = ["plugin_name", "plugin_description", "init_code"]
+        missing = [f for f in required if not str(ai_response.get(f, "")).strip()]
+        if missing:
+            return {"success": False, "error": f"AI 返回缺少必需字段: {', '.join(missing)}",
+                    "plugin_name": plugin_name or ai_response.get("plugin_name", "unknown"),
+                    "raw_response": ai_response}
+
+        if plugin_name:
+            ai_response["plugin_name"] = plugin_name
+
+        try:
+            plugin_path = self._create_plugin_files(ai_response)
+        except Exception as e:
+            return {"success": False, "error": f"写入插件文件出错: {e}",
+                    "plugin_name": ai_response.get("plugin_name", "unknown"), "raw_response": ai_response}
+
+        result = dict(ai_response)
+        result["success"] = True
+        result["plugin_path"] = str(plugin_path)
+        # 是否含 tool：tool_code 非空，或 __init__ 里声明了 function_declarations
+        result["has_tool"] = bool(str(ai_response.get("tool_code", "")).strip()) \
+            or ("function_declarations" in str(ai_response.get("init_code", "")))
+        return result
+
+    def _create_plugin_files(self, parsed: Dict[str, Any]) -> Path:
+        plugin_name = parsed["plugin_name"]
         plugin_dir = self.base_path / plugin_name
+
         if plugin_dir.exists():
-            logger.warning(f"插件目录 {plugin_dir} 已存在，将删除该目录及其内容")
-
-            # 强制垃圾回收，释放可能的文件句柄
-            import gc
+            logger.warning(f"插件目录 {plugin_dir} 已存在，将覆盖")
+            import gc, time
             gc.collect()
-
-            # 稍等一下让系统释放文件句柄
-            import time
             time.sleep(0.1)
-
             try:
                 shutil.rmtree(plugin_dir)
             except PermissionError as e:
                 logger.error(f"删除目录失败: {e}")
-                # 重命名作为备用方案
-                backup_name = f"{plugin_name}_old_{int(time.time())}"
-                backup_dir = self.base_path / backup_name
-                plugin_dir.rename(backup_dir)
-                logger.info(f"已重命名为: {backup_dir}")
+                backup = self.base_path / f"{plugin_name}_old_{int(time.time())}"
+                plugin_dir.rename(backup)
+                logger.info(f"已重命名旧目录为: {backup}")
 
-        # 创建插件目录
         plugin_dir.mkdir(exist_ok=True)
 
-        # 创建主插件文件
-        main_file = plugin_dir / f"{plugin_name}.py"
-        with open(main_file, 'w', encoding='utf-8') as f:
-            f.write(parsed_result["main_code"])
+        # __init__.py（必需）
+        (plugin_dir / "__init__.py").write_text(parsed["init_code"], encoding="utf-8")
 
-        # 创建__init__.py文件
-        init_file = plugin_dir / "__init__.py"
-        with open(init_file, 'w', encoding='utf-8') as f:
-            f.write(parsed_result["init_code"])
+        # main.py（事件插件，可空）
+        main_code = str(parsed.get("main_code", "")).strip()
+        if main_code:
+            (plugin_dir / "main.py").write_text(parsed["main_code"], encoding="utf-8")
 
-        # 如果有配置示例且不是空的JSON对象，创建配置文件
-        config_example = parsed_result.get("config", "")
-        if config_example and config_example.strip() not in ["", "{}"]:
-            config_file = plugin_dir / "config.yaml"
-            with open(config_file, 'w', encoding='utf-8') as f:
-                f.write(config_example)
+        # func_collection.py（tool，可空）
+        tool_code = str(parsed.get("tool_code", "")).strip()
+        if tool_code:
+            (plugin_dir / "func_collection.py").write_text(parsed["tool_code"], encoding="utf-8")
+
+        # config.yaml（可选）
+        config_example = str(parsed.get("config", "")).strip()
+        if config_example and config_example not in ("{}", "{ }"):
+            (plugin_dir / "config.yaml").write_text(parsed["config"], encoding="utf-8")
 
         return plugin_dir
 
-    async def generate_multiple_plugins(self, requirements: List[str]) -> List[Dict[str, Any]]:
-        """批量生成多个插件"""
-        results = []
-        for i, requirement in enumerate(requirements):
-            print(f"正在生成第 {i + 1}/{len(requirements)} 个插件...")
+    def syntax_check(self, plugin_path) -> List[str]:
+        """ast.parse 校验目录下所有 .py，返回错误列表（空=通过）。"""
+        errors = []
+        for pyfile in Path(plugin_path).glob("*.py"):
+            try:
+                ast.parse(pyfile.read_text(encoding="utf-8"))
+            except SyntaxError as e:
+                errors.append(f"{pyfile.name}:{e.lineno}: {e.msg}")
+            except Exception as e:
+                errors.append(f"{pyfile.name}: {e}")
+        return errors
 
-            # 构建提示词
-            prompt = self._build_ai_prompt(requirement)
+    async def activate(self, bot, plugin_name: str, has_tool: bool) -> Dict[str, Any]:
+        """激活生成的插件：加载事件处理器；若含 tool 则重扫 func_map 并刷新 mai_reply。"""
+        info = {"loaded": False, "tool_registered": False}
+        try:
+            if bot is not None and hasattr(bot, "load_plugin"):
+                info["loaded"] = bool(await bot.load_plugin(plugin_name))
+        except Exception as e:
+            info["load_error"] = str(e)
+            logger.warning(f"[ai_code_generator] load_plugin({plugin_name}) 失败: {e}")
 
-            # 调用AI获取结果
-            from framework_common.framework_util.yamlLoader import YAMLManager
-            ai_response = await schemaReplyCore(
-                config=YAMLManager("run"),
-                schema=self._get_plugin_schema(),
-                user_message=prompt,
-                user_id=1000
-            )
-
-            # 生成插件
-            result = await self.generate_plugin(ai_response)
-            results.append(result)
-
-            # 避免请求过于频繁
-            if i < len(requirements) - 1:
-                await asyncio.sleep(1)
-
-        return results
-
-    def _get_plugin_schema(self) -> Dict[str, Any]:
-        """获取插件定义的Schema"""
-        return {
-            "type": "object",
-            "properties": {
-                "plugin_name": {
-                    "type": "string",
-                    "description": "插件目录名称（使用下划线命名，如：weather_plugin）。"
-                },
-                "plugin_description": {
-                    "type": "string",
-                    "description": "插件功能描述，应清晰简洁。"
-                },
-                "main_code": {
-                    "type": "string",
-                    "description": "主插件文件（例如：main.py）的完整Python代码。代码应能实际工作，包含所有必要的导入和功能逻辑。"
-                },
-                "init_code": {
-                    "type": "string",
-                    "description": "__init__.py文件的完整Python代码，通常用于初始化包或导出模块。如果不需要，可以是空字符串。"
-                },
-                "config": {
-                    "type": "string",
-                    "description": "配置文件（例如：config.json）的示例内容，用于配置API密钥等敏感信息或可变参数。内容应是有效的JSON字符串。如果不需要配置，请返回空JSON对象 `{}` 的字符串表示。"
-                },
-                "usage_instructions": {
-                    "type": "string",
-                    "description": "插件的详细使用说明，包括安装步骤、配置方法和调用示例代码。内容应清晰易懂，可以直接用于指导用户。"
-                }
-            },
-            "required": [
-                "plugin_name",
-                "plugin_description",
-                "main_code",
-                "init_code",
-                "config",
-                "usage_instructions"
-            ]
-        }
+        if has_tool:
+            try:
+                from framework_common.framework_util.func_map_loader import rescan
+                rescan()
+                from run.mai_reply.service.reply_engine import refresh_tools
+                info["tool_count"] = refresh_tools()
+                info["tool_registered"] = True
+            except Exception as e:
+                info["tool_error"] = str(e)
+                logger.warning(f"[ai_code_generator] tool 注册失败: {e}")
+        return info
 
     def list_generated_plugins(self) -> List[str]:
-        """列出已生成的插件"""
         plugins = []
         if self.base_path.exists():
             for item in self.base_path.iterdir():
@@ -541,79 +344,30 @@ module = install_and_import(package_name, import_name)
                     plugins.append(item.name)
         return plugins
 
-    def get_plugin_info(self, plugin_name: str) -> Dict[str, Any]:
-        """获取插件信息"""
-        plugin_dir = self.base_path / plugin_name
-        if not plugin_dir.exists():
-            return {"error": "插件不存在"}
 
-        try:
-            # 读取__init__.py获取描述
-            init_file = plugin_dir / "__init__.py"
-            if init_file.exists():
-                with open(init_file, 'r', encoding='utf-8') as f:
-                    init_content = f.read()
-
-                # 提取插件描述
-                desc_match = re.search(r'plugin_description\s*=\s*["\'](.+?)["\']', init_content)
-                description = desc_match.group(1) if desc_match else "无描述"
-            else:
-                description = "无描述"
-
-            # 检查主文件
-            main_file = plugin_dir / f"{plugin_name}.py"
-            has_main_file = main_file.exists()
-
-            return {
-                "name": plugin_name,
-                "description": description,
-                "has_main_file": has_main_file,
-                "plugin_dir": str(plugin_dir)
-            }
-
-        except Exception as e:
-            return {"error": f"读取插件信息时出错: {str(e)}"}
-
-
-# 使用示例
-async def code_generate(config,prompt,user_id):
-    """简化的代码生成函数"""
+# ---------------------------------------------------------------------- #
+# 供 code_generator.py 调用的入口
+# ---------------------------------------------------------------------- #
+async def code_generate(bot, config, prompt, user_id):
+    """生成插件/tool：调用专用端点 → 写盘 → 语法校验 → 激活（含 tool 动态注册）。"""
     generator = AIPluginGenerator()
-
-    # 构建AI提示词
     ai_prompt = generator._build_ai_prompt(requirement=prompt)
-    #print("发送给AI的提示词:")
-    #print(ai_prompt)
-    #print("-" * 50)
 
-    # 调用schemaReplyCore获取AI响应
-    from framework_common.framework_util.yamlLoader import YAMLManager
-    ai_response = await schemaReplyCore(
-        config=config,
-        keep_history=True,
-        schema=generator._get_plugin_schema(),
-        user_message=ai_prompt,
-        user_id=int(f"{user_id}1024"),
-        model_set=config.ai_code_generator.ai_coder["使用模型"]
-    )
+    from run.ai_code_generator.service.llm_backend import generate_structured
+    ai_response = await generate_structured(config, generator._get_plugin_schema(), ai_prompt, user_id=user_id)
 
-
-
-    # 生成插件
     result = await generator.generate_plugin(ai_response)
+    if not result.get("success"):
+        logger.error(f"❌ 插件生成失败: {result.get('error')}")
+        return result
 
-    logger.info("插件生成结果:")
-    if result["success"]:
-        logger.info(f"✅ 插件生成成功!")
-        logger.info(f"插件名称: {result['plugin_name']}")
-        logger.info(f"插件描述: {result['plugin_description']}")
-        logger.info(f"插件路径: {result['plugin_path']}")
-        logger.info(f"使用说明: {result.get('usage_instructions', '无')}")
-    else:
-        logger.error(f"❌ 插件生成失败: {result['error']}")
+    result["syntax_errors"] = generator.syntax_check(result["plugin_path"])
+    result["activation"] = await generator.activate(bot, result["plugin_name"], result.get("has_tool", False))
 
+    logger.info(f"✅ 插件生成: {result['plugin_name']} ({result.get('kind')}), "
+                f"syntax_errors={result['syntax_errors']}, activation={result['activation']}")
     return result
 
 
 if __name__ == "__main__":
-    asyncio.run(code_generate("你好，请为我开发一个你好插件，当用户发送“你好”时，回复“你好，欢迎使用我的插件！"))
+    asyncio.run(code_generate(None, None, "生成一个 tool：判断整数是否为素数", 1000))

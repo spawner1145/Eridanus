@@ -27,6 +27,7 @@ except Exception:  # pragma: no cover - 依赖异常时走极简解析
     YAML = None
 
 from framework_common.utils.system_logger import get_logger
+from framework_common.framework_util.function_control import load_disabled_skills
 
 logger = get_logger(__name__)
 
@@ -99,7 +100,7 @@ class SkillLoader:
         self._scan_if_needed()
         selected = []
         wanted = {name.strip() for name in names if name and name.strip()}
-        for skill in self._skills.values():
+        for skill in self._visible_skills().values():
             if skill.name in wanted:
                 selected.append(skill)
         return self._build_loaded_skills(selected, "按模型请求加载的 skill 说明：")
@@ -172,6 +173,20 @@ class SkillLoader:
         self._last_scan = now
         self._scan()
 
+    def _visible_skills(self) -> Dict[str, Skill]:
+        """扫描到的 skill 中，剔除在「功能管理」里被禁用的那些。
+
+        禁用列表由 function_control.load_disabled_skills 提供（上游 mtime 缓存），
+        因此在界面上切换开关后，下一条对话即生效，无需热重载。
+        """
+        try:
+            disabled = load_disabled_skills()
+        except Exception:
+            disabled = set()
+        if not disabled:
+            return self._skills
+        return {k: v for k, v in self._skills.items() if v.name not in disabled}
+
     def _scan(self) -> None:
         if not self.skills_dir.exists():
             return
@@ -234,7 +249,7 @@ class SkillLoader:
         selected: List[Tuple[int, Skill]] = []
         lowered = (user_text or "").lower()
 
-        for skill in self._skills.values():
+        for skill in self._visible_skills().values():
             score = 0
             if skill.name in self.always_load:
                 score += 1000
@@ -273,7 +288,7 @@ class SkillLoader:
 
         selected_names = {skill.name for skill in selected}
         lines = []
-        for skill in sorted(self._skills.values(), key=lambda item: item.name):
+        for skill in sorted(self._visible_skills().values(), key=lambda item: item.name):
             marker = "已加载" if skill.name in selected_names else "可触发"
             lines.append(f"- {skill.name}（{marker}）：{skill.description}")
         return "当前可用 skill 包：\n" + "\n".join(lines) + "\n"
@@ -295,7 +310,7 @@ class SkillLoader:
     def _get_skill_by_name(self, name: str) -> Optional[Skill]:
         self._scan_if_needed()
         normalized = (name or "").strip()
-        for skill in self._skills.values():
+        for skill in self._visible_skills().values():
             if skill.name == normalized:
                 return skill
         return None

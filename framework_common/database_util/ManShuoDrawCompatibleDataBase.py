@@ -1,3 +1,5 @@
+import traceback
+
 import aiosqlite
 import json
 import asyncio
@@ -169,6 +171,7 @@ class AsyncSQLiteDatabase:
         读取用户数据，并将 JSON 字符串反序列化为嵌套字典。
         """
         logger.info(f"Reading user {user_id} from {self.db_path}")
+        #traceback.print_stack()
         conn = await self._get_connection()
         try:
             cursor = await conn.execute(
@@ -521,6 +524,7 @@ class AsyncSQLiteDatabase:
         获取数据库实例的异步方法
         """
         logger.info(f"Getting database instance for {db_path}")
+        #traceback.print_stack()
         instance = cls()
         if not instance._initialized:
             await instance.initialize(db_path, storage_dir)
