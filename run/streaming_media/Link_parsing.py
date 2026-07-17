@@ -31,7 +31,7 @@ async def call_bili_download_video(bot, event, config,type_download='video'):
     if json_linking['soft_type'] not in {'bilibili', 'dy', 'wb', 'xhs', 'x'}:
         await bot.send(event, '该类型视频图片暂未提供下载支持，敬请期待')
         return
-    proxy = config.common_config.basic_config["proxy"]["http_proxy"]
+    #proxy = config.common_config.basic_config["proxy"]["http_proxy"]
     if type_download == 'video' and json_linking['video_url']:
         try:
             video_json = await download_video_link_prising(json_linking, filepath='data/pictures/cache/', proxy=proxy)
