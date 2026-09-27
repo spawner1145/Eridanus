@@ -333,9 +333,9 @@ def main(bot: ExtendBot, config: YAMLManager):
     # ---------------------------------------------------------
     async def call_sd_generate(prompt: str) -> Optional[str]:
         sd_cfg = config.qq_zone.config.get("sd绘画设置", {})
-        base_url = sd_cfg.get("sdUrl", "http://apollodorus.xyz:3530")
+        base_url = sd_cfg.get("sdUrl", "http://api.apollodorus.xyz")
         if not base_url:
-            base_url = "http://apollodorus.xyz:3530"
+            base_url = "http://api.apollodorus.xyz"
         base_url = base_url.rstrip("/")
         txt2img_url = f"{base_url}/sdapi/v1/txt2img"
 
