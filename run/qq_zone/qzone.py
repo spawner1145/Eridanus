@@ -673,6 +673,7 @@ def main(bot: ExtendBot, config: YAMLManager):
     night_theme_pool = getattr(qzone_themes, 'NIGHT_THEME_POOL', [])
     daily_theme_pool = getattr(qzone_themes, 'DAILY_VTUBER_THEMES', [])
     theme_mutation_directives = getattr(qzone_themes, 'THEME_MUTATION_DIRECTIVES', [])
+    post_archetypes = getattr(qzone_themes, 'POST_STRUCTURE_ARCHETYPES', [])
 
     def pick_next_theme(task_name: str) -> dict:
         if task_name == "早安":
@@ -702,13 +703,20 @@ def main(bot: ExtendBot, config: YAMLManager):
 
         current_global_mem = mai_context.get_global_memory() if mai_context else ""
 
-        # 智能挑选主题与去重约束
         # 智能挑选基础主题种子（Seed）与去重约束
         theme_obj = pick_next_theme(task_name)
         base_theme = theme_obj["theme"]
         sd_theme_hint = theme_obj["sd_hint"]
         selected_theme_id = theme_obj["id"]
         selected_elements = theme_obj.get("elements", [])
+
+        # 随机抽取一种行文句式骨架原型（彻底打破三段论/交代式固定句式，创造真实活人感）
+        chosen_archetype = random.choice(post_archetypes) if post_archetypes else {
+            "name": "即时碎碎念与生活切片",
+            "description": "【即时碎碎念与生活切片】：像随手发在小号或备忘录的一两句自言自语，有具体的生活细节或场景，语调轻快随意，自然停下，不强行升华或总结。",
+            "examples": "“微波炉热牛奶转到最后一秒跳停的声音，莫名有点解压。” / “路过花店被刚剪枝的青草味呛了一下，但还挺好闻的。”"
+        }
+        logger.info(f"[Qzone 句式原型] {task_name} 采用行文形态: 【{chosen_archetype['name']}】")
 
         # 变体衍生机制：将已选主题作为种子(Seed)，每次按 70% 概率引入变体引导词发散演绎全新切面（发挥LLM创造力）
         mutation_hint = ""
@@ -717,9 +725,9 @@ def main(bot: ExtendBot, config: YAMLManager):
             m_type = directive_obj.get("type", "生活切面发散")
             m_text = directive_obj.get("directive", "")
             mutation_hint = (
-                f"\n【动态变体激发（发挥创造力）】（类型：{m_type}）：\n"
+                f"\n【变体发散（发挥创造力）】（类型：{m_type}）：\n"
                 f"{m_text}\n"
-                f"请以此种子切面为灵感跳板，自由发散演绎出属于你的意料之外的真实小插曲或全新变体，不必死板拘泥于种子原话！"
+                f"请以此种子切面为灵感跳板，自由发散演绎出属于你的真实小插曲或微妙心境，不必死板拘泥于种子原话！"
             )
             logger.info(f"[Qzone 变体激发] {task_name} 触发变体衍生: [{m_type}]，基底种子: {base_theme[:30]}")
         else:
@@ -738,21 +746,28 @@ def main(bot: ExtendBot, config: YAMLManager):
         sys_prompt = (
             f"你是{bot_name}。\n"
             f"你的人设信息如下：\n{chara_text}\n\n"
-            f"你现在要发一条 QQ 空间动态（{task_name}的说说）。\n"
+            f"你现在要发一条真实的社交动态（{task_name}的说说）。\n"
             f"当前真实时间线：{time_context}\n"
-            f"风格完全参考 Twitter/X 真实可爱的生活系 Vtuber（参考 @moonjelly0、@jellyhoshiumi 的生活碎念与手账日记感）：\n"
-            f"【核心禁令】：严格杜绝千篇一律的“被窝好软”、“被子封印我”、“赖床”、“钻进被窝”这种套话！严禁让读者感觉每天都在重复过同一天！\n"
+            f"风格完全参考 Twitter/X 真实可爱的生活系 Vtuber（参考 @moonjelly0、@jellyhoshiumi 的生活随手碎念与情绪切面）：\n"
+            f"【核心禁令与破除AI套路】：\n"
+            f"1. 严禁套用‘交代起因 + 发生波折 + 句尾固定口号(啦/呀/晚安/目移/大家觉得呢)’这种八股记叙三段论结构！\n"
+            f"2. 严禁使用括号旁白表情（如‘（目移）’、‘（叹气）’、‘（揉眼睛）’、‘（小声）’）！真实女孩子在社媒发文绝不带自导自演的动作括号！\n"
+            f"3. 严禁句尾机械式打卡问候（不要逢早必说‘大家早安呀~’、逢晚必说‘晚安好梦~’、逢吃必问‘大家最喜欢什么呀’）！收尾自然，但也不要刻意搞成干瘪、断层、故弄玄虚的‘极简一句话机器假文艺’！要有真实的呼吸感与生活细节。\n"
+            f"4. 严格杜绝‘被窝好软’、‘被子封印我’、‘赖床’等陈词滥调！\n"
             f"{negative_constraints}"
-            f"【本次新的一天微小灵感种子（Seed）】：{base_theme}。{fest_tip}{mutation_hint}\n"
-            f"1. 极简、微小生活碎片感、少女心情日记，像真人女孩子随手敲出来的生活小确幸或真实日常。\n"
-            f"2. 口气自然灵动，带一点女孩子的真实俏皮与微小心情，可以偶尔带一两个波浪号~或可爱标点，杜绝AI总结腔。\n"
-            f"3. 严格限制字数在 15 ~ 45 字之间，点到即止，短小精炼。\n"
-            f"4. 直接输出说说正文，严禁携带任何多余解释、引号或格式。"
+            f"【本次行文骨架形态原型（务必遵循并打破常规叙事）】：\n"
+            f"{chosen_archetype['description']}\n"
+            f"参考示范：{chosen_archetype['examples']}\n\n"
+            f"【本次微小灵感切入种子（Seed）】：{base_theme}。{fest_tip}{mutation_hint}\n\n"
+            f"【写作要领】：\n"
+            f"- 像真实女孩子在手机备忘录随手敲下一句话，或者在走路时脱口而出的一小句自言自语。\n"
+            f"- 字数通常在 15 ~ 55 字之间，像真实少女的心情日记或小号碎碎念，有具体的生活细节或感官（声音/味道/微小画面），避免空洞只有一句话的人机感。\n"
+            f"- 直接输出说说正文，严禁携带任何多余解释、引号或格式。"
         )
 
-        user_prompt = f"请写一条你今天（{time_context}）的{task_name}说说，展现新一天的不同切面。"
+        user_prompt = f"请写一条你现在（{time_context}）的动态碎片，采用【{chosen_archetype['name']}】的说话方式，写出真实活人呼吸感。"
         if current_global_mem:
-            user_prompt += f" 你最近的生活碎片记录（可自然呼应）：\n{current_global_mem}"
+            user_prompt += f" 你最近的日常记忆碎片（可自然呼应）：\n{current_global_mem}"
 
         post_content = ""
         try:
@@ -880,12 +895,19 @@ def main(bot: ExtendBot, config: YAMLManager):
             except Exception as e:
                 logger.debug(f"[Qzone Vtuber日常] 提取群聊灵感异常: {e}")
 
-        # 接入多样化日常灵感与少女心情日记库（避免近期重复）
         # 接入多样化日常灵感与少女心情日记库（避免近期重复），以种子(Seed)驱动发散
         daily_theme_obj = pick_next_theme("日常")
         chosen_cat = daily_theme_obj.get("id", "daily_mood")
         chosen_style = daily_theme_obj.get("theme", "分享少女日常生活中的真实可爱碎片")
         chosen_sd_hint = daily_theme_obj.get("sd_hint", "casual daily, relaxed posture, cute expression, high quality")
+
+        # 随机抽取一种行文句式骨架原型（打破AI三段论固定结构）
+        chosen_daily_archetype = random.choice(post_archetypes) if post_archetypes else {
+            "name": "感叹与内心独白开门见山",
+            "description": "【感叹与内心独白开门见山】：先吐出当下的情绪词或无厘头感慨，再轻描淡写带过原因，像直接对着空气说话，拒绝‘我在...然后...所以...’的记叙文结构。",
+            "examples": "“完蛋，完全不想动弹。” / “啊！世界上怎么会有烤红薯这么香的东西啊！”"
+        }
+        logger.info(f"[Qzone 句式原型] 日常动态采用行文形态: 【{chosen_daily_archetype['name']}】")
 
         # 日常变体衍生引导词（按 70% 概率触发深度发散，避免特定小趣事话题反复雷同）
         daily_mutation_hint = ""
@@ -904,17 +926,24 @@ def main(bot: ExtendBot, config: YAMLManager):
         sys_vtuber_prompt = (
             f"你是{bot_name}。\n"
             f"人设：\n{chara_text}\n\n"
-            f"你现在要在自己的社交主页/QQ空间发一条简短动态。\n"
+            f"你现在要在自己的社交主页/QQ空间发一条简短动态碎片。\n"
             f"当前时间：{time_context}\n"
-            f"风格完全参考 Twitter/X 真实可爱的生活系 Vtuber（如 @moonjelly0、@jellyhoshiumi）：\n"
+            f"风格完全参考 Twitter/X 真实可爱的生活系 Vtuber（如 @moonjelly0、@jellyhoshiumi 的生活碎念）：\n"
+            f"【核心禁令与破除AI套路】：\n"
+            f"1. 严禁套用‘因为/我在...然后...最后...（大家觉得呢）’这种小学生作文八股结构！\n"
+            f"2. 严禁使用括号旁白表情（如‘（目移）’、‘（望天）’、‘（叹气）’）！真人推文绝不自带动作戏！\n"
+            f"3. 严禁句尾机械式抛问或口号式收尾！自然流露，点到即止，允许留白！\n\n"
+            f"【本次行文骨架形态原型（务必遵循并打破常规叙事）】：\n"
+            f"{chosen_daily_archetype['description']}\n"
+            f"参考示范：{chosen_daily_archetype['examples']}\n\n"
             f"本次动态微小切入种子（Seed）：【{chosen_style}】。{daily_mutation_hint}\n"
             f"要求：\n"
-            f"1. 像真人女孩随手敲出来的文字，体现出当前时段（{time_context}）的鲜活生活感，严禁AI翻译腔、严禁报幕式套话。\n"
-            f"2. 保持真实呼吸感，偶尔用一两个波浪号或日常标点，不要堆砌废话。\n"
-            f"3. 严格限制字数在 15 ~ 45 字之间，短小自然，点到即止。\n"
-            f"4. 直接输出动态正文，不要包含任何多余文字或引号。"
+            f"- 像真人女孩子在走神或跟空气对话时脱口而出的一小句话，体现出当前时段（{time_context}）的鲜活生活感。\n"
+            f"- 保持真实呼吸感，偶尔用一两个波浪号或日常标点，不要堆砌废话。\n"
+            f"- 字数通常在 15 ~ 55 字之间，有具体的生活现场感和细节，自然轻快，避免过于干瘪或只有半句的人机感。\n"
+            f"- 直接输出动态正文，不要包含任何多余文字或引号。"
         )
-        user_vtuber_prompt = "请发一条日常动态。"
+        user_vtuber_prompt = f"请发一条日常动态，采用【{chosen_daily_archetype['name']}】结构，写出真实少女生活感。"
         if group_snippet:
             user_vtuber_prompt += f"\n刚才群里大家聊到这些：\n{group_snippet}\n可以顺着其中某个有趣话题随手吐槽或发问，也可以自说自话。"
         elif current_global_mem:
