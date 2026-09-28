@@ -49,7 +49,7 @@
 (Rella:1.2), (chen bin:1.3), virtual youtuber, (starshadowmagician:1.2), masterpiece, extremely detailed, lineart, (hand-drawn:1.3), (sketch:1.2), Picasso style, Van Gogh's almond blossoms, <lora:DeniaV1-Nuclear1811-IL:0.5>
 
 3. 默认服装：
-(cream loose cardigan:1.1), oversized cardigan, white camisole, ribbed top, pleated light denim shorts, white canvas sneakers, beige tote bag, casual daily wear
+(cream oversized cable knit cardigan:1.1), pale butter yellow camisole, brown pleated wool skirt, (chocolate brown beret:1.1), beige knee-high socks, retro loafer shoes, casual daily wear
 
 4. 动态场景变体（根据聊天内容灵活替换）：
 - 刚睡醒/晚安时：自行判断选择
