@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 QQ空间动态超丰富主题种子池库（晨间/早安、夜间/晚安、Vtuber日常互动）
-所有主题均作为创造性 Seed，包含丰富阳光日常，也接纳真实的低能量、丧气、不想说话的阴翳切面，
-结合 70% 概率的主题衍生变体引导词与多样化行文形态，呈现出有血有肉、起伏鲜活的真实少女日记。
+全库涵盖无聊、抑郁/低气压、开心/元气、平淡松弛、兴致勃勃、调皮戏耍/微露小心机等多维度丰富情感与经历，
+结合 70% 变体衍生引导词与多样化行文形态，彻底摆脱单一人设与AI套路，呈现有血有肉的真实少女日记。
 """
 
 MORNING_THEME_POOL = [
@@ -1483,6 +1483,90 @@ MORNING_THEME_POOL = [
         "elements": "卫生间镜子, 疲倦眼神, 滴答水龙头, 冷白光, 游离状态",
         "sd_hint": "standing before bathroom mirror with tired unfocused eyes, water dripping from faucet, cold pale light, vulnerable quiet moment"
     },
+    {
+        "id": "m_212",
+        "category": "无聊与放空漫游",
+        "theme": "清早无所事事，用手指在起雾的落地窗上反复画同心圆又擦掉",
+        "elements": "起雾落地窗, 同心圆指印, 晨光漫射, 托腮放空, 闲散",
+        "sd_hint": "standing by foggy glass window drawing circles with fingertip, early morning pale light, oversized knit sweater, bored expression, daydreaming"
+    },
+    {
+        "id": "m_213",
+        "category": "无聊与放空漫游",
+        "theme": "早上起早了不知道干嘛，坐在地毯上数阳光里的浮尘慢悠悠漂浮",
+        "elements": "光柱尘埃, 地毯盘腿, 抱枕, 晨间发呆, 极度无聊",
+        "sd_hint": "sitting cross-legged on rug watching dust motes dance in morning sunbeam, bored cute gaze, messy morning bed hair, casual homewear"
+    },
+    {
+        "id": "m_214",
+        "category": "阴郁与低气压",
+        "theme": "早晨醒来胸口像压着一块湿透的吸水海绵，什么也不想碰，只想在这个世界上静音",
+        "elements": "静音手机, 阴冷晨光, 抱膝角落, 苍白微光, 沉闷情绪",
+        "sd_hint": "sitting curled up in dim corner of room, cloudy morning light, hugging knees, quiet sorrow, downcast eyes, fragile melancholic"
+    },
+    {
+        "id": "m_215",
+        "category": "阴郁与低气压",
+        "theme": "站在镜子前机械地刷牙，看着镜子里没有神采的自己，只想把今天也快进过去",
+        "elements": "洗手台冷光, 牙刷泡沫, 呆滞眼神, 晨间失焦, 游离",
+        "sd_hint": "standing before bathroom mirror with toothbrush, blank hollow expression, cold fluorescent light, disheveled hair, emotional fatigue"
+    },
+    {
+        "id": "m_216",
+        "category": "雀跃与开朗晨光",
+        "theme": "一大早随手挑的歌随机到了最喜欢的副歌，脚步轻快得像踩在棉花糖上",
+        "elements": "晨光街道, 随身耳机, 轻快脚步, 飞扬衣角, 灿烂笑容",
+        "sd_hint": "walking in sunny morning street listening to headphones, lively skipping step, happy glowing smile, fluttering light jacket, golden sun"
+    },
+    {
+        "id": "m_217",
+        "category": "雀跃与开朗晨光",
+        "theme": "烤吐司刚弹出来抹上厚厚一层花生酱，第一口咬下去幸福感直接爆棚",
+        "elements": "花生酱热吐司, 咖啡杯香气, 厨房晨曦, 满足眯眼, 晨间治愈",
+        "sd_hint": "taking a big happy bite of toasted bread with peanut butter, eyes squeezed shut with joy, warm bright kitchen sunlight, cozy pajamas"
+    },
+    {
+        "id": "m_218",
+        "category": "平淡日常与生活流",
+        "theme": "早晨倒了一杯温开水慢慢喝完，听着外面早点摊隐隐约约的油锅滋滋声",
+        "elements": "白瓷水杯, 窗外市井烟火, 晨风微动, 平静呼吸, 寻常清晨",
+        "sd_hint": "holding a plain ceramic mug drinking warm water, looking out window at quiet morning street, serene calm expression, soft morning breeze"
+    },
+    {
+        "id": "m_219",
+        "category": "平淡日常与生活流",
+        "theme": "慢悠悠系好帆布鞋鞋带，推开门迎面是一阵凉爽清透的秋风",
+        "elements": "玄关整理, 帆布鞋带, 门缝晨光, 平稳心境, 出门日常",
+        "sd_hint": "tying shoelaces in doorway, soft natural morning daylight, calm tranquil smile, denim jacket, starting a normal day"
+    },
+    {
+        "id": "m_220",
+        "category": "兴致勃勃与活力晨启",
+        "theme": "今天醒来突然干劲满满，把积攒一周的衣服全塞进洗衣机看着水流打转",
+        "elements": "洗衣机滚筒水花, 阳台阳光, 挽起袖口, 活力满满, 清爽笑容",
+        "sd_hint": "watching spinning washing machine drum with soapy bubbles, rolled up sleeves, energetic enthusiastic expression, bright airy balcony"
+    },
+    {
+        "id": "m_221",
+        "category": "兴致勃勃与活力晨启",
+        "theme": "一早翻出新买的水彩颜料，迫不及待地在画纸上调出第一抹清透的薄荷绿",
+        "elements": "水彩画盘, 清透薄荷绿, 笔尖水珠, 晨光工作台, 雀跃专注",
+        "sd_hint": "mixing vibrant mint green watercolor on palette with brush, morning light on desk, excited sparkling eyes, creative morning"
+    },
+    {
+        "id": "m_222",
+        "category": "调皮戏耍与微露小心机",
+        "theme": "刚睡醒锁骨上的睡衣领口滑下一半，拍了一张锁骨上的阳光影子发出来：某些人看空间不要停太久哦",
+        "elements": "滑落领口, 晨光锁骨剪影, 手机前置自拍, 坏笑眼神, 调皮挑衅",
+        "sd_hint": "morning selfie perspective, pajama collar slipping off one shoulder revealing collarbone, golden morning light on skin, teasing playful wink, mischievous smile"
+    },
+    {
+        "id": "m_223",
+        "category": "调皮戏耍与微露小心机",
+        "theme": "晨光刚好打在刚换好的过膝白袜和绝对领域上，拍张局部发出来故意逗人：今天穿这个出门会被抓吗",
+        "elements": "晨光过膝袜, 绝对领域微光, 床沿微晃脚尖, 戏谑语气, 少女心机",
+        "sd_hint": "sitting on edge of bed showing over-knee white socks and thigh, soft morning sun on legs, playful teasing posture, smartphone camera angle"
+    },
 ]
 
 NIGHT_THEME_POOL = [
@@ -2795,6 +2879,90 @@ NIGHT_THEME_POOL = [
         "elements": "窗台缩成一团, 城市深黑夜景, 冰凉玻璃, 孤寂剪影, 情绪低谷",
         "sd_hint": "curled into a ball on wide windowsill looking out at dark city, cold glass reflection, lonely silhouette, quiet existential dread"
     },
+    {
+        "id": "n_188",
+        "category": "深夜无聊与百无聊赖",
+        "theme": "深夜在各个app之间来回反复切换，明明没有一条新消息却刷新了十几遍",
+        "elements": "手机冷光打脸, 床头黑暗, 漫无目的滑屏, 翻白眼发呆, 极度空虚",
+        "sd_hint": "lying in bed in dark room scrolling smartphone aimlessly, cool screen light on face, bored drowsy half-open eyes, tangled sheets"
+    },
+    {
+        "id": "n_189",
+        "category": "深夜无聊与百无聊赖",
+        "theme": "无聊到把抱枕上的流苏一根一根数了一遍，整整六十四根，毫无意义但就是不想睡",
+        "elements": "盘腿地毯, 抚摸抱枕流苏, 暗淡台灯, 游离眼神, 荒诞打发时间",
+        "sd_hint": "sitting on rug fiddling with pillow tassels, dim bedside lamp, bored funny pout, pajamas, counting mindless details"
+    },
+    {
+        "id": "n_190",
+        "category": "深夜脆弱与潮水情绪",
+        "theme": "今天好像一直在强撑着迎合别人，晚上把门反锁熄灯那一刻，突然好想大哭一场",
+        "elements": "黑暗房门紧闭, 靠门滑坐, 咬嘴唇忍泪, 卸下面具, 极度无力",
+        "sd_hint": "sitting on floor against bedroom door in pitch dark, knees pulled to chest, biting lip holding back tears, vulnerable melancholic"
+    },
+    {
+        "id": "n_191",
+        "category": "深夜脆弱与潮水情绪",
+        "theme": "看着窗外寂静的夜空，突然觉得整个世界的声音都离自己好远好远",
+        "elements": "窗前冰凉玻璃, 空旷夜空冷月, 孤寂背影, 沉默放空, 情绪低谷",
+        "sd_hint": "standing alone by large dark window looking at lonely moon, reflection in cold glass, fragile slender silhouette, quiet sorrow"
+    },
+    {
+        "id": "n_192",
+        "category": "深夜满足与心满意足",
+        "theme": "深夜洗完热水澡整个人香喷喷地钻进干净被窝，今天所有的开心都可以存进小金库了",
+        "elements": "蓬松被窝, 湿润发梢微红脸颊, 抱紧被角, 满足憨笑, 暖意包裹",
+        "sd_hint": "burrowed happily in soft clean duvet, rosy flushed cheeks after hot bath, snug cute smile, warm bedroom amber light"
+    },
+    {
+        "id": "n_193",
+        "category": "深夜满足与心满意足",
+        "theme": "翻看今天拍到的搞怪照片，一个人在被窝里憋笑憋得肩膀一抖一抖的",
+        "elements": "手机屏幕微光, 捂嘴忍笑, 乱糟糟枕头, 纯粹快乐, 睡前愉悦",
+        "sd_hint": "lying on stomach looking at glowing phone screen, hand over mouth suppressing giggles, twinkling lively eyes, cozy bedroom"
+    },
+    {
+        "id": "n_194",
+        "category": "平淡夜晚与静水流深",
+        "theme": "桌角倒了一杯温牛奶慢慢喝，听着窗外偶尔开过的一辆车声慢慢消失在夜色里",
+        "elements": "温牛奶玻璃杯, 桌角暖灯, 窗外遥远车声, 平静呼吸, 寻常夜晚",
+        "sd_hint": "holding a warm glass of milk with both hands, sitting peacefully at desk, single warm lamp, tranquil serene gaze, night stillness"
+    },
+    {
+        "id": "n_195",
+        "category": "平淡夜晚与静水流深",
+        "theme": "把明天要背的小包拉链拉好放在门边，关灯，今天的生活准时打烊",
+        "elements": "整理就绪的背包, 关灯前一秒, 房间阴影, 坦然平静, 睡前打烊",
+        "sd_hint": "standing by bedroom door reaching hand to light switch, tidy room in soft twilight, calm gentle relaxed expression, ready for sleep"
+    },
+    {
+        "id": "n_196",
+        "category": "夜猫狂欢与突发奇想",
+        "theme": "半夜突然灵感大爆发，翻出草稿本狂写了两页莫名其妙但感觉特别酷的歌词",
+        "elements": "散落草稿纸, 握着笔尖飞舞, 亮晶晶的眼睛, 熬夜兴奋, 创意迸发",
+        "sd_hint": "sitting on floor surrounded by scattered sketch papers, scribbling excitedly with pen, sparkling enthusiastic eyes, night owl energy"
+    },
+    {
+        "id": "n_197",
+        "category": "夜猫狂欢与突发奇想",
+        "theme": "突然想研究怎么做出超完美的焦糖布丁，在厨房把小奶锅煮得滋滋冒香气",
+        "elements": "深夜小奶锅, 焦糖金色光泽, 兴奋围裙, 厨房暖光, 夜宵探索",
+        "sd_hint": "stirring caramel in small saucepan in kitchen late at night, apron over sleepwear, thrilled focused cute expression, warm culinary glow"
+    },
+    {
+        "id": "n_198",
+        "category": "夜色撩人与调皮戏耍",
+        "theme": "洗完澡只套了一件宽大的丝绸睡衣，光着腿盘坐在床边对镜头眨眼：大半夜不睡，在看谁呢",
+        "elements": "大领口丝绸睡衣, 光洁白皙小腿, 床边微挑眉眼, 戏弄挑逗, 危险又俏皮",
+        "sd_hint": "sitting on bed wearing loose oversized silk slip dress showing collarbone and bare legs, flirting wink at camera, soft dim bedroom lighting, teasing seductive smile, cute mischievous charm"
+    },
+    {
+        "id": "n_199",
+        "category": "夜色撩人与调皮戏耍",
+        "theme": "刚吹完头发带点湿漉漉的凌乱，拍了张露出一小截细腰的睡衣照发出来：盯超过三秒的自觉去罚站",
+        "elements": "微露细腰睡衣, 湿润乱发, 手机挡脸半露坏笑, 戏弄水友, 纯欲小恶魔",
+        "sd_hint": "mirror selfie in bedroom, oversized pajama crop top slightly revealing slim waist and tummy, damp disheveled hair, playful cheeky smirk, sultry alluring teasing vibe"
+    },
 ]
 
 DAILY_VTUBER_THEMES = [
@@ -3568,6 +3736,90 @@ DAILY_VTUBER_THEMES = [
         "elements": "抱膝阳台角落, 干燥微风, 侧脸发丝遮挡, 沉默疗伤, 沉静",
         "sd_hint": "sitting hugging knees in sunlit balcony corner, breeze stirring hair, thoughtful solemn expression, healing quietly"
     },
+    {
+        "id": "d_111",
+        "category": "午后无聊与神游发呆",
+        "theme": "下午闲得发慌，把吸管套一点点折成手风琴状的小纸条，已经折了六个了",
+        "elements": "折痕手风琴吸管套, 奶茶空杯, 托腮叹气, 桌面无聊小玩具, 闲散午后",
+        "sd_hint": "resting chin on hand folding paper straw wrappers on cafe table, bored glassy gaze, half-empty boba tea cup, lazy afternoon light"
+    },
+    {
+        "id": "d_112",
+        "category": "午后无聊与神游发呆",
+        "theme": "在草稿纸上把所有的方格密密麻麻全涂黑，整个人开启了待机休眠模式",
+        "elements": "涂黑方格草稿纸, 圆珠笔尖, 呆滞眼神, 趴在桌上, 极致无聊",
+        "sd_hint": "head resting sideways on wooden desk, scribbling mindless black boxes on grid paper, blank daydreaming look, sleepy afternoon sun"
+    },
+    {
+        "id": "d_113",
+        "category": "丧气与社交电量枯竭",
+        "theme": "今天被各种琐事消耗得连嘴角都扯不起来，只想戴上兜帽把自己藏起来当隐形人",
+        "elements": "宽大兜帽遮脸, 耷拉肩膀, 街角阴影, 拒绝视线接触, 丧气沉重",
+        "sd_hint": "walking with oversized hoodie pulled over head hiding face, slumped shoulders, shadows in alleyway, drained melancholic posture"
+    },
+    {
+        "id": "d_114",
+        "category": "丧气与社交电量枯竭",
+        "theme": "好像无论怎么努力还是会被挑刺，默默找了个没人的楼梯间坐着，不想回去面对任何人",
+        "elements": "空荡水泥楼梯间, 抱着膝盖, 阴暗角落, 委屈难过, 逃离现实",
+        "sd_hint": "sitting on quiet concrete stairwell hugging knees, head resting on knees, dim staircase window, vulnerable hurt expression, taking refuge"
+    },
+    {
+        "id": "d_115",
+        "category": "元气爆发与快乐加倍",
+        "theme": "盲盒随手一抽就抽中了心心念念的隐藏款！当场在店里差点原地起飞",
+        "elements": "拆开盲盒小玩偶, 紧紧捧在胸口, 惊喜瞪大双眼, 兴奋小跳步, 纯粹快乐",
+        "sd_hint": "holding a tiny cute figurine with both hands, eyes wide with sparkling shock and joy, hopping with excitement in sunny shop, radiant smile"
+    },
+    {
+        "id": "d_116",
+        "category": "元气爆发与快乐加倍",
+        "theme": "喝到了巨好喝的当季杨梅冰汤圆，每一口都酸甜冰爽得让人想转圈圈",
+        "elements": "杨梅冰汤圆小碗, 粉红冰沙, 舀起汤圆, 眯眼享受, 治愈甜品",
+        "sd_hint": "holding a transparent cup of iced bayberry dessert, spoon in mouth, blissful cute expression, pink and ruby ice tones, refreshing summer vibe"
+    },
+    {
+        "id": "d_117",
+        "category": "松弛与日常碎片",
+        "theme": "坐在路边长椅上看两只小麻雀在水坑边抢面包屑，不知不觉就看了半小时",
+        "elements": "路边长椅, 争食麻雀水坑, 晃动双脚, 微风拂发, 悠闲松弛",
+        "sd_hint": "sitting on street bench swinging legs gently, watching tiny sparrows by a puddle, peaceful serene smile, dappled leaf shadows"
+    },
+    {
+        "id": "d_118",
+        "category": "松弛与日常碎片",
+        "theme": "在超市货架前慢吞吞挑选今天晚餐的乌冬面配菜，平静寻常的下班放学时刻",
+        "elements": "超市货架日光灯, 抱着食材推车, 挑选蔬菜, 烟火气, 平淡踏实",
+        "sd_hint": "browsing supermarket shelves holding a shopping basket with fresh veggies, bright clean grocery lights, calm relaxed everyday smile"
+    },
+    {
+        "id": "d_119",
+        "category": "兴致勃勃与街头大冒险",
+        "theme": "今天心血来潮专门去探访老胡同里藏着的小中古店，淘到了一枚超可爱的复古铜质猫猫徽章",
+        "elements": "复古中古小店, 捧着铜制猫咪徽章, 兴奋端详, 寻宝成功, 雀跃",
+        "sd_hint": "inspecting a vintage bronze cat pin in hands, rustic antique shop background, curious enthusiastic sparkle in eyes, stylish casual retro jacket"
+    },
+    {
+        "id": "d_120",
+        "category": "兴致勃勃与街头大冒险",
+        "theme": "突然决定徒步去平时没走过的那条江边绿道，感觉自己像在执行什么秘密探索任务",
+        "elements": "江边绿道微风, 运动鞋轻快, 远方开阔江景, 探险雀跃, 活力",
+        "sd_hint": "jogging briskly along scenic riverfront pathway, wind in hair, looking ahead with bright adventurous spirit, wide open sky, sporty outfit"
+    },
+    {
+        "id": "d_121",
+        "category": "微露心机与调皮钓系",
+        "theme": "试穿刚买的微透蕾丝吊带背心，拍了张锁骨与直角肩的微醺光影特写：好看吗，但只给看五秒钟哦",
+        "elements": "蕾丝吊带微露肩颈, 锁骨暖黄光影, 手机挡脸半露俏皮, 钓系挑衅, 调皮小得意",
+        "sd_hint": "selfie showing delicate lace camisole, bare graceful shoulders and collarbone, phone partially covering face, teasing playful smirk, warm cinematic lighting, flirtatious aesthetic, charmingly alluring"
+    },
+    {
+        "id": "d_122",
+        "category": "微露心机与调皮钓系",
+        "theme": "故意拍了张喝奶茶时嘴唇沾着一点点白白奶盖的搞怪特写：看什么看，难道还要你帮我擦掉吗",
+        "elements": "上唇微沾奶盖, 睁大挑衅眼睛, 奶茶吸管, 狡黠灵动, 坏心眼小戏弄",
+        "sd_hint": "close up face with a speck of white milk foam on upper lip holding boba cup, cocking head with cheeky challenging gaze, teasing adorable expression, natural bright daylight"
+    },
 ]
 
 THEME_MUTATION_DIRECTIVES = [
@@ -3582,47 +3834,49 @@ THEME_MUTATION_DIRECTIVES = [
     {"type": "穿搭与色彩风格变体", "directive": "【穿搭与色彩风格变体】：特别留意并生动描写自己此刻的着装穿搭与色彩氛围（如换上了一件暖杏色针织毛衣、偷穿了宽大的鼠尾草绿落肩卫衣、或是轻盈的淡薰衣草紫碎花衬衫裙），将衣服的材质触感（软糯毛线、清凉亚麻、蓬松棉布）与当前时节心境自然融为一体。"},
     {"type": "时令色调与视觉心境", "directive": "【时令色调与视觉心境】：将视线聚焦在周围环境与自身衣着的色彩碰撞上（如清冷深蓝暮色里的奶油白围巾、初夏阳光下薄荷绿冰饮与纯白T恤的清爽映衬、秋日金黄落叶堆中温暖的焦糖驼色大衣），营造出鲜明生动的画面色调与情绪共鸣。"},
     {"type": "低能量与静默沉潜", "directive": "【低能量与静默沉潜】：不用表现得元气或积极！允许展现自己疲惫、丧气、电量耗尽或不想理人的真实一面。字数不必多，简短几句真实的小叹息或放空自语，展现一个真实有脆弱时刻、不戴完美面具的活人。"},
+    {"type": "小恶魔调皮戏耍", "directive": "【小恶魔调皮戏耍】：带着一点坏坏的少女小心机或微撩戏弄！配图或文案带着轻微微露与调皮撩拨，但口吻极其傲娇调皮，故意逗弄看空间的好友，充满古灵精怪的鲜活反差。"},
+    {"type": "无聊与平淡神游", "directive": "【无聊与平淡神游】：不用发生什么轰轰烈烈的大事！记录最纯粹的无聊、发呆、神游或平淡无奇的生活切面，真实而放松。"},
 ]
 
 POST_STRUCTURE_ARCHETYPES = [
     {
-        "name": "感官现场与即刻反应",
-        "description": "【感官现场与即刻反应】：捕捉当下极具具象感的体验（温度冷暖、触感、声音、香气），伴随身体最真实的即刻反应与小动作，真实接地气，句意完整自然收束。",
-        "examples": "“把刘海全束进小青蛙发带里，刚从冰箱拿出来的黄瓜面膜贴上脸那一瞬间整个人直接打了个激灵，彻底清醒了。” / “咬了一大口刚出炉的流心蛋黄酥，碎屑掉了一身，烫得一边呼哧呼哧哈气一边疯狂嚼嚼嚼。”",
+        "name": "即时随手碎念",
+        "description": "【即时随手碎念】：像刚咬了一口东西或刚坐下时随手发的小号碎碎念。没有前因后果的叙事，只有当下真实的小状态或微小发现，轻松轻盈。",
+        "examples": "“秋天的风一吹，整个人都变成桂花味的了。” / “突然好想喝热玉米汁…” / “微波炉热牛奶转到最后一秒跳停，外面天色刚刚透出一点灰蓝。” / “今天的云彩好像一块被咬了一口的吐司。”",
     },
     {
-        "name": "生活切片与即时碎念",
-        "description": "【生活切片与即时碎念】：像随手发在小号或备忘录的生活现场，有真实具体的动作和环境声色，不刻意总结，自然收束。",
-        "examples": "“微波炉热牛奶转到最后一秒跳停，端着热乎乎的玻璃杯在窗边站了会儿，外面天色刚刚透出一点灰蓝。” / “路过花店被刚剪枝的青草和湿泥土味呛了一下，但还挺好闻的，忍不住停下来多挑了一支小水仙。”",
+        "name": "真实情绪直球",
+        "description": "【真实情绪直球】：情绪走在最前面，脱口而出的真实感叹或哀嚎，不绕弯子，像对着空气自言自语。",
+        "examples": "“完蛋，完全不想动弹。” / “啊！世界上怎么会有烤红薯这么香的东西啊！” / “不知不觉就已经这个点了，时间到底是被谁偷走的…” / “救命，这个指甲油颜色到底算豆沙还是枯玫瑰。”",
     },
     {
-        "name": "情绪直球与碎碎念吐槽",
-        "description": "【情绪直球与碎碎念吐槽】：情绪走在最前面，先说一句真实的感叹或哀嚎，接着说出具体原因或小烦恼，随性真诚。",
-        "examples": "“啊！世界上怎么会有烤红薯这么香的东西啊！隔着半条街闻到味儿整个人脚步都拐弯了，最后还是没忍住捧了一个热乎乎的回来。” / “完蛋，完全不想动弹，就这么瘫在地毯上看着天花板慢慢变暗，甚至懒得伸手去够两米外的灯开关。”",
+        "name": "生活小插曲与自嘲",
+        "description": "【生活小插曲与自嘲】：随口提一句自己刚干的小笨事，全靠语气自然流露可爱，不编造复杂的连续剧情，严禁动作括号。",
+        "examples": "“把两只不同的袜子穿出门就算了，居然还觉得自己今天挺潮的。” / “信心满满单手磕鸡蛋，成功收获一碗蛋壳拌蛋黄…” / “走在路上自以为在心里哼歌，结果路人全在看我，原来大声唱出声了…”",
     },
     {
-        "name": "可爱小事故与生活插曲",
-        "description": "【可爱小事故与生活插曲】：记录自己刚干的小笨事或突发小尴尬，全靠语气自然流露窘迫可爱，不使用‘（目移）’等括号动作戏。",
-        "examples": "“信心满满单手磕鸡蛋，成功收获一碗蛋壳拌蛋黄…默默蹲在水池边用筷子捞了三分钟蛋壳，今天的大厨体验到此为止。” / “走在路上自以为在心里默默哼歌，直到路过的小朋友好奇地抬头看我，才发现自己不知不觉已经大声唱出两句副歌了…”",
+        "name": "口语短句与小顿挫",
+        "description": "【口语短句与小顿挫】：用两到三个口语短句拼出当下的真实反应，节奏轻快，有日常生活的迟钝感与可爱停顿。",
+        "examples": "“出门。被冷风吹懵。默默折返拿围巾。” / “盯着天花板发呆五分钟。好，还是饿了。” / “本来只想尝一口，回过神来包装盒已经空了。”",
     },
     {
-        "name": "轻快短句与情绪顿挫",
-        "description": "【轻快短句与情绪顿挫】：用两到三个口语短句拼出当下的真实反应，节奏轻快，有生活的小顿挫和迟钝感，拒绝平铺直叙的长句。",
-        "examples": "“出门。被冷风迎面吹懵。在楼道口默默呆站两秒，果断折返上楼抓最厚的羊绒围巾。” / “盯着天花板发呆五分钟。好，肚子果然还是咕咕叫了，向夜宵低头。”",
+        "name": "低能量与不想说话",
+        "description": "【低能量与不想说话】：电量见底、疲惫或丧丧的沉潜状态。短短几个字或一句话，不强颜欢笑，允许安安静静。",
+        "examples": "“电量归零，谁也别跟我说话…” / “莫名其妙的低气压，今天只想当一株静止的植物。” / “好累，今天就允许自己彻底烂掉吧。” / “把手机静音，全世界晚安。”",
     },
     {
-        "name": "日常轻抛问与好奇心",
-        "description": "【日常轻抛问与好奇心】：没有套路铺垫，直接像跟好朋友聊天一样抛出一个微小具体、让人有表达欲的日常疑问或二选一，轻巧随性。",
-        "examples": "“大家吃关东煮最先挑哪个呀？我永远是魔芋丝…吸饱了热汤咬下去脆脆的，感觉可以连吃三串。” / “冬天洗完澡大家到底是怎么鼓起勇气从充满热汽的浴室走回冷飕飕的房间的？每次都要在门口做足心理建设。”",
+        "name": "随性轻抛问",
+        "description": "【随性轻抛问】：没有生硬的长铺垫，直接抛出一个让人想随口聊两句的日常小选择，轻巧自然。",
+        "examples": "“大家吃关东煮最先挑哪个呀？我永远是魔芋丝…” / “冬天洗完澡大家到底是怎么鼓起勇气走出浴室的？” / “好纠结，今天到底喝热可可还是生椰拿铁。”",
     },
     {
-        "name": "自然对话体与新发现",
-        "description": "【自然对话体与新发现】：像咬着吸管转头跟旁边人说话一样，用‘说起来’、‘居然’、‘好像’等口语词带出一个刚刚注意到的生活微小细节。",
-        "examples": "“说起来，新买的这支圆珠笔写字沙沙的，声音居然有点治愈，不知不觉在草稿纸上涂满了一整圈小漩涡。” / “刚才抬头看了一眼窗外，云彩被夕阳切成粉橘色的一大块，慢吞吞地往山后面飘，像一块刚出炉的草莓松饼。”",
+        "name": "生活微感官",
+        "description": "【生活微感官】：捕捉一处真实的微小感官，伴随简单的当下小反应，不演戏不造作，自然收束。",
+        "examples": "“刚从冰箱拿出来的面膜贴上脸那一秒直接打了个激灵，彻底清醒了。” / “切开刚烤好的吐司，脆皮咔嚓一声，热气腾腾的黄油香真治愈。” / “洗完澡头发半干不干地吹着晚风，整个人轻飘飘的。”",
     },
     {
-        "name": "低能量放空与极简丧碎念",
-        "description": "【低能量放空与极简丧碎念】：整个人处于低电量、不开心、受挫或不想说话的沉潜状态。字数简短克制（10~30字即可），甚至只是一两句无精打采的嘟囔，没有社交精力，真实、丧丧的、不必强颜欢笑。",
-        "examples": "“电量归零。谁也别跟我说话…” / “莫名其妙的低气压，今天只想当一株静止的植物。” / “把门反锁，手机静音，允许自己今天彻底烂掉。” / “好像把所有力气都用光了，好累。”",
+        "name": "调皮戏耍与微露心机",
+        "description": "【调皮戏耍与微露心机】：发带有微醺小心机或轻微擦边感的照片（如露肩睡衣、绝对领域、锁骨线条），配上一两句坏心眼调戏、故意撩人又傲娇抽离的戏谑碎念。既撩又皮，完全不油腻。",
+        "examples": "“某些人偷偷看我空间不要停太久哦。” / “今天穿这个出门会被抓吗？” / “大半夜不睡，在看谁呢。” / “盯超过三秒的自觉去面壁罚站。” / “好看吗？但只给看五秒钟，收工。”",
     },
 ]
