@@ -1382,6 +1382,526 @@ MORNING_THEME_POOL = [
             "清晨回味"
         ],
         "sd_hint": "morning, face buried in freshly sun-dried fluffy white duvet, inhaling comforting scent, soft warm pastel lighting, cozy smile"
+    },
+    {
+        "category": "户外自然",
+        "theme": "清晨森林湿地寻鹿：清早穿上防水短靴钻进雾气缭绕的水杉林，靴底踩在松针和落叶上发出轻微沙沙声，林间光柱倾泻，远处刚好有一只小梅花鹿在低头喝露水",
+        "elements": [
+            "水杉林",
+            "森林晨光",
+            "小鹿",
+            "防水短靴",
+            "林间薄雾"
+        ],
+        "sd_hint": "early morning, misty redwood forest, sunlight filtering through tall trees, spotting a deer in distance, wearing cute outdoor jacket and boots, wondrous expression",
+        "id": "m_107"
+    },
+    {
+        "category": "户外自然",
+        "theme": "山间梯田镜面朝霞：破晓时分登上半山腰的观景台，层层叠叠注满清水的灌水梯田倒映着天上瑰丽的粉紫色朝霞，像千百面镶嵌在山脊上的小镜子",
+        "elements": [
+            "梯田朝霞",
+            "山间清晨",
+            "粉紫云彩",
+            "水面倒影",
+            "微凉山风"
+        ],
+        "sd_hint": "dawn, hilltop view overlooking flooded terraced rice paddies reflecting pink sunrise sky, morning breeze fluttering hair, holding travel camera, wide angle scenery",
+        "id": "m_108"
+    },
+    {
+        "category": "户外自然",
+        "theme": "静谧茶园采茶晨光：六点半的翠绿茶山笼罩在乳白色的薄雾里，指尖轻轻掐下带着冰凉晨露的一芽一叶，整片空气都弥漫着极其清洌微苦的茶树清香",
+        "elements": [
+            "茶山晨雾",
+            "采茶",
+            "带露茶叶",
+            "茶香微风",
+            "竹制小背篓"
+        ],
+        "sd_hint": "early morning, lush green terraced tea plantation enveloped in light fog, plucking fresh dew-covered tea leaves, small bamboo basket, smiling softly, natural lighting",
+        "id": "m_109"
+    },
+    {
+        "category": "户外自然",
+        "theme": "高原草原晨骑：骑着温顺的小马漫步在无边无际的微绿草原上，晨光把草尖的白霜一点点晒化成晶莹露珠，远处雪山尖被第一缕阳光镀上一层纯金",
+        "elements": [
+            "高原草原",
+            "晨骑小马",
+            "雪山金顶",
+            "草尖白霜",
+            "辽阔清风"
+        ],
+        "sd_hint": "morning, riding a gentle pony across wide highland meadow, distant snow mountains glowing in golden sunrise, clear blue sky, cozy knit sweater and scarf",
+        "id": "m_110"
+    },
+    {
+        "category": "户外自然",
+        "theme": "岩石海角灯塔眺望：天刚蒙蒙亮就爬上了海角白色灯塔的旋转台阶，海鸥在脚下翻滚的白色浪花上空盘旋，清晨第一声汽笛从遥远的海平线悠扬传来",
+        "elements": [
+            "海角灯塔",
+            "海浪拍岸",
+            "盘旋海鸥",
+            "远方汽笛",
+            "清晨咸凉海风"
+        ],
+        "sd_hint": "early morning dawn, standing on balcony of white coastal lighthouse, sea spray and flying seagulls below, looking out at vast ocean horizon, windblown hair, cinematic",
+        "id": "m_111"
+    },
+    {
+        "category": "户外自然",
+        "theme": "竹海林道清脆竹鸣：清早骑车穿过深深的碧绿竹林，两旁高耸的青竹在风里轻轻摇晃，互相碰撞发出像清泉一样的笃笃竹节鸣响，空气甘甜得让人想深呼吸",
+        "elements": [
+            "竹海",
+            "林间公路",
+            "竹节声响",
+            "晨间骑行",
+            "清新空气"
+        ],
+        "sd_hint": "early morning, riding bicycle through towering green bamboo forest path, shafts of soft morning sunlight, peaceful smile, casual athletic clothes, refreshing breeze",
+        "id": "m_112"
+    },
+    {
+        "category": "户外自然",
+        "theme": "秋日落叶大道慢跑：迎着七点的浅金色晨光慢跑，路两旁高大的法国梧桐落了一地金黄干爽的落叶，每跑一步都能踩出干脆治愈的咔嚓声响",
+        "elements": [
+            "梧桐落叶",
+            "晨跑",
+            "浅金晨光",
+            "落叶声响",
+            "秋凉空气"
+        ],
+        "sd_hint": "autumn morning, jogging along wide boulevard carpeted with golden sycamore leaves, warm morning light, cute running hoodie, energetic flushed cute cheeks",
+        "id": "m_113"
+    },
+    {
+        "category": "户外自然",
+        "theme": "向日葵花田晨露：大清早跑到郊外的向日葵种植园，成百上千株硕大金黄的花盘全都整齐划一地仰面朝着东方，花瓣上挂满圆滚滚的露珠像碎钻一样发亮",
+        "elements": [
+            "向日葵花田",
+            "晨露",
+            "迎着东方",
+            "朝阳金光",
+            "草帽夏装"
+        ],
+        "sd_hint": "early morning, standing among blooming golden sunflower field facing rising sun, large yellow blossoms with sparkling dew, straw hat, sundress, bright warm glow",
+        "id": "m_114"
+    },
+    {
+        "category": "户外自然",
+        "theme": "古运河畔晨钓小憩：坐在古老石拱桥下看早起的老爷爷抛竿钓鱼，河面漂着几片打转的绿色浮萍，两岸白墙黑瓦的屋顶上升起细细的早饭炊烟",
+        "elements": [
+            "古运河",
+            "石拱桥",
+            "晨钓浮萍",
+            "瓦顶炊烟",
+            "水乡清晨"
+        ],
+        "sd_hint": "peaceful morning by ancient canal with stone arch bridge, willow trees, reflections in calm water, watching distant morning life, retro cozy cardigan",
+        "id": "m_115"
+    },
+    {
+        "category": "美食治愈",
+        "theme": "自制厚切焦糖法式吐司：把浸透了香草鸡蛋牛奶汁的厚切吐司放进平底锅，黄油滋滋融化，出锅前撒一层白糖用喷枪燎出焦脆的琥珀色焦糖壳，香甜扑鼻",
+        "elements": [
+            "法式吐司",
+            "黄油滋滋声",
+            "焦糖脆壳",
+            "香草牛奶",
+            "厨房晨光"
+        ],
+        "sd_hint": "morning cozy kitchen, plating thick golden French toast with caramelized crust, maple syrup dripping, apron over pajama shirt, joyful domestic atmosphere",
+        "id": "m_116"
+    },
+    {
+        "category": "美食治愈",
+        "theme": "柴火土灶熬南瓜小米粥：清晨在农家小院里揭开大铁锅盖，金黄浓稠的小米粥咕嘟咕嘟冒着大泡，粉糯甜润的老南瓜块已经完全化在粥里，暖透手心",
+        "elements": [
+            "大铁锅南瓜粥",
+            "农家晨炊",
+            "热气腾腾",
+            "小米粥香",
+            "瓷碗暖手"
+        ],
+        "sd_hint": "early morning rustic kitchen, holding steaming ceramic bowl of golden pumpkin millet porridge, warm rising steam, cozy wooden table, gentle happy smile",
+        "id": "m_117"
+    },
+    {
+        "category": "美食治愈",
+        "theme": "手压冷萃茉莉柑橘美式：从冰箱拿出冷藏浸泡了一整夜的茉莉花茶与冷萃咖啡液，倒在装满透明老冰块的玻璃杯里，切一片鲜橙挂在杯沿，清脆撞冰声叫醒整个人",
+        "elements": [
+            "冷萃美式",
+            "茉莉花茶",
+            "老冰块撞击",
+            "切片鲜橙",
+            "晨间提神"
+        ],
+        "sd_hint": "bright morning kitchen, pouring iced cold brew coffee with orange slice and jasmine tea into glass with large ice cube, condensation on glass, refreshed expression",
+        "id": "m_118"
+    },
+    {
+        "category": "美食治愈",
+        "theme": "街角生煎包第一锅出炉：排队等七点开锅的那一锅生煎，老板刷油撒黑芝麻和翠绿葱花，一掀木锅盖白雾瞬间漫过头顶，焦脆金黄的底部咬一口满嘴肉汁鲜甜",
+        "elements": [
+            "街角生煎包",
+            "掀锅热气",
+            "黑芝麻葱花",
+            "焦脆金黄",
+            "早餐烟火气"
+        ],
+        "sd_hint": "morning street food stall, steam billowing from large cast iron pan of frying pan-fried buns sprinkled with scallions and sesame, holding paper takeaway bag",
+        "id": "m_119"
+    },
+    {
+        "category": "美食治愈",
+        "theme": "酸奶燕麦水果隔夜罐开盖：昨晚精心分层铺好的希腊酸奶、奇亚籽、覆盆子与蓝莓，冷藏一夜后变得像冰淇淋一样绵密浓郁，上面撒上一把香脆烤坚果",
+        "elements": [
+            "隔夜燕麦杯",
+            "希腊酸奶",
+            "新鲜蓝莓覆盆子",
+            "烤坚果脆",
+            "健康早餐"
+        ],
+        "sd_hint": "morning dining table, holding a glass mason jar filled with colorful overnight oats layers and fresh berries, wooden spoon, cozy casual outfit, morning sunlight",
+        "id": "m_120"
+    },
+    {
+        "category": "美食治愈",
+        "theme": "老式红豆豆沙小圆子：大早晨煮了一碗热气腾腾的红豆沙小圆子，糯米圆子一颗颗浮在浓郁暗红的沙沙红豆汤上，撒两撮干桂花，甜香一路钻进心窝",
+        "elements": [
+            "红豆沙小圆子",
+            "干桂花甜香",
+            "软糯小圆子",
+            "白瓷小碗",
+            "暖胃甜汤"
+        ],
+        "sd_hint": "warm morning breakfast, eating sweet red bean soup with chewy rice balls topped with osmanthus flowers, soft morning light, cozy oversized sweater",
+        "id": "m_121"
+    },
+    {
+        "category": "生活仪式",
+        "theme": "新拆封水彩画本的第一笔水痕：清晨在书桌前裁开一本崭新的 300g 纯棉水彩纸，羊毛排笔饱蘸清水刷过纸面，晕开一滴钴蓝色，看着颜料像烟雾一样在纸上自由蔓延",
+        "elements": [
+            "纯棉水彩纸",
+            "水痕蔓延",
+            "钴蓝颜料",
+            "羊毛排笔",
+            "晨光书桌"
+        ],
+        "sd_hint": "bright morning study room, painting first stroke of cobalt blue watercolor on fresh textured paper, delicate paintbrushes, art studio vibe, concentrated gentle smile",
+        "id": "m_122"
+    },
+    {
+        "category": "生活仪式",
+        "theme": "清早彻底换掉一套薰衣草纯棉床单：把洗得干爽泛着太阳香气的浅紫色床单展开甩在空中，床单像降落伞一样鼓起蓬松弧度缓缓落平，整间卧室都是阳光晒过的气味",
+        "elements": [
+            "换新床单",
+            "薰衣草紫色",
+            "太阳香气",
+            "蓬松被套",
+            "清晨整理"
+        ],
+        "sd_hint": "morning bedroom, spreading fresh lavender-scented cotton bedsheets over mattress, sunlit cozy room, laundry basket nearby, cheerful bright vibe",
+        "id": "m_123"
+    },
+    {
+        "category": "生活仪式",
+        "theme": "把所有多肉植物搬去晒第一缕全光谱日光：七点钟小心翼翼把窗台上的玉露、生石花和桃蛋小花盆全搬到朝南的花架上，用小气吹仔细吹掉叶片缝隙里的浮灰",
+        "elements": [
+            "多肉玉露",
+            "阳光花架",
+            "小气吹吹灰",
+            "圆滚滚桃蛋",
+            "早间植物养护"
+        ],
+        "sd_hint": "morning balcony, tending to rows of cute succulent plants in terracotta pots, holding tiny rubber air blower, gentle morning sunbeams, cozy domestic scene",
+        "id": "m_124"
+    },
+    {
+        "category": "生活仪式",
+        "theme": "给旧胶皮相机装上一卷新日光胶卷：咔哒一声扣上胶片机后盖，小心翼翼拨动过片扳手直到计数器归到数字一，按下快门听见一声清脆金属撞击，期待今天的每一张抓拍",
+        "elements": [
+            "胶片机",
+            "装胶卷",
+            "过片扳手",
+            "快门清脆声",
+            "出门准备"
+        ],
+        "sd_hint": "morning room, loading fresh 35mm film into vintage mechanical camera, holding camera near window light, vintage aesthetic, creative artsy outfit",
+        "id": "m_125"
+    },
+    {
+        "category": "生活仪式",
+        "theme": "晨光中手写今天的无压力小愿望便签：撕下一张嫩黄色的小便签纸，用黑色墨水钢笔在上面写下'去买一束雏菊'、'喝一杯好喝的热燕麦'，字迹在光线里缓缓风干",
+        "elements": [
+            "手写小便签",
+            "黑色钢笔字",
+            "晨光书桌",
+            "无压力愿望",
+            "黄绿色雏菊"
+        ],
+        "sd_hint": "sunlit desk, writing a daily to-do wish note with fountain pen, cute stationary accessories, mug with steam, focused sweet expression",
+        "id": "m_126"
+    },
+    {
+        "category": "生灵萌宠",
+        "theme": "小鸟在纱窗外啄花盆小泥土：刚拉开窗帘，就看见两只羽毛毛茸茸的灰头小山雀在阳台迷迭香花盆里跳来跳去，脑袋一歪一歪地啄土找小种子，可爱到不敢大声出气",
+        "elements": [
+            "窗台小山雀",
+            "迷迭香花盆",
+            "毛茸茸歪头",
+            "纱窗晨光",
+            "屏息观察"
+        ],
+        "sd_hint": "early morning bedroom, peeking through sheer curtain at tiny birds perched on potted plant on balcony, wide curious eyes, soft morning glow, peaceful and cute",
+        "id": "m_127"
+    },
+    {
+        "category": "生灵萌宠",
+        "theme": "小猫把下巴搁在拖鞋上踩奶打呼：刚从床沿伸下一只脚，脚背就被一团毛茸茸的热源贴住了，小家伙一边发出拖拉机一样满足的呼噜声，一边闭着眼睛踩我的绒毛拖鞋",
+        "elements": [
+            "小猫踩奶",
+            "拖拉机呼噜",
+            "绒毛拖鞋",
+            "早晨撒娇",
+            "暖烘烘猫毛"
+        ],
+        "sd_hint": "morning bedroom, cute fluffy cat rubbing chin against fuzzy slipper, purring happily, girl sitting on edge of bed looking down affectionately, cozy soft aesthetic",
+        "id": "m_128"
+    },
+    {
+        "category": "生灵萌宠",
+        "theme": "草坪上追着肥皂泡撒欢的萨摩耶：清早在公园散步，旁边有一只雪白像大棉花糖一样的萨摩耶犬正蹦跶着去追路人吹出的大泡泡，两只立耳抖动，咧着嘴笑得像个小太阳",
+        "elements": [
+            "萨摩耶微笑",
+            "彩色肥皂泡",
+            "晨间公园草坪",
+            "白棉花糖大狗",
+            "治愈活力"
+        ],
+        "sd_hint": "bright morning park lawn, watching joyful white Samoyed dog playfully jumping after rainbow soap bubbles, dewy grass, laughter, cute sporty casual clothes",
+        "id": "m_129"
+    },
+    {
+        "category": "城市漫游",
+        "theme": "搭乘清晨第一班复古地面有轨电车：六点半坐上空无一人的复古绿皮电车靠窗位，车轮碾在铁轨上发出叮叮当当的节奏声，车窗外整座城市正在晨光中缓缓苏醒",
+        "elements": [
+            "复古有轨电车",
+            "靠窗空座",
+            "铁轨叮咚声",
+            "晨光街道",
+            "城市苏醒"
+        ],
+        "sd_hint": "early morning, sitting inside vintage green tram by sunny window, empty wooden seats, golden sunlight streaming in, looking out at quiet awakening city streets",
+        "id": "m_130"
+    },
+    {
+        "category": "城市漫游",
+        "theme": "清早花卉批发市场的繁花海洋：七点钻进巨大的花卉交易市场，刚卸货的卡车旁全是整箱带着水珠的粉白绣球、香雪兰与重瓣洋牡丹，满地碎花瓣踩起来软绵绵",
+        "elements": [
+            "花卉批发市场",
+            "整箱洋牡丹",
+            "露珠绣球花",
+            "花香扑鼻",
+            "晨间寻宝"
+        ],
+        "sd_hint": "morning wholesale flower market, surrounded by massive crates and buckets of blooming peonies and hydrangeas with water drops, holding bouquet, joyful bright atmosphere",
+        "id": "m_131"
+    },
+    {
+        "category": "户外自然",
+        "theme": "晨光穿透云海的索道缆车：清晨七点坐上通往云端峰顶的红色全景缆车，脚下是翻滚如雪白波浪的浩瀚云海，阳光突然从云缝里喷薄而出把缆车轿厢染成粉金",
+        "elements": [
+            "全景索道缆车",
+            "脚下浩瀚云海",
+            "喷薄金色阳光",
+            "红白轿厢",
+            "高空壮阔风景"
+        ],
+        "sd_hint": "early morning, riding red scenic cable car high above endless rolling white sea of clouds, morning sunbeams piercing through mist, breathtaking expansive vista",
+        "id": "m_132"
+    },
+    {
+        "category": "户外自然",
+        "theme": "初冬湖面薄冰脆响：湖边浅滩结了一层薄如蝉翼的透明晨冰，拾起一小颗圆石子轻轻滑过去，石子在冰面上擦出一连串像小水琴一样清脆悦耳的滑冰回音",
+        "elements": [
+            "透明薄冰",
+            "石子滑击",
+            "清脆冰音",
+            "初冬晨湖",
+            "呵出的白气"
+        ],
+        "sd_hint": "early winter morning, standing by tranquil lake with thin transparent ice sheet at shore, tossing smooth pebble across ice, warm woolen coat, earmuffs, breath misty in air",
+        "id": "m_133"
+    },
+    {
+        "category": "户外自然",
+        "theme": "晨光中静止的玻璃海皮划艇：清晨六点的珊瑚海湾平静得没有一丝褶皱，透明皮划艇悬浮在如同果冻一般的碧蓝海水上，能一眼看清水底彩色小鱼和斑斓珊瑚礁",
+        "elements": [
+            "透明皮划艇",
+            "果冻玻璃海",
+            "海底彩色小鱼",
+            "晨光珊瑚礁",
+            "清澈宁静"
+        ],
+        "sd_hint": "early morning, sitting in clear bottom kayak floating on glass-like turquoise shallow ocean lagoon, vibrant coral reef and tropical fish visible beneath, sun hat, pristine calm",
+        "id": "m_134"
+    },
+    {
+        "category": "美食治愈",
+        "theme": "自己研磨肉桂粉撒在热卡布奇诺奶沫上：手摇研磨机转动时发出微脆的木质声响，一小匙现磨肉桂粉轻扬在厚厚绵密的白色奶泡顶端，捧起杯子闻一口瞬间清醒暖和",
+        "elements": [
+            "热卡布奇诺",
+            "现磨肉桂粉",
+            "绵密厚奶泡",
+            "手摇研磨机",
+            "木质餐桌"
+        ],
+        "sd_hint": "morning coffee table, dusting freshly ground cinnamon over thick pillowy foam of hot cappuccino, ceramic coffee cup held in two hands, cozy morning lighting",
+        "id": "m_135"
+    },
+    {
+        "category": "美食治愈",
+        "theme": "刚出炉手工黑糖肉桂卷开撕：烤箱叮的一声弹开门，铺满整盘的螺旋肉桂卷表面淋着洁白乳酪糖霜，糖霜正随着滚烫的余温慢慢融化渗进层层松软的面包纹理里",
+        "elements": [
+            "黑糖肉桂卷",
+            "融化乳酪糖霜",
+            "刚出炉烤箱",
+            "浓郁肉桂甜香",
+            "撕开拉丝"
+        ],
+        "sd_hint": "morning bakery kitchen, lifting a warm swirled cinnamon roll covered in melting cream cheese glaze, steam rising, sweet satisfied smile, apron",
+        "id": "m_136"
+    },
+    {
+        "category": "美食治愈",
+        "theme": "手冲柴鱼高汤茶泡饭：热腾腾的米饭上整齐码着烤得焦香金黄的鲑鱼碎、海苔丝与白芝麻，提起小铜壶把滚烫澄清的昆布柴鱼高汤沿碗边淋下，滋滋香气腾起",
+        "elements": [
+            "日式茶泡饭",
+            "柴鱼昆布高汤",
+            "烤鲑鱼碎",
+            "海苔芝麻",
+            "小铜壶淋汤"
+        ],
+        "sd_hint": "traditional morning breakfast, pouring steaming dashi broth from copper kettle over rice bowl topped with grilled salmon and nori strips, tranquil morning light",
+        "id": "m_137"
+    },
+    {
+        "category": "生活仪式",
+        "theme": "给窗台玻璃彩绘贴纸晒出彩虹光斑：把新买的三棱镜水晶吊坠挂在卧室朝东的窗沿上，八点钟太阳一照，整面白墙和地毯上瞬间跃动起几十个五彩斑斓的小彩虹光斑",
+        "elements": [
+            "三棱镜水晶挂件",
+            "彩虹光斑",
+            "晨光折射",
+            "白墙地毯跳跃",
+            "神奇光影"
+        ],
+        "sd_hint": "sunlit bright bedroom, delicate suncatcher crystal prism hanging by window casting dazzling rainbow spectrum spots all over wall and wooden floor, reaching out in wonder",
+        "id": "m_138"
+    },
+    {
+        "category": "生活仪式",
+        "theme": "清早挑选一枚今天要带出门的可爱胸针：打开绒布饰品盒，在一排金属珐琅小徽章里挑出了一只抱着小榛果的松鼠胸针，端端正正别在米白色毛呢开衫的左襟上",
+        "elements": [
+            "金属珐琅胸针",
+            "松鼠抱榛果",
+            "毛呢开衫",
+            "挑选饰品",
+            "出门精致感"
+        ],
+        "sd_hint": "morning bedroom vanity, pinning a cute enamel acorn squirrel brooch onto lapel of cream knit cardigan, looking in mirror, satisfied sweet smile",
+        "id": "m_139"
+    },
+    {
+        "category": "生活仪式",
+        "theme": "早起擦亮一面复古圆木梳妆镜：用柔软的纯棉布蘸一点清水把梳妆镜擦得纤尘不染，镜子里清晰映出晨光、窗外摇曳的绿叶和自己刚刚梳整齐的一头柔顺秀发",
+        "elements": [
+            "复古圆镜",
+            "擦拭镜面",
+            "明亮清晰",
+            "晨光绿叶倒影",
+            "秀发清爽"
+        ],
+        "sd_hint": "morning vanity, wiping round wooden mirror clean with soft cloth, mirror reflection showing soft morning sunshine and girl brushing hair, tidy aesthetic bedroom",
+        "id": "m_140"
+    },
+    {
+        "category": "生活仪式",
+        "theme": "给小阳台薄荷与罗勒摘心插瓶：剪下三根长势茂盛的青翠薄荷尖，泡进盛满凉白开的透明小玻璃烧杯里摆在书桌一角，满屋子都是让人精神一振的清凉草本香",
+        "elements": [
+            "摘心薄荷",
+            "透明小烧杯",
+            "草本清香",
+            "书桌水培",
+            "绿色生机"
+        ],
+        "sd_hint": "morning study room, placing fresh green mint cuttings into glass beaker with water on wooden desk, refreshing green herb scent, sunny window backdrop",
+        "id": "m_141"
+    },
+    {
+        "category": "生灵萌宠",
+        "theme": "清早在院子里给野鸟小木屋添杂粮谷物：往树桠上挂着的红顶小木屋里撒上一小把葵花籽和碎玉米粒，刚退后三步，两只小麻雀就叽叽喳喳飞下来开心地啄食",
+        "elements": [
+            "野鸟小木屋",
+            "葵花籽杂粮",
+            "小麻雀欢跃",
+            "树荫晨光",
+            "默默守护"
+        ],
+        "sd_hint": "morning backyard garden, filling cute wooden bird feeder hanging from tree with sunflower seeds, tiny sparrows perching nearby, gentle nature loving smile",
+        "id": "m_142"
+    },
+    {
+        "category": "生灵萌宠",
+        "theme": "小狗早晨叼着自己最爱的小毛绒骨头来拱被角：还在半睡半醒，被窝旁边就伸进来一颗湿漉漉的小黑鼻子，嘴里还牢牢叼着它被洗得发白的小胡萝卜玩偶摇尾巴",
+        "elements": [
+            "小狗湿漉漉鼻子",
+            "小胡萝卜玩偶",
+            "摇尾巴叫醒",
+            "晨间撒娇",
+            "宠溺互动"
+        ],
+        "sd_hint": "early morning in bed, cute puppy poking nose under quilt holding a soft plush carrot toy, wagging tail, girl giggling affectionately, morning sunbeams",
+        "id": "m_143"
+    },
+    {
+        "category": "城市漫游",
+        "theme": "清晨空旷的海滨公路单车追风：骑着复古单车在刚被清洁车冲刷过的宽阔沿海公路上飞驰，车筐里放着刚买的长棍面包和保温杯，海风把外衫吹得像风帆一样鼓起",
+        "elements": [
+            "海滨公路",
+            "单车飞驰",
+            "车筐法棍面包",
+            "海风呼啸",
+            "自由畅快"
+        ],
+        "sd_hint": "morning, riding bicycle along wide open coastal highway next to blue ocean, fresh baguette in front basket, wind fluttering light summer cardigan, ecstatic joyful expression",
+        "id": "m_144"
+    },
+    {
+        "category": "城市漫游",
+        "theme": "老城区清晨第一间旧书店翻新开门：路过老巷子里那家开了三十年的木门旧书店，白发店主刚好推开厚重木板门，一股混合着古老纸张、油墨和檀木香的古旧气息扑面而来",
+        "elements": [
+            "老旧书店开门",
+            "旧书墨香",
+            "巷道清晨",
+            "泛黄书页",
+            "偶遇寻宝"
+        ],
+        "sd_hint": "quiet morning alleyway, stepping into vintage second-hand bookstore just opening its wooden doors, shelves packed with antique books, dust motes in sunbeams",
+        "id": "m_145"
+    },
+    {
+        "category": "城市漫游",
+        "theme": "社区小菜场挑拣水灵灵带露小番茄：清早七点半跟着拎菜篮的阿姨们在菜摊前挑小番茄，红彤彤圆滚滚的小果子还沾着清晨喷水机留下的细密水雾，蒂头翠绿欲滴",
+        "elements": [
+            "水灵小番茄",
+            "晨间菜市场",
+            "细密喷雾",
+            "翠绿蒂头",
+            "挑选新鲜"
+        ],
+        "sd_hint": "morning local farmer market, handpicking bright red cherry tomatoes with fresh water droplets from wooden crate, cute canvas tote bag, vibrant colorful stall",
+        "id": "m_146"
     }
 ]
 
@@ -2685,6 +3205,422 @@ NIGHT_THEME_POOL = [
             "准备入梦"
         ],
         "sd_hint": "night, cozy bed, thick duvet tucked all the way up to chin, eyes softly fluttering shut, dark tranquil bedroom with faint starlight"
+    },
+    {
+        "category": "自然风景",
+        "theme": "静谧森林溪流畔的荧光夜游：盛夏午夜沿着潺潺林间小溪漫步，水面上升腾起一层薄薄的青色凉气，溪边石头缝和蕨类叶片下亮起一片片荧绿色的小萤火点",
+        "elements": [
+            "林间溪流",
+            "冷色薄雾",
+            "草丛萤火",
+            "夜晚水声潺潺",
+            "手电筒光晕"
+        ],
+        "sd_hint": "midnight, walking by tranquil forest stream surrounded by glowing green fireflies, mist over running water, holding small vintage flashlight, wondrous serene expression",
+        "id": "n_101"
+    },
+    {
+        "category": "自然风景",
+        "theme": "山崖露营帐篷看漫天银河悬挂：帐篷门帘卷起，仰头就是没有一丝城市光害的澄澈夜空，银河像一条倾倒的钻石河流横跨天幕，两颗流星划过山峦剪影",
+        "elements": [
+            "山顶帐篷",
+            "璀璨银河",
+            "流星划过",
+            "山峦剪影",
+            "露营地灯暖光"
+        ],
+        "sd_hint": "late night, sitting inside warm cozy camping tent looking out at magnificent glowing Milky Way arching across dark mountain sky, shooting star, thermos bottle in hands",
+        "id": "n_102"
+    },
+    {
+        "category": "自然风景",
+        "theme": "夜间海潮荧光泪水波：站在海浪轻拍脚背的礁石浅滩，随着海水一波波涌上来，浪花边缘在夜色里泛起一圈圈梦幻惊艳的幽蓝色荧光生物冷光",
+        "elements": [
+            "荧光海浪",
+            "幽蓝冷光",
+            "礁石浅滩",
+            "夜间潮水声",
+            "赤脚踩水"
+        ],
+        "sd_hint": "night, standing barefoot on beach watching bio-luminescent blue glowing waves crashing gently on wet sand, deep indigo ocean, starry sky, ethereal magical aesthetic",
+        "id": "n_103"
+    },
+    {
+        "category": "自然风景",
+        "theme": "初雪降临深夜的庭院寂静：十二点推开窗，黑夜里正无声无息飘着鹅毛大雪，院子里的石灯笼和松树枝上已经积了一层松软厚实的白雪，整座世界安静得只剩雪花落下的声音",
+        "elements": [
+            "深夜初雪",
+            "无声鹅毛雪",
+            "松树积雪",
+            "石灯笼",
+            "纯白静谧"
+        ],
+        "sd_hint": "late night, looking out open wooden window at quiet courtyard covered in thick freshly fallen white snow, snow falling silently, cozy woolen shawl, peaceful serene face",
+        "id": "n_104"
+    },
+    {
+        "category": "自然风景",
+        "theme": "秋夜田野薄雾与巨大金黄秋月：深夜漫步在空旷的收割后稻田边，低悬在地平线上方的秋季满月大得惊人，散发出蜜糖一样的琥珀金光，把草尖夜雾照得通透",
+        "elements": [
+            "巨大秋月",
+            "琥珀金光",
+            "田野夜雾",
+            "收割后草垛",
+            "深秋夜凉"
+        ],
+        "sd_hint": "autumn night, standing in harvested field gazing at massive glowing golden harvest moon rising above horizon, misty ground, warm coat and scarf, cinematic lighting",
+        "id": "n_105"
+    },
+    {
+        "category": "居家治愈",
+        "theme": "深夜炉火旁烤棉花糖热红酒：用小长签串着白白胖胖的棉花糖在壁炉碳火上烤到表皮焦黄微融，搭配一杯煮透了肉桂棒、八角与橙皮的无酒精温热红酒，暖透脚尖",
+        "elements": [
+            "烤焦糖棉花糖",
+            "无酒精热红酒",
+            "壁炉炭火暖意",
+            "肉桂八角香",
+            "羊毛袜子"
+        ],
+        "sd_hint": "cozy night by warm glowing fireplace, roasting fluffy marshmallow on a stick until golden brown, mug of steaming spiced mulled wine beside, thick knit socks",
+        "id": "n_106"
+    },
+    {
+        "category": "居家治愈",
+        "theme": "深夜点燃香薰石膏滴入佛手柑精油：关掉所有大灯，只在小托盘里滴下三滴佛手柑与雪松复配精油，清冽又微甜的木质柑橘香气随着夜风缓缓沉降在枕边",
+        "elements": [
+            "香薰石膏",
+            "佛手柑雪松精油",
+            "关灯微暗",
+            "夜间沉静",
+            "枕边香气"
+        ],
+        "sd_hint": "dim night bedroom, dropping essential oil onto ceramic aroma diffuser stone, soft ambient warm lamp, relaxed sleepy gentle expression, comfortable silk pajamas",
+        "id": "n_107"
+    },
+    {
+        "category": "居家治愈",
+        "theme": "深夜慢节奏手冲低因洋甘菊热奶：奶锅里小火咕嘟煮着干洋甘菊花苞与鲜牛奶，过滤后倒进宽口陶杯，用细勺淋上一圈野椴树蜂蜜，喝完全身毛孔都舒展开来",
+        "elements": [
+            "洋甘菊热牛奶",
+            "细火慢煮",
+            "椴树蜂蜜",
+            "宽口陶杯",
+            "舒缓身心"
+        ],
+        "sd_hint": "night cozy kitchen, pouring steaming chamomile hot milk from small saucepan through strainer into ceramic mug, honey jar, sleepy calm smile, dim warm lighting",
+        "id": "n_108"
+    },
+    {
+        "category": "居家治愈",
+        "theme": "在厚地毯上拼完一千片日系插画拼图的最后一块：盘腿坐在地毯上三个小时，终于把绘着向日葵花田的拼图最后一片空缺咔哒一声严丝合缝嵌进去，巨大的成就感油然而生",
+        "elements": [
+            "千片拼图完成",
+            "地毯盘腿",
+            "严丝合缝最后一击",
+            "台灯柔光",
+            "心满意足"
+        ],
+        "sd_hint": "late night floor, sitting cross-legged on plush rug putting final piece into completed large colorful jigsaw puzzle on low table, joyful victorious cute expression",
+        "id": "n_109"
+    },
+    {
+        "category": "居家治愈",
+        "theme": "午夜重温小时候看过的精装童话书插画：靠在堆满靠枕的床头翻开一本泛黄的大开本插画童话，指尖抚摸着磨砂质感的铜版纸，画里的城堡与小精灵在暖黄台灯下仿佛会呼吸",
+        "elements": [
+            "精装童话书",
+            "童年插画",
+            "铜版纸手感",
+            "床头靠枕堆",
+            "怀旧安宁"
+        ],
+        "sd_hint": "late night in bed propped up by big fluffy pillows, turning pages of a large vintage illustrated fairy tale book under soft bedside lamp, dreamy soft nostalgic eyes",
+        "id": "n_110"
+    },
+    {
+        "category": "夜游漫行",
+        "theme": "深夜二十四小时无人花房看夜昙花初绽：半夜轻手轻脚推开街角玻璃花房的小门，角落里那盆罕见的夜昙花正以肉眼可见的速度缓缓舒展雪白修长的花瓣，幽香四溢",
+        "elements": [
+            "夜昙花绽放",
+            "无人玻璃花房",
+            "雪白花瓣舒展",
+            "夜半幽香",
+            "屏息见证"
+        ],
+        "sd_hint": "midnight, inside glass greenhouse, watching a rare white night-blooming cereus flower slowly opening petals, gentle ambient lanterns, breathtaking mystical beauty",
+        "id": "n_111"
+    },
+    {
+        "category": "夜游漫行",
+        "theme": "深夜天桥栏杆俯瞰车流红色尾灯河流：站在横跨主干道的空旷人行天桥上，微凉夜风迎面吹拂，桥下川流不息的红色汽车尾灯在长曝光般的视野里汇成一条温暖的红色光河",
+        "elements": [
+            "人行天桥",
+            "车流红色尾灯",
+            "俯瞰城市夜景",
+            "夜风吹拂发丝",
+            "开阔心绪"
+        ],
+        "sd_hint": "night, leaning on railing of pedestrian bridge over busy highway, looking down at long trails of glowing red car lights, windy night, casual trench coat, thoughtful peaceful gaze",
+        "id": "n_112"
+    },
+    {
+        "category": "夜游漫行",
+        "theme": "深夜古老石桥看一轮水中摇晃碎月：古镇的游人全都散尽了，坐在青石板桥墩边缘，一轮皎洁的满月正好落在水中央，偶尔游过的一条小鱼把圆月撞成一圈圈波光粼粼的碎银",
+        "elements": [
+            "青石桥墩",
+            "水中倒映碎月",
+            "古镇静谧夜",
+            "波光银光",
+            "垂脚看水"
+        ],
+        "sd_hint": "night at ancient water town, sitting on stone bridge with legs dangling, watching bright moon reflection ripple on dark water surface, quiet traditional lanterns",
+        "id": "n_113"
+    },
+    {
+        "category": "夜游漫行",
+        "theme": "十二点在空无一人的天台晾干头发：洗完热水澡抱着毛巾爬上顶楼天台，躺在露天折叠椅上，夜风温柔地穿过发丝一点点把头发吹得蓬松轻盈，远方是整座城市的点点星火",
+        "elements": [
+            "天台露天躺椅",
+            "晾干长发",
+            "洗发水清香",
+            "城市夜景远眺",
+            "彻底放松"
+        ],
+        "sd_hint": "midnight, relaxing on lounge chair on open rooftop, holding towel around damp hair, breeze drying hair, glittering city skyline far below, pajamas, pure tranquil serenity",
+        "id": "n_114"
+    },
+    {
+        "category": "夜游漫行",
+        "theme": "深夜在老唱片店试听区戴大耳机听黑胶爵士乐：街角转弯处那家快打烊的黑胶店里，戴上厚重的复古头戴式大耳机，唱针落在黑胶凹槽里的轻微炒豆杂音引出一段慵懒萨克斯",
+        "elements": [
+            "黑胶唱片店",
+            "头戴式大耳机",
+            "炒豆杂音",
+            "慵懒爵士乐",
+            "深夜温暖角落"
+        ],
+        "sd_hint": "late night, inside vintage vinyl record shop, wearing retro over-ear headphones, listening to spinning record, warm dim lighting, relaxed bliss expression",
+        "id": "n_115"
+    },
+    {
+        "category": "睡意萌生",
+        "theme": "猫咪肚皮热烘烘贴在腰间呼噜震动：整个人刚窝进被窝，小猫就从被尾熟练地钻进来，把整个热腾腾软绵绵的小肚皮紧紧贴在我的腰侧，像揣着一个会发出共鸣震动的小暖炉",
+        "elements": [
+            "猫咪贴肚皮",
+            "腰间热源",
+            "呼噜共鸣震动",
+            "暖融融被窝",
+            "安心熟睡"
+        ],
+        "sd_hint": "late night bedroom, lying under soft duvet with cute sleeping cat snuggled against waist purring, dim warm nightlight, drowsy content smile, absolute warmth",
+        "id": "n_116"
+    },
+    {
+        "category": "睡意萌生",
+        "theme": "戴上毛绒发带敷一片冰镇黄瓜晚安面膜：洗漱完毕用小青蛙毛绒发带把刘海全束在脑后，敷上一片带着淡淡黄瓜水润清香的冰凉补水面膜，闭着眼听舒缓的白噪音水滴声",
+        "elements": [
+            "毛绒发带束发",
+            "黄瓜晚安面膜",
+            "冰凉水润",
+            "白噪音水滴",
+            "睡前护肤"
+        ],
+        "sd_hint": "late night bedroom, wearing cute plush frog headband, applying hydrating sheet mask, resting head on fluffy pillow with eyes closed, soothing skincare routine",
+        "id": "n_117"
+    },
+    {
+        "category": "睡意萌生",
+        "theme": "把明天要背的小挎包拉链拉好端正摆好：把钥匙、润唇膏、小纸巾和耳机整整齐齐码进包里，拉上拉链端正放在床头柜上，心里踏踏实实地关掉台灯准备进入无梦的好觉",
+        "elements": [
+            "收拾明天挎包",
+            "摆放床头柜",
+            "井井有条安心",
+            "关灯前一秒",
+            "平静舒坦"
+        ],
+        "sd_hint": "late night, placing neatly packed cute crossbody bag on bedside table, turning off lamp switch, dark room lit by moonlight, stretching sleepily into bed",
+        "id": "n_118"
+    },
+    {
+        "category": "睡意萌生",
+        "theme": "窗外夜间慢速洒水车播着老八音盒调子：深夜一点整条马路只有那辆慢吞吞的橙色洒水车，水幕哗哗刷过地面，八音盒音乐顺着夜风从远到近又慢慢远去，听得人眼皮越来越沉",
+        "elements": [
+            "夜间洒水车",
+            "八音盒老旋律",
+            "水刷过地面声",
+            "由远及近夜音",
+            "沉沉困意"
+        ],
+        "sd_hint": "late night bedroom, peeking drowsily through curtains at empty street glistening with water from passing street sweeper truck, sleepy eyes, cozy atmosphere",
+        "id": "n_119"
+    },
+    {
+        "category": "睡意萌生",
+        "theme": "把冰凉脚丫终于暖热在热水袋柔软绒套里：冬天钻进冰冷被窝把双脚伸进毛茸茸的小羊造型热水袋套里，那一股持续温厚的暖意顺着小腿一路传遍全身，惬意得忍不住叹气",
+        "elements": [
+            "小羊热水袋",
+            "绒毛布套",
+            "双脚暖热",
+            "惬意舒缓叹息",
+            "融化在被窝里"
+        ],
+        "sd_hint": "winter night in bed, hugging plush sheep hot water bottle under fluffy quilt, cheeks flushed warm, peaceful sleepy face drifting into sweet dreams",
+        "id": "n_120"
+    },
+    {
+        "category": "自然风景",
+        "theme": "静坐码头木桩听潮水轻轻拍岸：深夜坐在空无一人的渔港旧木桩上，双腿悬空，海水在脚下一米深处缓慢地涨落拍打着长满青苔的石岸，整片海湾只有规律的浪潮水声",
+        "elements": [
+            "码头旧木桩",
+            "潮水规律拍岸",
+            "长满青苔石岸",
+            "咸湿夜风",
+            "放空双腿"
+        ],
+        "sd_hint": "midnight, sitting on wooden pier dock with legs hanging over calm dark ocean water, gentle ripples reflecting moon, wind in oversized sweater, contemplative serenity",
+        "id": "n_121"
+    },
+    {
+        "category": "自然风景",
+        "theme": "初秋晚风吹过山顶芦苇荡沙沙作响：天黑后登上城市边缘的小山坡，整片白茫茫的芦苇穗在凉爽的夜风中齐刷刷倒伏又扬起，发出像海潮一样连绵不绝的沙沙声响",
+        "elements": [
+            "山顶芦苇荡",
+            "夜风吹拂",
+            "白茫茫芦苇穗",
+            "波涛般沙沙声",
+            "辽阔宁静"
+        ],
+        "sd_hint": "night, standing in vast field of tall silvery reeds swaying in autumn wind under clear starry sky, holding soft knit scarf, poetic peaceful atmosphere",
+        "id": "n_122"
+    },
+    {
+        "category": "自然风景",
+        "theme": "山涧温泉池雾气蒸腾与仰望冷月：整个人浸泡在热气腾腾的露天天然硫磺温泉里，周围石头上落着冰凉露水，热气化作白雾蒸腾而上，透过水雾仰望挂在冷杉树顶的一轮细月",
+        "elements": [
+            "露天天然温泉",
+            "热气蒸腾白雾",
+            "冷月树影",
+            "冷热交织舒坦",
+            "彻底洗净疲劳"
+        ],
+        "sd_hint": "night, soaking in open-air hot spring surrounded by smooth rocks and pine trees, warm steam rising around, looking up at crescent moon through mist, serene relaxed face",
+        "id": "n_123"
+    },
+    {
+        "category": "居家治愈",
+        "theme": "深夜自己动手修剪发尾分叉：坐在明亮的台灯下拿出一把极锋利的小剪刀，小心翼翼地把每一撮发丝捻在指尖寻找微小的毛躁分叉剪掉，咔嚓咔嚓的细响让人莫名解压专注",
+        "elements": [
+            "小剪刀修发尾",
+            "台灯专注光",
+            "发丝捻指尖",
+            "咔嚓解压声",
+            "整理清爽"
+        ],
+        "sd_hint": "late night bedroom desk, sitting under bright lamp carefully trimming hair ends with tiny scissors, focused adorable expression, loose pajama camisole",
+        "id": "n_124"
+    },
+    {
+        "category": "居家治愈",
+        "theme": "给窗台心爱的毛绒玩具排排坐开睡前小茶会：睡觉前把床头的大白鹅、小熊和长耳朵兔子玩具一个个端端正正摆在枕头边围成一圈，假装给它们分发空气小饼干说晚安",
+        "elements": [
+            "毛绒玩具开会",
+            "大白鹅小熊",
+            "围成一圈",
+            "睡前童心",
+            "空气小饼干"
+        ],
+        "sd_hint": "cozy night bedroom, tucking an assortment of cute plush toys (goose, teddy bear, bunny) into line on bed pillows, playful childlike sweet smile, soft dim lamp",
+        "id": "n_125"
+    },
+    {
+        "category": "居家治愈",
+        "theme": "在草稿本上用荧光笔乱涂解压色块：没有目的也不想画具体的东西，只是把薄荷绿、奶油黄和樱花粉的荧光笔一笔一笔涂在纸上交叠混色，看着平滑的色块铺满纸页就觉得心安",
+        "elements": [
+            "荧光笔色块",
+            "薄荷绿与奶油黄",
+            "无目的涂鸦",
+            "纸张吸收油墨",
+            "视觉极度解压"
+        ],
+        "sd_hint": "late night desk, coloring smooth abstract pastel swatches on notepad with pastel highlighter markers, calm soothing expression, comfortable oversized t-shirt",
+        "id": "n_126"
+    },
+    {
+        "category": "夜游漫行",
+        "theme": "深夜空旷自助洗衣房看滚筒彩色衣物打转：坐在塑料长椅上，透明滚筒里蓝白相间的毛衣在温热水流里翻滚打转，洗衣液散发出浓郁清新的铃兰花香，规律轰鸣声催人欲眠",
+        "elements": [
+            "自助洗衣房",
+            "旋转滚筒",
+            "铃兰洗衣液香",
+            "规律轰鸣声",
+            "长椅放空等待"
+        ],
+        "sd_hint": "late night retro laundromat, sitting on colorful plastic bench watching clothes tumbling in illuminated circular washing machine drum, cozy oversized jacket, drowsy gaze",
+        "id": "n_127"
+    },
+    {
+        "category": "夜游漫行",
+        "theme": "深夜便利店关东煮挑最后一串吸饱汤汁的厚萝卜：深夜推开便利店的玻璃门，关东煮格子里只剩最后一节煮得半透明呈琥珀色的白萝卜，咬下去滚烫鲜甜的昆布汤汁瞬间溢满口腔",
+        "elements": [
+            "便利店关东煮",
+            "吸饱汤汁厚萝卜",
+            "琥珀半透明",
+            "昆布鲜汤",
+            "暖透胃口"
+        ],
+        "sd_hint": "late night convenience store, holding paper cup of steaming oden with a thick daikon radish on skewer, happy comforted face, warm indoor light against cold dark outside",
+        "id": "n_128"
+    },
+    {
+        "category": "夜游漫行",
+        "theme": "夜半散步偶遇一只在长椅上打盹的肥三花猫：路过社区公园木长椅，一只圆滚滚的三花猫正把自己揣成一个饱满的毛绒面团在打盹，走近了它只懒洋洋撩开半只眼皮咪了一声",
+        "elements": [
+            "公园木长椅",
+            "打盹肥三花",
+            "揣手手毛团",
+            "懒洋洋半睁眼",
+            "深夜偶遇温情"
+        ],
+        "sd_hint": "night park path under warm lamppost, gently petting chubby sleeping calico cat curled up on wooden bench, kneeling down softly, gentle loving smile",
+        "id": "n_129"
+    },
+    {
+        "category": "睡意萌生",
+        "theme": "戴上蒸汽热敷眼罩闭眼感受温润热气：撕开薰衣草味的蒸汽眼罩挂在耳后，大约四十度的温热蒸汽慢慢包覆住有些酸涩的双眼，整个人像漂浮在温暖平静的水面上慢慢下沉",
+        "elements": [
+            "蒸汽热敷眼罩",
+            "薰衣草温热",
+            "缓解双眼酸涩",
+            "轻飘飘浮沉感",
+            "准备入梦"
+        ],
+        "sd_hint": "late night in bed, wearing warm steam eye mask over eyes, resting head back on deep pillow, relaxed peaceful lips slightly parted, dim warm ambiance",
+        "id": "n_130"
+    },
+    {
+        "category": "睡意萌生",
+        "theme": "调慢床头木质小座钟的发条滴答声：拧上一圈小巧的发条，老座钟在床头柜上发出极为轻微沉稳的滴答滴答声，一下一下数着时间流逝，就像有节奏的心跳一样让人心安神定",
+        "elements": [
+            "木质老座钟",
+            "轻微滴答声",
+            "规律节奏心跳",
+            "床头柜暗香",
+            "心安沉睡"
+        ],
+        "sd_hint": "night bedside, setting small vintage wooden wind-up clock on nightstand, turning off lamp, moonlight falling across peaceful face under blankets",
+        "id": "n_131"
+    },
+    {
+        "category": "睡意萌生",
+        "theme": "在厚羽绒被深处把自己蜷成一个小小的贝壳：外面的夜风吹得窗玻璃发出呜呜细响，屋里却暖意融融，把头顶以下全部埋在蓬松的大被子里，世界彻底与我无关啦",
+        "elements": [
+            "蜷缩成小贝壳",
+            "厚羽绒被深处",
+            "窗外风声呼啸",
+            "被窝绝对安全感",
+            "安心好梦"
+        ],
+        "sd_hint": "late night bedroom, girl completely curled up cozy like a seashell under thick fluffy white duvet, only nose and messy hair peeking out, blissful sleeping smile",
+        "id": "n_132"
     }
 ]
 
@@ -3468,6 +4404,279 @@ DAILY_VTUBER_THEMES = [
             "疯狂连拍"
         ],
         "sd_hint": "afternoon, leaning close to a chubby loafing cat on windowsill with all paws hidden, framing shot with phone camera, giggling adoration"
+    },
+    {
+        "category": "趣味提问",
+        "theme": "薯片掉在干净地毯上三秒定律到底算不算数：刚才不小心把最后一片完整的蜂蜜黄油大薯片掉在地毯上了！我以零点五秒的速度捡起来了，大家说吃掉还是不吃，在线等挺急的！",
+        "elements": [
+            "薯片掉地毯",
+            "三秒定律",
+            "蜂蜜黄油味",
+            "极速捡起",
+            "评论区求救"
+        ],
+        "sd_hint": "afternoon living room, kneeling on carpet holding up a single golden potato chip, conflicted funny cute expression, wide eyes, casual hoodie",
+        "id": "d_061"
+    },
+    {
+        "category": "趣味提问",
+        "theme": "喝奶茶吸管到底应该从密封膜正中间插还是边缘插：每次戳奶茶密封膜都像在排雷，插正中间很容易被顶出来，插边缘又觉得不对称强迫症犯了！你们都是哪一派？",
+        "elements": [
+            "戳奶茶吸管",
+            "密封膜纠结",
+            "中间派对决边缘派",
+            "强迫症发作",
+            "求问大家习惯"
+        ],
+        "sd_hint": "afternoon cafe, holding plastic boba cup and pointed straw hovering above sealed plastic lid with intense funny concentration, cute focus",
+        "id": "d_062"
+    },
+    {
+        "category": "趣味提问",
+        "theme": "洗澡时突然产生的世界级天才灵感到底要去哪里登记：为什么每一次洗澡被热水淋着的时候，脑袋里就会冒出一万个颠覆物理学的伟大发明和神级小说大纲，关掉喷头就全忘了啊！",
+        "elements": [
+            "洗澡灵感爆发",
+            "天才脑洞",
+            "关掉喷头全忘",
+            "灵魂提问",
+            "大家共鸣"
+        ],
+        "sd_hint": "bathroom mirror vanity, wrapped in fluffy towel drying hair, wide excited animated eyes talking to camera, playful hilarious energy",
+        "id": "d_063"
+    },
+    {
+        "category": "趣味提问",
+        "theme": "如果可以拥有一只任何体型的动物做宠物你们选什么：我想选一只只有仓鼠那么大的大胖熊猫！或者一只像小汽车那么大可以骑着去买菜的毛茸茸海獭！评论区让我看看你们的想象力！",
+        "elements": [
+            "微型宠物脑洞",
+            "仓鼠体型大熊猫",
+            "小汽车海獭",
+            "趣味征集",
+            "评论区狂欢"
+        ],
+        "sd_hint": "daytime room, leaning forward on desk resting chin on both hands, smiling mischievously at viewer, thought bubbles forming, cozy sweater",
+        "id": "d_064"
+    },
+    {
+        "category": "生活小插曲",
+        "theme": "撕酸奶盖竟然舔到了一张极其完美的纯白光面：今天随手撕开一杯老酸奶，盖子上竟然连一丝酸奶残留都没有！干净平整得像一面镜子，不知道该高兴还是觉得少了一道灵魂工序！",
+        "elements": [
+            "完美纯净酸奶盖",
+            "无残留撕盖",
+            "少了舔盖乐趣",
+            "哭笑不得",
+            "生活奇观"
+        ],
+        "sd_hint": "daytime kitchen table, holding up pristine clean foil yogurt lid in bewilderment, looking at spoon in hand, funny pouty cute face",
+        "id": "d_065"
+    },
+    {
+        "category": "生活小插曲",
+        "theme": "把两只不同花色但是同个长度的袜子穿出门了：低头穿帆布鞋才发现左脚是黄绿色小雏菊，右脚是浅蓝色荷包蛋！但仔细看竟然有一种莫名其妙的前卫撞色潮流感，本少女决定就这么出门了！",
+        "elements": [
+            "左右袜子不同",
+            "小雏菊与荷包蛋",
+            "前卫撞色感",
+            "错位潮流自信",
+            "出门好心情"
+        ],
+        "sd_hint": "hallway entrance, tying yellow canvas sneakers showing mismatched cute socks (one floral, one egg pattern), grinning proudly with hands on hips",
+        "id": "d_066"
+    },
+    {
+        "category": "生活小插曲",
+        "theme": "去自动售货机买饮料竟然滚下来了两罐：投了一罐葡萄味苏打水的硬币，掉落舱里咚咚响了两声，竟然多送了我一罐冰红茶！这算不算是今天宇宙特批给我的幸运盲盒？！",
+        "elements": [
+            "自动售货机惊喜",
+            "滚出两罐饮料",
+            "葡萄苏打与冰红茶",
+            "意外好运盲盒",
+            "开心到跳步"
+        ],
+        "sd_hint": "outdoor sunny street corner, crouching by vending machine holding two cold soda cans with huge shocked delighted smile, sparkling anime eyes",
+        "id": "d_067"
+    },
+    {
+        "category": "生活小插曲",
+        "theme": "新买的签字笔写出来的粗细刚好是命中注定的手感：0.38 毫米的速干暗红色中性笔，笔尖在手账纸上划过的阻尼感和墨水渗透速度堪称神级契合，一口气把草稿纸写满了无意义的涂鸦！",
+        "elements": [
+            "神仙手感签字笔",
+            "0.38暗红墨水",
+            "手账阻尼感极佳",
+            "停不下来的书写",
+            "文具控狂喜"
+        ],
+        "sd_hint": "study desk afternoon, holding gel pen over notebook filled with neat cute doodles, sparkling eyes admiring writing, stationary lover heaven",
+        "id": "d_068"
+    },
+    {
+        "category": "少女碎碎念",
+        "theme": "下午三点的阳光正好照亮了空气里的几颗浮尘：坐在木地板上靠着书柜，看着一道斜斜的光柱里，微小的尘埃在空气里慢慢悠悠地上下打转跳舞，突然觉得时间慢得像融化的麦芽糖",
+        "elements": [
+            "午后三点斜阳",
+            "光柱跳舞浮尘",
+            "靠书柜发呆",
+            "时间融化感",
+            "极致静谧慢节奏"
+        ],
+        "sd_hint": "afternoon living room floor, leaning against wooden bookshelf, watching dust motes dancing in bright golden sunlight beam, peaceful dreamy face",
+        "id": "d_069"
+    },
+    {
+        "category": "少女碎碎念",
+        "theme": "在超市挑西瓜把耳朵贴上去拍得啪啪响：虽然我根本听不懂到底哪种声音代表熟透了，但只要眉头紧锁、神情严肃地把西瓜挨个敲一遍，在旁边买菜的阿姨眼里我就是专业鉴瓜大师！",
+        "elements": [
+            "超市挑西瓜",
+            "耳朵贴瓜拍打",
+            "不懂装懂严肃脸",
+            "影帝级鉴瓜",
+            "俏皮小得意"
+        ],
+        "sd_hint": "supermarket fruit aisle, leaning ear close against a large green striped watermelon tapping it with serious hilarious detective expression",
+        "id": "d_070"
+    },
+    {
+        "category": "少女碎碎念",
+        "theme": "耳机里正好随机到高中时期单曲循环的那首歌：走在梧桐树荫下，前奏一响起来的那一秒，多年前那个夏天的橘子汽水味和吹过教室走廊的过堂风瞬间从记忆深处呼啸而来",
+        "elements": [
+            "随机播放老歌",
+            "瞬间记忆通感",
+            "橘子汽水与过堂风",
+            "树荫漫步",
+            "微酸泛甜青春感"
+        ],
+        "sd_hint": "tree-shaded street sidewalk, wearing white wired earbuds looking up at dappled sunlight through green leaves, nostalgic sweet wistful smile",
+        "id": "d_071"
+    },
+    {
+        "category": "少女碎碎念",
+        "theme": "洗手液按出了一个超完美的正圆形小泡沫球：今天在水池边按压起泡洗手液，掌心里竟然托起了一个晶莹剔透又极其坚固的粉红色大泡泡，捧着看了足足一分钟舍不得冲掉！",
+        "elements": [
+            "洗手液粉红泡泡",
+            "掌心捧住",
+            "晶莹坚固圆球",
+            "舍不得冲洗",
+            "孩子气快乐"
+        ],
+        "sd_hint": "bathroom sink, holding both hands cupped holding a perfect giant pink soap bubble, looking at it in absolute childlike adoration, soft morning glow",
+        "id": "d_072"
+    },
+    {
+        "category": "可爱小牢骚",
+        "theme": "为什么刚洗完车/刚洗完鞋子外面就必定要飘三滴雨：气死本少女了！早上才把小白鞋刷得闪闪发光踩着出门，走到地铁站不到五百米天上就啪嗒啪嗒精准掉了几滴泥点子！天理何在！",
+        "elements": [
+            "刚洗小白鞋下雨",
+            "精准泥点子暴击",
+            "气鼓鼓小牢骚",
+            "跺脚可爱委屈",
+            "墨菲定律再现"
+        ],
+        "sd_hint": "street sidewalk, holding closed umbrella looking down at pristine white sneakers with tiny raindrop spots, adorable pouty grumpy expression with puffed cheeks",
+        "id": "d_073"
+    },
+    {
+        "category": "可爱小牢骚",
+        "theme": "衣服商标到底是谁发明出来的折磨人神器：今天穿的新衣服领子后面那个刺绣商标，从早上出门开始就一直在脖子后面进行微米级的反复刺挠！我已经找了五分钟剪刀了！",
+        "elements": [
+            "衣服刺绣商标",
+            "脖子后微痒刺挠",
+            "找剪刀大作战",
+            "娇憨小抱怨",
+            "生活真实感"
+        ],
+        "sd_hint": "bedroom mirror, reaching back of neck scratching at annoying collar tag with funny distressed face, holding tiny sewing scissors looking around",
+        "id": "d_074"
+    },
+    {
+        "category": "可爱小牢骚",
+        "theme": "塑料袋系成死结时人类手指的无力感：想打开昨天买回来的零食袋子，袋口不知道被哪个打结天才系成了一个比金刚石还硬的死结，我的指甲盖都快抠翻了！直接拿牙咬算输吗？！",
+        "elements": [
+            "塑料袋死结",
+            "指甲盖抠不动",
+            "拿牙咬较劲",
+            "好笑的倔强",
+            "评论区支招"
+        ],
+        "sd_hint": "kitchen table, tugging furiously at a tight knot on plastic snack bag with teeth and fingernails, determined funny exaggerated expression",
+        "id": "d_075"
+    },
+    {
+        "category": "趣味提问",
+        "theme": "大家给自己的植物起名到底有多离谱：我给阳台上的薄荷起名叫'薄情郎'，给仙人掌起名叫'扎男'，给绿萝起名叫'发际线拯救者'！你们有给盆栽起过什么惊世骇俗的名字吗？",
+        "elements": [
+            "植物离谱起名",
+            "薄情郎薄荷",
+            "扎男仙人掌",
+            "评论区爆笑征集",
+            "拟人化互动"
+        ],
+        "sd_hint": "balcony garden, pointing proudly at labeled potted plants with tiny handmade signboards, giggling with one hand covering mouth, playful personality",
+        "id": "d_076"
+    },
+    {
+        "category": "趣味提问",
+        "theme": "到底是哪种超能力最适合现代人摸鱼：隐形（可以当场在工位上消失睡大觉）还是暂停时间（可以多睡五个小时的美容觉）？大家投个票，说不定今晚做梦就能选装了！",
+        "elements": [
+            "摸鱼超能力",
+            "隐形术对决时间暂停",
+            "美容觉投票",
+            "轻松脑洞",
+            "今晚做梦兑换"
+        ],
+        "sd_hint": "cozy bedroom chair, holding up a magic wand or superhero mask playing around, wink at camera, imaginative fun daytime vibe",
+        "id": "d_077"
+    },
+    {
+        "category": "生活小插曲",
+        "theme": "把烤箱里的吐司烤出了一只天然的小熊笑脸：今天切片吐司放进小烤箱，不知道是气孔还是面包屑分布的原因，焦黄的烙痕正好形成了一对圆耳朵和微笑的嘴巴，拍了一百张照片舍不得吃！",
+        "elements": [
+            "吐司小熊笑脸",
+            "天然焦斑奇迹",
+            "狂拍一百张",
+            "舍不得下口",
+            "治愈小确幸"
+        ],
+        "sd_hint": "bright kitchen counter, holding up a slice of toast with naturally occurring cute bear face browning pattern, beaming with excitement, smartphone nearby",
+        "id": "d_078"
+    },
+    {
+        "category": "生活小插曲",
+        "theme": "在旧记事本夹层里发现两年前画的歪歪扭扭小猫涂鸦：翻找旧收据突然掉出一张发黄的便签，上面用圆珠笔画着一只长着六根胡须、肚子比水桶还圆的火柴棍小猫，旁边还写着'今天也要开心'！",
+        "elements": [
+            "旧便签小猫涂鸦",
+            "圆滚滚火柴猫",
+            "两年前穿越留言",
+            "温暖笑意",
+            "岁月小碎片"
+        ],
+        "sd_hint": "room desk afternoon, holding a small crumpled sticky note with a childlike cat doodle, nostalgic gentle smile, messy notebooks scattered around",
+        "id": "d_079"
+    },
+    {
+        "category": "少女碎碎念",
+        "theme": "风把落叶吹在帆布鞋头一路跟着我走了一百米：走在林荫道上一片金黄的小枫叶正好卡在帆布鞋带的交叉口上，像给鞋子配了一朵小胸花，就这么带着它跨过了两条马路！",
+        "elements": [
+            "枫叶卡在鞋带",
+            "天然鞋花",
+            "跟着走了一百米",
+            "秋日浪漫小跟班",
+            "轻快步伐"
+        ],
+        "sd_hint": "autumn sidewalk, lifting one foot slightly to show a bright red maple leaf tucked into sneaker laces, hands in coat pockets, playful happy face",
+        "id": "d_080"
+    },
+    {
+        "category": "可爱小牢骚",
+        "theme": "买回来的气泡水开盖瞬间像火山爆发一样喷了我一袖子：明明在冰箱里老老实实静置了一整天！为什么我一转瓶盖它就嘶的一声带着冰凉的白沫喷泉直接冲上天花板啊！现在整间屋子都是蜜桃味！",
+        "elements": [
+            "气泡水喷泉暴击",
+            "蜜桃味满屋飘",
+            "袖子沾满气泡",
+            "呆若木鸡",
+            "好笑狼狈"
+        ],
+        "sd_hint": "kitchen sink, holding a fapping fizzy soda bottle with foam bubbling over, wiping drops from nose with other sleeve, funny surprised anime face",
+        "id": "d_081"
     }
 ]
 
@@ -3513,102 +4722,3 @@ THEME_MUTATION_DIRECTIVES = [
         "directive": "【时令色调与视觉心境】：将视线聚焦在周围环境与自身衣着的色彩碰撞上（如清冷深蓝暮色里的奶油白围巾、初夏阳光下薄荷绿冰饮与纯白T恤的清爽映衬、秋日金黄落叶堆中温暖的焦糖驼色大衣），营造出鲜明生动的画面色调与情绪共鸣。"
     }
 ]
-
-# =====================================================================
-# 少女穿搭风格与色彩库 (Outfit and Color Palette Diversity Pool)
-# 用于 Stable Diffusion 绘图提示词变体引导，彻底摆脱固定服饰和单一色彩
-# =====================================================================
-
-OUTFIT_STYLE_POOLS = [
-    {
-        "category": "针织与毛衣 (Knitwear / Sweaters)",
-        "styles": [
-            "oversized cream cable-knit sweater, pleated brown plaid skirt, beige ankle boots",
-            "dusty blue turtleneck sweater, off-white corduroy pants, cozy warm vibe",
-            "mint green loose cardigan over white camisole, light denim shorts",
-            "lavender fluffy mohair sweater, pearl white midi skirt, gentle sweet aesthetic",
-            "mustard yellow knitted pullover, dark navy pleated skirt, vintage beret",
-            "pastel pink ribbed knit sweater, gray wool shorts, cute knitted leg warmers",
-            "warm beige v-neck knit vest over crisp white collared shirt, pleated skirt",
-            "emerald green chunky knit sweater, off-white casual trousers, relaxed fit"
-        ]
-    },
-    {
-        "category": "连身裙与裙装 (Dresses / Skirts)",
-        "styles": [
-            "light blue floral sundress, puff sleeves, delicate white ribbon waist tie",
-            "vintage beige prairie dress, square neckline, lace trim, wooden buttons",
-            "navy blue sailor collar dress, white stripes, red neckerchief tie, preppy look",
-            "sage green tier-layered slip dress over cream long-sleeve blouse",
-            "dusty rose chiffon dress, ruffled hem, romantic gentle breeze silhouette",
-            "pale yellow gingham cotton dress, frilled shoulder straps, sweet cottagecore style",
-            "black velvet mini dress with white Peter Pan collar, cuff lace details"
-        ]
-    },
-    {
-        "category": "街头休闲与卫衣 (Streetwear / Hoodies)",
-        "styles": [
-            "pastel lilac oversized hoodie, black bike shorts, chunky sneakers",
-            "cropped faded denim jacket, white crewneck tee, high-waisted beige cargo pants",
-            "charcoal grey zip-up hoodie, striped tank top inside, loose washed jeans",
-            "creamy white baseball varsity jacket, navy pleated tennis skirt, tube socks",
-            "matcha green relaxed sweatshirt, raw-edge denim skirt, canvas tote bag",
-            "oversized pastel color-block windbreaker, black leggings, sporty dynamic vibe",
-            "light grey slouchy crewneck pullover, relaxed denim overalls with one strap undone"
-        ]
-    },
-    {
-        "category": "居家与睡衣 (Loungewear / Nightwear)",
-        "styles": [
-            "soft fleece pastel pink bear-ear hoodie pajamas, matching fluffy shorts",
-            "light grey oversized slouchy waffle-knit loungewear set, cozy indoor softness",
-            "silky cream ivory pajama shirt and shorts set, contrast navy piping",
-            "sky blue striped oversized cotton boyfriend shirt, cozy white thigh-high socks",
-            "soft yellow flannel pajama set, loose fit, fuzzy sheep slippers",
-            "lavender cotton camisole and loose lounge pants, matching light wrap cardigan"
-        ]
-    },
-    {
-        "category": "衬衫与学院风 (Shirts / Academy)",
-        "styles": [
-            "crisp white button-up blouse, knitted navy houndstooth sweater vest, pleated skirt",
-            "light brown oversized linen shirt unbuttoned over white graphic tee, khaki shorts",
-            "soft pink Peter Pan collar blouse, brown suspender pinafore skirt",
-            "plaid flannel oversized shirt in teal and beige, dark gray denim skirt",
-            "chambray blue button-down shirt tucked into high-waist white pleated skirt"
-        ]
-    },
-    {
-        "category": "秋冬外套与大衣 (Outerwear / Coats)",
-        "styles": [
-            "camel beige double-breasted trench coat, warm red plaid wool scarf",
-            "olive green quilted liner jacket, off-white turtleneck, dark brown trousers",
-            "dusty blue duffle coat with horn toggles, cream fluffy ear muffs, plaid skirt",
-            "fluffy white teddy bear fleece jacket, pastel pink knit beanie, jeans",
-            "chocolate brown tailored wool coat, ivory knit turtleneck sweater, beret"
-        ]
-    }
-]
-
-OUTFIT_COLOR_PALETTES = [
-    "cream white and pastel mint green",
-    "soft lavender and ivory beige",
-    "dusty rose pink and warm pearl white",
-    "navy blue and crisp pure white",
-    "mustard yellow and charcoal grey",
-    "sage olive green and warm oatmeal cream",
-    "baby blue and light heather grey",
-    "caramel brown and warm apricot",
-    "lilac purple and pale vanilla yellow",
-    "matcha green and linen beige",
-    "powder pink and soft sky blue",
-    "soft mocha brown and creamy milk white"
-]
-
-def get_random_outfit_guidance() -> str:
-    """随机挑选一种穿搭和配色建议，作为 SD prompt 提取的引导语"""
-    import random
-    cat_obj = random.choice(OUTFIT_STYLE_POOLS)
-    style = random.choice(cat_obj["styles"])
-    palette = random.choice(OUTFIT_COLOR_PALETTES)
-    return f"{style}, palette: {palette}"
