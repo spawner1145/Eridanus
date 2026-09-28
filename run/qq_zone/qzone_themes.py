@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 QQ空间动态超丰富主题种子池库（晨间/早安、夜间/晚安、Vtuber日常互动）
-所有主题均作为创造性 Seed，结合 70% 概率的主题衍生变体引导词与生活化发帖句式形态，
-彻底破除 AI 机械化三段论与过短失真的人机感，展现自然生动的少女心情日记风格。
+所有主题均作为创造性 Seed，包含丰富阳光日常，也接纳真实的低能量、丧气、不想说话的阴翳切面，
+结合 70% 概率的主题衍生变体引导词与多样化行文形态，呈现出有血有肉、起伏鲜活的真实少女日记。
 """
 
 MORNING_THEME_POOL = [
@@ -1448,6 +1448,41 @@ MORNING_THEME_POOL = [
         "elements": "迎风自行车, 飞扬白衬衫, 下坡公路, 金色晨光漫洒, 肆意畅快大笑",
         "sd_hint": "riding bicycle downhill with hands on handlebars, white shirt billowing like wings, golden sunrise, exhilarated joyful expression"
     },
+    {
+        "id": "m_207",
+        "category": "低能量与放空沉潜",
+        "theme": "电量告急的清晨，整个人像是被抽走了所有力气，只想缩在角落静静听着外面细微的雨声",
+        "elements": "角落蜷缩, 灰蒙蒙晨光, 窗外细雨, 空白思绪, 极低电量",
+        "sd_hint": "sitting curled up in corner, dim grey morning light, rain outside window, weary expression, oversized worn sweater, quiet low energy"
+    },
+    {
+        "id": "m_208",
+        "category": "低能量与放空沉潜",
+        "theme": "闹钟响了三次也没能把自己拼凑完整，坐在床边看着地毯发呆，今天大概只想当一个静止的盆栽",
+        "elements": "床沿呆坐, 耷拉双肩, 地毯微光, 迟滞思绪, 拒绝开机",
+        "sd_hint": "sitting on edge of bed looking down at carpet, slumped shoulders, disheveled hair, dim bedroom, tired exhausted mood"
+    },
+    {
+        "id": "m_209",
+        "category": "低能量与放空沉潜",
+        "theme": "莫名其妙的低气压早晨，连倒一杯温水都觉得耗尽了力气，不想说话也不想面对任何人",
+        "elements": "半杯温水, 靠着墙壁, 低垂眼帘, 灰调晨色, 沉默不语",
+        "sd_hint": "leaning against wall holding half glass of water, downcast eyes, muted soft lighting, melancholic calm, silent withdrawal"
+    },
+    {
+        "id": "m_210",
+        "category": "低能量与放空沉潜",
+        "theme": "今天大概是彻底报废的阴天模式，脑子里全是一团团乱麻，什么也不想思考",
+        "elements": "趴在桌上, 凌乱书桌, 阴冷天光, 闭眼沉寂, 逃避现实",
+        "sd_hint": "arms folded on table with face resting on arms, messy desk, dull overcast window light, gloomy low battery vibe"
+    },
+    {
+        "id": "m_211",
+        "category": "低能量与放空沉潜",
+        "theme": "早晨醒来胸口沉闷闷的，机械地刷牙洗脸，镜子里的人看起来好陌生又疲惫",
+        "elements": "卫生间镜子, 疲倦眼神, 滴答水龙头, 冷白光, 游离状态",
+        "sd_hint": "standing before bathroom mirror with tired unfocused eyes, water dripping from faucet, cold pale light, vulnerable quiet moment"
+    },
 ]
 
 NIGHT_THEME_POOL = [
@@ -2725,6 +2760,41 @@ NIGHT_THEME_POOL = [
         "elements": "梦中可颂, 猛醒抓紧枕角, 眨巴眼睛回神, 啼笑皆非, 睡衣微皱",
         "sd_hint": "waking up clutching pillow corner tightly, blinky sleepy eyes, comic realization, soft messy hair, pastel bedding"
     },
+    {
+        "id": "n_183",
+        "category": "深夜低能量与情绪沉潜",
+        "theme": "今天一整天都在硬撑着笑，回到房间关上门的那一秒，整个人像断线的木偶一样滑坐到地上",
+        "elements": "背靠房门滑坐, 漆黑房间, 卸下防备, 抱膝埋头, 疲惫到极致",
+        "sd_hint": "sitting on floor leaning against closed door in dark room, hugging knees with head down, exhausted after long day, emotional relief"
+    },
+    {
+        "id": "n_184",
+        "category": "深夜低能量与情绪沉潜",
+        "theme": "不想回任何消息，不想整理乱糟糟的房间，就这么任由黑暗把自己慢慢吞掉",
+        "elements": "静音手机屏幕微亮, 散落抱枕, 幽暗阴影, 空洞眼神, 拒绝社交",
+        "sd_hint": "lying on bed staring blankly at ceiling, muted smartphone glowing softly nearby, deep shadows, emotionally drained, quiet isolation"
+    },
+    {
+        "id": "n_185",
+        "category": "深夜低能量与情绪沉潜",
+        "theme": "有些说不上来的难过和委屈，在深夜突然像潮水一样漫上来，眼眶酸酸的但其实什么也没发生",
+        "elements": "微湿眼眶, 侧卧被单, 窗外冷月, 咬着嘴唇, 隐秘脆弱",
+        "sd_hint": "lying on side in bed, tears welling in eyes, biting lower lip, cold moonlight sliver, fragile vulnerable melancholic beauty"
+    },
+    {
+        "id": "n_186",
+        "category": "深夜低能量与情绪沉潜",
+        "theme": "电量百分之零，连抬起手把被子拉好都做不到，今天就允许自己彻底烂掉吧",
+        "elements": "仰躺地毯, 摊开双手, 散落外套, 天花板微光, 彻底摆烂",
+        "sd_hint": "lying flat on rug with arms spread wide, jacket discarded beside, dim ceiling ambient light, totally drained, surrender"
+    },
+    {
+        "id": "n_187",
+        "category": "深夜低能量与情绪沉潜",
+        "theme": "深夜被一种巨大的虚无感包裹，好像今天做的一切都没有意义，只想在这个世界上暂时隐形",
+        "elements": "窗台缩成一团, 城市深黑夜景, 冰凉玻璃, 孤寂剪影, 情绪低谷",
+        "sd_hint": "curled into a ball on wide windowsill looking out at dark city, cold glass reflection, lonely silhouette, quiet existential dread"
+    },
 ]
 
 DAILY_VTUBER_THEMES = [
@@ -3470,6 +3540,34 @@ DAILY_VTUBER_THEMES = [
         "elements": "厨房门口抓后脑勺, 茫然眨巴双眼, 冰箱各色磁贴, 短暂失忆现场, 呆萌日常",
         "sd_hint": "standing at kitchen doorway scratching back of head with blank puzzled expression, colorful fridge magnets behind, funny forgetful moment"
     },
+    {
+        "id": "d_107",
+        "category": "低能量与不想说话",
+        "theme": "电量见底，社交额度彻底耗尽，今天是一颗谁戳都不会有反应的石头",
+        "elements": "缩进大卫衣, 兜帽遮脸, 戴着耳机装睡, 隔绝世界, 零社交欲",
+        "sd_hint": "sitting on sofa with oversized hoodie hood pulled low over face, large headphones, pretending to sleep, isolated bubble"
+    },
+    {
+        "id": "d_108",
+        "category": "低能量与不想说话",
+        "theme": "莫名其妙的情绪滑铁卢，什么事情都没做错，但整个人就是丧到了地心",
+        "elements": "趴在抱枕上, 闷闷不乐, 拖鞋甩在一边, 叹气, 低落气场",
+        "sd_hint": "lying stomach down burying face partially in pillow, slippers kicked off, gloomy aura, unprovoked sadness, tired teenager"
+    },
+    {
+        "id": "d_109",
+        "category": "低能量与不想说话",
+        "theme": "今天只想把嘴巴用拉链拉上，听歌看窗外落叶，任何需要开口说哪怕一个字的事情都请远离我",
+        "elements": "窗边发呆, 塞着耳塞, 手指抠着桌角, 眼神游离, 拒绝交流",
+        "sd_hint": "gazing out window with wired earbuds in, picking at wooden desk edge with finger, distant gaze, silent solitude"
+    },
+    {
+        "id": "d_110",
+        "category": "低能量与不想说话",
+        "theme": "心里有点堵，像有一块吸饱了雨水的沉重海绵，只想安静地晒干自己，不需要任何安慰",
+        "elements": "抱膝阳台角落, 干燥微风, 侧脸发丝遮挡, 沉默疗伤, 沉静",
+        "sd_hint": "sitting hugging knees in sunlit balcony corner, breeze stirring hair, thoughtful solemn expression, healing quietly"
+    },
 ]
 
 THEME_MUTATION_DIRECTIVES = [
@@ -3483,37 +3581,48 @@ THEME_MUTATION_DIRECTIVES = [
     {"type": "微气候与时令通感", "directive": "【微气候与时令通感】：把当前季节与微气候带来的心绪变化与场景深度交融（如深秋傍晚泛着冷意的蓝紫色天空让人好想喝一口热可可、初夏微热柏油路散发的气息预示着大雨将至、晴朗冬日午后阳光晒得毛衣散发出干燥温暖的气味）。"},
     {"type": "穿搭与色彩风格变体", "directive": "【穿搭与色彩风格变体】：特别留意并生动描写自己此刻的着装穿搭与色彩氛围（如换上了一件暖杏色针织毛衣、偷穿了宽大的鼠尾草绿落肩卫衣、或是轻盈的淡薰衣草紫碎花衬衫裙），将衣服的材质触感（软糯毛线、清凉亚麻、蓬松棉布）与当前时节心境自然融为一体。"},
     {"type": "时令色调与视觉心境", "directive": "【时令色调与视觉心境】：将视线聚焦在周围环境与自身衣着的色彩碰撞上（如清冷深蓝暮色里的奶油白围巾、初夏阳光下薄荷绿冰饮与纯白T恤的清爽映衬、秋日金黄落叶堆中温暖的焦糖驼色大衣），营造出鲜明生动的画面色调与情绪共鸣。"},
+    {"type": "低能量与静默沉潜", "directive": "【低能量与静默沉潜】：不用表现得元气或积极！允许展现自己疲惫、丧气、电量耗尽或不想理人的真实一面。字数不必多，简短几句真实的小叹息或放空自语，展现一个真实有脆弱时刻、不戴完美面具的活人。"},
 ]
 
 POST_STRUCTURE_ARCHETYPES = [
     {
-        "name": "感叹与情绪直球",
-        "description": "【感叹与情绪直球】：先吐出当下的情绪词或真实感叹，再带出一句原因或吐槽。不交代冗长前因后果，像刚经历完立刻发出来的一声哀嚎或兴奋。",
-        "examples": "“啊！世界上怎么会有烤红薯这么香的东西啊！” / “完蛋，完全不想动弹。” / “救命，这个指甲油颜色到底算豆沙还是枯玫瑰。”",
+        "name": "感官现场与即刻反应",
+        "description": "【感官现场与即刻反应】：捕捉当下极具具象感的体验（温度冷暖、触感、声音、香气），伴随身体最真实的即刻反应与小动作，真实接地气，句意完整自然收束。",
+        "examples": "“把刘海全束进小青蛙发带里，刚从冰箱拿出来的黄瓜面膜贴上脸那一瞬间整个人直接打了个激灵，彻底清醒了。” / “咬了一大口刚出炉的流心蛋黄酥，碎屑掉了一身，烫得一边呼哧呼哧哈气一边疯狂嚼嚼嚼。”",
     },
     {
-        "name": "即时碎碎念与生活切片",
-        "description": "【即时碎碎念与生活切片】：像随手发在小号或备忘录的一两句自言自语，有具体的生活细节或场景，语调轻快随意，自然停下，不强行升华或总结。",
-        "examples": "“微波炉热牛奶转到最后一秒跳停的声音，莫名有点解压。” / “路过花店被刚剪枝的青草味呛了一下，但还挺好闻的。” / “出门前到处找耳机，最后发现好端端挂在自己脖子上…”",
+        "name": "生活切片与即时碎念",
+        "description": "【生活切片与即时碎念】：像随手发在小号或备忘录的生活现场，有真实具体的动作和环境声色，不刻意总结，自然收束。",
+        "examples": "“微波炉热牛奶转到最后一秒跳停，端着热乎乎的玻璃杯在窗边站了会儿，外面天色刚刚透出一点灰蓝。” / “路过花店被刚剪枝的青草和湿泥土味呛了一下，但还挺好闻的，忍不住停下来多挑了一支小水仙。”",
     },
     {
-        "name": "可爱小事故与自嘲",
-        "description": "【可爱小事故与自嘲】：讲自己刚干的笨事或遇到的尴尬小插曲，全靠口吻自然流露窘迫可爱，严禁使用动作括号（如目移、捂脸）。",
-        "examples": "“把两只不同的袜子穿出门就算了，居然还觉得自己今天挺潮的。” / “信心满满单手磕鸡蛋，成功收获一碗蛋壳拌蛋黄。” / “走在路上自以为在心里哼歌，直到路人看我才发现一直唱出声了…”",
+        "name": "情绪直球与碎碎念吐槽",
+        "description": "【情绪直球与碎碎念吐槽】：情绪走在最前面，先说一句真实的感叹或哀嚎，接着说出具体原因或小烦恼，随性真诚。",
+        "examples": "“啊！世界上怎么会有烤红薯这么香的东西啊！隔着半条街闻到味儿整个人脚步都拐弯了，最后还是没忍住捧了一个热乎乎的回来。” / “完蛋，完全不想动弹，就这么瘫在地毯上看着天花板慢慢变暗，甚至懒得伸手去够两米外的灯开关。”",
+    },
+    {
+        "name": "可爱小事故与生活插曲",
+        "description": "【可爱小事故与生活插曲】：记录自己刚干的小笨事或突发小尴尬，全靠语气自然流露窘迫可爱，不使用‘（目移）’等括号动作戏。",
+        "examples": "“信心满满单手磕鸡蛋，成功收获一碗蛋壳拌蛋黄…默默蹲在水池边用筷子捞了三分钟蛋壳，今天的大厨体验到此为止。” / “走在路上自以为在心里默默哼歌，直到路过的小朋友好奇地抬头看我，才发现自己不知不觉已经大声唱出两句副歌了…”",
     },
     {
         "name": "轻快短句与情绪顿挫",
         "description": "【轻快短句与情绪顿挫】：用两到三个口语短句拼出当下的真实反应，节奏轻快，有生活的小顿挫和迟钝感，拒绝平铺直叙的长句。",
-        "examples": "“出门。被冷风吹懵。默默折返拿厚围巾。” / “盯着天花板发呆五分钟。好，肚子还是饿了。” / “本来只想尝一口草莓大福，回过神来包装盒已经空了。”",
+        "examples": "“出门。被冷风迎面吹懵。在楼道口默默呆站两秒，果断折返上楼抓最厚的羊绒围巾。” / “盯着天花板发呆五分钟。好，肚子果然还是咕咕叫了，向夜宵低头。”",
     },
     {
-        "name": "真诚日常轻抛问",
-        "description": "【真诚日常轻抛问】：没有套路铺垫，直接像跟好朋友聊天一样抛出一个微小具体、让人有表达欲的日常疑问或二选一，轻巧随性。",
-        "examples": "“大家吃关东煮最先挑哪个呀？我永远是魔芋丝…” / “冬天洗完澡大家到底是怎么鼓起勇气从浴室走回房间的？” / “好纠结，今天到底喝热可可还是生椰拿铁。”",
+        "name": "日常轻抛问与好奇心",
+        "description": "【日常轻抛问与好奇心】：没有套路铺垫，直接像跟好朋友聊天一样抛出一个微小具体、让人有表达欲的日常疑问或二选一，轻巧随性。",
+        "examples": "“大家吃关东煮最先挑哪个呀？我永远是魔芋丝…吸饱了热汤咬下去脆脆的，感觉可以连吃三串。” / “冬天洗完澡大家到底是怎么鼓起勇气从充满热汽的浴室走回冷飕飕的房间的？每次都要在门口做足心理建设。”",
     },
     {
         "name": "自然对话体与新发现",
         "description": "【自然对话体与新发现】：像咬着吸管转头跟旁边人说话一样，用‘说起来’、‘居然’、‘好像’等口语词带出一个刚刚注意到的生活微小细节。",
-        "examples": "“说起来，新买的这支圆珠笔写字沙沙的，居然有点好听。” / “刚才抬头看了一眼窗外，今天的云彩好像一块被咬了一口的吐司。” / “不知不觉就已经这个点了，时间到底是被谁偷走的…”",
+        "examples": "“说起来，新买的这支圆珠笔写字沙沙的，声音居然有点治愈，不知不觉在草稿纸上涂满了一整圈小漩涡。” / “刚才抬头看了一眼窗外，云彩被夕阳切成粉橘色的一大块，慢吞吞地往山后面飘，像一块刚出炉的草莓松饼。”",
+    },
+    {
+        "name": "低能量放空与极简丧碎念",
+        "description": "【低能量放空与极简丧碎念】：整个人处于低电量、不开心、受挫或不想说话的沉潜状态。字数简短克制（10~30字即可），甚至只是一两句无精打采的嘟囔，没有社交精力，真实、丧丧的、不必强颜欢笑。",
+        "examples": "“电量归零。谁也别跟我说话…” / “莫名其妙的低气压，今天只想当一株静止的植物。” / “把门反锁，手机静音，允许自己今天彻底烂掉。” / “好像把所有力气都用光了，好累。”",
     },
 ]
