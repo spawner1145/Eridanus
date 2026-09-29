@@ -37,7 +37,7 @@ httpx = install_and_import("httpx")
 zipfile = install_and_import("zipfile")
 # 全局变量，用于存储 logger 实例和屏蔽的日志类别
 _logger = None
-_blocked_loggers = []
+_blocked_loggers = ["INFO_MSG", "DEBUG"]
 
 app = Flask(__name__, static_folder="dist", static_url_path="")
 app.json.sort_keys = False  # 不要对json排序

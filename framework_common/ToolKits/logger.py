@@ -8,7 +8,7 @@ import colorlog
 
 # 全局变量，用于存储 logger 实例和屏蔽的日志类别
 _logger = None
-_blocked_loggers = []  # 默认禁用DEBUG
+_blocked_loggers = ["INFO_MSG", "DEBUG"]  # 默认禁用DEBUG
 _lock = threading.Lock()  # 添加线程锁
 _current_log_date = None
 
