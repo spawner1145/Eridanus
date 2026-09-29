@@ -1,13 +1,16 @@
 # encoding: utf-8
 import asyncio
 import functools
+import hashlib
 import importlib
 import json
 import logging
 import os
 import shutil
 import sys
+import threading
 import time
+import urllib
 from io import StringIO
 
 from cryptography.fernet import Fernet
@@ -995,6 +998,240 @@ def index(e):
 clients = set()
 
 # WebSocket路由
+
+# ==========================================
+# Android ??? / ???? ????
+# ==========================================
+android_pending_events = {}  # user_id -> threading.Event
+android_pending_responses = {}  # user_id -> reply_data
+
+def clean_expired_chat_files(days=3):
+    """?? chat_files ????????????3?????????"""
+    try:
+        if not os.path.exists(UPLOAD_FOLDER):
+            return
+        now = time.time()
+        expire_seconds = days * 86400
+        removed_count = 0
+        for fname in os.listdir(UPLOAD_FOLDER):
+            fpath = os.path.join(UPLOAD_FOLDER, fname)
+            if os.path.isfile(fpath):
+                try:
+                    mtime = os.path.getmtime(fpath)
+                    if (now - mtime) > expire_seconds:
+                        os.remove(fpath)
+                        removed_count += 1
+                except Exception:
+                    pass
+        if removed_count > 0:
+            logger.server(f"[FileCache] ????? {removed_count} ??? {days} ????????")
+    except Exception as e:
+        logger.warning(f"[FileCache] ????????: {e}")
+
+def _start_file_cleanup_thread():
+    """?????????? 12 ??????????? 3 ????"""
+    def _loop():
+        while True:
+            try:
+                clean_expired_chat_files(days=3)
+            except Exception:
+                pass
+            time.sleep(43200)  # 12 ??
+    t = threading.Thread(target=_loop, daemon=True, name="FileCleanupThread")
+    t.start()
+
+# ????????
+_start_file_cleanup_thread()
+
+def cache_local_image_for_remote(img_path_or_url):
+    """
+    ???????? file://D:/... ??????????
+    ?????? chat_files/ ????? Android App ??? Web ?? /api/chat/media/<filename>
+    ????? http/https ? base64 ?????
+    """
+    if not img_path_or_url or not isinstance(img_path_or_url, str):
+        return img_path_or_url
+
+    if img_path_or_url.startswith("http://") or img_path_or_url.startswith("https://") or img_path_or_url.startswith("base64://"):
+        return img_path_or_url
+
+    # ?? file:// ?????
+    local_path = img_path_or_url
+    if local_path.startswith("file://"):
+        parsed = urllib.parse.urlparse(local_path)
+        unquoted = urllib.parse.unquote(parsed.path)
+        if unquoted.startswith('/') and len(unquoted) > 2 and unquoted[2] == ':':
+            unquoted = unquoted[1:]
+        local_path = unquoted
+
+    if os.path.isfile(local_path):
+        try:
+            ext = os.path.splitext(local_path)[1]
+            if not ext:
+                ext = ".jpg"
+            # ?? md5 ???????????????
+            with open(local_path, "rb") as rf:
+                content = rf.read()
+            fmd5 = hashlib.md5(content).hexdigest()[:16]
+            dest_name = f"cached_{fmd5}{ext}"
+            dest_path = os.path.join(UPLOAD_FOLDER, dest_name)
+            if not os.path.exists(dest_path):
+                with open(dest_path, "wb") as wf:
+                    wf.write(content)
+            return f"/api/chat/media/{dest_name}"
+        except Exception as e:
+            logger.warning(f"[cache_local_image] ???????? {local_path}: {e}")
+            return img_path_or_url
+    return img_path_or_url
+
+def extract_onebot_text(message):
+    if isinstance(message, str):
+        return message
+    if isinstance(message, list):
+        texts = []
+        for item in message:
+            if isinstance(item, dict):
+                if item.get("type") == "text":
+                    texts.append(item.get("data", {}).get("text", ""))
+                elif item.get("type") == "image":
+                    texts.append("[??]")
+            elif isinstance(item, str):
+                texts.append(item)
+        return "".join(texts)
+    return str(message)
+
+def extract_onebot_images(message):
+    images = []
+    if isinstance(message, list):
+        for item in message:
+            if isinstance(item, dict) and item.get("type") == "image":
+                f_info = item.get("data", {}).get("file") or item.get("data", {}).get("url")
+                if f_info:
+                    cached_url = cache_local_image_for_remote(f_info)
+                    images.append(cached_url)
+    return images
+
+@app.route("/api/chat/media/<path:filename>", methods=["GET"])
+def get_chat_media_file(filename):
+    """???? chat_files ??????? Android App??????????"""
+    try:
+        return send_from_directory(UPLOAD_FOLDER, filename)
+    except Exception as e:
+        return jsonify({"error": f"File not found: {e}"}), 404
+
+@app.route("/api/android/status", methods=["GET"])
+def android_status():
+    """Android App ?????????"""
+    return jsonify({
+        "status": "ok",
+        "bot_connected": len(clients) > 0,
+        "default_qq_id": 1840094972,
+        "active_clients": len(clients)
+    })
+
+@app.route("/api/android/ask", methods=["POST"])
+def android_ask():
+    """Android App ?????/?????????? QQ ????????"""
+    data = request.get_json(silent=True) or {}
+    text = data.get("text", "").strip()
+    image_base64 = data.get("image_base64")
+    user_id = data.get("user_id") or 1840094972
+    nickname = data.get("nickname") or "Android?????"
+    timeout = float(data.get("timeout") or 60.0)
+
+    try:
+        user_id = int(user_id)
+    except:
+        user_id = 1840094972
+
+    # ?? OneBot v11 ?????
+    msg_segments = []
+    # ???????? (self_id: 1000000) ???????????
+    at_bot = data.get("at_bot", True)
+    if at_bot:
+        msg_segments.append({
+            "type": "at",
+            "data": {"qq": "1000000", "name": "Eridanus"}
+        })
+
+    if image_base64:
+        clean_b64 = image_base64
+        if "base64," in clean_b64:
+            clean_b64 = clean_b64.split("base64,")[1]
+        msg_segments.append({
+            "type": "image",
+            "data": {"file": f"base64://{clean_b64}"}
+        })
+    if text:
+        msg_segments.append({
+            "type": "text",
+            "data": {"text": text}
+        })
+
+    if len(msg_segments) <= (1 if at_bot else 0):
+        return jsonify({"status": "error", "message": "Prompt is empty"}), 400
+
+    now_ms = int(time.time() * 1000)
+    event_payload = {
+        "self_id": 1000000,
+        "user_id": user_id,
+        "time": int(time.time()),
+        "message_id": now_ms,
+        "real_id": now_ms % 2147483647,
+        "message_seq": now_ms % 2147483647,
+        "message_type": "group",
+        "sender": {
+            "user_id": user_id,
+            "nickname": nickname,
+            "card": "",
+            "role": "member",
+            "title": ""
+        },
+        "raw_message": text,
+        "font": 14,
+        "sub_type": "normal",
+        "message": msg_segments,
+        "message_format": "array",
+        "post_type": "message",
+        "group_id": 222222,  # ?????????
+        "adapter_source": "android"
+    }
+
+    # ???? Event
+    ev = threading.Event()
+    android_pending_events[user_id] = ev
+    android_pending_responses.pop(user_id, None)
+
+    # ??????? WebSocket?? Eridanus Bot ???
+    ev_json = json.dumps(event_payload, ensure_ascii=False)
+    for c in list(clients):
+        try:
+            c.send(ev_json)
+        except Exception:
+            clients.discard(c)
+
+    # ????
+    flag = ev.wait(timeout=timeout)
+    android_pending_events.pop(user_id, None)
+
+    if flag and user_id in android_pending_responses:
+        reply_info = android_pending_responses.pop(user_id)
+        return jsonify({
+            "status": "ok",
+            "reply": reply_info.get("reply", ""),
+            "images": reply_info.get("images", []),
+            "message": "success",
+            "user_id": user_id
+        })
+    else:
+        return jsonify({
+            "status": "timeout",
+            "reply": "Eridanus ???????? Bot ??????????? Hub?",
+            "images": [],
+            "message": "timeout",
+            "user_id": user_id
+        }), 504
+
 @sock.route('/api/ws')
 def handle_websocket(ws):
     global auth_info
@@ -1038,6 +1275,22 @@ def handle_websocket(ws):
             # 1. 转发主程序 Eridanus 发出的 Action 指令至所有外部客户端（包括 TG）
             if isinstance(message, dict) and message.get("action") in valid_message_actions:
                 target_group_id = message.get("params", {}).get("group_id", 879886836)
+
+                # ??????? Android ???? (group_id == 222222) ???
+                if target_group_id == 222222 or str(target_group_id) == "222222":
+                    try:
+                        raw_msg = message.get("params", {}).get("message", "")
+                        extracted_text = extract_onebot_text(raw_msg)
+                        extracted_images = extract_onebot_images(raw_msg)
+                        # ????????? Android ??
+                        for uid, ev in list(android_pending_events.items()):
+                            android_pending_responses[uid] = {
+                                "reply": extracted_text,
+                                "images": extracted_images
+                            }
+                            ev.set()
+                    except Exception as e_resp:
+                        logger.warning(f"?? Android ??????: {e_resp}")
                 action_json = json.dumps(message, ensure_ascii=False)
                 # 广播给除发送端外的其它客户端（如 TelegramAdapter）
                 for client in list(clients):
@@ -1129,6 +1382,7 @@ def handle_websocket(ws):
                             client.send(event_json)
                     except Exception:
                         clients.discard(client)
+    except Exception as e:
         logger.server(f"WebSocket事件: {str(e)}")
         # traceback.print_exc()
     finally:
