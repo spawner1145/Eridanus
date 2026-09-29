@@ -1,4 +1,4 @@
-﻿# encoding: utf-8
+# encoding: utf-8
 import asyncio
 import functools
 import hashlib
@@ -1000,13 +1000,13 @@ clients = set()
 # WebSocket路由
 
 # ==========================================
-# Android ??? / ?????????
+# Android 客户端 / 统一中转接口与图床缓存
 # ==========================================
 android_pending_events = {}       # user_id -> threading.Event
 android_pending_responses = {}    # user_id -> reply_data dict {"reply": str, "images": list}
 
 def clean_expired_chat_files(days=3):
-    """?? chat_files ????????????(??3?)????????"""
+    """清理 chat_files 中超过指定天数(默认3天)的过期临时图片文件"""
     try:
         if not os.path.exists(UPLOAD_FOLDER):
             return
@@ -1024,23 +1024,23 @@ def clean_expired_chat_files(days=3):
                 except Exception:
                     pass
         if removed_count > 0:
-            logger.server(f"[FileCache] ????? {removed_count} ??? {days} ????????")
+            logger.server(f"[FileCache] 清理了 {removed_count} 个超过 {days} 天的过期临时文件")
     except Exception as e:
-        logger.warning(f"[FileCache] ????????: {e}")
+        logger.warning(f"[FileCache] 清理过期文件失败: {e}")
 
 def _start_file_cleanup_thread():
-    """???????????? 12 ??????????? 3 ????"""
+    """后台定时清理线程，每 12 小时清理一次超过 3 天的文件"""
     def _loop():
         while True:
             try:
                 clean_expired_chat_files(days=3)
             except Exception:
                 pass
-            time.sleep(43200)  # 12 ??
+            time.sleep(43200)  # 12 小时
     t = threading.Thread(target=_loop, daemon=True, name="FileCleanupThread")
     t.start()
 
-# ????????
+# 启动定时清理线程
 _start_file_cleanup_thread()
 
 def cache_local_image_for_remote(img_path_or_url):
@@ -1121,9 +1121,10 @@ def extract_onebot_images(message):
                     cached_url = cache_local_image_for_remote(f_info)
                     images.append(cached_url)
     return images
+
 @app.route("/api/chat/media/<path:filename>", methods=["GET"])
 def get_chat_media_file(filename):
-    """???? chat_files ???????? Android App ??????"""
+    """直接访问 chat_files 中的图片文件，供 Android App 跨设备加载"""
     try:
         return send_from_directory(UPLOAD_FOLDER, filename)
     except Exception as e:
@@ -1131,7 +1132,7 @@ def get_chat_media_file(filename):
 
 @app.route("/api/android/status", methods=["GET"])
 def android_status():
-    """Android App ?????????"""
+    """Android App 连通性与状态检查"""
     return jsonify({
         "status": "ok",
         "bot_connected": len(clients) > 0,
@@ -1141,10 +1142,10 @@ def android_status():
 
 @app.route("/api/android/history", methods=["GET"])
 def android_history():
-    """? Android App ???????????????????"""
+    """为 Android App 提供与机器人交互的最近历史消息"""
     try:
         limit = int(request.args.get("limit", 50))
-        # ???? limit ???
+        # 获取最近 limit 条记录
         rows = asyncio.run(get_msg(0, limit))
         results = []
         for r in rows:
@@ -1159,7 +1160,7 @@ def android_history():
                 images = []
 
                 if isinstance(msg_obj, dict):
-                    # Action ???? send_group_msg
+                    # Action 指令如 send_group_msg
                     raw_msg = msg_obj.get("params", {}).get("message", "")
                     text_content = extract_onebot_text(raw_msg)
                     images = extract_onebot_images(raw_msg)
@@ -1180,7 +1181,7 @@ def android_history():
             except Exception:
                 continue
 
-        # ???????????????????????????
+        # 按从旧到新的时间顺序返回供前端渲染
         results.reverse()
         return jsonify({"status": "ok", "messages": results})
     except Exception as e:
@@ -1188,7 +1189,7 @@ def android_history():
 
 @app.route("/api/android/upload", methods=["POST"])
 def android_upload_image():
-    """? Android App ?????????? chat_files ????? URL"""
+    """供 Android App 上传图片并保存到 chat_files，返回公开访问 URL"""
     try:
         file = request.files.get("file")
         if not file:
@@ -1211,7 +1212,7 @@ def android_upload_image():
 
 @app.route("/api/android/ask", methods=["POST"])
 def android_ask():
-    """Android App ??/???????? QQ ??????"""
+    """Android App 发送/提问接口，与 QQ 上下文记忆打通"""
     data = request.get_json(silent=True) or {}
     text = data.get("text", "").strip()
     image_base64 = data.get("image_base64")
@@ -1271,11 +1272,11 @@ def android_ask():
         "message": msg_segments,
         "message_format": "array",
         "post_type": "message",
-        "group_id": 222222,  # ?? Android ???
+        "group_id": 222222,  # 虚拟 Android 群号
         "adapter_source": "android"
     }
 
-    # ????????????????
+    # 记录该提问消息至数据库
     try:
         asyncio.run(
             update_msg(
@@ -1287,14 +1288,14 @@ def android_ask():
             )
         )
     except Exception as ex:
-        logger.warning(f"??? Android ??????: {ex}")
+        logger.warning(f"记录 Android 提问消息失败: {ex}")
 
-    # ??????????
+    # 等待机器人生成回复的通知事件
     ev = threading.Event()
     android_pending_events[user_id] = ev
     android_pending_responses[user_id] = {"reply": "", "images": []}
 
-    # ??????? WebSocket (Eridanus Bot ???)
+    # 广播事件至本地 WebSocket (Eridanus Bot 机器人)
     ev_json = json.dumps(event_payload, ensure_ascii=False)
     for c in list(clients):
         try:
@@ -1302,11 +1303,11 @@ def android_ask():
         except Exception:
             clients.discard(c)
 
-    # ????????
+    # 阻塞等待回复生成
     flag = ev.wait(timeout=timeout)
 
     if flag:
-        # ?????????? 2.5 ?????????(|| ??)???????
+        # 延时 2.5 秒以确保所有分段消息(|| 分割)接收完整
         time.sleep(2.5)
         android_pending_events.pop(user_id, None)
         reply_info = android_pending_responses.pop(user_id, {"reply": "", "images": []})
@@ -1325,11 +1326,28 @@ def android_ask():
         android_pending_responses.pop(user_id, None)
         return jsonify({
             "status": "timeout",
-            "reply": "Eridanus ?????????? Bot ???????? Hub?",
+            "reply": "(Eridanus 生成回复超时，请检查 Bot 是否已连接到 Hub)",
             "images": [],
             "message": "timeout",
             "user_id": user_id
         }), 504
+
+def get_webui_auth_token():
+    """读取 basic_config.yaml 中的 webui.auth_token 鉴权密钥"""
+    try:
+        cfg_path = os.path.join(os.path.dirname(BASE_DIR), "run", "common_config", "basic_config.yaml")
+        if not os.path.exists(cfg_path):
+            cfg_path = os.path.join(BASE_DIR, "run", "common_config", "basic_config.yaml")
+        if os.path.exists(cfg_path):
+            with open(cfg_path, 'r', encoding='utf-8') as f:
+                cfg = yaml.safe_load(f)
+                if isinstance(cfg, dict):
+                    webui_cfg = cfg.get("webui", {})
+                    if isinstance(webui_cfg, dict):
+                        return str(webui_cfg.get("auth_token", "")).strip()
+    except Exception as e:
+        logger.warning(f"[Auth] 读取 WebUI auth_token 异常: {e}")
+    return ""
 
 @sock.route('/api/ws')
 def handle_websocket(ws):
@@ -1337,15 +1355,20 @@ def handle_websocket(ws):
     logger.server("WebSocket 客户端已连接")
     clients.add(ws)
     try:
-        # 对非本地的访问鉴权
-        try:
-            # if request.remote_addr not in ip_whitelist:
-            if request.remote_addr not in ['127.0.0.1']:
-                recv_token = request.args.get('auth_token')
-                if auth_info[recv_token] > int(time.time()):
-                    logger.server(f"WebSocket客户端登录 - {request.remote_addr}")
-        except:
-            raise ValueError(f"WebSocket 客户端登录失败 - {request.remote_addr}")
+        # 对来自非本机的外部 WebSocket 连接进行鉴权 (Hub 端口 5007)
+        # 本地连接 (127.0.0.1, ::1, localhost 等) 或未设置 token 时自动放行
+        client_ip = request.remote_addr or ""
+        is_local = client_ip in ['127.0.0.1', '::1', 'localhost'] or client_ip.startswith('127.')
+        if not is_local:
+            configured_token = get_webui_auth_token()
+            recv_token = request.args.get('auth_token', '').strip()
+            # 如果配置了 token，则要求传入的 token 匹配配置项，或者属于已通过 WebUI 登录的有效会话
+            if configured_token:
+                is_valid_session = (recv_token in auth_info and auth_info[recv_token] > int(time.time()))
+                if recv_token != configured_token and not is_valid_session:
+                    logger.warning(f"WebSocket 外部客户端鉴权未通过 - IP: {client_ip}")
+                    raise ValueError(f"WebSocket 外部客户端鉴权未通过 - IP: {client_ip}")
+            logger.server(f"WebSocket 外部客户端鉴权通过 - IP: {client_ip}")
         while True:
             # 接收来自前端的消息
             message = ws.receive()
@@ -1375,14 +1398,14 @@ def handle_websocket(ws):
             if isinstance(message, dict) and message.get("action") in valid_message_actions:
                 target_group_id = message.get("params", {}).get("group_id", 879886836)
 
-                # ???? Android ??? (group_id == 222222) ???
+                # 捕获发送给 Android 虚拟群 (group_id == 222222) 的回复
                 if target_group_id == 222222 or str(target_group_id) == "222222":
                     try:
                         raw_msg = message.get("params", {}).get("message", "")
                         extracted_text = extract_onebot_text(raw_msg)
                         extracted_images = extract_onebot_images(raw_msg)
 
-                        # ????????????????
+                        # 将机器人的回复持久化保存
                         try:
                             asyncio.run(
                                 update_msg(
@@ -1394,9 +1417,9 @@ def handle_websocket(ws):
                                 )
                             )
                         except Exception as e_db:
-                            logger.warning(f"Android ???????: {e_db}")
+                            logger.warning(f"Android 消息入库失败: {e_db}")
 
-                        # ?????? Android HTTP/WS ????????????
+                        # 聚合机器人回复并唤醒等待中的 Android 请求
                         for uid, ev in list(android_pending_events.items()):
                             curr_info = android_pending_responses.get(uid, {"reply": "", "images": []})
                             curr_reply = curr_info.get("reply", "")
@@ -1416,7 +1439,7 @@ def handle_websocket(ws):
                             }
                             ev.set()
                     except Exception as e_resp:
-                        logger.warning(f"?? Android ????: {e_resp}")
+                        logger.warning(f"处理 Android 响应异常: {e_resp}")
                 action_json = json.dumps(message, ensure_ascii=False)
                 # 广播给除发送端外的其它客户端（如 TelegramAdapter）
                 for client in list(clients):
@@ -1443,10 +1466,9 @@ def handle_websocket(ws):
                         )
                     except Exception as ex:
                         logger.warning(f"消息记录更新失败: {ex}")
-                continue
 
-            # 2. 转发从外部客户端（如 TelegramAdapter）上报的 OneBot 事件
-            elif isinstance(message, dict) and message.get("post_type") == "message":
+            # 2. 如果收到的是外部适配器（如 TelegramAdapter）发来的 OneBot Event 事件，广播给主程序及 WebUI
+            elif isinstance(message, dict) and "post_type" in message:
                 event_json = json.dumps(message, ensure_ascii=False)
                 for client in list(clients):
                     if client != ws:
@@ -1454,20 +1476,17 @@ def handle_websocket(ws):
                             client.send(event_json)
                         except Exception:
                             clients.discard(client)
-                continue
 
-            # 3. 处理 WebUI 发送的聊天列表消息
+            # 3. 原始 WebUI 前端发送的 Array 格式消息，包装为标准 OneBot v11 Group 消息并注入
             elif isinstance(message, list):
-                if message and isinstance(message[0], dict) and "msg_id" in message[0]:
-                    message_id = message[0]["msg_id"]
-                    del message[0]
-
-                # 更新数据库聊天记录
+                is_update = True
+                message_id = time_now
+                role = 'end'
                 try:
                     asyncio.run(
                         update_msg(
                             time_now, json.dumps({
-                                "role": "end",
+                                "role": role,
                                 "message_id": message_id,
                                 "message": message
                             })
@@ -1549,4 +1568,3 @@ def start_webui():
     app.run(host="0.0.0.0", port=5007,threaded=True)
 # 启动Eridanus并捕获输出，反馈到前端。
 # 不会写，不写！
-
