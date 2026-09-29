@@ -49,8 +49,8 @@ telegram群组：[点击加入](https://t.me/+BUcoYoUebgIzMWFl)
 Eridanus 采用基于 **OneBot v11 协议标准**与**事件驱动中心 Hub** 的多端统一桥接架构：无需重复启动多份 Bot 核心插件，通过 WebUI 服务端作为 WebSocket Hub 中转，实现 QQ、WebUI、Telegram 以及移动端（如 Android 悬浮窗应用）的无缝接入与共享上下文。
 
 ### 核心架构示意图
-
-`	ext
+````
+	ext
  ┌───────────────────────┐          ┌────────────────────────┐
  │   QQ (OneBot v11)     │          │    Telegram Bot API    │
  │ (Snowluma /LLOneBot等) │          │ (长轮询 / sendDocument) │
@@ -90,7 +90,7 @@ Eridanus 采用基于 **OneBot v11 协议标准**与**事件驱动中心 Hub** �
  │    WebUI 前端网页    │               │  Android 悬浮窗应用  │
  │  (Vue / WebSocket)  │               │ (屏幕识别/翻译/建议) │
  └─────────────────────┘               └─────────────────────┘
-`
+````
 
 ### 多端协同与路由设计
 
