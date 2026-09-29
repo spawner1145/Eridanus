@@ -1,4 +1,4 @@
-# encoding: utf-8
+﻿# encoding: utf-8
 import asyncio
 import functools
 import hashlib
@@ -1045,9 +1045,8 @@ _start_file_cleanup_thread()
 
 def cache_local_image_for_remote(img_path_or_url):
     """
-    ?????????? file:// ????????? Web ?????? chat_files/
-    ???? Android App ? Web ?????? /api/chat/media/<filename> ??????
-    ?? http/https ? base64 ??????
+    将本地图片或 file:// 路径复制到 WebUI 托管目录 chat_files/
+    使得 Android App 等远程客户端可通过 /api/chat/media/<filename> 直接获取
     """
     if not img_path_or_url or not isinstance(img_path_or_url, str):
         return img_path_or_url
@@ -1063,12 +1062,24 @@ def cache_local_image_for_remote(img_path_or_url):
             unquoted = unquoted[1:]
         local_path = unquoted
 
-    if os.path.isfile(local_path):
+    # 处理相对路径或绝对路径
+    candidate_paths = [local_path]
+    if not os.path.isabs(local_path):
+        candidate_paths.append(os.path.join(os.path.dirname(BASE_DIR), local_path))
+        candidate_paths.append(os.path.join(BASE_DIR, local_path))
+
+    resolved_path = None
+    for cp in candidate_paths:
+        if os.path.isfile(cp):
+            resolved_path = cp
+            break
+
+    if resolved_path:
         try:
-            ext = os.path.splitext(local_path)[1]
+            ext = os.path.splitext(resolved_path)[1]
             if not ext:
                 ext = ".jpg"
-            with open(local_path, "rb") as rf:
+            with open(resolved_path, "rb") as rf:
                 content = rf.read()
             fmd5 = hashlib.md5(content).hexdigest()[:16]
             dest_name = f"cached_{fmd5}{ext}"
@@ -1078,12 +1089,12 @@ def cache_local_image_for_remote(img_path_or_url):
                     wf.write(content)
             return f"/api/chat/media/{dest_name}"
         except Exception as e:
-            logger.warning(f"[cache_local_image] ???????? {local_path}: {e}")
+            logger.warning(f"[cache_local_image] 缓存本地图片失败 {resolved_path}: {e}")
             return img_path_or_url
     return img_path_or_url
 
 def extract_onebot_text(message):
-    """?? OneBot ??????????"""
+    """提取 OneBot 消息中的纯文本内容"""
     if isinstance(message, str):
         return message
     if isinstance(message, list):
@@ -1093,14 +1104,14 @@ def extract_onebot_text(message):
                 if item.get("type") == "text":
                     texts.append(item.get("data", {}).get("text", ""))
                 elif item.get("type") == "image":
-                    texts.append("[图片]")
+                    pass
             elif isinstance(item, str):
                 texts.append(item)
         return "".join(texts)
     return str(message)
 
 def extract_onebot_images(message):
-    """????? OneBot ???????????/???????"""
+    """提取并缓存 OneBot 消息列表中的图片/文件路径为可访问URL"""
     images = []
     if isinstance(message, list):
         for item in message:
@@ -1110,7 +1121,6 @@ def extract_onebot_images(message):
                     cached_url = cache_local_image_for_remote(f_info)
                     images.append(cached_url)
     return images
-
 @app.route("/api/chat/media/<path:filename>", methods=["GET"])
 def get_chat_media_file(filename):
     """???? chat_files ???????? Android App ??????"""
@@ -1206,7 +1216,7 @@ def android_ask():
     text = data.get("text", "").strip()
     image_base64 = data.get("image_base64")
     user_id = data.get("user_id") or 1840094972
-    nickname = data.get("nickname") or "Android助理"
+    nickname = data.get("nickname") or "主人"
     timeout = float(data.get("timeout") or 60.0)
 
     try:
