@@ -1000,13 +1000,13 @@ clients = set()
 # WebSocket路由
 
 # ==========================================
-# Android ??? / ???? ????
+# Android ??? / ?????????
 # ==========================================
-android_pending_events = {}  # user_id -> threading.Event
-android_pending_responses = {}  # user_id -> reply_data
+android_pending_events = {}       # user_id -> threading.Event
+android_pending_responses = {}    # user_id -> reply_data dict {"reply": str, "images": list}
 
 def clean_expired_chat_files(days=3):
-    """?? chat_files ????????????3?????????"""
+    """?? chat_files ????????????(??3?)????????"""
     try:
         if not os.path.exists(UPLOAD_FOLDER):
             return
@@ -1029,7 +1029,7 @@ def clean_expired_chat_files(days=3):
         logger.warning(f"[FileCache] ????????: {e}")
 
 def _start_file_cleanup_thread():
-    """?????????? 12 ??????????? 3 ????"""
+    """???????????? 12 ??????????? 3 ????"""
     def _loop():
         while True:
             try:
@@ -1045,9 +1045,9 @@ _start_file_cleanup_thread()
 
 def cache_local_image_for_remote(img_path_or_url):
     """
-    ???????? file://D:/... ??????????
-    ?????? chat_files/ ????? Android App ??? Web ?? /api/chat/media/<filename>
-    ????? http/https ? base64 ?????
+    ?????????? file:// ????????? Web ?????? chat_files/
+    ???? Android App ? Web ?????? /api/chat/media/<filename> ??????
+    ?? http/https ? base64 ??????
     """
     if not img_path_or_url or not isinstance(img_path_or_url, str):
         return img_path_or_url
@@ -1055,7 +1055,6 @@ def cache_local_image_for_remote(img_path_or_url):
     if img_path_or_url.startswith("http://") or img_path_or_url.startswith("https://") or img_path_or_url.startswith("base64://"):
         return img_path_or_url
 
-    # ?? file:// ?????
     local_path = img_path_or_url
     if local_path.startswith("file://"):
         parsed = urllib.parse.urlparse(local_path)
@@ -1069,7 +1068,6 @@ def cache_local_image_for_remote(img_path_or_url):
             ext = os.path.splitext(local_path)[1]
             if not ext:
                 ext = ".jpg"
-            # ?? md5 ???????????????
             with open(local_path, "rb") as rf:
                 content = rf.read()
             fmd5 = hashlib.md5(content).hexdigest()[:16]
@@ -1085,6 +1083,7 @@ def cache_local_image_for_remote(img_path_or_url):
     return img_path_or_url
 
 def extract_onebot_text(message):
+    """?? OneBot ??????????"""
     if isinstance(message, str):
         return message
     if isinstance(message, list):
@@ -1094,13 +1093,14 @@ def extract_onebot_text(message):
                 if item.get("type") == "text":
                     texts.append(item.get("data", {}).get("text", ""))
                 elif item.get("type") == "image":
-                    texts.append("[??]")
+                    texts.append("[图片]")
             elif isinstance(item, str):
                 texts.append(item)
         return "".join(texts)
     return str(message)
 
 def extract_onebot_images(message):
+    """????? OneBot ???????????/???????"""
     images = []
     if isinstance(message, list):
         for item in message:
@@ -1113,7 +1113,7 @@ def extract_onebot_images(message):
 
 @app.route("/api/chat/media/<path:filename>", methods=["GET"])
 def get_chat_media_file(filename):
-    """???? chat_files ??????? Android App??????????"""
+    """???? chat_files ???????? Android App ??????"""
     try:
         return send_from_directory(UPLOAD_FOLDER, filename)
     except Exception as e:
@@ -1129,24 +1129,92 @@ def android_status():
         "active_clients": len(clients)
     })
 
+@app.route("/api/android/history", methods=["GET"])
+def android_history():
+    """? Android App ???????????????????"""
+    try:
+        limit = int(request.args.get("limit", 50))
+        # ???? limit ???
+        rows = asyncio.run(get_msg(0, limit))
+        results = []
+        for r in rows:
+            try:
+                item_data = json.loads(r[0])
+                msg_obj = item_data.get("message")
+                role = item_data.get("role", "start")
+                is_user = (role == "end")
+                time_val = item_data.get("message_id", 0)
+
+                text_content = ""
+                images = []
+
+                if isinstance(msg_obj, dict):
+                    # Action ???? send_group_msg
+                    raw_msg = msg_obj.get("params", {}).get("message", "")
+                    text_content = extract_onebot_text(raw_msg)
+                    images = extract_onebot_images(raw_msg)
+                elif isinstance(msg_obj, list):
+                    text_content = extract_onebot_text(msg_obj)
+                    images = extract_onebot_images(msg_obj)
+                elif isinstance(msg_obj, str):
+                    text_content = msg_obj
+
+                if text_content or images:
+                    results.append({
+                        "id": time_val,
+                        "text": text_content,
+                        "images": images,
+                        "is_user": is_user,
+                        "time": time_val
+                    })
+            except Exception:
+                continue
+
+        # ???????????????????????????
+        results.reverse()
+        return jsonify({"status": "ok", "messages": results})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/android/upload", methods=["POST"])
+def android_upload_image():
+    """? Android App ?????????? chat_files ????? URL"""
+    try:
+        file = request.files.get("file")
+        if not file:
+            return jsonify({"status": "error", "message": "No file uploaded"}), 400
+        ext = os.path.splitext(file.filename)[1] or ".jpg"
+        content = file.read()
+        fmd5 = hashlib.md5(content).hexdigest()[:16]
+        dest_name = f"cached_{fmd5}{ext}"
+        dest_path = os.path.join(UPLOAD_FOLDER, dest_name)
+        if not os.path.exists(dest_path):
+            with open(dest_path, "wb") as wf:
+                wf.write(content)
+        return jsonify({
+            "status": "ok",
+            "url": f"/api/chat/media/{dest_name}",
+            "filename": dest_name
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route("/api/android/ask", methods=["POST"])
 def android_ask():
-    """Android App ?????/?????????? QQ ????????"""
+    """Android App ??/???????? QQ ??????"""
     data = request.get_json(silent=True) or {}
     text = data.get("text", "").strip()
     image_base64 = data.get("image_base64")
     user_id = data.get("user_id") or 1840094972
-    nickname = data.get("nickname") or "Android?????"
+    nickname = data.get("nickname") or "Android助理"
     timeout = float(data.get("timeout") or 60.0)
 
     try:
         user_id = int(user_id)
-    except:
+    except Exception:
         user_id = 1840094972
 
-    # ?? OneBot v11 ?????
     msg_segments = []
-    # ???????? (self_id: 1000000) ???????????
     at_bot = data.get("at_bot", True)
     if at_bot:
         msg_segments.append({
@@ -1193,16 +1261,30 @@ def android_ask():
         "message": msg_segments,
         "message_format": "array",
         "post_type": "message",
-        "group_id": 222222,  # ?????????
+        "group_id": 222222,  # ?? Android ???
         "adapter_source": "android"
     }
 
-    # ???? Event
+    # ????????????????
+    try:
+        asyncio.run(
+            update_msg(
+                now_ms, json.dumps({
+                    "role": "end",
+                    "message_id": now_ms,
+                    "message": msg_segments
+                }, ensure_ascii=False)
+            )
+        )
+    except Exception as ex:
+        logger.warning(f"??? Android ??????: {ex}")
+
+    # ??????????
     ev = threading.Event()
     android_pending_events[user_id] = ev
-    android_pending_responses.pop(user_id, None)
+    android_pending_responses[user_id] = {"reply": "", "images": []}
 
-    # ??????? WebSocket?? Eridanus Bot ???
+    # ??????? WebSocket (Eridanus Bot ???)
     ev_json = json.dumps(event_payload, ensure_ascii=False)
     for c in list(clients):
         try:
@@ -1210,23 +1292,30 @@ def android_ask():
         except Exception:
             clients.discard(c)
 
-    # ????
+    # ????????
     flag = ev.wait(timeout=timeout)
-    android_pending_events.pop(user_id, None)
 
-    if flag and user_id in android_pending_responses:
-        reply_info = android_pending_responses.pop(user_id)
+    if flag:
+        # ?????????? 2.5 ?????????(|| ??)???????
+        time.sleep(2.5)
+        android_pending_events.pop(user_id, None)
+        reply_info = android_pending_responses.pop(user_id, {"reply": "", "images": []})
+        final_reply = reply_info.get("reply", "").strip()
+        final_images = reply_info.get("images", [])
+
         return jsonify({
             "status": "ok",
-            "reply": reply_info.get("reply", ""),
-            "images": reply_info.get("images", []),
+            "reply": final_reply,
+            "images": final_images,
             "message": "success",
             "user_id": user_id
         })
     else:
+        android_pending_events.pop(user_id, None)
+        android_pending_responses.pop(user_id, None)
         return jsonify({
             "status": "timeout",
-            "reply": "Eridanus ???????? Bot ??????????? Hub?",
+            "reply": "Eridanus ?????????? Bot ???????? Hub?",
             "images": [],
             "message": "timeout",
             "user_id": user_id
@@ -1276,21 +1365,48 @@ def handle_websocket(ws):
             if isinstance(message, dict) and message.get("action") in valid_message_actions:
                 target_group_id = message.get("params", {}).get("group_id", 879886836)
 
-                # ??????? Android ???? (group_id == 222222) ???
+                # ???? Android ??? (group_id == 222222) ???
                 if target_group_id == 222222 or str(target_group_id) == "222222":
                     try:
                         raw_msg = message.get("params", {}).get("message", "")
                         extracted_text = extract_onebot_text(raw_msg)
                         extracted_images = extract_onebot_images(raw_msg)
-                        # ????????? Android ??
+
+                        # ????????????????
+                        try:
+                            asyncio.run(
+                                update_msg(
+                                    time_now, json.dumps({
+                                        "role": "start",
+                                        "message_id": time_now,
+                                        "message": message
+                                    }, ensure_ascii=False)
+                                )
+                            )
+                        except Exception as e_db:
+                            logger.warning(f"Android ???????: {e_db}")
+
+                        # ?????? Android HTTP/WS ????????????
                         for uid, ev in list(android_pending_events.items()):
+                            curr_info = android_pending_responses.get(uid, {"reply": "", "images": []})
+                            curr_reply = curr_info.get("reply", "")
+                            if curr_reply and extracted_text:
+                                curr_reply = (curr_reply + "\n" + extracted_text) if curr_reply else extracted_text
+                            elif extracted_text:
+                                curr_reply = extracted_text
+
+                            curr_imgs = curr_info.get("images", [])
+                            for img in extracted_images:
+                                if img not in curr_imgs:
+                                    curr_imgs.append(img)
+
                             android_pending_responses[uid] = {
-                                "reply": extracted_text,
-                                "images": extracted_images
+                                "reply": curr_reply,
+                                "images": curr_imgs
                             }
                             ev.set()
                     except Exception as e_resp:
-                        logger.warning(f"?? Android ??????: {e_resp}")
+                        logger.warning(f"?? Android ????: {e_resp}")
                 action_json = json.dumps(message, ensure_ascii=False)
                 # 广播给除发送端外的其它客户端（如 TelegramAdapter）
                 for client in list(clients):

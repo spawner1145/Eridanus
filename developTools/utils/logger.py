@@ -19,11 +19,12 @@ class CategoryHandler(logging.StreamHandler):
     def __init__(self):
         super().__init__()
         import sys
-        if hasattr(sys.stderr, "reconfigure"):
-            try:
-                sys.stderr.reconfigure(errors="backslashreplace")
-            except Exception:
-                pass
+        for stream in (sys.stdout, sys.stderr):
+            if hasattr(stream, "reconfigure"):
+                try:
+                    stream.reconfigure(encoding="utf-8", errors="replace")
+                except Exception:
+                    pass
         # 为不同类别创建不同的formatter
         self.formatters = {
             'default': self._create_formatter(
