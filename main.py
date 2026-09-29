@@ -202,8 +202,27 @@ def main_sync():
             # 3. 创建双Bot管理器（如果有副Bot）
             if bot2:
                 bot2.fix_id=config.common_config.basic_config["master"]["id"]
-                dual_manager = DualBotManager(bot1, bot2, target_group_id=879886836)
+                dual_manager = DualBotManager(bot1, bot2, target_group_id=[879886836, 111111, 222222])
                 bot1.logger.info("🔧 双Bot管理器已创建，开始启动双Bot系统...")
+
+                # 检查是否配置了 Telegram Bot Token
+                try:
+                    tg_cfg = config.common_config.basic_config.get("telegram", {})
+                    tg_token = tg_cfg.get("bot_token") if tg_cfg.get("enable") else None
+                    if tg_token and str(tg_token).strip():
+                        from developTools.adapters.telegram_adapter import TelegramAdapter
+                        tg_proxy = tg_cfg.get("proxy") or config.common_config.basic_config.get("proxy", {}).get("http_proxy", "")
+                        tg_adapter = TelegramAdapter(
+                            token=str(tg_token).strip(),
+                            hub_ws_url="ws://127.0.0.1:5007/api/ws",
+                            proxy=tg_proxy,
+                            default_qq_id=config.common_config.basic_config["master"]["id"]
+                        )
+                        asyncio.create_task(tg_adapter.start())
+                        bot1.logger.info("🚀 Telegram Adapter 服务已成功随主系统拉起！")
+                except Exception as tg_err:
+                    bot1.logger.error(f"Telegram Adapter 启动失败: {tg_err}")
+
                 # 启动双Bot系统
                 await dual_manager.start_both_bots()
             else:

@@ -1,6 +1,6 @@
-# dual_bot_manager.py
+﻿# dual_bot_manager.py
 import asyncio
-from typing import Union, Optional
+from typing import Union, Optional, Set
 from developTools.adapters.websocket_adapter import WebSocketBot
 
 from developTools.event.base import EventBase
@@ -11,15 +11,23 @@ from framework_common.framework_util.websocket_fix import ExtendBot
 class DualBotManager:
     """双Bot管理器，负责协调两个Bot之间的消息转发"""
 
-    def __init__(self, primary_bot: ExtendBot, secondary_bot: WebSocketBot, target_group_id: int = 879886836):
+    def __init__(self, primary_bot: ExtendBot, secondary_bot: WebSocketBot, target_group_id: Union[int, list, set] = 879886836):
         self.primary_bot = primary_bot
         self.secondary_bot = secondary_bot
+        # 支持单个 target_group_id 或群组集合（用于WebUI、Telegram、Android悬浮窗等虚拟群）
+        if isinstance(target_group_id, (list, set, tuple)):
+            self.target_group_ids: Set[int] = {int(gid) for gid in target_group_id}
+        else:
+            self.target_group_ids: Set[int] = {int(target_group_id)}
         self.target_group_id = target_group_id
 
         # 设置消息转发
         self._setup_message_forwarding()
         # 重写主Bot的send方法
         self._override_primary_bot_send()
+
+    def add_target_group_id(self, group_id: int):
+        self.target_group_ids.add(int(group_id))
 
     def _setup_message_forwarding(self):
         """设置从副Bot到主Bot的消息转发"""
@@ -38,10 +46,13 @@ class DualBotManager:
                     # 处理心跳等非业务消息
                     if 'heartbeat' not in str(data):
                         try:
-                            if 'user_id' in data:
-                                data['user_id']=self.secondary_bot.fix_id
-                            if 'sender' in data:
-                                data['sender']['user_id']=self.secondary_bot.fix_id
+                            # 仅在未指定user_id或者user_id为占位时，才使用fix_id，避免覆盖来自Telegram/Android客户端透传的QQ绑定ID
+                            fix_id = getattr(self.secondary_bot, "fix_id", None)
+                            if fix_id:
+                                if 'user_id' not in data or data.get('user_id') in [111111111, 0, None]:
+                                    data['user_id'] = fix_id
+                                if 'sender' in data and (data['sender'].get('user_id') in [111111111, 0, None]):
+                                    data['sender']['user_id'] = fix_id
                         except Exception as e:
                             self.secondary_bot.logger.error(f"bot id修正失败: {e}")
                         self.secondary_bot.logger.info(f"副Bot收到服务端响应: {data}")
@@ -73,6 +84,21 @@ class DualBotManager:
                             except Exception:
                                 pass
                             # 将副Bot接收到的事件转发给主Bot的事件总线处理
+                            # 统一规范并推断 adapter_source
+                            src = data.get("adapter_source")
+                            if not src:
+                                gid = getattr(event_obj, "group_id", None)
+                                gid_str = str(gid) if gid is not None else ""
+                                if gid_str.startswith("11111") or gid_str.startswith("1111"):
+                                    src = "telegram"
+                                elif gid == 222222 or gid_str == "222222":
+                                    src = "android"
+                                elif gid == 879886836 or gid_str == "879886836":
+                                    src = "webui"
+                                else:
+                                    src = "webui"
+                            event_obj.adapter_source = src
+
                             asyncio.create_task(self.primary_bot.event_bus.emit(event_obj))
                         else:
                             self.secondary_bot.logger.warning("副Bot无法匹配事件类型，跳过处理。")
@@ -102,8 +128,19 @@ class DualBotManager:
 
         async def routed_send(event: EventBase, components: list[Union[MessageComponent, str]], Quote: bool = False):
             """路由发送方法：根据群号决定使用哪个Bot发送"""
-            # 检查是否为目标群号
-            if hasattr(event, 'group_id') and event.group_id == self.target_group_id:
+            # 检查是否为目标群号（支持集合判断）
+            # ??????????????????879886836?webui?222222?android?11111???telegram???/???
+            # 根据 adapter_source 或 group_id 判断是否通过副Bot (接入Hub的 Telegram/WebUI/Android) 发送
+            is_virtual_group = False
+            src = getattr(event, "adapter_source", None)
+            if src in ("telegram", "webui", "android"):
+                is_virtual_group = True
+            elif hasattr(event, 'group_id'):
+                gid = event.group_id
+                if gid in self.target_group_ids or gid == self.target_group_id or str(gid).startswith("11111"):
+                    is_virtual_group = True
+
+            if is_virtual_group:
                 # 使用副Bot发送
                 self.primary_bot.logger.info_msg(f"消息路由到副Bot发送，群号: {event.group_id}")
                 return await self._send_via_secondary_bot(event, components, Quote)

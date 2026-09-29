@@ -75,7 +75,7 @@ ip_whitelist = []
 # ip_whitelist = ["127.0.0.1","192.168.195.128","192.168.195.137","::1"]
 
 # 合法的消息事件，其余不储存进数据库。
-valid_message_actions = ['send_group_forward_msg','send_group_msg','upload_group_file']
+valid_message_actions = ['send_group_forward_msg', 'send_private_forward_msg', 'send_group_msg', 'send_private_msg', 'upload_group_file', 'upload_private_file']
 
 # 用户信息文件
 user_file = "./user_info.yaml"
@@ -1027,69 +1027,108 @@ def handle_websocket(ws):
                     except Exception:
                         clients.discard(client)
                         # 获取前端消息的id
-            # 毫秒时间戳
+            # 统一时间戳
             time_now = int(time.time() * 1000)
             message_id = time_now
             is_update = False
-            # 前端渲染气泡用。end是用户，start是机器人
+            target_group_id = 879886836
+            # 区分消息发起者
             role = 'end'
-            # 如果是webui发来的信息（一个列表），提取里面的消息id（发送时间戳）
-            if isinstance(message,list):
-                is_update = True
-                message_id = message[0]["msg_id"]
-                # 删除第0项：包含msg_id的字典
-                del message[0]
-            #如果不是webui发来的消息，以收到消息的时间为id
-            elif message.get("action") in valid_message_actions:
-                is_update = True
-                message_id = time_now
-                role = 'start'
 
-            # 存入聊天记录到数据库
-            if is_update:
-                asyncio.run(
-                    update_msg(
-                        time_now,json.dumps(
-                        {"role" : role,
-                        "message_id" : message_id,
-                        "message" : message}
-                )))
+            # 1. 转发主程序 Eridanus 发出的 Action 指令至所有外部客户端（包括 TG）
+            if isinstance(message, dict) and message.get("action") in valid_message_actions:
+                target_group_id = message.get("params", {}).get("group_id", 879886836)
+                action_json = json.dumps(message, ensure_ascii=False)
+                # 广播给除发送端外的其它客户端（如 TelegramAdapter）
+                for client in list(clients):
+                    if client != ws:
+                        try:
+                            client.send(action_json)
+                        except Exception:
+                            clients.discard(client)
 
-            # logger.server(message, type(message))
+                # 如果是 WebUI 的本地群，则持久化消息
+                if target_group_id == 879886836:
+                    is_update = True
+                    message_id = time_now
+                    role = 'start'
+                    try:
+                        asyncio.run(
+                            update_msg(
+                                time_now, json.dumps({
+                                    "role": role,
+                                    "message_id": message_id,
+                                    "message": message
+                                })
+                            )
+                        )
+                    except Exception as ex:
+                        logger.warning(f"消息记录更新失败: {ex}")
+                continue
 
-            onebot_event = {
-                'self_id': 1000000,
-                'user_id': 111111111,
-                'time': time_now,
-                'message_id': message_id,
-                'real_id': 1253451396,
-                'message_seq': 1253451396,
-                'message_type': 'group',
-                'sender':
-                    {'user_id': 111111111, 'nickname': '主人', 'card': '', 'role': 'member', 'title': ''},
-                'raw_message': "",
-                'font': 14,
-                'sub_type': 'normal',
-                'message': message,
-                'message_format': 'array',
-                'post_type': 'message',
-                'group_id': 879886836}
+            # 2. 转发从外部客户端（如 TelegramAdapter）上报的 OneBot 事件
+            elif isinstance(message, dict) and message.get("post_type") == "message":
+                event_json = json.dumps(message, ensure_ascii=False)
+                for client in list(clients):
+                    if client != ws:
+                        try:
+                            client.send(event_json)
+                        except Exception:
+                            clients.discard(client)
+                continue
 
+            # 3. 处理 WebUI 发送的聊天列表消息
+            elif isinstance(message, list):
+                if message and isinstance(message[0], dict) and "msg_id" in message[0]:
+                    message_id = message[0]["msg_id"]
+                    del message[0]
 
-            def send_mes(onebot_event):
+                # 更新数据库聊天记录
+                try:
+                    asyncio.run(
+                        update_msg(
+                            time_now, json.dumps({
+                                "role": "end",
+                                "message_id": message_id,
+                                "message": message
+                            })
+                        )
+                    )
+                except Exception as ex:
+                    logger.warning(f"消息记录更新失败: {ex}")
+
+                onebot_event = {
+                    'self_id': 1000000,
+                    'user_id': 111111111,
+                    'time': time_now,
+                    'message_id': message_id,
+                    'real_id': 1253451396,
+                    'message_seq': 1253451396,
+                    'message_type': 'group',
+                    'sender': {
+                        'user_id': 111111111,
+                        'nickname': '主人',
+                        'card': '',
+                        'role': 'member',
+                        'title': ''
+                    },
+                    'raw_message': "",
+                    'font': 14,
+                    'sub_type': 'normal',
+                    'message': message,
+                    'message_format': 'array',
+                    'post_type': 'message',
+                    'group_id': 879886836,
+                    'adapter_source': 'webui'
+                }
+
                 event_json = json.dumps(onebot_event, ensure_ascii=False)
-
-                # 发送给所有连接的客户端（后端）
                 for client in list(clients):
                     try:
-                        if client != ws:  # 避免回传给前端
+                        if client != ws:
                             client.send(event_json)
                     except Exception:
                         clients.discard(client)
-
-                # logger.server(f"已发送 OneBot v11 事件: {event_json}")
-            send_mes(onebot_event)
-    except Exception as e:
         logger.server(f"WebSocket事件: {str(e)}")
         # traceback.print_exc()
     finally:

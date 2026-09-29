@@ -27,7 +27,7 @@ _🎊 基于 [OneBot](https://github.com/howmanybots/onebot/blob/master/README.m
   <a href="">参与贡献</a>
 </p>
 
-</p>
+
 
 # 部署
 [文档](https://eridanus.netlify.app)    
@@ -36,26 +36,74 @@ _🎊 基于 [OneBot](https://github.com/howmanybots/onebot/blob/master/README.m
 如使用快捷部署部署失败，请参照文档部署。
 # 交流
 QQ群：1050663831  [点击加入](https://qm.qq.com/q/4iD3sVJNZe)
+telegram群组：[点击加入](https://t.me/+BUcoYoUebgIzMWFl)
 
 **如果您对此项目的开发工作感兴趣，欢迎加入我们🎉。**
 
 # 更新计划
-- [x] galgame查询，同步请求部分修改为异步
-- [x] ai对话功能，群聊上下文读取方式优化，人设读取方式优化，提高兼容性
-- [ ] 自定义问答，微调训练
-- [X] 点歌功能修复
-- [x] 输出内容自我审核
-- [x] 抖音视频下载
-- [ ] jmcomic功能优化
-- [ ] 定时任务完善。用函数调用实现事项提醒效果。
-- [ ] 更多主动触发功能
-- [x] 函数调用func_map描述优化，降低tokens消耗
-- [ ] 其他平台适配器
-- [x] webui重构，提高兼容性，界面美化。webui与项目本体合并
-- [ ] ai绘画冗余、重复代码优化
-- [ ] 接入petpet
-- [X] 开发文档优化，插件模板
-- [X] 重构自身绘图框架
+- [x] 接入telegram
+
+
+# 架构与多平台接入 (Architecture & Multi-Platform Hub)
+
+Eridanus 采用基于 **OneBot v11 协议标准**与**事件驱动中心 Hub** 的多端统一桥接架构：无需重复启动多份 Bot 核心插件，通过 WebUI 服务端作为 WebSocket Hub 中转，实现 QQ、WebUI、Telegram 以及移动端（如 Android 悬浮窗应用）的无缝接入与共享上下文。
+
+### 核心架构示意图
+
+`	ext
+ ┌───────────────────────┐          ┌────────────────────────┐
+ │   QQ (OneBot v11)     │          │    Telegram Bot API    │
+ │ (Snowluma /LLOneBot等) │          │ (长轮询 / sendDocument) │
+ └───────────┬───────────┘          └───────────┬────────────┘
+             │                                  │
+     (正向/反向 WS)                      (双向事件与消息转换)
+             │                                  │
+             ▼                                  ▼
+ ┌───────────────────────────────────────────────────────────┐
+ │          Eridanus Multi-Platform WebSocket Hub            │
+ │                    (web/server_new.py)                    │
+ │                                                           │
+ │  * 虚拟路由分发 (Virtual Group Router):                    │
+ │    - 真实 QQ 群: 原样透传                                  │
+ │    - WebUI 模拟群: 879886836                              │
+ │    - Telegram 群/频道: 11111{chat_id}                     │
+ │    - Android 悬浮端: 222222                               │
+ │                                                           │
+ │  * 来源标记字段 (adapter_source):                         │
+ │    - qq / webui / telegram / android                      │
+ │    - 支持针对非 QQ 平台关闭图片混淆/灰度与 PDF 加密等限制 │
+ └─────────────────────────────┬─────────────────────────────┘
+                               │
+                       (OneBot v11 内部总线)
+                               ▼
+ ┌───────────────────────────────────────────────────────────┐
+ │               Eridanus Bot Core & Plugins                 │
+ │                                                           │
+ │  * 插件生态: Mai_Reply / 资源搜索 / 屏幕视觉建议 / 数据库 │
+ │  * 记忆共享: 跨平台通过 /bind <qq_id> 共享相同用户上下文   │
+ └───────────────────────────────────────────────────────────┘
+                               ▲
+                               │
+            ┌──────────────────┴──────────────────┐
+            │                                     │
+ ┌──────────┴──────────┐               ┌──────────┴──────────┐
+ │    WebUI 前端网页    │               │  Android 悬浮窗应用  │
+ │  (Vue / WebSocket)  │               │ (屏幕识别/翻译/建议) │
+ └─────────────────────┘               └─────────────────────┘
+`
+
+### 多端协同与路由设计
+
+1. **统一适配与无缝透传**：
+   - 所有的入站消息（QQ、WebUI、Telegram、Android）在进入 Bot 处理流水线前，均被规范化为标准的 OneBot v11 GroupMessageEvent 或 PrivateMessageEvent。
+   - 消息携带统一的 dapter_source（取值 qq、webui、	elegram、ndroid），供业务插件优雅识别终端来源。
+2. **免二次启动插件 (Single Instance Multi-Client)**：
+   - Eridanus 作为标准 OneBot 客户端连接本地 Hub，所有插件仅在内存中加载一次，无需为每个平台单独拉起 Bot 实例。
+3. **Telegram 增强能力**：
+   - **合并转发相册化**：支持 OneBot Node 消息节点，将多个图片合并为单个 Telegram sendMediaGroup 原生相册发出，告别刷屏。
+   - **文件原样传输**：针对 JM 漫画、PDF 下载与大文件，直接通过 Telegram sendDocument 接口传输，当目标为 Telegram 时自动绕过加密并免去密码提示。
+   - **上下文绑定**：发送 /bind <QQ号> 即可将 Telegram 会话与对应的 QQ 用户 ID 关联，实现跨端上下文与长期记忆互通。
+
 # 派生项目
 - [Achernar](https://github.com/AOrbitron/Achernar) cpolar隧道本地反向代理，kaggle自动切换账号运行指定脚本。(用于在kaggle持久化部署ai绘画等服务)
 - [vits api](https://github.com/avilliai/vits_api) 本地部署vits语音合成服务端，已打包。

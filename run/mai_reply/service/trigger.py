@@ -235,23 +235,22 @@ class TriggerChecker:
         return False
 
     @staticmethod
-    def _has_at( event, bot_self_id: int) -> bool:
+    def _has_at(event, bot_self_id: int) -> bool:
         #print(event)
         if not hasattr(event, "group_id"):
-            #print("不是群消息")
+            #print("?????")
             return False
 
         if not event.message_chain.has(At):
-            #print("消息中没有At")
+            #print("?????At")
             return False
         for seg in event.message_chain.get(At):
             qq = getattr(seg, "qq", None)
             if qq is None:
                 qq = (getattr(seg, "data", {}) or {}).get("qq")
-            if str(qq) in {str(bot_self_id), "1000000"}:
+            if str(qq) in {str(bot_self_id), "1000000"} or (hasattr(event, "group_id") and str(event.group_id).startswith("11111")):
                 return True
         return False
-
     @staticmethod
     def _remove_at_segments(event, text: str, bot_name: str, bot_self_id: int) -> str:
         # Rebuild from every segment so multiple At/Text parts are retained
