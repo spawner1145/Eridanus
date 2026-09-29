@@ -1122,6 +1122,71 @@ def extract_onebot_images(message):
                     images.append(cached_url)
     return images
 
+def get_webui_auth_token():
+    """读取 basic_config.yaml 中的 webui.auth_token 鉴权密钥"""
+    try:
+        cfg_path = os.path.join(os.path.dirname(BASE_DIR), "run", "common_config", "basic_config.yaml")
+        if not os.path.exists(cfg_path):
+            cfg_path = os.path.join(BASE_DIR, "run", "common_config", "basic_config.yaml")
+        if os.path.exists(cfg_path):
+            with open(cfg_path, 'r', encoding='utf-8') as f:
+                yaml_loader = YAML(typ='safe')
+                cfg = yaml_loader.load(f)
+                if isinstance(cfg, dict):
+                    webui_cfg = cfg.get("webui", {})
+                    if isinstance(webui_cfg, dict):
+                        return str(webui_cfg.get("auth_token", "")).strip()
+    except Exception as e:
+        logger.warning(f"[Auth] 读取 WebUI auth_token 异常: {e}")
+    return ""
+
+def verify_external_request_auth():
+    """
+    检查外部请求鉴权：
+    1. 若未设置 auth_token，则放行
+    2. 若客户端来自本机(127.0.0.1, ::1)，放行
+    3. 若外部访问，支持从 Header (X-Auth-Token/Authorization), Query (auth_token/token), 
+       或者 JSON Body (auth_token) 中读取 token 并比对。
+    """
+    configured_token = get_webui_auth_token()
+    if not configured_token:
+        return True, ""
+
+    client_ip = request.remote_addr or ""
+    # 如果没有走反代直接来自本机
+    is_local = (client_ip in ['127.0.0.1', '::1', 'localhost'] or client_ip.startswith('127.'))
+    # 注意：如果经过了反向代理 (例如 frp/nginx/caddy)，用户可能从外网访问
+    # 因此如果有 X-Forwarded-For 且不全是 127.0.0.1，或者外部域名访问，必须严密校验 token
+    forwarded_for = request.headers.get("X-Forwarded-For", "").strip()
+    if forwarded_for and not all(ip.strip() in ['127.0.0.1', '::1', 'localhost'] for ip in forwarded_for.split(',')):
+        is_local = False
+
+    # 获取请求传入的 token
+    recv_token = (
+        request.headers.get("X-Auth-Token", "") or
+        request.headers.get("Authorization", "").replace("Bearer ", "") or
+        request.args.get("auth_token", "") or
+        request.args.get("token", "")
+    ).strip()
+
+    if not recv_token and request.is_json:
+        data = request.get_json(silent=True) or {}
+        recv_token = str(data.get("auth_token", "")).strip()
+
+    # 检查是否匹配配置的 token
+    if recv_token == configured_token:
+        return True, ""
+
+    # 检查是否是 WebUI 登录会话中的合法 token
+    if recv_token in auth_info and auth_info[recv_token] > int(time.time()):
+        return True, ""
+
+    # 如果完全是本地且没有携带外部代理来源，允许本地开发环境访问
+    if is_local and not forwarded_for and not recv_token:
+        return True, ""
+
+    return False, "鉴权失败：缺少有效或匹配的访问 Token (Invalid Auth Token)"
+
 @app.route("/api/chat/media/<path:filename>", methods=["GET"])
 def get_chat_media_file(filename):
     """直接访问 chat_files 中的图片文件，供 Android App 跨设备加载"""
@@ -1133,6 +1198,13 @@ def get_chat_media_file(filename):
 @app.route("/api/android/status", methods=["GET"])
 def android_status():
     """Android App 连通性与状态检查"""
+    auth_ok, auth_msg = verify_external_request_auth()
+    if not auth_ok:
+        return jsonify({
+            "status": "error",
+            "message": auth_msg
+        }), 401
+
     return jsonify({
         "status": "ok",
         "bot_connected": len(clients) > 0,
@@ -1143,6 +1215,13 @@ def android_status():
 @app.route("/api/android/history", methods=["GET"])
 def android_history():
     """为 Android App 提供与机器人交互的最近历史消息"""
+    auth_ok, auth_msg = verify_external_request_auth()
+    if not auth_ok:
+        return jsonify({
+            "status": "error",
+            "message": auth_msg
+        }), 401
+
     try:
         limit = int(request.args.get("limit", 50))
         # 获取最近 limit 条记录
@@ -1190,6 +1269,13 @@ def android_history():
 @app.route("/api/android/upload", methods=["POST"])
 def android_upload_image():
     """供 Android App 上传图片并保存到 chat_files，返回公开访问 URL"""
+    auth_ok, auth_msg = verify_external_request_auth()
+    if not auth_ok:
+        return jsonify({
+            "status": "error",
+            "message": auth_msg
+        }), 401
+
     try:
         file = request.files.get("file")
         if not file:
@@ -1213,6 +1299,13 @@ def android_upload_image():
 @app.route("/api/android/ask", methods=["POST"])
 def android_ask():
     """Android App 发送/提问接口，与 QQ 上下文记忆打通"""
+    auth_ok, auth_msg = verify_external_request_auth()
+    if not auth_ok:
+        return jsonify({
+            "status": "error",
+            "message": auth_msg
+        }), 401
+
     data = request.get_json(silent=True) or {}
     text = data.get("text", "").strip()
     image_base64 = data.get("image_base64")
@@ -1332,23 +1425,6 @@ def android_ask():
             "user_id": user_id
         }), 504
 
-def get_webui_auth_token():
-    """读取 basic_config.yaml 中的 webui.auth_token 鉴权密钥"""
-    try:
-        cfg_path = os.path.join(os.path.dirname(BASE_DIR), "run", "common_config", "basic_config.yaml")
-        if not os.path.exists(cfg_path):
-            cfg_path = os.path.join(BASE_DIR, "run", "common_config", "basic_config.yaml")
-        if os.path.exists(cfg_path):
-            with open(cfg_path, 'r', encoding='utf-8') as f:
-                cfg = yaml.safe_load(f)
-                if isinstance(cfg, dict):
-                    webui_cfg = cfg.get("webui", {})
-                    if isinstance(webui_cfg, dict):
-                        return str(webui_cfg.get("auth_token", "")).strip()
-    except Exception as e:
-        logger.warning(f"[Auth] 读取 WebUI auth_token 异常: {e}")
-    return ""
-
 @sock.route('/api/ws')
 def handle_websocket(ws):
     global auth_info
@@ -1358,16 +1434,18 @@ def handle_websocket(ws):
         # 对来自非本机的外部 WebSocket 连接进行鉴权 (Hub 端口 5007)
         # 本地连接 (127.0.0.1, ::1, localhost 等) 或未设置 token 时自动放行
         client_ip = request.remote_addr or ""
-        is_local = client_ip in ['127.0.0.1', '::1', 'localhost'] or client_ip.startswith('127.')
-        if not is_local:
-            configured_token = get_webui_auth_token()
-            recv_token = request.args.get('auth_token', '').strip()
-            # 如果配置了 token，则要求传入的 token 匹配配置项，或者属于已通过 WebUI 登录的有效会话
-            if configured_token:
-                is_valid_session = (recv_token in auth_info and auth_info[recv_token] > int(time.time()))
-                if recv_token != configured_token and not is_valid_session:
-                    logger.warning(f"WebSocket 外部客户端鉴权未通过 - IP: {client_ip}")
-                    raise ValueError(f"WebSocket 外部客户端鉴权未通过 - IP: {client_ip}")
+        forwarded_for = request.headers.get("X-Forwarded-For", "").strip()
+        is_local = (client_ip in ['127.0.0.1', '::1', 'localhost'] or client_ip.startswith('127.'))
+        if forwarded_for and not all(ip.strip() in ['127.0.0.1', '::1', 'localhost'] for ip in forwarded_for.split(',')):
+            is_local = False
+
+        configured_token = get_webui_auth_token()
+        if not is_local and configured_token:
+            recv_token = (request.args.get('auth_token') or request.args.get('token') or "").strip()
+            is_valid_session = (recv_token in auth_info and auth_info[recv_token] > int(time.time()))
+            if recv_token != configured_token and not is_valid_session:
+                logger.warning(f"WebSocket 外部客户端鉴权未通过 - IP: {client_ip}")
+                raise ValueError(f"WebSocket 外部客户端鉴权未通过 - IP: {client_ip}")
             logger.server(f"WebSocket 外部客户端鉴权通过 - IP: {client_ip}")
         while True:
             # 接收来自前端的消息
@@ -1420,11 +1498,12 @@ def handle_websocket(ws):
                             logger.warning(f"Android 消息入库失败: {e_db}")
 
                         # 聚合机器人回复并唤醒等待中的 Android 请求
+                        # 注意：每个独立分段用 || 分隔，以便客户端准确切分并模拟逐条发出
                         for uid, ev in list(android_pending_events.items()):
                             curr_info = android_pending_responses.get(uid, {"reply": "", "images": []})
                             curr_reply = curr_info.get("reply", "")
                             if curr_reply and extracted_text:
-                                curr_reply = (curr_reply + "\n" + extracted_text) if curr_reply else extracted_text
+                                curr_reply = curr_reply + "||" + extracted_text
                             elif extracted_text:
                                 curr_reply = extracted_text
 
