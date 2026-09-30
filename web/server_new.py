@@ -6,6 +6,7 @@ import importlib
 import json
 import logging
 import os
+import re
 import shutil
 import sys
 import threading
@@ -1096,12 +1097,12 @@ def cache_local_image_for_remote(img_path_or_url):
     return img_path_or_url
 
 def extract_onebot_text(message):
-    """?? OneBot ???????????? list ??? CQ ????????????"""
+    """?? OneBot ????/??????????? CQ ??????"""
     if not message:
         return ""
     def _clean(t):
-        s = re.sub(r'\[CQ:[^,\]]+(?:,[^,\]+)*\]', '', str(t))
-        s = re.sub(r'\[\u56fe\u7247\]t=[0-9.]*', '', s)
+        s = re.sub(r'\[CQ:[^\]]+\]', '', str(t))
+        s = re.sub(r'\[??\]t=[0-9.]*', '', s)
         return s
     if isinstance(message, str):
         return _clean(message).strip()
@@ -1117,12 +1118,13 @@ def extract_onebot_text(message):
     return _clean(str(message)).strip()
 
 def extract_onebot_images(message):
-    """提取并缓存 OneBot 消息列表/CQ码中的图片路径为公开可访问URL"""
+    """????? OneBot ????/CQ?????????????URL"""
     images = []
     if not message:
         return images
+    img_pattern = r'\[CQ:image,[^\]]*?(?:file|url)=([^,\]]+)'
     if isinstance(message, str):
-        for m in re.finditer(r'\[CQ:image,[^\]]*?(?:file|url)=([^,\]+)', message):
+        for m in re.finditer(img_pattern, message):
             f_val = m.group(1).strip()
             if f_val:
                 cached = cache_local_image_for_remote(f_val)
@@ -1137,7 +1139,7 @@ def extract_onebot_images(message):
                     if cached_url not in images:
                         images.append(cached_url)
             elif isinstance(item, str):
-                for m in re.finditer(r'\[CQ:image,[^\]]*?(?:file|url)=([^,\]+)', item):
+                for m in re.finditer(img_pattern, item):
                     f_val = m.group(1).strip()
                     if f_val:
                         cached = cache_local_image_for_remote(f_val)
