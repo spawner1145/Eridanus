@@ -37,8 +37,13 @@ class TelegramAdapter:
         self.bot_username: str = ""
         self.bot_first_name: str = "YuccaBot"
 
+        # 映射缓存持久化文件: data/dataBase/tg_chat_map.json
+        self.chat_map_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            "data", "dataBase", "tg_chat_map.json"
+        )
         # 映射表: 11111-前缀group_id <-> 真实 Telegram chat_id (int or str)
-        self.group_to_tg_chat: Dict[int, Any] = {}
+        self.group_to_tg_chat: Dict[int, Any] = self._load_chat_map()
         # 映射表: OneBot message_id <-> 真实 Telegram message_id & chat_id
         self.msg_id_to_tg: Dict[int, Dict[str, Any]] = {}
         # 绑定持久化路径: data/dataBase/tg_user_bindings.json
@@ -47,6 +52,10 @@ class TelegramAdapter:
             "data", "dataBase", "tg_user_bindings.json"
         )
         self.tg_user_bindings: Dict[str, int] = self._load_bindings()
+
+        self.ws: Optional[websockets.WebSocketClientProtocol] = None
+        self.is_running = False
+        self.tg_offset = 0
 
     def _load_bindings(self) -> Dict[str, int]:
         try:
@@ -67,31 +76,56 @@ class TelegramAdapter:
         except Exception as e:
             self.logger.tg_warning(f"[TelegramAdapter] 保存用户绑定配置失败: {e}")
 
-        self.ws: Optional[websockets.WebSocketClientProtocol] = None
-        self.is_running = False
-        self.tg_offset = 0
+
+
+    def _load_chat_map(self) -> Dict[int, Any]:
+        try:
+            if os.path.exists(self.chat_map_file):
+                with open(self.chat_map_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        return {int(k): v for k, v in data.items()}
+        except Exception as e:
+            self.logger.tg_warning(f"[TelegramAdapter] 处理 Chat 映射配置异常: {e}")
+        return {}
+
+    def _save_chat_map(self):
+        try:
+            os.makedirs(os.path.dirname(self.chat_map_file), exist_ok=True)
+            with open(self.chat_map_file, "w", encoding="utf-8") as f:
+                json.dump({str(k): v for k, v in self.group_to_tg_chat.items()}, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            self.logger.tg_warning(f"[TelegramAdapter] 处理 Chat 映射配置异常: {e}")
 
     def encode_to_virtual_group_id(self, tg_chat_id: Any) -> int:
         """
-        将 Telegram 的 channel_id/chat_id 统一转成以 11111 为前缀的数字 group_id:
-        若 channel_id 是纯数字则直接拼在 11111 后面；
-        若包含非数字字符，则将字符转换成对应 ascii/数字码后拼入。
+        # 将 Telegram 的 channel_id/chat_id 统一转成以 11111 为前缀的数字 group_id:
+        # 将 Telegram 的 channel_id/chat_id 统一转成以 11111 为前缀的数字 group_id:
+        # -100 超级群/频道使用 111110
+        # 普通群组使用 111111
+        # 私聊/个人对话使用 111112
         """
         raw_str = str(tg_chat_id).strip()
         if raw_str.startswith("-100"):
             clean = raw_str[4:]
+            prefix = "111110"
         elif raw_str.startswith("-"):
             clean = raw_str[1:]
+            prefix = "111111"
         else:
             clean = raw_str
+            prefix = "111112"
 
         if clean.isdigit():
-            virtual_id = int("11111" + clean[:12])
+            virtual_id = int(prefix + clean[:12])
         else:
             num_repr = "".join(str(ord(c)) for c in clean)[:12]
-            virtual_id = int("11111" + num_repr)
+            virtual_id = int(prefix + num_repr)
 
         self.group_to_tg_chat[virtual_id] = tg_chat_id
+        if clean.isdigit():
+            self.group_to_tg_chat[int("11111" + clean[:12])] = tg_chat_id
+        self._save_chat_map()
         return virtual_id
 
     async def _fetch_bot_info(self):
@@ -146,32 +180,40 @@ class TelegramAdapter:
         user_id = params.get("user_id")
         src = data.get("adapter_source")
 
+        def _decode_fallback(gid: int) -> Optional[Any]:
+            gid_str = str(gid)
+            if gid_str.startswith("111110"):
+                # 对应超级群/频道 -100xxxx
+                return -int("100" + gid_str[6:])
+            elif gid_str.startswith("111111"):
+                # 对应普通群组 -xxxx
+                return -int(gid_str[6:])
+            elif gid_str.startswith("111112"):
+                # 对应私聊用户 chat_id
+                return int(gid_str[6:])
+            elif gid_str.startswith("11111"):
+                rem = gid_str[5:]
+                return -int("100" + rem) if len(rem) >= 9 else int(rem)
+            return None
+
         tg_chat_id = None
         if src == "telegram":
             if group_id:
                 gid = int(group_id)
-                tg_chat_id = self.group_to_tg_chat.get(gid)
-                if not tg_chat_id and str(gid).startswith("11111"):
-                    gid_str = str(gid)[5:]
-                    tg_chat_id = -int("100" + gid_str) if len(gid_str) >= 9 else int(gid_str)
+                tg_chat_id = self.group_to_tg_chat.get(gid) or _decode_fallback(gid)
             if not tg_chat_id and user_id:
                 tg_chat_id = user_id
         elif group_id and str(group_id).startswith("11111"):
             gid = int(group_id)
-            tg_chat_id = self.group_to_tg_chat.get(gid)
-            if not tg_chat_id:
-                gid_str = str(gid)[5:]
-                tg_chat_id = -int("100" + gid_str) if len(gid_str) >= 9 else int(gid_str)
+            tg_chat_id = self.group_to_tg_chat.get(gid) or _decode_fallback(gid)
         elif user_id:
-            # 查找绑定的 chat_id 或虚拟 user_id 对应的 chat_id
             target_uid = int(user_id)
             for c_id, b_qq in self.tg_user_bindings.items():
                 if b_qq == target_uid:
                     tg_chat_id = c_id
                     break
             if not tg_chat_id and str(target_uid).startswith("11111"):
-                raw_cid = str(target_uid)[5:]
-                tg_chat_id = -int(raw_cid) if (len(raw_cid) >= 9) else int(raw_cid)
+                tg_chat_id = _decode_fallback(target_uid)
 
         return tg_chat_id
 
@@ -256,7 +298,8 @@ class TelegramAdapter:
         url_doc = f"https://api.telegram.org/bot{self.token}/sendDocument"
         local_path = self._resolve_local_path(file_ref)
 
-        async with httpx.AsyncClient(proxy=self.proxy, timeout=120.0) as client:
+        doc_timeout = httpx.Timeout(connect=60.0, read=300.0, write=300.0, pool=60.0)
+        async with httpx.AsyncClient(proxy=self.proxy, timeout=doc_timeout) as client:
             try:
                 if local_path and os.path.exists(local_path):
                     file_size = os.path.getsize(local_path)
@@ -704,10 +747,24 @@ class TelegramAdapter:
                 is_mentioned = True
                 clean_text = text.replace(at_tag, "").strip()
 
-        # 频道 post、私聊或者显式 @ Bot 时添加 OneBot At，以便触发 Bot 逻辑
-        if chat_type != "private":
-            if is_mentioned or text.startswith("/") or chat_type == "channel":
-                onebot_messages.append({"type": "at", "data": {"qq": self.bot_id}})
+        # 频道 post、私聊或者显式 @ Bot / 斜杠指令 时注入 OneBot At 消息段，确保触发 Bot 回复
+        # 针对常见问候/起始指令去除前缀 '/'，避免被 mai_reply 的 ignore_prefixes: ['/', '#'] 过滤
+        if clean_text.lower() == "/start":
+            clean_text = "你好"
+        elif clean_text.lower() in ("/hi", "/hello", "/hey"):
+            clean_text = clean_text.lstrip("/")
+        elif clean_text.lower().startswith(("/hi ", "/hello ", "/hey ")):
+            clean_text = clean_text[1:]
+
+        # 频道 post、私聊或者显式 @ Bot / 斜杠指令 时注入 OneBot At 消息段，确保触发 Bot 回复
+        should_at = False
+        if chat_type in ("private", "channel"):
+            should_at = True
+        elif is_mentioned or text.startswith("/"):
+            should_at = True
+
+        if should_at:
+            onebot_messages.insert(0, {"type": "at", "data": {"qq": self.bot_id}})
 
         # 3. 接收图片
         if "photo" in msg:

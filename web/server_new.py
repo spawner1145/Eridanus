@@ -1097,12 +1097,12 @@ def cache_local_image_for_remote(img_path_or_url):
     return img_path_or_url
 
 def extract_onebot_text(message):
-    """?? OneBot ????/??????????? CQ ??????"""
+    """提取 OneBot 文本消息/过滤图片占位符与 CQ 码"""
     if not message:
         return ""
     def _clean(t):
         s = re.sub(r'\[CQ:[^\]]+\]', '', str(t))
-        s = re.sub(r'\[??\]t=[0-9.]*', '', s)
+        s = re.sub(r'\[图片\]t=[0-9.]*', '', s)
         return s
     if isinstance(message, str):
         return _clean(message).strip()
@@ -1118,7 +1118,7 @@ def extract_onebot_text(message):
     return _clean(str(message)).strip()
 
 def extract_onebot_images(message):
-    """????? OneBot ????/CQ?????????????URL"""
+    """提取并缓存 OneBot 消息列表/CQ码中的图片路径为公开可访问URL"""
     images = []
     if not message:
         return images
@@ -1239,7 +1239,7 @@ def android_status():
 
 @app.route("/api/android/history", methods=["GET"])
 def android_history():
-    """? Android App ?????????????????? since_id ????"""
+    """供 Android App 轮询或加载历史记录接口，支持 since_id 增量查询"""
     auth_ok, auth_msg = verify_external_request_auth()
     if not auth_ok:
         return jsonify({
@@ -1258,11 +1258,11 @@ def android_history():
                 since_id = None
 
         if since_id is not None and since_id > 0:
-            # ??????? msg_id ?? since_id ???????????
+            # 增量查询：仅拉取大于 since_id 的新记录，按时间正序
             rows = asyncio.run(get_msg_since(since_id, limit))
             need_reverse = False
         else:
-            # ??/????????? limit ????????????????
+            # 首屏/全量查询：获取最近 limit 条记录，拉出后按时间正序排列
             rows = asyncio.run(get_msg(0, limit))
             need_reverse = True
 
@@ -1290,7 +1290,7 @@ def android_history():
                     images = extract_onebot_images(msg_obj)
 
                 if text_content or images:
-                    # ??? || ????
+                    # 支持 || 多段拆分
                     if "||" in text_content and not is_user:
                         parts = [p.strip() for p in text_content.split("||") if p.strip()]
                         for pi, p_seg in enumerate(parts):
@@ -1545,16 +1545,16 @@ def handle_websocket(ws):
             if isinstance(message, dict) and message.get("action") in valid_message_actions:
                 target_group_id = message.get("params", {}).get("group_id", 879886836)
 
-                # ????? Android ??? (group_id == 222222) ???
+                # 捕获发送给 Android 客户端 (group_id == 222222) 的消息
                 if target_group_id == 222222 or str(target_group_id) == "222222":
                     try:
                         raw_msg = message.get("params", {}).get("message", "")
                         extracted_text = extract_onebot_text(raw_msg)
                         extracted_images = extract_onebot_images(raw_msg)
 
-                        # ?????????????????????????????????
+                        # 记录历史并唤醒等待的客户端
                         if extracted_text or extracted_images:
-                            # ????????????
+                            # 保存到持久化数据库
                             try:
                                 asyncio.run(
                                     update_msg(
@@ -1566,10 +1566,10 @@ def handle_websocket(ws):
                                     )
                                 )
                             except Exception as e_db:
-                                logger.warning(f"Android ??????: {e_db}")
+                                logger.warning(f"Android 存储消息失败: {e_db}")
 
-                            # ?????????????? Android ??
-                            # ?????????? || ???????????????????
+                            # 唤醒当前阻塞等待回复的 Android 客户端
+                            # 若为多段消息（含 ||），累计拼装给长轮询或即时推送
                             for uid, ev in list(android_pending_events.items()):
                                 curr_info = android_pending_responses.get(uid, {"reply": "", "images": []})
                                 curr_reply = curr_info.get("reply", "")
@@ -1589,7 +1589,7 @@ def handle_websocket(ws):
                                 }
                                 ev.set()
                     except Exception as e_resp:
-                        logger.warning(f"?? Android ????: {e_resp}")
+                        logger.warning(f"处理 Android 响应失败: {e_resp}")
                 action_json = json.dumps(message, ensure_ascii=False)
                 # 广播给除发送端外的其它客户端（如 TelegramAdapter）
                 for client in list(clients):
