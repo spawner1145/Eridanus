@@ -1,5 +1,6 @@
 # encoding: utf-8
 import asyncio
+import base64
 import functools
 import hashlib
 import importlib
