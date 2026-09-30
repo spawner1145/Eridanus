@@ -34,6 +34,17 @@ async def get_msg(start = 0,end = 1)->list:
             else:
                 return []
 
+
+async def get_msg_since(since_id: int, limit: int = 50) -> list:
+    """?? msg_id ?? since_id ??????? msg_id ??????????"""
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        async with db.execute("SELECT data FROM conversation_history WHERE msg_id > ? ORDER BY msg_id ASC LIMIT ?", (since_id, limit)) as cursor:
+            results = await cursor.fetchall()
+            if results:
+                return results
+            else:
+                return []
+
 async def update_msg(msg_id, data):
     """更新聊天记录"""
     async with aiosqlite.connect(DATABASE_FILE) as db:

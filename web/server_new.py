@@ -30,7 +30,7 @@ from framework_common.framework_util.function_control import (
     list_all_functions, save_disabled, list_all_skills, save_disabled_skills,
 )
 from userdb_query import get_users_range, get_users_count, search_users_by_id, get_user_signed_days
-from chatdb_manage import get_msg, update_msg, delete_specified_msg, delete_all_msg, get_file_storage, update_file_storage
+from chatdb_manage import get_msg, get_msg_since, update_msg, delete_specified_msg, delete_all_msg, get_file_storage, update_file_storage
 
 flask_sock = install_and_import("flask_sock")
 from flask_sock import Sock
@@ -1061,6 +1061,8 @@ def cache_local_image_for_remote(img_path_or_url):
         if unquoted.startswith('/') and len(unquoted) > 2 and unquoted[2] == ':':
             unquoted = unquoted[1:]
         local_path = unquoted
+        if parsed.netloc:
+            local_path = parsed.netloc + unquoted
 
     # 处理相对路径或绝对路径
     candidate_paths = [local_path]
@@ -1094,32 +1096,53 @@ def cache_local_image_for_remote(img_path_or_url):
     return img_path_or_url
 
 def extract_onebot_text(message):
-    """提取 OneBot 消息中的纯文本内容"""
+    """?? OneBot ???????????? list ??? CQ ????????????"""
+    if not message:
+        return ""
+    def _clean(t):
+        s = re.sub(r'\[CQ:[^,\]]+(?:,[^,\]+)*\]', '', str(t))
+        s = re.sub(r'\[\u56fe\u7247\]t=[0-9.]*', '', s)
+        return s
     if isinstance(message, str):
-        return message
+        return _clean(message).strip()
     if isinstance(message, list):
         texts = []
         for item in message:
             if isinstance(item, dict):
                 if item.get("type") == "text":
-                    texts.append(item.get("data", {}).get("text", ""))
-                elif item.get("type") == "image":
-                    pass
+                    texts.append(_clean(item.get("data", {}).get("text", "")))
             elif isinstance(item, str):
-                texts.append(item)
-        return "".join(texts)
-    return str(message)
+                texts.append(_clean(item))
+        return "".join(texts).strip()
+    return _clean(str(message)).strip()
 
 def extract_onebot_images(message):
-    """提取并缓存 OneBot 消息列表中的图片/文件路径为可访问URL"""
+    """提取并缓存 OneBot 消息列表/CQ码中的图片路径为公开可访问URL"""
     images = []
-    if isinstance(message, list):
+    if not message:
+        return images
+    if isinstance(message, str):
+        for m in re.finditer(r'\[CQ:image,[^\]]*?(?:file|url)=([^,\]+)', message):
+            f_val = m.group(1).strip()
+            if f_val:
+                cached = cache_local_image_for_remote(f_val)
+                if cached not in images:
+                    images.append(cached)
+    elif isinstance(message, list):
         for item in message:
             if isinstance(item, dict) and item.get("type") == "image":
                 f_info = item.get("data", {}).get("file") or item.get("data", {}).get("url")
                 if f_info:
                     cached_url = cache_local_image_for_remote(f_info)
-                    images.append(cached_url)
+                    if cached_url not in images:
+                        images.append(cached_url)
+            elif isinstance(item, str):
+                for m in re.finditer(r'\[CQ:image,[^\]]*?(?:file|url)=([^,\]+)', item):
+                    f_val = m.group(1).strip()
+                    if f_val:
+                        cached = cache_local_image_for_remote(f_val)
+                        if cached not in images:
+                            images.append(cached)
     return images
 
 def get_webui_auth_token():
@@ -1214,7 +1237,7 @@ def android_status():
 
 @app.route("/api/android/history", methods=["GET"])
 def android_history():
-    """为 Android App 提供与机器人交互的最近历史消息"""
+    """? Android App ?????????????????? since_id ????"""
     auth_ok, auth_msg = verify_external_request_auth()
     if not auth_ok:
         return jsonify({
@@ -1224,8 +1247,23 @@ def android_history():
 
     try:
         limit = int(request.args.get("limit", 50))
-        # 获取最近 limit 条记录
-        rows = asyncio.run(get_msg(0, limit))
+        since_id_raw = request.args.get("since_id")
+        since_id = None
+        if since_id_raw is not None and str(since_id_raw).strip() != "":
+            try:
+                since_id = int(str(since_id_raw).strip())
+            except Exception:
+                since_id = None
+
+        if since_id is not None and since_id > 0:
+            # ??????? msg_id ?? since_id ???????????
+            rows = asyncio.run(get_msg_since(since_id, limit))
+            need_reverse = False
+        else:
+            # ??/????????? limit ????????????????
+            rows = asyncio.run(get_msg(0, limit))
+            need_reverse = True
+
         results = []
         for r in rows:
             try:
@@ -1239,7 +1277,6 @@ def android_history():
                 images = []
 
                 if isinstance(msg_obj, dict):
-                    # Action 指令如 send_group_msg
                     raw_msg = msg_obj.get("params", {}).get("message", "")
                     text_content = extract_onebot_text(raw_msg)
                     images = extract_onebot_images(raw_msg)
@@ -1247,21 +1284,37 @@ def android_history():
                     text_content = extract_onebot_text(msg_obj)
                     images = extract_onebot_images(msg_obj)
                 elif isinstance(msg_obj, str):
-                    text_content = msg_obj
+                    text_content = extract_onebot_text(msg_obj)
+                    images = extract_onebot_images(msg_obj)
 
                 if text_content or images:
-                    results.append({
-                        "id": time_val,
-                        "text": text_content,
-                        "images": images,
-                        "is_user": is_user,
-                        "time": time_val
-                    })
+                    # ??? || ????
+                    if "||" in text_content and not is_user:
+                        parts = [p.strip() for p in text_content.split("||") if p.strip()]
+                        for pi, p_seg in enumerate(parts):
+                            p_imgs = images if pi == len(parts) - 1 else []
+                            results.append({
+                                "id": time_val + pi,
+                                "raw_msg_id": time_val,
+                                "text": p_seg,
+                                "images": p_imgs,
+                                "is_user": False,
+                                "time": time_val
+                            })
+                    else:
+                        results.append({
+                            "id": time_val,
+                            "raw_msg_id": time_val,
+                            "text": text_content,
+                            "images": images,
+                            "is_user": is_user,
+                            "time": time_val
+                        })
             except Exception:
                 continue
 
-        # 按从旧到新的时间顺序返回供前端渲染
-        results.reverse()
+        if need_reverse:
+            results.reverse()
         return jsonify({"status": "ok", "messages": results})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -1311,6 +1364,8 @@ def android_ask():
     image_base64 = data.get("image_base64")
     user_id = data.get("user_id") or 1840094972
     nickname = data.get("nickname") or "主人"
+    if nickname in ["Android助理", "Android"]:
+        nickname = "主人"
     timeout = float(data.get("timeout") or 60.0)
 
     try:
@@ -1327,13 +1382,25 @@ def android_ask():
         })
 
     if image_base64:
-        clean_b64 = image_base64
-        if "base64," in clean_b64:
-            clean_b64 = clean_b64.split("base64,")[1]
-        msg_segments.append({
-            "type": "image",
-            "data": {"file": f"base64://{clean_b64}"}
-        })
+        try:
+            clean_b64 = image_base64
+            if "base64," in clean_b64:
+                clean_b64 = clean_b64.split("base64,")[1]
+            img_bytes = base64.b64decode(clean_b64)
+            img_md5 = hashlib.md5(img_bytes).hexdigest()[:16]
+            dest_name = f"cached_{img_md5}.jpg"
+            dest_path = os.path.join(UPLOAD_FOLDER, dest_name)
+            if not os.path.exists(dest_path):
+                with open(dest_path, "wb") as wf:
+                    wf.write(img_bytes)
+            # 采用标准本地 file:// 协议，让 mai_reply 和视觉模型直接原生加载
+            abs_uri = f"file:///{os.path.abspath(dest_path).replace(chr(92), '/')}"
+            msg_segments.append({
+                "type": "image",
+                "data": {"file": abs_uri}
+            })
+        except Exception as e_b64:
+            logger.warning(f"[Android Ask] 保存上传图片失败: {e_b64}")
     if text:
         msg_segments.append({
             "type": "text",
@@ -1476,49 +1543,51 @@ def handle_websocket(ws):
             if isinstance(message, dict) and message.get("action") in valid_message_actions:
                 target_group_id = message.get("params", {}).get("group_id", 879886836)
 
-                # 捕获发送给 Android 虚拟群 (group_id == 222222) 的回复
+                # ????? Android ??? (group_id == 222222) ???
                 if target_group_id == 222222 or str(target_group_id) == "222222":
                     try:
                         raw_msg = message.get("params", {}).get("message", "")
                         extracted_text = extract_onebot_text(raw_msg)
                         extracted_images = extract_onebot_images(raw_msg)
 
-                        # 将机器人的回复持久化保存
-                        try:
-                            asyncio.run(
-                                update_msg(
-                                    time_now, json.dumps({
-                                        "role": "start",
-                                        "message_id": time_now,
-                                        "message": message
-                                    }, ensure_ascii=False)
+                        # ?????????????????????????????????
+                        if extracted_text or extracted_images:
+                            # ????????????
+                            try:
+                                asyncio.run(
+                                    update_msg(
+                                        time_now, json.dumps({
+                                            "role": "start",
+                                            "message_id": time_now,
+                                            "message": message
+                                        }, ensure_ascii=False)
+                                    )
                                 )
-                            )
-                        except Exception as e_db:
-                            logger.warning(f"Android 消息入库失败: {e_db}")
+                            except Exception as e_db:
+                                logger.warning(f"Android ??????: {e_db}")
 
-                        # 聚合机器人回复并唤醒等待中的 Android 请求
-                        # 注意：每个独立分段用 || 分隔，以便客户端准确切分并模拟逐条发出
-                        for uid, ev in list(android_pending_events.items()):
-                            curr_info = android_pending_responses.get(uid, {"reply": "", "images": []})
-                            curr_reply = curr_info.get("reply", "")
-                            if curr_reply and extracted_text:
-                                curr_reply = curr_reply + "||" + extracted_text
-                            elif extracted_text:
-                                curr_reply = extracted_text
+                            # ?????????????? Android ??
+                            # ?????????? || ???????????????????
+                            for uid, ev in list(android_pending_events.items()):
+                                curr_info = android_pending_responses.get(uid, {"reply": "", "images": []})
+                                curr_reply = curr_info.get("reply", "")
+                                if curr_reply and extracted_text:
+                                    curr_reply = curr_reply + "||" + extracted_text
+                                elif extracted_text:
+                                    curr_reply = extracted_text
 
-                            curr_imgs = curr_info.get("images", [])
-                            for img in extracted_images:
-                                if img not in curr_imgs:
-                                    curr_imgs.append(img)
+                                curr_imgs = curr_info.get("images", [])
+                                for img in extracted_images:
+                                    if img not in curr_imgs:
+                                        curr_imgs.append(img)
 
-                            android_pending_responses[uid] = {
-                                "reply": curr_reply,
-                                "images": curr_imgs
-                            }
-                            ev.set()
+                                android_pending_responses[uid] = {
+                                    "reply": curr_reply,
+                                    "images": curr_imgs
+                                }
+                                ev.set()
                     except Exception as e_resp:
-                        logger.warning(f"处理 Android 响应异常: {e_resp}")
+                        logger.warning(f"?? Android ????: {e_resp}")
                 action_json = json.dumps(message, ensure_ascii=False)
                 # 广播给除发送端外的其它客户端（如 TelegramAdapter）
                 for client in list(clients):

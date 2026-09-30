@@ -41,8 +41,31 @@ class TelegramAdapter:
         self.group_to_tg_chat: Dict[int, Any] = {}
         # 映射表: OneBot message_id <-> 真实 Telegram message_id & chat_id
         self.msg_id_to_tg: Dict[int, Dict[str, Any]] = {}
-        # 绑定表: Telegram chat_id -> 绑定的 QQ user_id
-        self.tg_user_bindings: Dict[Any, int] = {}
+        # 绑定持久化路径: data/dataBase/tg_user_bindings.json
+        self.bindings_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            "data", "dataBase", "tg_user_bindings.json"
+        )
+        self.tg_user_bindings: Dict[str, int] = self._load_bindings()
+
+    def _load_bindings(self) -> Dict[str, int]:
+        try:
+            if os.path.exists(self.bindings_file):
+                with open(self.bindings_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        return {str(k): int(v) for k, v in data.items()}
+        except Exception as e:
+            self.logger.tg_warning(f"[TelegramAdapter] 读取用户绑定配置失败: {e}")
+        return {}
+
+    def _save_bindings(self):
+        try:
+            os.makedirs(os.path.dirname(self.bindings_file), exist_ok=True)
+            with open(self.bindings_file, "w", encoding="utf-8") as f:
+                json.dump(self.tg_user_bindings, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            self.logger.tg_warning(f"[TelegramAdapter] 保存用户绑定配置失败: {e}")
 
         self.ws: Optional[websockets.WebSocketClientProtocol] = None
         self.is_running = False
@@ -139,8 +162,16 @@ class TelegramAdapter:
             if not tg_chat_id:
                 gid_str = str(gid)[5:]
                 tg_chat_id = -int("100" + gid_str) if len(gid_str) >= 9 else int(gid_str)
-        elif user_id and str(user_id) in self.tg_user_bindings:
-            tg_chat_id = user_id
+        elif user_id:
+            # 查找绑定的 chat_id 或虚拟 user_id 对应的 chat_id
+            target_uid = int(user_id)
+            for c_id, b_qq in self.tg_user_bindings.items():
+                if b_qq == target_uid:
+                    tg_chat_id = c_id
+                    break
+            if not tg_chat_id and str(target_uid).startswith("11111"):
+                raw_cid = str(target_uid)[5:]
+                tg_chat_id = -int(raw_cid) if (len(raw_cid) >= 9) else int(raw_cid)
 
         return tg_chat_id
 
@@ -631,21 +662,29 @@ class TelegramAdapter:
 
         text = msg.get("text", "") or msg.get("caption", "")
 
+        # 计算未绑定时的独立唯一虚拟 user_id (使用 sender_id，绝不共享他人记忆)
+        clean_sid = str(abs(int(sender_id)))
+        fallback_virtual_uid = int("11111" + clean_sid[:10])
+
         # 用户身份绑定: /bind <qq_id>
         if text.startswith("/bind"):
             parts = text.split()
             if len(parts) > 1 and parts[1].isdigit():
                 bound_qq = int(parts[1])
-                self.tg_user_bindings[chat_id] = bound_qq
+                self.tg_user_bindings[str(sender_id)] = bound_qq
+                self._save_bindings()
                 await self._send_to_telegram(chat_id, f"✅ 成功绑定 QQ 账号: {bound_qq}！现在所有功能将共享该 QQ 的上下文与记忆。")
                 return
             elif len(parts) == 1:
-                cur_qq = self.tg_user_bindings.get(chat_id, self.default_qq_id)
-                await self._send_to_telegram(chat_id, f"当前绑定的 QQ 账号为: {cur_qq}\n发送 /bind <QQ号> 可随时切换绑定。")
+                cur_qq = self.tg_user_bindings.get(str(sender_id))
+                if cur_qq:
+                    await self._send_to_telegram(chat_id, f"当前绑定的 QQ 账号为: {cur_qq}\n发送 /bind <QQ号> 可随时切换绑定。")
+                else:
+                    await self._send_to_telegram(chat_id, f"当前未绑定任何 QQ 账号 (临时独立身份ID: {fallback_virtual_uid})。\n发送 /bind <你的QQ号> 即可共享你的 QQ 上下文与记忆。")
                 return
 
         virtual_group_id = self.encode_to_virtual_group_id(chat_id)
-        user_id = self.tg_user_bindings.get(chat_id, self.default_qq_id)
+        user_id = self.tg_user_bindings.get(str(sender_id), fallback_virtual_uid)
 
         # 构建 OneBot 消息段
         onebot_messages: List[Dict[str, Any]] = []
