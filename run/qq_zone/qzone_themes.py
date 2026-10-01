@@ -3880,3 +3880,143 @@ POST_STRUCTURE_ARCHETYPES = [
         "examples": "“某些人偷偷看我空间不要停太久哦。” / “今天穿这个出门会被抓吗？” / “大半夜不睡，在看谁呢。” / “盯超过三秒的自觉去面壁罚站。” / “好看吗？但只给看五秒钟，收工。”",
     },
 ]
+
+
+# ---------------------------------------------------------------------------
+# 服饰搭配与全色谱配色种子池 (Outfit & Palette Seed Variation Engine)
+# 用于彻底打破单一薄荷绿/单调配色偏见，实现 70% 概率衍生变体、全色谱与丰富日常穿搭
+# ---------------------------------------------------------------------------
+import random
+
+OUTFIT_PALETTE_SEEDS = [
+    # 暖驼烘焙系列 (Warm Caramel & Bakery)
+    {"name": "焦糖暖驼与燕麦奶白", "primary": "caramel brown", "secondary": "oatmeal cream", "tags": "caramel brown and oatmeal cream"},
+    {"name": "肉桂奶茶与浅卡其", "primary": "cinnamon milk tea", "secondary": "light khaki", "tags": "cinnamon milk tea and light khaki"},
+    {"name": "枫糖暖橘与象牙白", "primary": "maple orange", "secondary": "ivory white", "tags": "maple terracotta orange and ivory white"},
+    {"name": "浓郁黑巧可可与奶霜", "primary": "cocoa dark chocolate", "secondary": "creamy white", "tags": "cocoa brown and creamy white"},
+    {"name": "奶油杏黄与暖沙色", "primary": "buttermilk yellow", "secondary": "warm sand", "tags": "buttermilk yellow and warm sand beige"},
+
+    # 浓郁复古与深色学院系列 (Vintage, Dark Academia & Deep Tones)
+    {"name": "勃栾第酒红与碳黑", "primary": "burgundy wine red", "secondary": "pitch black", "tags": "burgundy wine red and dark black"},
+    {"name": "深海藏青与纯正米白", "primary": "midnight navy blue", "secondary": "crisp off-white", "tags": "midnight navy blue and crisp off-white"},
+    {"name": "复古森林墨绿与深棕", "primary": "hunter green", "secondary": "espresso brown", "tags": "deep hunter green and espresso brown"},
+    {"name": "炭墨黑配石墨灰", "primary": "charcoal black", "secondary": "graphite grey", "tags": "charcoal black and heather graphite grey"},
+    {"name": "深李子紫配复古暗红", "primary": "deep plum purple", "secondary": "muted crimson", "tags": "deep plum purple and muted dark crimson"},
+
+    # 水洗丹宁与清冷日常系列 (Washed Denim & Cool Casuals)
+    {"name": "水洗浅蓝牛仔与纯白", "primary": "washed light blue denim", "secondary": "pure white", "tags": "washed light blue denim and pure white"},
+    {"name": "深靛蓝牛仔配麻花花灰", "primary": "indigo blue denim", "secondary": "heather grey", "tags": "dark indigo denim and heather grey"},
+    {"name": "冰川浅灰配冷劽黑", "primary": "glacier light grey", "secondary": "clean black", "tags": "glacier grey and solid black"},
+    {"name": "军工装榄榄绿配沙漠卡其", "primary": "olive army green", "secondary": "desert khaki", "tags": "olive green and desert khaki"},
+
+    # 柔和莫兰迪与粉雾甜美系列 (Morandi & Soft Muted Pastels)
+    {"name": "浅芋紫与奶霜白", "primary": "dusty lilac purple", "secondary": "milky white", "tags": "dusty lilac purple and milky white"},
+    {"name": "干燥玫瑰烟粉与燕麦灰", "primary": "dusty rose pink", "secondary": "heather oatmeal", "tags": "dusty rose pink and heather oatmeal"},
+    {"name": "鼠尾草灰绿与奶茶色", "primary": "muted sage green", "secondary": "soft milk tea", "tags": "muted sage green and light milk tea"},
+    {"name": "雾霾冰蓝与珍珠白", "primary": "powder baby blue", "secondary": "pearl white", "tags": "powder haze blue and pearl white"},
+    {"name": "柔和杏桃粉与淡奶油", "primary": "soft apricot peach", "secondary": "pastel cream", "tags": "soft apricot peach and pastel cream"},
+
+    # 极简中性与黑白高级系列 (Monochrome & Minimalist Neutrals)
+    {"name": "极简经典纯黑与纯白", "primary": "monochrome black", "secondary": "crisp white", "tags": "monochrome clean black and pure white"},
+    {"name": "燕麦浅花灰配羊绒米白", "primary": "oatmeal light grey", "secondary": "cashmere beige", "tags": "oatmeal grey and cashmere beige"},
+
+    # 活力元气与轻快撞色系列 (Vibrant & Contrast Playful)
+    {"name": "明媚樱桃红配水洗牛仔", "primary": "vibrant cherry red", "secondary": "washed denim blue", "tags": "vibrant cherry red and light denim blue"},
+    {"name": "明快姜黄配深藏青", "primary": "mustard yellow", "secondary": "deep ocean navy", "tags": "mustard yellow and deep navy"},
+    {"name": "蜜桃西柚粉配纯白", "primary": "grapefruit peach pink", "secondary": "clean white", "tags": "peach grapefruit pink and clean white"},
+]
+
+OUTFIT_STYLE_SEEDS = [
+    # 慵懒居家 / 晨昏舒展
+    {"template": "{p} slouchy chunky knit cardigan, {s} ribbed camisole, cozy shorts", "category": "loungewear"},
+    {"template": "{p} cotton pajama set with piped collar, relaxed sleepwear", "category": "sleepwear"},
+    {"template": "{p} oversized boyfriend graphic t-shirt, relaxed loungewear, bare legs", "category": "loungewear"},
+    {"template": "{p} soft fleece hooded loungewear bathrobe, loosely tied sash", "category": "sleepwear"},
+    {"template": "{p} silk slip camisole nightdress, {s} sheer lightweight robe", "category": "sleepwear"},
+    {"template": "{p} oversized drawstring hoodie, {s} loose sweatpants, cozy indoor vibes", "category": "loungewear"},
+    {"template": "{p} off-the-shoulder loose knit sweater, {s} soft pajama shorts", "category": "sleepwear"},
+    {"template": "{p} waffle-knit long sleeve henley top, {s} lounge pants", "category": "loungewear"},
+
+    # 街头休闲 / 随性日常
+    {"template": "{p} oversized drop-shoulder hoodie, {s} pleated tennis skirt, white sneakers", "category": "casual"},
+    {"template": "{p} washed denim jacket, {s} basic crewneck tee, black relaxed trousers", "category": "casual"},
+    {"template": "{p} striped long-sleeve tee, {s} baggy denim dungarees overalls", "category": "casual"},
+    {"template": "{p} utility zip-up windbreaker jacket, {s} loose cargo pants with side pockets", "category": "streetwear"},
+    {"template": "{p} vintage varsity bomber jacket, {s} plain tee, denim mini skirt", "category": "casual"},
+    {"template": "{p} zip-up track jacket, {s} pleated sports skirt, retro high-top sneakers", "category": "sporty"},
+    {"template": "{p} cropped boxy t-shirt, {s} high-waisted wide-leg cargo jeans", "category": "streetwear"},
+    {"template": "{p} relaxed flannel plaid button-down shirt, {s} white undershirt, denim shorts", "category": "casual"},
+
+    # 文艺学院 / 优雅叠穿
+    {"template": "{p} cable-knit v-neck sweater over {s} crisp collared shirt, pleated skirt", "category": "preppy"},
+    {"template": "{p} tailored blazer, {s} fitted turtleneck knit top, high-waisted tailored trousers", "category": "preppy"},
+    {"template": "{p} vintage knitted sweater vest over {s} puff-sleeve blouse, a-line skirt", "category": "preppy"},
+    {"template": "{p} classic double-breasted trench coat, {s} crewneck knit, cropped straight trousers", "category": "preppy"},
+    {"template": "{p} sailor collar knit cardigan, {s} navy pleated skirt, knee-high socks", "category": "preppy"},
+    {"template": "{p} argyle pattern knit cardigan, {s} white collared blouse, wool mini skirt", "category": "preppy"},
+
+    # 少女轻甜 / 度假裙装
+    {"template": "{p} french square-neck puff-sleeve floral dress, delicate ruffles", "category": "girlish"},
+    {"template": "{p} gingham check pinafore apron dress over {s} puff-sleeve baby tee", "category": "girlish"},
+    {"template": "{p} ruffled lace collar chiffon blouse, {s} high-waist suspender mini skirt", "category": "girlish"},
+    {"template": "{p} cropped knit cardigan with pearlescent buttons, {s} flowy pleated midi skirt", "category": "girlish"},
+    {"template": "{p} tiered ruffles sundress, thin shoulder straps, summer breeze", "category": "girlish"},
+
+    # 轻度小心机 / 微露微醺
+    {"template": "{p} slanted off-the-shoulder loose knit sweater showing clavicle, {s} denim mini skirt", "category": "alluring"},
+    {"template": "{p} delicate spaghetti strap camisole under unbuttoned {s} oversized linen shirt, denim shorts", "category": "alluring"},
+    {"template": "{p} form-fitting ribbed knit bodycon mini dress, subtle silhouette", "category": "alluring"},
+    {"template": "{p} cropped athletic bralette top under {s} sheer airy unbuttoned sun-shirt, biker shorts", "category": "alluring"},
+    {"template": "{p} halter neck knit top, {s} high-waist slit skirt", "category": "alluring"},
+]
+
+OUTFIT_MUTATION_DETAILS = [
+    "chunky knit scarf around neck",
+    "wire-rimmed round glasses",
+    "over-ear headphones around neck",
+    "canvas tote bag on shoulder",
+    "wool beret tilted cute",
+    "dainty silver pendant necklace",
+    "loose velvet hair ribbon",
+    "rolled-up cuffs, casual styling",
+    "slouchy loose socks with retro sneakers",
+    "casual bucket hat",
+    "half-tucked shirt hem",
+    "baseball cap worn slightly tilted",
+    "cozy fingerless knit wrist warmers",
+    "delicate choker necklace",
+    "beanie hat pulled down casual",
+]
+
+def get_random_outfit_data() -> dict:
+    """
+    获取随机全色谱穿搭结构化数据
+    基于 24 套全色谱配色种子、32 款日常款式与 70% 概率触发饰品/细节变体
+    """
+    style = random.choice(OUTFIT_STYLE_SEEDS)
+    palette = random.choice(OUTFIT_PALETTE_SEEDS)
+
+    outfit = style["template"].format(p=palette["primary"], s=palette["secondary"])
+    detail = ""
+    # 70% 概率随机叠加高质感配件或细节变体，避免穿搭呆板单一
+    if random.random() < 0.70:
+        detail = random.choice(OUTFIT_MUTATION_DETAILS)
+        outfit = f"{outfit}, {detail}"
+
+    return {
+        "palette_name": palette["name"],
+        "primary_color": palette["primary"],
+        "secondary_color": palette["secondary"],
+        "color_tags": palette["tags"],
+        "category": style["category"],
+        "outfit_tags": outfit,
+        "detail": detail,
+    }
+
+
+def get_random_outfit_guidance() -> str:
+    """
+    获取用于提示词生成的随机穿搭引导标签字符串
+    返回主色辅色款式模板 + 细节配件标签，打破单一薄荷绿与固定装扮
+    """
+    return get_random_outfit_data()["outfit_tags"]

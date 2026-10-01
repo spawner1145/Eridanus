@@ -22,6 +22,11 @@ try:
 except ImportError:
     import qzone_themes
 
+try:
+    from run.qq_zone.chinese_calendar_helper import get_chinese_calendar_info
+except ImportError:
+    from chinese_calendar_helper import get_chinese_calendar_info
+
 from developTools.event.events import LifecycleMetaEvent, GroupMessageEvent, PrivateMessageEvent
 from developTools.message.message_components import Text, Image, Mface
 
@@ -374,52 +379,67 @@ def main(bot: ExtendBot, config: YAMLManager):
             headers["Authorization"] = f"Bearer {apikey}"
         timeout_val = int(sd_cfg.get("timeout", 120))
 
-        try:
-            logger.info(f"[Qzone SD] 请求生图: {txt2img_url}, prompt: {prompt[:80]}...")
-            async with httpx.AsyncClient(timeout=timeout_val, headers=headers, trust_env=False) as client:
-                resp = await client.post(txt2img_url, json=payload)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    images = data.get("images", [])
-                    if images:
-                        raw_b64 = images[0]
-                        if "," in raw_b64:
-                            raw_b64 = raw_b64.split(",", 1)[1]
-                        img_bytes = base64.b64decode(raw_b64)
-                        out_dir = Path("data/pictures/cache")
-                        out_dir.mkdir(parents=True, exist_ok=True)
-                        save_path = out_dir / f"qzone_sd_{uuid.uuid4().hex[:8]}.png"
-                        save_path.write_bytes(img_bytes)
-                        logger.info(f"[Qzone SD] 生图成功并保存至: {save_path}")
-                        return str(save_path)
-                logger.error(f"[Qzone SD] 接口状态码异常: {resp.status_code}, 内容: {resp.text[:120]}")
-        except Exception as e:
-            logger.error(f"[Qzone SD] 生图请求失败: {e}")
+        # 重试机制：支持配置重试次数（默认失败重试 3 次，共 4 次尝试机会）与间隔延迟
+        max_retries = int(sd_cfg.get("max_retries", 3))
+        retry_delay = float(sd_cfg.get("retry_delay", 2.5))
+        total_attempts = 1 + max(0, max_retries)
+
+        for attempt in range(1, total_attempts + 1):
+            attempt_str = f"[{attempt}/{total_attempts}]" if total_attempts > 1 else ""
+            err_msg = ""
+            try:
+                logger.info(f"[Qzone SD] 请求生图 {attempt_str}: {txt2img_url}, prompt: {prompt[:80]}...")
+                async with httpx.AsyncClient(timeout=timeout_val, headers=headers, trust_env=False) as client:
+                    resp = await client.post(txt2img_url, json=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        images = data.get("images", [])
+                        if images:
+                            raw_b64 = images[0]
+                            if "," in raw_b64:
+                                raw_b64 = raw_b64.split(",", 1)[1]
+                            img_bytes = base64.b64decode(raw_b64)
+                            out_dir = Path("data/pictures/cache")
+                            out_dir.mkdir(parents=True, exist_ok=True)
+                            save_path = out_dir / f"qzone_sd_{uuid.uuid4().hex[:8]}.png"
+                            save_path.write_bytes(img_bytes)
+                            logger.info(f"[Qzone SD] 生图成功并保存至: {save_path}")
+                            return str(save_path)
+                        else:
+                            err_msg = "响应中未包含图片数据 (images 列表为空)"
+                    else:
+                        err_msg = f"接口状态码异常: {resp.status_code}, 内容: {resp.text[:120]}"
+            except Exception as e:
+                err_msg = f"网络请求异常: {e}"
+
+            if attempt < total_attempts:
+                logger.warning(
+                    f"[Qzone SD] 第 {attempt}/{total_attempts} 次生图失败 ({err_msg})，"
+                    f"将在 {retry_delay}s 后进行第 {attempt + 1} 次重试..."
+                )
+                await asyncio.sleep(retry_delay)
+            else:
+                logger.error(f"[Qzone SD] 生图已重试 {max_retries} 次仍未成功，最终放弃: {err_msg}")
+
         return None
 
     # ---------------------------------------------------------
-    # 老黄历辅助方法
+    # ---------------------------------------------------------
+    # 中国节假日与二十四节气辅助方法（纯本地离线高精度计算）
     # ---------------------------------------------------------
     async def get_almanac_info() -> Optional[str]:
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
-        url = f"https://www.36jxs.com/api/Commonweal/almanac?sun={today}"
+        """
+        获取中国节假日与节气信息（纯本地离线高精度计算，无需脆弱外部接口）
+        支持农历传统节日（除夕、春节、元宵、端午、中秋等）、二十四节气天文视黄经计算、公历重要节日。
+        """
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=10) as resp:
-                    data = await resp.json()
-                    if data.get("code") != 1:
-                        return None
-                    d = data.get("data", {})
-                    solar_term = d.get("SolarTermName") or ""
-                    lunar_festival = d.get("LJie") or ""
-                    gregorian_festival = d.get("GJie") or ""
-                    if lunar_festival:
-                        lunar_festival = lunar_festival.split()[0]
-                    if gregorian_festival:
-                        gregorian_festival = gregorian_festival.split()[0]
-                    return solar_term or lunar_festival or gregorian_festival
+            today = datetime.date.today()
+            info = get_chinese_calendar_info(today)
+            if info:
+                logger.info(f"[Qzone 日历] 今日命中节日/节气: {info}")
+            return info
         except Exception as e:
-            logger.warning(f"[Qzone] 老黄历获取失败: {e}")
+            logger.warning(f"[Qzone 日历] 节假日计算异常: {e}")
             return None
 
     def get_bot_persona_info() -> tuple[str, str]:
@@ -542,31 +562,52 @@ def main(bot: ExtendBot, config: YAMLManager):
         default_outfit = rules.get("outfit", "")
         full_rules_text = rules.get("full_section", "")
 
-        # 随机抽取一套多样化服饰穿搭与配色引导
-        outfit_guidance = ""
-        get_outfit_fn = getattr(qzone_themes, "get_random_outfit_guidance", None)
-        if callable(get_outfit_fn):
-            outfit_guidance = get_outfit_fn()
+        # 随机抽取一套结构化全色谱穿搭数据（全色谱配色种子 + 服饰款式模板 + 70% 概率细节配件变体）
+        outfit_data = None
+        get_outfit_data_fn = getattr(qzone_themes, "get_random_outfit_data", None)
+        if callable(get_outfit_data_fn):
+            try:
+                outfit_data = get_outfit_data_fn()
+            except Exception as e:
+                logger.warning(f"[Qzone SD] 获取穿搭数据异常: {e}")
+
+        if outfit_data:
+            palette_name = outfit_data.get("palette_name", "经典日常色")
+            primary_color = outfit_data.get("primary_color", "navy blue")
+            secondary_color = outfit_data.get("secondary_color", "white")
+            outfit_tags = outfit_data.get("outfit_tags", "")
+            outfit_detail = outfit_data.get("detail", "")
+        else:
+            palette_name = "焦糖驼色配米白"
+            primary_color = "caramel camel brown"
+            secondary_color = "warm off-white"
+            outfit_tags = "caramel camel brown slouchy chunky knit cardigan, warm off-white ribbed camisole, cozy shorts"
+            outfit_detail = ""
 
         dynamic_scene_tags = ""
         try:
             if mai_llm:
                 prompt_generator = (
                     f"你是一名专业动漫 Stable Diffusion 提示词专家。角色是：{bot_name}。\n"
-                    f"根据角色动态文案，仅提取【当前情绪与表情】+【当前动作/场景/日常服饰与配色变体】的纯英文 tags。\n"
+                    f"根据角色动态文案，仅提取【当前情绪与表情】+【当前动作/场景/日常服饰穿搭】的纯英文 tags。\n"
                     f"角色卡绘图规则参考：\n{full_rules_text if full_rules_text else '日常场景参考: casual clothes, sitting on sofa, cozy room. 视角表情: slight blush, upper body'}\n"
                     f"当前主题建议：{theme_desc}\n"
-                    f"推荐服饰款式与配色多样性灵感（供参考，也可契合文案自选新穿搭与色系，切忌单一固定）：{outfit_guidance if outfit_guidance else 'diverse casual clothes with rich pastel colors'}\n"
+                    f"【本次系统指定的服饰与色系种子（核心硬性约束）】：\n"
+                    f"- 配色方案名称：{palette_name}\n"
+                    f"- 本次指定主色：{primary_color}，指定辅色：{secondary_color}\n"
+                    f"- 款式模板与细节参考：{outfit_tags}\n"
                     f"当前动态文案：{post_text}\n\n"
                     f"要求：\n"
                     f"1. 绝对不要重复生成发色、发型、眼睛等基础面部特征设定（系统已全局保留）。\n"
-                    f"2. 必须包含具体的【衣服款式与明确颜色】（例如：cream oversized knit sweater, pleated brown skirt 或 pastel lilac hoodie, white sneakers 或 dusty blue sundress 等，不要只写模糊的'clothes'）。\n"
-                    f"3. 仅输出情绪状态、服饰穿搭（含颜色/款式）、动作和场景，不要解释，不要输出任何中文。\n"
-                    f"4. 仅输出纯英文 tags，用英文逗号分隔。"
+                    f"2. 服饰穿搭必须严格使用上述系统分配的色系（主色：{primary_color}，辅色：{secondary_color}），严禁随意篡改色系！\n"
+                    f"3. 【重点严禁】：绝对严禁千篇一律偏向薄荷绿（mint green / pastel green / light green 等单一刻板偏见）！本次服饰主色必须明确使用指定的【{primary_color}】（如：{primary_color} 卫衣/毛衣/大衣/睡衣/衬衫等），展现全色谱多样性！\n"
+                    f"4. 可根据动态文案微调款式细节（如睡前可使用 {primary_color} 睡衣/家居服，外出/晨起使用相应外套/风衣），但服装主色必须忠实保持为 {primary_color}。\n"
+                    f"5. 仅输出情绪状态、服饰穿搭（含指定颜色与款式）、动作和场景，不要解释，不要输出任何中文。\n"
+                    f"6. 仅输出纯英文 tags，用英文逗号分隔。"
                 )
                 sd_tags = await mai_llm.chat(
                     messages=[{"role": "user", "content": prompt_generator}],
-                    system_prompt="You are an expert prompt engineer specializing in anime Stable Diffusion tags with diverse clothing styles and harmonious color palettes.",
+                    system_prompt="You are an expert prompt engineer specializing in anime Stable Diffusion tags with diverse clothing styles and rich full-spectrum color palettes.",
                 )
                 if sd_tags:
                     cleaned_tags = sd_tags.strip().replace("\n", ", ")
@@ -578,6 +619,26 @@ def main(bot: ExtendBot, config: YAMLManager):
         if not dynamic_scene_tags:
             dynamic_scene_tags = theme_desc
 
+        # 色彩纠偏与防薄荷绿复现机制：
+        # 若本次种子分配的并非绿色系（主色与辅色均不含 green），但 LLM 依然机械输出 mint green / pastel green 等刻板色彩，
+        # 则进行后置正则替换纠偏，强制替换为当前种子分配的真实主色。
+        is_green_palette = ("green" in primary_color.lower()) or ("green" in secondary_color.lower())
+        if not is_green_palette and dynamic_scene_tags:
+            # 替换 mint green, pastel green, light green, pale green 等
+            dynamic_scene_tags = re.sub(
+                r"\b(?:mint|pastel|light|pale)\s+green\b",
+                primary_color,
+                dynamic_scene_tags,
+                flags=re.IGNORECASE
+            )
+            # 替换单独修饰服装的 mint (例如 mint hoodie, mint sweater, mint pajamas)
+            dynamic_scene_tags = re.sub(
+                r"\bmint\s+(sweater|hoodie|cardigan|coat|dress|skirt|pajamas|sleepwear|shirt|jacket|top|pants|t-shirt|tee|camisole)\b",
+                rf"{primary_color} \1",
+                dynamic_scene_tags,
+                flags=re.IGNORECASE
+            )
+
         prompt_elements = []
         # 注入高质量与美学通用标签
         quality_anchor = "rating:general, best quality, very aesthetic, absurdres"
@@ -586,22 +647,33 @@ def main(bot: ExtendBot, config: YAMLManager):
         if base_anchor:
             prompt_elements.append(base_anchor)
 
-        # 扩充服饰款式关键词，若 LLM 生成或主题中已经指定了具体服饰/穿搭，则优先采用新服饰，避免固定死板注入默认套装
+        # 扩充服饰款式关键词，若 LLM 生成已包含明确服饰，则进行色彩与细节协同；若无明确服饰，则注入种子穿搭
         cloth_keywords = [
             "pajamas", "dress", "clothes", "hoodie", "shirt", "skirt", "jacket", "outfit",
             "robe", "apron", "sweater", "cardigan", "coat", "uniform", "blouse", "vest",
             "sleeves", "tank top", "crop top", "swimsuit", "kimono", "hanfu", "loungewear",
             "sportswear", "windbreaker", "overalls", "dungarees", "jersey", "parka", "tunic",
-            "pants", "shorts", "trousers", "jeans"
+            "pants", "shorts", "trousers", "jeans", "nightdress"
         ]
         has_custom_clothing = any(ck in dynamic_scene_tags.lower() for ck in cloth_keywords)
 
         if not has_custom_clothing:
-            if outfit_guidance:
-                # 优先注入随机生成的丰富日常穿搭与配色，增加服饰多样性
-                prompt_elements.append(outfit_guidance)
+            if outfit_tags:
+                prompt_elements.append(outfit_tags)
             elif default_outfit:
                 prompt_elements.append(default_outfit)
+        else:
+            # 若 LLM 生成了衣服但未体现指定的主色或辅色，补充主色强调标签，防止色彩漂移
+            has_palette_color = (
+                primary_color.lower() in dynamic_scene_tags.lower()
+                or secondary_color.lower() in dynamic_scene_tags.lower()
+            )
+            if not has_palette_color:
+                prompt_elements.append(f"({primary_color} clothing:1.1)")
+
+            # 若本次种子抽取了 70% 概率细节/配件变体，且 LLM tags 中尚未包含，则注入丰富细节
+            if outfit_detail and outfit_detail.lower() not in dynamic_scene_tags.lower():
+                prompt_elements.append(outfit_detail)
 
         if dynamic_scene_tags:
             prompt_elements.append(dynamic_scene_tags)
