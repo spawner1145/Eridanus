@@ -32,7 +32,7 @@ from framework_common.framework_util.function_control import (
     list_all_functions, save_disabled, list_all_skills, save_disabled_skills,
 )
 from userdb_query import get_users_range, get_users_count, search_users_by_id, get_user_signed_days
-from chatdb_manage import get_msg, get_msg_since, update_msg, delete_specified_msg, delete_all_msg, get_file_storage, update_file_storage
+from chatdb_manage import get_msg, get_msg_since, get_android_history_records, update_msg, delete_specified_msg, delete_all_msg, get_file_storage, update_file_storage
 
 flask_sock = install_and_import("flask_sock")
 from flask_sock import Sock
@@ -1047,30 +1047,39 @@ _start_file_cleanup_thread()
 
 def cache_local_image_for_remote(img_path_or_url):
     """
-    将本地图片或 file:// 路径复制到 WebUI 托管目录 chat_files/
-    使得 Android App 等远程客户端可通过 /api/chat/media/<filename> 直接获取
+    ?????? file:// ????? WebUI ???? chat_files/
+    ?? Android App ????????? /api/chat/media/<filename> ????
     """
     if not img_path_or_url or not isinstance(img_path_or_url, str):
         return img_path_or_url
 
-    if img_path_or_url.startswith("http://") or img_path_or_url.startswith("https://") or img_path_or_url.startswith("base64://"):
-        return img_path_or_url
+    clean_str = img_path_or_url.strip()
+    if clean_str.startswith("/api/chat/media/"):
+        return clean_str
+    if clean_str.startswith("http://") or clean_str.startswith("https://") or clean_str.startswith("base64://"):
+        return clean_str
 
-    local_path = img_path_or_url
-    if local_path.startswith("file://"):
-        parsed = urllib.parse.urlparse(local_path)
-        unquoted = urllib.parse.unquote(parsed.path)
-        if unquoted.startswith('/') and len(unquoted) > 2 and unquoted[2] == ':':
-            unquoted = unquoted[1:]
-        local_path = unquoted
-        if parsed.netloc:
-            local_path = parsed.netloc + unquoted
+    s = clean_str
+    if s.startswith("file:///"):
+        s = s[8:]
+    elif s.startswith("file://"):
+        s = s[7:]
 
-    # 处理相对路径或绝对路径
+    try:
+        s = urllib.parse.unquote(s)
+    except Exception:
+        pass
+
+    if len(s) >= 3 and s[0] == '/' and s[2] == ':':
+        s = s[1:]
+    elif len(s) >= 2 and s[0] == '\\' and s[2] == ':':
+        s = s[1:]
+
+    local_path = os.path.normpath(s)
     candidate_paths = [local_path]
     if not os.path.isabs(local_path):
-        candidate_paths.append(os.path.join(os.path.dirname(BASE_DIR), local_path))
-        candidate_paths.append(os.path.join(BASE_DIR, local_path))
+        candidate_paths.append(os.path.normpath(os.path.join(os.path.dirname(BASE_DIR), local_path)))
+        candidate_paths.append(os.path.normpath(os.path.join(BASE_DIR, local_path)))
 
     resolved_path = None
     for cp in candidate_paths:
@@ -1084,18 +1093,18 @@ def cache_local_image_for_remote(img_path_or_url):
             if not ext:
                 ext = ".jpg"
             with open(resolved_path, "rb") as rf:
-                content = rf.read()
-            fmd5 = hashlib.md5(content).hexdigest()[:16]
+                file_bytes = rf.read()
+            fmd5 = hashlib.md5(file_bytes).hexdigest()[:16]
             dest_name = f"cached_{fmd5}{ext}"
             dest_path = os.path.join(UPLOAD_FOLDER, dest_name)
             if not os.path.exists(dest_path):
                 with open(dest_path, "wb") as wf:
-                    wf.write(content)
+                    wf.write(file_bytes)
             return f"/api/chat/media/{dest_name}"
         except Exception as e:
-            logger.warning(f"[cache_local_image] 缓存本地图片失败 {resolved_path}: {e}")
-            return img_path_or_url
-    return img_path_or_url
+            logger.warning(f"[cache_local_image] ???????? {resolved_path}: {e}")
+            return clean_str
+    return clean_str
 
 def extract_onebot_text(message):
     """提取 OneBot 文本消息/过滤图片占位符与 CQ 码"""
@@ -1240,7 +1249,7 @@ def android_status():
 
 @app.route("/api/android/history", methods=["GET"])
 def android_history():
-    """供 Android App 轮询或加载历史记录接口，支持 since_id 增量查询"""
+    """? Android App ?????????????? since_id ????"""
     auth_ok, auth_msg = verify_external_request_auth()
     if not auth_ok:
         return jsonify({
@@ -1258,23 +1267,16 @@ def android_history():
             except Exception:
                 since_id = None
 
-        if since_id is not None and since_id > 0:
-            # 增量查询：仅拉取大于 since_id 的新记录，按时间正序
-            rows = asyncio.run(get_msg_since(since_id, limit))
-            need_reverse = False
-        else:
-            # 首屏/全量查询：获取最近 limit 条记录，拉出后按时间正序排列
-            rows = asyncio.run(get_msg(0, limit))
-            need_reverse = True
+        rows = asyncio.run(get_android_history_records(since_id=since_id or 0, limit=limit))
 
         results = []
-        for r in rows:
+        for mid, data_str in rows:
             try:
-                item_data = json.loads(r[0])
+                item_data = json.loads(data_str)
                 msg_obj = item_data.get("message")
                 role = item_data.get("role", "start")
                 is_user = (role == "end")
-                time_val = item_data.get("message_id", 0)
+                time_val = item_data.get("message_id") or mid
 
                 text_content = ""
                 images = []
@@ -1291,33 +1293,30 @@ def android_history():
                     images = extract_onebot_images(msg_obj)
 
                 if text_content or images:
-                    # 支持 || 多段拆分
                     if "||" in text_content and not is_user:
                         parts = [p.strip() for p in text_content.split("||") if p.strip()]
                         for pi, p_seg in enumerate(parts):
                             p_imgs = images if pi == len(parts) - 1 else []
                             results.append({
-                                "id": time_val + pi,
-                                "raw_msg_id": time_val,
+                                "id": int(time_val) + pi,
+                                "raw_msg_id": int(time_val),
                                 "text": p_seg,
                                 "images": p_imgs,
                                 "is_user": False,
-                                "time": time_val
+                                "time": int(time_val)
                             })
                     else:
                         results.append({
-                            "id": time_val,
-                            "raw_msg_id": time_val,
+                            "id": int(time_val),
+                            "raw_msg_id": int(time_val),
                             "text": text_content,
                             "images": images,
                             "is_user": is_user,
-                            "time": time_val
+                            "time": int(time_val)
                         })
             except Exception:
                 continue
 
-        if need_reverse:
-            results.reverse()
         return jsonify({"status": "ok", "messages": results})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -1456,7 +1455,7 @@ def android_ask():
     # 等待机器人生成回复的通知事件
     ev = threading.Event()
     android_pending_events[user_id] = ev
-    android_pending_responses[user_id] = {"reply": "", "images": []}
+    android_pending_responses[user_id] = {"reply": "", "images": [], "msg_id": 0}
 
     # 广播事件至本地 WebSocket (Eridanus Bot 机器人)
     ev_json = json.dumps(event_payload, ensure_ascii=False)
@@ -1473,14 +1472,16 @@ def android_ask():
         # 延时 2.5 秒以确保所有分段消息(|| 分割)接收完整
         time.sleep(2.5)
         android_pending_events.pop(user_id, None)
-        reply_info = android_pending_responses.pop(user_id, {"reply": "", "images": []})
+        reply_info = android_pending_responses.pop(user_id, {"reply": "", "images": [], "msg_id": 0})
         final_reply = reply_info.get("reply", "").strip()
         final_images = reply_info.get("images", [])
+        final_msg_id = reply_info.get("msg_id", 0)
 
         return jsonify({
             "status": "ok",
             "reply": final_reply,
             "images": final_images,
+            "msg_id": final_msg_id,
             "message": "success",
             "user_id": user_id
         })
@@ -1586,7 +1587,8 @@ def handle_websocket(ws):
 
                                 android_pending_responses[uid] = {
                                     "reply": curr_reply,
-                                    "images": curr_imgs
+                                    "images": curr_imgs,
+                                    "msg_id": time_now
                                 }
                                 ev.set()
                     except Exception as e_resp:

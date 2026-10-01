@@ -36,14 +36,28 @@ async def get_msg(start = 0,end = 1)->list:
 
 
 async def get_msg_since(since_id: int, limit: int = 50) -> list:
-    """?? msg_id ?? since_id ??????? msg_id ??????????"""
+    """? msg_id ?? since_id ????????? msg_id ????"""
     async with aiosqlite.connect(DATABASE_FILE) as db:
         async with db.execute("SELECT data FROM conversation_history WHERE msg_id > ? ORDER BY msg_id ASC LIMIT ?", (since_id, limit)) as cursor:
             results = await cursor.fetchall()
-            if results:
-                return results
-            else:
-                return []
+            return results or []
+
+async def get_android_history_records(since_id: int = 0, limit: int = 50) -> list:
+    """? Android ?????????? [(msg_id, data), ...]??????????"""
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        if since_id and since_id > 0:
+            async with db.execute(
+                "SELECT msg_id, data FROM conversation_history WHERE msg_id > ? ORDER BY msg_id ASC LIMIT ?",
+                (since_id, limit)
+            ) as cursor:
+                return await cursor.fetchall() or []
+        else:
+            async with db.execute(
+                "SELECT msg_id, data FROM conversation_history ORDER BY msg_id DESC LIMIT ?",
+                (limit,)
+            ) as cursor:
+                rows = await cursor.fetchall() or []
+                return list(reversed(rows))
 
 async def update_msg(msg_id, data):
     """更新聊天记录"""
