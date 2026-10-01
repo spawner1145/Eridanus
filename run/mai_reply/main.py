@@ -29,10 +29,13 @@ import base64
 import io
 import re
 import uuid
+from framework_common.database_util.User import get_users_with_permission_above
+from run.mai_reply.service.proactive_service import ProactiveService
+from run.mai_reply.service.proactive import build_proactive_prompt, should_proactively_message
 
 from PIL import Image as PILImage
 
-from developTools.event.events import GroupMessageEvent, PrivateMessageEvent
+from developTools.event.events import GroupMessageEvent, PrivateMessageEvent, LifecycleMetaEvent, Sender
 from developTools.message.message_components import Text, Image, Mface, At, Reply
 from framework_common.framework_util.websocket_fix import ExtendBot
 from framework_common.framework_util.yamlLoader import YAMLManager
@@ -126,6 +129,12 @@ async def extract_message_content(event, bot) -> tuple:
             continue  # 已在上方处理
         if isinstance(msg, Text):
             text_parts.append(msg.text)
+        elif isinstance(msg, At):
+            # Preserve every mention in the multimodal text passed to
+            # TriggerChecker/LLM, including its stable QQ identifier.
+            qq = int(msg.qq)
+            name = getattr(msg, "name", None) or ("全体成员" if qq == 0 else str(qq))
+            text_parts.append(f"[@{name}，QQ: {qq}]")
         elif isinstance(msg, (Image, Mface)):
             try:
                 url = await get_img(event, bot)
@@ -162,6 +171,34 @@ def main(bot: ExtendBot, config: YAMLManager):
         return
     engine = ReplyEngine(config)
     trigger = TriggerChecker(config, engine.context, engine.emotion)
+    proactive_service = ProactiveService(engine)
+    proactive_running = False
+
+    async def proactive_loop():
+        nonlocal proactive_running
+        if proactive_running:
+            return
+        proactive_running = True
+        try:
+            while True:
+                cfg = proactive_service.get_proactive_config()
+                if cfg.get("enable", False):
+                    await proactive_service.run_scan_round(bot)
+                interval_min = int(cfg.get("scan_interval_minutes") or cfg.get("interval_minutes", 30))
+                await asyncio.sleep(max(interval_min, 1) * 60)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            bot.logger.error(f"MaiReply proactive loop stopped: {exc}", exc_info=True)
+        finally:
+            proactive_running = False
+    proactive_task = None
+
+    @bot.on(LifecycleMetaEvent)
+    async def start_proactive_loop(_event):
+        nonlocal proactive_task
+        if proactive_task is None or proactive_task.done():
+            proactive_task = asyncio.create_task(proactive_loop(), name="mai-reply-proactive")
 
     bot.logger.info("[MaiReply] 高拟人化AI回复插件已加载")
 
@@ -197,6 +234,22 @@ def main(bot: ExtendBot, config: YAMLManager):
         if not getattr(event, "message_chain", None) or not event.message_chain.has(At):
             return False
         return int(event.message_chain.get(At)[0].qq) != 0
+
+    def context_text(event, fallback: str = "") -> str:
+        """构建当前消息的结构化文本，明确保留每个 @ 的昵称和 QQ 号。"""
+        parts = []
+        at_index = 0
+        chain = getattr(event, "message_chain", None)
+        if chain:
+            for component in chain:
+                if isinstance(component, Text):
+                    parts.append(component.text)
+                elif isinstance(component, At):
+                    at_index += 1
+                    qq = int(component.qq)
+                    name = getattr(component, "name", None) or ("全体成员" if qq == 0 else str(qq))
+                    parts.append(f"[@{name}( id:{qq})]")
+        return "".join(parts).strip() or fallback.strip()
 
     def command_matches(text: str, command: str, has_at_target: bool) -> bool:
         if text == command or text.startswith(command + " "):
@@ -274,6 +327,7 @@ def main(bot: ExtendBot, config: YAMLManager):
     @bot.on(GroupMessageEvent)
     async def handle_group(event: GroupMessageEvent):
         text = event.pure_text or ""
+        message_context_text = context_text(event, text)
 
         # 清理指令
         if await handle_clear_command(event, is_group=True):
@@ -306,7 +360,7 @@ def main(bot: ExtendBot, config: YAMLManager):
                     engine.context.push_group_window(
                         event.group_id,
                         user_name,
-                        clean_text,
+                        message_context_text,
                         user_id=event.user_id,  # ← 传入 user_id
                     )
                     # 群印象计数 tick（即便不回复，也感知气氛）

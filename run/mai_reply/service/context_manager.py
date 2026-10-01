@@ -241,8 +241,9 @@ class ContextManager:
     ) -> None:
         key = self._group_key(group_id, user_id) if group_id else self._private_key(user_id)
         history = self._load_history(key)
-        history.append({"role": "user",      "content": user_message})
-        history.append({"role": "assistant", "content": assistant_message})
+        now = int(time.time())
+        history.append({"role": "user", "content": user_message, "ts": now, "hour": time.localtime(now).tm_hour})
+        history.append({"role": "assistant", "content": assistant_message, "ts": int(time.time())})
         self._save_history(key, history)
 
     def clear_session(self, group_id: Optional[int], user_id: int) -> None:
@@ -362,7 +363,15 @@ class ContextManager:
         for item in window:
             sender = item.get("sender", "?")
             text   = item.get("text", "")
-            lines.append(f"你说：{text}" if sender == bot_name else f"{sender}：{text}")
+            if sender == bot_name:
+                lines.append(f"你说：{text}")
+                continue
+            # Include the stable account identifier when available.  Older
+            # persisted entries may not have user_id, so keep their nickname
+            # rendering unchanged.
+            user_id = item.get("user_id")
+            sender_label = f"{sender}（用户ID: {user_id}）" if user_id is not None else sender
+            lines.append(f"{sender_label}：{text}")
         return "【群里最近的聊天记录】\n" + "\n".join(lines)
 
     # ------------------------------------------------------------------ 用户印象
@@ -460,6 +469,46 @@ class ContextManager:
         return self._group_key(group_id, user_id) if group_id else self._private_key(user_id)
 
     # ------------------------------------------------------------------ 生命周期
+
+
+    def _global_memory_key(self) -> str:
+        return "memory:global"
+
+    def get_global_memory(self) -> str:
+        raw = self._imp_get(self._global_memory_key())
+        if not raw:
+            return ""
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                return "\n".join(data)
+        except Exception:
+            pass
+        return str(raw)
+
+    def update_global_memory(self, content: str, max_items: int = 5) -> None:
+        if not content or not content.strip():
+            return
+        raw = self._imp_get(self._global_memory_key())
+        history_items = []
+        if raw:
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    history_items = parsed
+                elif isinstance(parsed, str):
+                    history_items = [parsed]
+            except Exception:
+                history_items = [str(raw)]
+        clean_item = content.strip()
+        if clean_item not in history_items:
+            history_items.append(clean_item)
+        if len(history_items) > max_items:
+            history_items = history_items[-max_items:]
+        self._imp_set(self._global_memory_key(), json.dumps(history_items, ensure_ascii=False))
+
+    def clear_global_memory(self) -> None:
+        self._imp_delete(self._global_memory_key())
 
     def close(self) -> None:
         self._ctx_sqlite.close()

@@ -18,6 +18,13 @@ class CategoryHandler(logging.StreamHandler):
 
     def __init__(self):
         super().__init__()
+        import sys
+        for stream in (sys.stdout, sys.stderr):
+            if hasattr(stream, "reconfigure"):
+                try:
+                    stream.reconfigure(encoding="utf-8", errors="replace")
+                except Exception:
+                    pass
         # 为不同类别创建不同的formatter
         self.formatters = {
             'default': self._create_formatter(
@@ -35,6 +42,10 @@ class CategoryHandler(logging.StreamHandler):
             'server': self._create_formatter(
                 '%(log_color)s%(asctime)s - %(name)s - %(levelname)s - [SERVER] %(message)s',
                 {'DEBUG': 'white', 'INFO': 'purple', 'WARNING': 'yellow', 'ERROR': 'red', 'CRITICAL': 'bold_red'}
+            ),
+            'tg': self._create_formatter(
+                '%(log_color)s%(asctime)s [%(name)s] - %(levelname)s - [TG_BOT] %(message)s',
+                {'DEBUG': 'cyan', 'INFO': 'bold_light_blue', 'WARNING': 'bold_yellow', 'ERROR': 'bold_red', 'CRITICAL': 'bold_red'}
             )
         }
         # 设置默认formatter
@@ -217,6 +228,18 @@ class LoggerWrapper:
     def server(self, message, *args, **kwargs):
         if self._logger.isEnabledFor(logging.INFO) and "SERVER" not in _blocked_loggers:
             self._log_with_category(logging.INFO, message, 'server', *args, **kwargs)
+
+    def tg_info(self, message, *args, **kwargs):
+        if self._logger.isEnabledFor(logging.INFO) and "TG" not in _blocked_loggers:
+            self._log_with_category(logging.INFO, message, 'tg', *args, **kwargs)
+
+    def tg_warning(self, message, *args, **kwargs):
+        if self._logger.isEnabledFor(logging.WARNING):
+            self._log_with_category(logging.WARNING, message, 'tg', *args, **kwargs)
+
+    def tg_error(self, message, *args, **kwargs):
+        if self._logger.isEnabledFor(logging.ERROR):
+            self._log_with_category(logging.ERROR, message, 'tg', *args, **kwargs)
 
     def update_log_file(self):
         """手动更新日志文件"""

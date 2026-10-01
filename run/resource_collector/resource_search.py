@@ -1,5 +1,6 @@
 import asyncio
 import random
+import re
 import shutil
 import traceback
 import pprint
@@ -7,7 +8,7 @@ from framework_common.utils.install_and_import import install_and_import
 import subprocess
 from concurrent.futures.thread import ThreadPoolExecutor
 
-from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent
+from developTools.event.events import GroupMessageEvent, LifecycleMetaEvent, PrivateMessageEvent
 from developTools.message.message_components import Image, Node, Text, File, Card
 from developTools.utils.logger import get_logger
 from framework_common.database_util.User import get_user
@@ -83,64 +84,105 @@ async def call_download_book(bot,event,config,book_id: str,hash:str):
     else:
         await bot.send(event, "你没有权限使用该功能")
 
-async def call_asmr(bot,event,config,try_again=False,mode="random"):
+async def call_asmr(bot, event, config, try_again=False, mode="random"):
     user_info = await get_user(event.user_id)
     if user_info.permission >= config.resource_collector.config["asmr"]["asmr_level"]:
         bot.logger.info("asmr start")
         try:
-            if mode=="random":
-                r=await random_asmr_100(proxy=config.common_config.basic_config["proxy"]["http_proxy"])
-            elif mode=="latest":
-                r=await choose_from_latest_asmr_100(proxy=config.common_config.basic_config["proxy"]["http_proxy"])
-            elif mode=="hotest":
+            if mode == "random":
+                r = await random_asmr_100(proxy=config.common_config.basic_config["proxy"]["http_proxy"])
+            elif mode == "latest":
+                r = await choose_from_latest_asmr_100(proxy=config.common_config.basic_config["proxy"]["http_proxy"])
+            elif mode == "hotest":
                 r = await choose_from_hotest_asmr_100(proxy=config.common_config.basic_config["proxy"]["http_proxy"])
-            i = random.choice(r['media_urls'])
 
-            await bot.send(event, Card(audio=i[0], title=i[1], image=r['mainCoverUrl']))
+            media_list = r.get('media_urls') or []
+            selected_track = random.choice(media_list) if media_list else None
+
+            # 判断是否为 Telegram / WebUI / Android 等无审核限制平台
+            adapter_src = getattr(event, "adapter_source", None)
+            if not adapter_src and hasattr(event, "group_id"):
+                gid_s = str(event.group_id)
+                if gid_s.startswith("11111"):
+                    adapter_src = "telegram"
+                elif gid_s == "222222":
+                    adapter_src = "android"
+                elif gid_s == "879886836":
+                    adapter_src = "webui"
+            is_unrestricted = adapter_src in ("telegram", "webui", "android")
+
+            # 1. Card 卡片发送（仅 QQ 端支持 Card，TG/WebUI 非 QQ 环境跳过 Card，避免报错）
+            if not is_unrestricted and selected_track:
+                try:
+                    await bot.send(event, Card(audio=selected_track[0], title=selected_track[1], image=r['mainCoverUrl']))
+                except Exception as card_err:
+                    bot.logger.warning(f"Card 发送失败，将通过图文下发: {card_err}")
+
+            # 2. 封鍢图片下载：TG/WebUI/Android 下强制关闭灰度图（gray_layer=False），发送高清原图
+            use_gray = False if is_unrestricted else bool(config.resource_collector.config["asmr"]["gray_layer"])
             try:
-                img=await download_img(r['mainCoverUrl'],f"data/pictures/cache/{random_str()}.png",config.resource_collector.config["asmr"]["gray_layer"],proxy=config.common_config.basic_config["proxy"]["http_proxy"])
+                img = await download_img(
+                    r['mainCoverUrl'],
+                    f"data/pictures/cache/{random_str()}.png",
+                    use_gray,
+                    proxy=config.common_config.basic_config["proxy"]["http_proxy"]
+                )
             except Exception as e:
                 bot.logger.error(f"download_img error:{e}")
-                img=r['mainCoverUrl']
+                img = r['mainCoverUrl']
+
             forward_list = []
-            if config.resource_collector.config["asmr"]["with_url"]:
-                forward_list.append(Node(content=[Text(f"随机asmr\n标题: {r['title']}\nnsfw: {r['nsfw']}\n源: {r['source_url']}"), Image(file=img)]))
+            audio_info_suffix = f"\n\n🎧 推荐音轨: {selected_track[1]}\n🔗 播放直链: {selected_track[0]}" if selected_track else ""
+            summary_text = f"ASMR\n标题: {r['title']}\nnsfw: {r['nsfw']}\n源: {r['source_url']}{audio_info_suffix}"
+
+            # 在 Telegram / WebUI 等环境中，直接下发图文（TG 不支持 QQ 合并转发 Node）
+            if is_unrestricted:
+                await bot.send(event, [Text(summary_text), Image(file=img)])
+            elif config.resource_collector.config["asmr"]["with_url"]:
+                forward_list.append(Node(content=[Text(summary_text), Image(file=img)]))
             else:
-                await bot.send(event,[Text(f"随机asmr\n标题: {r['title']}\nnsfw: {r['nsfw']}\n源: {r['source_url']}"), Image(file=img)])
-            file_paths=[]
-            main_path = f"data/voice/cache/{r['title']}.{r['media_urls'][0][1].split('.')[-1]}"
+                await bot.send(event, [Text(summary_text), Image(file=img)])
 
-            metype = r['media_urls'][0][1].split('.')[-1]
+            file_paths = []
+            safe_title = re.sub(r'[\\/:*?"<>|\r\n\t]', '_', r['title']).strip('. ')
+            if media_list:
+                ext = media_list[0][1].split('.')[-1].split('?')[0]
+                main_path = f"data/voice/cache/{safe_title}.{ext}"
+                metype = ext
 
-            for i in r['media_urls']:
-                if i[1].split('.')[-1] != metype or len(file_paths) >= config.resource_collector.config["asmr"]["max_merge_file_num"]:
-                    bot.logger.error(f"audio type change:{i[1]}")
-                    break
-                if config.resource_collector.config["asmr"]["with_file"]:
-                    path=f"data/voice/cache/{i[1]}"
-                    file=await download_file(i[0],path,config.common_config.basic_config["proxy"]["http_proxy"])
-                    file_paths.append(file)
-                text=f"音频名称: {i[1]}\n音频url: {i[0]}"
-                forward_list.append(Node(content=[Text(text)]))
-            if config.resource_collector.config["asmr"]["with_url"]:
-                await bot.send(event, forward_list)
-            if config.resource_collector.config["asmr"]["with_file"]:
-                loop = asyncio.get_running_loop()
-                try:
-                    await bot.send(event, "正在合并音频文件，请等待完成...")
-                    bot.logger.info(f"asmr file merge and upload start: path:{main_path},merge_files:{file_paths}")
-                    with ThreadPoolExecutor() as executor:
-                        path = await loop.run_in_executor(executor, merge_audio_files, file_paths, main_path)
-                    await bot.send(event, File(file=path))
-                except Exception as e:
-                    bot.logger.error(f"asmr file merge and upload error:{e}")
+                for track in media_list:
+                    clean_name = re.sub(r'[\\/:*?"<>|\r\n\t]', '_', track[1]).strip('. ')
+                    i_ext = clean_name.split('.')[-1].split('?')[0]
+                    if i_ext != metype or len(file_paths) >= config.resource_collector.config["asmr"]["max_merge_file_num"]:
+                        bot.logger.error(f"audio type change:{clean_name}")
+                        break
+                    if config.resource_collector.config["asmr"]["with_file"]:
+                        path = f"data/voice/cache/{clean_name}"
+                        file = await download_file(track[0], path, config.common_config.basic_config["proxy"]["http_proxy"])
+                        file_paths.append(file)
+                    text = f"音频名称: {clean_name}\n音频url: {track[0]}"
+                    forward_list.append(Node(content=[Text(text)]))
+
+                if not is_unrestricted and config.resource_collector.config["asmr"]["with_url"] and forward_list:
+                    await bot.send(event, forward_list)
+
+                if config.resource_collector.config["asmr"]["with_file"] and file_paths:
+                    loop = asyncio.get_running_loop()
+                    try:
+                        await bot.send(event, "正在合并音频文件，请等待完成...")
+                        bot.logger.info(f"asmr file merge and upload start: path:{main_path},merge_files:{file_paths}")
+                        with ThreadPoolExecutor() as executor:
+                            path = await loop.run_in_executor(executor, merge_audio_files, file_paths, main_path)
+                        await bot.send(event, File(file=path))
+                    except Exception as e:
+                        bot.logger.error(f"asmr file merge and upload error:{e}")
 
         except Exception as e:
             bot.logger.error(f"asmr error:{e}")
             if not try_again:
                 bot.logger.warning("asmr try again!")
-                await call_asmr(bot,event,config,try_again=True)
-            if try_again:
+                await call_asmr(bot, event, config, try_again=True, mode=mode)
+            else:
                 await bot.send(event, "失败了！要不再试一次？")
     else:
         await bot.send(event, "你没有权限使用该功能")
@@ -223,6 +265,9 @@ async def call_jm_ranking(bot, event, config, mode: str = "week"):
     """
     jm_cfg = config.resource_collector.config["JMComic"]
     anti_nsfw = jm_cfg.get("anti_nsfw", "black_and_white")
+    if getattr(event, "adapter_source", None) in ("telegram", "webui", "android") or getattr(event, "from_secondary", False):
+        anti_nsfw = "no_censor"
+        bot.logger.info("JM排行榜：来源为 Telegram/WebUI/Android，免除图片混淆，返回原图")
     limit = jm_cfg.get("ranking_limit", 10)          # 榜单条数，默认 10
     cover_workers = jm_cfg.get("cover_workers", 5)   # 并发封面下载线程数
 
@@ -316,6 +361,9 @@ async def jm_search(bot,event,config,search_topic):
 
         jm_cfg = config.resource_collector.config["JMComic"]
         anti_nsfw = jm_cfg.get("anti_nsfw", "obfuscate")
+        if getattr(event, "adapter_source", None) in ("telegram", "webui", "android") or getattr(event, "from_secondary", False):
+            anti_nsfw = "no_censor"
+            bot.logger.info("JM搜索：来源为 Telegram/WebUI/Android，免除图片混淆，返回原图")
         limit = jm_cfg.get("ranking_limit", 10)
         cover_workers = jm_cfg.get("cover_workers", 5)
 
@@ -408,7 +456,16 @@ async def jm_download(bot,event,config,comic_id):
             bot.logger.error(e)
             await bot.send(event, "下载失败", True)
         try:
-            if config.resource_collector.config['JMComic']["autoEncrypt"]:
+            # 判断发送目标是否为 Telegram / WebUI / Android 等无审核限制渠道
+            is_unrestricted_target = (
+                getattr(event, "adapter_source", None) in ("telegram", "webui", "android")
+                or getattr(event, "from_secondary", False)
+                or any(str(gid).startswith("11111") or str(gid) in ("879886836", "222222") for gid in operating.get(comic_id, []))
+            )
+
+            # TG/WebUI/Android 环境下不需要加密，直接使用原始 PDF
+            should_encrypt = config.resource_collector.config['JMComic']["autoEncrypt"] and not is_unrestricted_target
+            if should_encrypt:
                 encryptor = AsyncPDFEncryptor()
                 try:
                     await encryptor.encrypt_pdf_file(
@@ -422,6 +479,8 @@ async def jm_download(bot,event,config,comic_id):
                     traceback.print_exc()
                     pdf_path = f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}.pdf"
             else:
+                if is_unrestricted_target:
+                    bot.logger.info("JM下载：检测到目标渠道为 Telegram/WebUI/Android，已免除 PDF 加密")
                 pdf_path = f"{config.resource_collector.config['JMComic']['savePath']}/{comic_id}.pdf"
 
             msg_pdf = f"加密成功喵，密码：{comic_id}"
@@ -500,11 +559,11 @@ async def jm_download(bot,event,config,comic_id):
                     msg = await bot.send(event, "下载完成了( >ρ< )。请等待上传完成。")
                     if not os.path.exists('/mnt/video_disk/temp/JM'):
                         await bot.send(event, File(file=pdf_path))
-                    if config.resource_collector.config["JMComic"]["autoEncrypt"]:
+                    if config.resource_collector.config["JMComic"]["autoEncrypt"] and not is_unrestricted_target:
                         await bot.send(event, msg_pdf)
                     await delay_recall(bot, msg)
-            bot.logger.info("移除预览缓存")
-            operating.pop(comic_id)
+            bot.logger.info("移除下载任务缓存")
+            operating.pop(comic_id, None)
             if config.resource_collector.config['JMComic']["autoClearPDF"]:
                 await wait_and_delete_file(
                     bot,
@@ -551,11 +610,11 @@ async def jm_preview(bot, event, config, comic_id=607279,mode_check='preview'):
         if config.resource_collector.config["JMComic"]["openlist"]["enable"] is True:
             anti_nsfw = 'no_censor'
         else:
-            # 主bot接入公开平台需对图片脱敏；副bot(webui/live2d 等内部通道)无需，直接返回原图。
+            # 主bot接入公开平台需对图片脱敏；副bot/Telegram/WebUI/Android 等内部通道无需，直接返回原图。
             anti_nsfw = config.resource_collector.config["JMComic"]["anti_nsfw"]
-            if getattr(event, "from_secondary", False):
+            if getattr(event, "adapter_source", None) in ("telegram", "webui", "android") or getattr(event, "from_secondary", False):
                 anti_nsfw = "no_censor"
-                bot.logger.info("JM预览：来源为副bot，跳过图片混淆，返回原图")
+                bot.logger.info("JM预览：来源为 Telegram/WebUI/Android，免除图片混淆，返回原图")
         try:
             loop = asyncio.get_running_loop()
             with ThreadPoolExecutor() as executor:
@@ -624,12 +683,14 @@ def main(bot, config):
     asmr_task_activated = False
 
     @bot.on(GroupMessageEvent)
+    @bot.on(PrivateMessageEvent)
     async def book_resource_search(event):
         if str(event.pure_text).startswith("搜书"):
             book_name = str(event.pure_text).split("搜书")[1]
             await search_book_info(bot, event, config, book_name)
 
     @bot.on(GroupMessageEvent)
+    @bot.on(PrivateMessageEvent)
     async def book_resource_download(event):
         if str(event.pure_text).startswith("下载书"):
             try:
@@ -691,6 +752,9 @@ def main(bot, config):
 
             jm_cfg = config.resource_collector.config["JMComic"]
             anti_nsfw = jm_cfg.get("anti_nsfw", "obfuscate")
+            if getattr(event, "adapter_source", None) in ("telegram", "webui", "android") or getattr(event, "from_secondary", False):
+                anti_nsfw = "no_censor"
+                bot.logger.info("JM搜索：来源为 Telegram/WebUI/Android，免除图片混淆，返回原图")
             limit = jm_cfg.get("ranking_limit", 10)
             cover_workers = jm_cfg.get("cover_workers", 5)
 

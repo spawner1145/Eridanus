@@ -94,6 +94,7 @@ class MessageEvent(BaseModel):
     processed_message: List[Dict[str, Union[str, Dict]]] = []
 
     message_chain: MessageChain=[]
+    adapter_source: str = "onebot_v11"
     #pure_text: str = ""
 
     model_config = ConfigDict(extra="allow",arbitrary_types_allowed=True)

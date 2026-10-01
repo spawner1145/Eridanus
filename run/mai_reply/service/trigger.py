@@ -235,33 +235,43 @@ class TriggerChecker:
         return False
 
     @staticmethod
-    def _has_at( event, bot_self_id: int) -> bool:
+    def _has_at(event, bot_self_id: int) -> bool:
         #print(event)
         if not hasattr(event, "group_id"):
-            #print("不是群消息")
+            #print("?????")
             return False
 
         if not event.message_chain.has(At):
-            #print("消息中没有At")
+            #print("?????At")
             return False
-        if event.message_chain.get(At)[0].qq in [bot_self_id, 1000000]:
-            return True
-
+        for seg in event.message_chain.get(At):
+            qq = getattr(seg, "qq", None)
+            if qq is None:
+                qq = (getattr(seg, "data", {}) or {}).get("qq")
+            if str(qq) in {str(bot_self_id), "1000000"} or (hasattr(event, "group_id") and str(event.group_id).startswith("11111")):
+                return True
         return False
-
     @staticmethod
     def _remove_at_segments(event, text: str, bot_name: str, bot_self_id: int) -> str:
-        if event.message_chain.has(Text):
-            text = event.message_chain.get(Text)[0].text
-        if event.message_chain.has(At):
-            if event.message_chain.get(At)[0].qq in [bot_self_id, 1000000]:
-                logger.info(f"[TriggerChecker] 消息中包含@机器人自己的At，原始文本: '{text}'，已替换为 '@{bot_name}'")
-                text = f"@{bot_name}"+text
-            else:
-                text = f"@{event.message_chain.get(At)[0].name}"+text
-        if not event.message_chain.has(Text) and not event.message_chain.has(At):
+        # Rebuild from every segment so multiple At/Text parts are retained
+        # in their original order (the old implementation only used [0]).
+        chain = event.message_chain
+        parts = []
+        for seg in chain:
+            if isinstance(seg, Text):
+                parts.append(seg.text)
+            elif isinstance(seg, At):
+                qq = seg.qq
+                name = getattr(seg, "name", None) or str(qq or "")
+                if str(qq) in {str(bot_self_id), "1000000"}:
+                    logger.info(f"[TriggerChecker] 消息中包含@机器人自己的At，已替换为 '@{bot_name}'")
+                    continue
+                else:
+                    parts.append(f"[@{name}，QQ: {qq}]")
+        if parts:
+            text = "".join(parts)
+        if not chain.has(Text) and not chain.has(At):
             logger.warning(f"[TriggerChecker] 无法提取文本内容，消息链中既没有 Text 也没有 At，原始消息链: {event.message_chain}")
             return None
-        if bot_self_id:
-            text = text.replace(f"@{bot_self_id}", "").strip()
+        logger.info(f"清洗后的text: {text}")
         return text

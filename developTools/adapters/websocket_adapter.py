@@ -120,14 +120,16 @@ class EventBus:
             if self.enable_monitoring:
                 # 监控模式
                 for handler in handlers:
-                    asyncio.create_task(
+                    task = asyncio.create_task(
                         self._execute_handler_with_monitoring(handler, event_instance),
                         name=f"handler-{handler.__name__ if hasattr(handler, '__name__') else 'unknown'}"
                     )
+                    task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
             else:
                 # 原版模式（零开销）
                 for handler in handlers:
-                    asyncio.create_task(handler(event_instance))
+                    task = asyncio.create_task(handler(event_instance))
+                    task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
         else:
             pass
 
@@ -187,6 +189,8 @@ class WebSocketBot:
                             future.set_result(data)
                     elif "post_type" in data:
                         event_obj = EventFactory.create_event(data)
+                        if event_obj and not getattr(event_obj, "adapter_source", None):
+                            event_obj.adapter_source = data.get("adapter_source", "onebot_v11")
                         try:
                             if event_obj.post_type == "meta_event":
                                 if event_obj.meta_event_type == "lifecycle":

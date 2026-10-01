@@ -32,6 +32,7 @@ class EventBase(BaseModel, ABC):
     time: int
     self_id: int
     post_type: Literal["message", "notice", "request", "meta_event"] | str
+    adapter_source: str = "onebot_v11"
     auto_register: bool = Field(
         default=True,
         description="是否自动注册到 event_list 中，如果你的类是一个基类，则不要开启该选项。",

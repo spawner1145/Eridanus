@@ -77,6 +77,8 @@ class ExtendBot(WebSocketBot):
                             future.set_result(data)
                     elif "post_type" in data:
                         event_obj = EventFactory.create_event(data)
+                        if event_obj and not getattr(event_obj, "adapter_source", None):
+                            event_obj.adapter_source = data.get("adapter_source", "onebot_v11")
                         try:
                             if event_obj.post_type == "meta_event":
                                 if event_obj.meta_event_type == "lifecycle":

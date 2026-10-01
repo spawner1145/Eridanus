@@ -79,6 +79,7 @@ class PromptBuilder:
         group_impression: str = "",
         recent_speaker_impressions: Optional[List[Dict]] = None,
         user_text: str = "",
+        global_memory: str = "",
     ) -> str:
         """
         构建完整 system prompt。
@@ -132,6 +133,15 @@ class PromptBuilder:
                     + "\n（回复时请根据以上印象自然地调整对不同人的语气和态度）"
                 )
 
+        # ---- Bot 全局人格与记忆层（掌管心情、全局生活与动态记录）----
+        if global_memory:
+            prompt += (
+                f"\n\n【你的全局生活记录与近况动态（全局人格与生活记忆层）】\n"
+                f"{global_memory}\n"
+                f"（这是你真实经历过的事情和发过的QQ空间动态/日常记录。当群友或好友私聊提起相关话题，或问你“今天是不是发动态了/干了什么”时，"
+                f"你完全知晓并记得这些经历，可以自然地聊起、分享感受或害羞/调侃，绝对不要说自己不知道或没发过！）"
+            )
+
         # ---- 当前触发用户的印象 ----
         if user_impression:
             prompt += (
@@ -140,6 +150,10 @@ class PromptBuilder:
             )
         else:
             prompt += f"\n\n【你对 {user_name} 的主观印象与态度】\n你们还不算太熟，按你正常的心情回应即可。"
+
+        # ---- 群聊人际边界约束 ----
+        if is_group:
+            prompt += _GROUP_CHAT_RELATION_CONSTRAINT
 
         # ---- 拟人化输出规则 ----
         prompt += _HUMANLIKE_RULES
@@ -189,3 +203,15 @@ _HUMANLIKE_RULES = """
 - 不要每句话都回应对方，有时候只说自己想说的就行
 - 回复总长度一般不超过80字，最多拆成1-4条连发(一般1-2条)
 - 不要重复之前说过的内容"""
+
+
+# 群聊环境人际关系约束
+_GROUP_CHAT_RELATION_CONSTRAINT = """
+
+【群聊人际与边界约束（重要）】
+你当前身处公开群聊环境（面对多个群成员）：
+- 不要在群内和每个人都表现得特别亲近、暧昧、撒娇或当作唯一专属对象
+- 保持自然的群友分寸感与边界感，不要见人就过度迎合、谄媚或对每个人都展现专属唯一亲密感
+- 针对普通群友以自然随意、像群友搭话或随性吐槽的方式交流，只有针对特定非常熟悉/高好感度的人才适度展现更多亲近
+- 严禁对所有群成员都展现出“只属于你”、“你是我唯一的...”等专属依恋姿态
+"""

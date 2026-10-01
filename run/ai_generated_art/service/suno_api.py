@@ -140,6 +140,7 @@ async def generate_songs(cookie: str, prompt: str = "", tags: str = "", negative
     PAYLOAD['make_instrumental'] = make_instrumental
     
     downloaded_files = []
+    retry_count = 0
     
     async with httpx.AsyncClient(proxies=proxies, timeout=60) as client:
         try:
@@ -175,7 +176,6 @@ async def generate_songs(cookie: str, prompt: str = "", tags: str = "", negative
             print(f"成功发起请求, 获得 Clip IDs: {clip_ids}")
             
             pending_ids = list(clip_ids)
-            retry_count = 0
             retry_count = 0
             while pending_ids:
                 print(f"\n等待 10 秒后开始轮询... 剩余待处理 IDs: {len(pending_ids)}")

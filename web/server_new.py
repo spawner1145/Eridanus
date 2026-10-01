@@ -1,13 +1,18 @@
 # encoding: utf-8
 import asyncio
+import base64
 import functools
+import hashlib
 import importlib
 import json
 import logging
 import os
+import re
 import shutil
 import sys
+import threading
 import time
+import urllib
 from io import StringIO
 
 from cryptography.fernet import Fernet
@@ -27,7 +32,7 @@ from framework_common.framework_util.function_control import (
     list_all_functions, save_disabled, list_all_skills, save_disabled_skills,
 )
 from userdb_query import get_users_range, get_users_count, search_users_by_id, get_user_signed_days
-from chatdb_manage import get_msg, update_msg, delete_specified_msg, delete_all_msg, get_file_storage, update_file_storage
+from chatdb_manage import get_msg, get_msg_since, get_android_history_records, update_msg, delete_specified_msg, delete_all_msg, get_file_storage, update_file_storage
 
 flask_sock = install_and_import("flask_sock")
 from flask_sock import Sock
@@ -37,7 +42,7 @@ httpx = install_and_import("httpx")
 zipfile = install_and_import("zipfile")
 # 全局变量，用于存储 logger 实例和屏蔽的日志类别
 _logger = None
-_blocked_loggers = []
+_blocked_loggers = ["INFO_MSG", "DEBUG"]
 
 app = Flask(__name__, static_folder="dist", static_url_path="")
 app.json.sort_keys = False  # 不要对json排序
@@ -75,7 +80,7 @@ ip_whitelist = []
 # ip_whitelist = ["127.0.0.1","192.168.195.128","192.168.195.137","::1"]
 
 # 合法的消息事件，其余不储存进数据库。
-valid_message_actions = ['send_group_forward_msg','send_group_msg','upload_group_file']
+valid_message_actions = ['send_group_forward_msg', 'send_private_forward_msg', 'send_group_msg', 'send_private_msg', 'upload_group_file', 'upload_private_file']
 
 # 用户信息文件
 user_file = "./user_info.yaml"
@@ -995,21 +1000,524 @@ def index(e):
 clients = set()
 
 # WebSocket路由
+
+# ==========================================
+# Android 客户端 / 统一中转接口与图床缓存
+# ==========================================
+android_pending_events = {}       # user_id -> threading.Event
+android_pending_responses = {}    # user_id -> reply_data dict {"reply": str, "images": list}
+
+def clean_expired_chat_files(days=3):
+    """清理 chat_files 中超过指定天数(默认3天)的过期临时图片文件"""
+    try:
+        if not os.path.exists(UPLOAD_FOLDER):
+            return
+        now = time.time()
+        expire_seconds = days * 86400
+        removed_count = 0
+        for fname in os.listdir(UPLOAD_FOLDER):
+            fpath = os.path.join(UPLOAD_FOLDER, fname)
+            if os.path.isfile(fpath):
+                try:
+                    mtime = os.path.getmtime(fpath)
+                    if (now - mtime) > expire_seconds:
+                        os.remove(fpath)
+                        removed_count += 1
+                except Exception:
+                    pass
+        if removed_count > 0:
+            logger.server(f"[FileCache] 清理了 {removed_count} 个超过 {days} 天的过期临时文件")
+    except Exception as e:
+        logger.warning(f"[FileCache] 清理过期文件失败: {e}")
+
+def _start_file_cleanup_thread():
+    """后台定时清理线程，每 12 小时清理一次超过 3 天的文件"""
+    def _loop():
+        while True:
+            try:
+                clean_expired_chat_files(days=3)
+            except Exception:
+                pass
+            time.sleep(43200)  # 12 小时
+    t = threading.Thread(target=_loop, daemon=True, name="FileCleanupThread")
+    t.start()
+
+# 启动定时清理线程
+_start_file_cleanup_thread()
+
+def cache_local_image_for_remote(img_path_or_url):
+    """
+    ?????? file:// ????? WebUI ???? chat_files/
+    ?? Android App ????????? /api/chat/media/<filename> ????
+    """
+    if not img_path_or_url or not isinstance(img_path_or_url, str):
+        return img_path_or_url
+
+    clean_str = img_path_or_url.strip()
+    if clean_str.startswith("/api/chat/media/"):
+        return clean_str
+    if clean_str.startswith("http://") or clean_str.startswith("https://") or clean_str.startswith("base64://"):
+        return clean_str
+
+    s = clean_str
+    if s.startswith("file:///"):
+        s = s[8:]
+    elif s.startswith("file://"):
+        s = s[7:]
+
+    try:
+        s = urllib.parse.unquote(s)
+    except Exception:
+        pass
+
+    if len(s) >= 3 and s[0] == '/' and s[2] == ':':
+        s = s[1:]
+    elif len(s) >= 2 and s[0] == '\\' and s[2] == ':':
+        s = s[1:]
+
+    local_path = os.path.normpath(s)
+    candidate_paths = [local_path]
+    if not os.path.isabs(local_path):
+        candidate_paths.append(os.path.normpath(os.path.join(os.path.dirname(BASE_DIR), local_path)))
+        candidate_paths.append(os.path.normpath(os.path.join(BASE_DIR, local_path)))
+
+    resolved_path = None
+    for cp in candidate_paths:
+        if os.path.isfile(cp):
+            resolved_path = cp
+            break
+
+    if resolved_path:
+        try:
+            ext = os.path.splitext(resolved_path)[1]
+            if not ext:
+                ext = ".jpg"
+            with open(resolved_path, "rb") as rf:
+                file_bytes = rf.read()
+            fmd5 = hashlib.md5(file_bytes).hexdigest()[:16]
+            dest_name = f"cached_{fmd5}{ext}"
+            dest_path = os.path.join(UPLOAD_FOLDER, dest_name)
+            if not os.path.exists(dest_path):
+                with open(dest_path, "wb") as wf:
+                    wf.write(file_bytes)
+            return f"/api/chat/media/{dest_name}"
+        except Exception as e:
+            logger.warning(f"[cache_local_image] ???????? {resolved_path}: {e}")
+            return clean_str
+    return clean_str
+
+def extract_onebot_text(message):
+    """提取 OneBot 文本消息/过滤图片占位符与 CQ 码"""
+    if not message:
+        return ""
+    def _clean(t):
+        s = re.sub(r'\[CQ:[^\]]+\]', '', str(t))
+        s = re.sub(r'\[图片\]t=[0-9.]*', '', s)
+        return s
+    if isinstance(message, str):
+        return _clean(message).strip()
+    if isinstance(message, list):
+        texts = []
+        for item in message:
+            if isinstance(item, dict):
+                if item.get("type") == "text":
+                    texts.append(_clean(item.get("data", {}).get("text", "")))
+            elif isinstance(item, str):
+                texts.append(_clean(item))
+        return "".join(texts).strip()
+    return _clean(str(message)).strip()
+
+def extract_onebot_images(message):
+    """提取并缓存 OneBot 消息列表/CQ码中的图片路径为公开可访问URL"""
+    images = []
+    if not message:
+        return images
+    img_pattern = r'\[CQ:image,[^\]]*?(?:file|url)=([^,\]]+)'
+    if isinstance(message, str):
+        for m in re.finditer(img_pattern, message):
+            f_val = m.group(1).strip()
+            if f_val:
+                cached = cache_local_image_for_remote(f_val)
+                if cached not in images:
+                    images.append(cached)
+    elif isinstance(message, list):
+        for item in message:
+            if isinstance(item, dict) and item.get("type") == "image":
+                f_info = item.get("data", {}).get("file") or item.get("data", {}).get("url")
+                if f_info:
+                    cached_url = cache_local_image_for_remote(f_info)
+                    if cached_url not in images:
+                        images.append(cached_url)
+            elif isinstance(item, str):
+                for m in re.finditer(img_pattern, item):
+                    f_val = m.group(1).strip()
+                    if f_val:
+                        cached = cache_local_image_for_remote(f_val)
+                        if cached not in images:
+                            images.append(cached)
+    return images
+
+def get_webui_auth_token():
+    """读取 basic_config.yaml 中的 webui.auth_token 鉴权密钥"""
+    try:
+        cfg_path = os.path.join(os.path.dirname(BASE_DIR), "run", "common_config", "basic_config.yaml")
+        if not os.path.exists(cfg_path):
+            cfg_path = os.path.join(BASE_DIR, "run", "common_config", "basic_config.yaml")
+        if os.path.exists(cfg_path):
+            with open(cfg_path, 'r', encoding='utf-8') as f:
+                yaml_loader = YAML(typ='safe')
+                cfg = yaml_loader.load(f)
+                if isinstance(cfg, dict):
+                    webui_cfg = cfg.get("webui", {})
+                    if isinstance(webui_cfg, dict):
+                        return str(webui_cfg.get("auth_token", "")).strip()
+    except Exception as e:
+        logger.warning(f"[Auth] 读取 WebUI auth_token 异常: {e}")
+    return ""
+
+def verify_external_request_auth():
+    """
+    检查外部请求鉴权：
+    1. 若未设置 auth_token，则放行
+    2. 若客户端来自本机(127.0.0.1, ::1)，放行
+    3. 若外部访问，支持从 Header (X-Auth-Token/Authorization), Query (auth_token/token), 
+       或者 JSON Body (auth_token) 中读取 token 并比对。
+    """
+    configured_token = get_webui_auth_token()
+    if not configured_token:
+        return True, ""
+
+    client_ip = request.remote_addr or ""
+    # 如果没有走反代直接来自本机
+    is_local = (client_ip in ['127.0.0.1', '::1', 'localhost'] or client_ip.startswith('127.'))
+    # 注意：如果经过了反向代理 (例如 frp/nginx/caddy)，用户可能从外网访问
+    # 因此如果有 X-Forwarded-For 且不全是 127.0.0.1，或者外部域名访问，必须严密校验 token
+    forwarded_for = request.headers.get("X-Forwarded-For", "").strip()
+    if forwarded_for and not all(ip.strip() in ['127.0.0.1', '::1', 'localhost'] for ip in forwarded_for.split(',')):
+        is_local = False
+
+    # 获取请求传入的 token
+    recv_token = (
+        request.headers.get("X-Auth-Token", "") or
+        request.headers.get("Authorization", "").replace("Bearer ", "") or
+        request.args.get("auth_token", "") or
+        request.args.get("token", "")
+    ).strip()
+
+    if not recv_token and request.is_json:
+        data = request.get_json(silent=True) or {}
+        recv_token = str(data.get("auth_token", "")).strip()
+
+    # 检查是否匹配配置的 token
+    if recv_token == configured_token:
+        return True, ""
+
+    # 检查是否是 WebUI 登录会话中的合法 token
+    if recv_token in auth_info and auth_info[recv_token] > int(time.time()):
+        return True, ""
+
+    # 如果完全是本地且没有携带外部代理来源，允许本地开发环境访问
+    if is_local and not forwarded_for and not recv_token:
+        return True, ""
+
+    return False, "鉴权失败：缺少有效或匹配的访问 Token (Invalid Auth Token)"
+
+@app.route("/api/chat/media/<path:filename>", methods=["GET"])
+def get_chat_media_file(filename):
+    """直接访问 chat_files 中的图片文件，供 Android App 跨设备加载"""
+    try:
+        return send_from_directory(UPLOAD_FOLDER, filename)
+    except Exception as e:
+        return jsonify({"error": f"File not found: {e}"}), 404
+
+@app.route("/api/android/status", methods=["GET"])
+def android_status():
+    """Android App 连通性与状态检查"""
+    auth_ok, auth_msg = verify_external_request_auth()
+    if not auth_ok:
+        return jsonify({
+            "status": "error",
+            "message": auth_msg
+        }), 401
+
+    return jsonify({
+        "status": "ok",
+        "bot_connected": len(clients) > 0,
+        "default_qq_id": 1840094972,
+        "active_clients": len(clients)
+    })
+
+@app.route("/api/android/history", methods=["GET"])
+def android_history():
+    """? Android App ?????????????? since_id ????"""
+    auth_ok, auth_msg = verify_external_request_auth()
+    if not auth_ok:
+        return jsonify({
+            "status": "error",
+            "message": auth_msg
+        }), 401
+
+    try:
+        limit = int(request.args.get("limit", 50))
+        since_id_raw = request.args.get("since_id")
+        since_id = None
+        if since_id_raw is not None and str(since_id_raw).strip() != "":
+            try:
+                since_id = int(str(since_id_raw).strip())
+            except Exception:
+                since_id = None
+
+        rows = asyncio.run(get_android_history_records(since_id=since_id or 0, limit=limit))
+
+        results = []
+        for mid, data_str in rows:
+            try:
+                item_data = json.loads(data_str)
+                msg_obj = item_data.get("message")
+                role = item_data.get("role", "start")
+                is_user = (role == "end")
+                time_val = item_data.get("message_id") or mid
+
+                text_content = ""
+                images = []
+
+                if isinstance(msg_obj, dict):
+                    raw_msg = msg_obj.get("params", {}).get("message", "")
+                    text_content = extract_onebot_text(raw_msg)
+                    images = extract_onebot_images(raw_msg)
+                elif isinstance(msg_obj, list):
+                    text_content = extract_onebot_text(msg_obj)
+                    images = extract_onebot_images(msg_obj)
+                elif isinstance(msg_obj, str):
+                    text_content = extract_onebot_text(msg_obj)
+                    images = extract_onebot_images(msg_obj)
+
+                if text_content or images:
+                    if "||" in text_content and not is_user:
+                        parts = [p.strip() for p in text_content.split("||") if p.strip()]
+                        for pi, p_seg in enumerate(parts):
+                            p_imgs = images if pi == len(parts) - 1 else []
+                            results.append({
+                                "id": int(time_val) + pi,
+                                "raw_msg_id": int(time_val),
+                                "text": p_seg,
+                                "images": p_imgs,
+                                "is_user": False,
+                                "time": int(time_val)
+                            })
+                    else:
+                        results.append({
+                            "id": int(time_val),
+                            "raw_msg_id": int(time_val),
+                            "text": text_content,
+                            "images": images,
+                            "is_user": is_user,
+                            "time": int(time_val)
+                        })
+            except Exception:
+                continue
+
+        return jsonify({"status": "ok", "messages": results})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/android/upload", methods=["POST"])
+def android_upload_image():
+    """供 Android App 上传图片并保存到 chat_files，返回公开访问 URL"""
+    auth_ok, auth_msg = verify_external_request_auth()
+    if not auth_ok:
+        return jsonify({
+            "status": "error",
+            "message": auth_msg
+        }), 401
+
+    try:
+        file = request.files.get("file")
+        if not file:
+            return jsonify({"status": "error", "message": "No file uploaded"}), 400
+        ext = os.path.splitext(file.filename)[1] or ".jpg"
+        content = file.read()
+        fmd5 = hashlib.md5(content).hexdigest()[:16]
+        dest_name = f"cached_{fmd5}{ext}"
+        dest_path = os.path.join(UPLOAD_FOLDER, dest_name)
+        if not os.path.exists(dest_path):
+            with open(dest_path, "wb") as wf:
+                wf.write(content)
+        return jsonify({
+            "status": "ok",
+            "url": f"/api/chat/media/{dest_name}",
+            "filename": dest_name
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/android/ask", methods=["POST"])
+def android_ask():
+    """Android App 发送/提问接口，与 QQ 上下文记忆打通"""
+    auth_ok, auth_msg = verify_external_request_auth()
+    if not auth_ok:
+        return jsonify({
+            "status": "error",
+            "message": auth_msg
+        }), 401
+
+    data = request.get_json(silent=True) or {}
+    text = data.get("text", "").strip()
+    image_base64 = data.get("image_base64")
+    user_id = data.get("user_id") or 1840094972
+    nickname = data.get("nickname") or "主人"
+    if nickname in ["Android助理", "Android"]:
+        nickname = "主人"
+    timeout = float(data.get("timeout") or 60.0)
+
+    try:
+        user_id = int(user_id)
+    except Exception:
+        user_id = 1840094972
+
+    msg_segments = []
+    at_bot = data.get("at_bot", True)
+    if at_bot:
+        msg_segments.append({
+            "type": "at",
+            "data": {"qq": "1000000", "name": "Eridanus"}
+        })
+
+    if image_base64:
+        try:
+            clean_b64 = image_base64
+            if "base64," in clean_b64:
+                clean_b64 = clean_b64.split("base64,")[1]
+            img_bytes = base64.b64decode(clean_b64)
+            img_md5 = hashlib.md5(img_bytes).hexdigest()[:16]
+            dest_name = f"cached_{img_md5}.jpg"
+            dest_path = os.path.join(UPLOAD_FOLDER, dest_name)
+            if not os.path.exists(dest_path):
+                with open(dest_path, "wb") as wf:
+                    wf.write(img_bytes)
+            # 采用标准本地 file:// 协议，让 mai_reply 和视觉模型直接原生加载
+            abs_uri = f"file:///{os.path.abspath(dest_path).replace(chr(92), '/')}"
+            msg_segments.append({
+                "type": "image",
+                "data": {"file": abs_uri}
+            })
+        except Exception as e_b64:
+            logger.warning(f"[Android Ask] 保存上传图片失败: {e_b64}")
+    if text:
+        msg_segments.append({
+            "type": "text",
+            "data": {"text": text}
+        })
+
+    if len(msg_segments) <= (1 if at_bot else 0):
+        return jsonify({"status": "error", "message": "Prompt is empty"}), 400
+
+    now_ms = int(time.time() * 1000)
+    event_payload = {
+        "self_id": 1000000,
+        "user_id": user_id,
+        "time": int(time.time()),
+        "message_id": now_ms,
+        "real_id": now_ms % 2147483647,
+        "message_seq": now_ms % 2147483647,
+        "message_type": "group",
+        "sender": {
+            "user_id": user_id,
+            "nickname": nickname,
+            "card": "",
+            "role": "member",
+            "title": ""
+        },
+        "raw_message": text,
+        "font": 14,
+        "sub_type": "normal",
+        "message": msg_segments,
+        "message_format": "array",
+        "post_type": "message",
+        "group_id": 222222,  # 虚拟 Android 群号
+        "adapter_source": "android"
+    }
+
+    # 记录该提问消息至数据库
+    try:
+        asyncio.run(
+            update_msg(
+                now_ms, json.dumps({
+                    "role": "end",
+                    "message_id": now_ms,
+                    "message": msg_segments
+                }, ensure_ascii=False)
+            )
+        )
+    except Exception as ex:
+        logger.warning(f"记录 Android 提问消息失败: {ex}")
+
+    # 等待机器人生成回复的通知事件
+    ev = threading.Event()
+    android_pending_events[user_id] = ev
+    android_pending_responses[user_id] = {"reply": "", "images": [], "msg_id": 0}
+
+    # 广播事件至本地 WebSocket (Eridanus Bot 机器人)
+    ev_json = json.dumps(event_payload, ensure_ascii=False)
+    for c in list(clients):
+        try:
+            c.send(ev_json)
+        except Exception:
+            clients.discard(c)
+
+    # 阻塞等待回复生成
+    flag = ev.wait(timeout=timeout)
+
+    if flag:
+        # 延时 2.5 秒以确保所有分段消息(|| 分割)接收完整
+        time.sleep(2.5)
+        android_pending_events.pop(user_id, None)
+        reply_info = android_pending_responses.pop(user_id, {"reply": "", "images": [], "msg_id": 0})
+        final_reply = reply_info.get("reply", "").strip()
+        final_images = reply_info.get("images", [])
+        final_msg_id = reply_info.get("msg_id", 0)
+
+        return jsonify({
+            "status": "ok",
+            "reply": final_reply,
+            "images": final_images,
+            "msg_id": final_msg_id,
+            "message": "success",
+            "user_id": user_id
+        })
+    else:
+        android_pending_events.pop(user_id, None)
+        android_pending_responses.pop(user_id, None)
+        return jsonify({
+            "status": "timeout",
+            "reply": "(Eridanus 生成回复超时，请检查 Bot 是否已连接到 Hub)",
+            "images": [],
+            "message": "timeout",
+            "user_id": user_id
+        }), 504
+
 @sock.route('/api/ws')
 def handle_websocket(ws):
     global auth_info
     logger.server("WebSocket 客户端已连接")
     clients.add(ws)
     try:
-        # 对非本地的访问鉴权
-        try:
-            # if request.remote_addr not in ip_whitelist:
-            if request.remote_addr not in ['127.0.0.1']:
-                recv_token = request.args.get('auth_token')
-                if auth_info[recv_token] > int(time.time()):
-                    logger.server(f"WebSocket客户端登录 - {request.remote_addr}")
-        except:
-            raise ValueError(f"WebSocket 客户端登录失败 - {request.remote_addr}")
+        # 对来自非本机的外部 WebSocket 连接进行鉴权 (Hub 端口 5007)
+        # 本地连接 (127.0.0.1, ::1, localhost 等) 或未设置 token 时自动放行
+        client_ip = request.remote_addr or ""
+        forwarded_for = request.headers.get("X-Forwarded-For", "").strip()
+        is_local = (client_ip in ['127.0.0.1', '::1', 'localhost'] or client_ip.startswith('127.'))
+        if forwarded_for and not all(ip.strip() in ['127.0.0.1', '::1', 'localhost'] for ip in forwarded_for.split(',')):
+            is_local = False
+
+        configured_token = get_webui_auth_token()
+        if not is_local and configured_token:
+            recv_token = (request.args.get('auth_token') or request.args.get('token') or "").strip()
+            is_valid_session = (recv_token in auth_info and auth_info[recv_token] > int(time.time()))
+            if recv_token != configured_token and not is_valid_session:
+                logger.warning(f"WebSocket 外部客户端鉴权未通过 - IP: {client_ip}")
+                raise ValueError(f"WebSocket 外部客户端鉴权未通过 - IP: {client_ip}")
+            logger.server(f"WebSocket 外部客户端鉴权通过 - IP: {client_ip}")
         while True:
             # 接收来自前端的消息
             message = ws.receive()
@@ -1027,68 +1535,151 @@ def handle_websocket(ws):
                     except Exception:
                         clients.discard(client)
                         # 获取前端消息的id
-            # 毫秒时间戳
+            # 统一时间戳
             time_now = int(time.time() * 1000)
             message_id = time_now
             is_update = False
-            # 前端渲染气泡用。end是用户，start是机器人
+            target_group_id = 879886836
+            # 区分消息发起者
             role = 'end'
-            # 如果是webui发来的信息（一个列表），提取里面的消息id（发送时间戳）
-            if isinstance(message,list):
-                is_update = True
-                message_id = message[0]["msg_id"]
-                # 删除第0项：包含msg_id的字典
-                del message[0]
-            #如果不是webui发来的消息，以收到消息的时间为id
-            elif message.get("action") in valid_message_actions:
+
+            # 1. 转发主程序 Eridanus 发出的 Action 指令至所有外部客户端（包括 TG）
+            if isinstance(message, dict) and message.get("action") in valid_message_actions:
+                target_group_id = message.get("params", {}).get("group_id", 879886836)
+
+                # 捕获发送给 Android 客户端 (group_id == 222222) 的消息
+                if target_group_id == 222222 or str(target_group_id) == "222222":
+                    try:
+                        raw_msg = message.get("params", {}).get("message", "")
+                        extracted_text = extract_onebot_text(raw_msg)
+                        extracted_images = extract_onebot_images(raw_msg)
+
+                        # 记录历史并唤醒等待的客户端
+                        if extracted_text or extracted_images:
+                            # 保存到持久化数据库
+                            try:
+                                asyncio.run(
+                                    update_msg(
+                                        time_now, json.dumps({
+                                            "role": "start",
+                                            "message_id": time_now,
+                                            "message": message
+                                        }, ensure_ascii=False)
+                                    )
+                                )
+                            except Exception as e_db:
+                                logger.warning(f"Android 存储消息失败: {e_db}")
+
+                            # 唤醒当前阻塞等待回复的 Android 客户端
+                            # 若为多段消息（含 ||），累计拼装给长轮询或即时推送
+                            for uid, ev in list(android_pending_events.items()):
+                                curr_info = android_pending_responses.get(uid, {"reply": "", "images": []})
+                                curr_reply = curr_info.get("reply", "")
+                                if curr_reply and extracted_text:
+                                    curr_reply = curr_reply + "||" + extracted_text
+                                elif extracted_text:
+                                    curr_reply = extracted_text
+
+                                curr_imgs = curr_info.get("images", [])
+                                for img in extracted_images:
+                                    if img not in curr_imgs:
+                                        curr_imgs.append(img)
+
+                                android_pending_responses[uid] = {
+                                    "reply": curr_reply,
+                                    "images": curr_imgs,
+                                    "msg_id": time_now
+                                }
+                                ev.set()
+                    except Exception as e_resp:
+                        logger.warning(f"处理 Android 响应失败: {e_resp}")
+                action_json = json.dumps(message, ensure_ascii=False)
+                # 广播给除发送端外的其它客户端（如 TelegramAdapter）
+                for client in list(clients):
+                    if client != ws:
+                        try:
+                            client.send(action_json)
+                        except Exception:
+                            clients.discard(client)
+
+                # 如果是 WebUI 的本地群，则持久化消息
+                if target_group_id == 879886836:
+                    is_update = True
+                    message_id = time_now
+                    role = 'start'
+                    try:
+                        asyncio.run(
+                            update_msg(
+                                time_now, json.dumps({
+                                    "role": role,
+                                    "message_id": message_id,
+                                    "message": message
+                                })
+                            )
+                        )
+                    except Exception as ex:
+                        logger.warning(f"消息记录更新失败: {ex}")
+
+            # 2. 如果收到的是外部适配器（如 TelegramAdapter）发来的 OneBot Event 事件，广播给主程序及 WebUI
+            elif isinstance(message, dict) and "post_type" in message:
+                event_json = json.dumps(message, ensure_ascii=False)
+                for client in list(clients):
+                    if client != ws:
+                        try:
+                            client.send(event_json)
+                        except Exception:
+                            clients.discard(client)
+
+            # 3. 原始 WebUI 前端发送的 Array 格式消息，包装为标准 OneBot v11 Group 消息并注入
+            elif isinstance(message, list):
                 is_update = True
                 message_id = time_now
-                role = 'start'
+                role = 'end'
+                try:
+                    asyncio.run(
+                        update_msg(
+                            time_now, json.dumps({
+                                "role": role,
+                                "message_id": message_id,
+                                "message": message
+                            })
+                        )
+                    )
+                except Exception as ex:
+                    logger.warning(f"消息记录更新失败: {ex}")
 
-            # 存入聊天记录到数据库
-            if is_update:
-                asyncio.run(
-                    update_msg(
-                        time_now,json.dumps(
-                        {"role" : role,
-                        "message_id" : message_id,
-                        "message" : message}
-                )))
+                onebot_event = {
+                    'self_id': 1000000,
+                    'user_id': 111111111,
+                    'time': time_now,
+                    'message_id': message_id,
+                    'real_id': 1253451396,
+                    'message_seq': 1253451396,
+                    'message_type': 'group',
+                    'sender': {
+                        'user_id': 111111111,
+                        'nickname': '主人',
+                        'card': '',
+                        'role': 'member',
+                        'title': ''
+                    },
+                    'raw_message': "",
+                    'font': 14,
+                    'sub_type': 'normal',
+                    'message': message,
+                    'message_format': 'array',
+                    'post_type': 'message',
+                    'group_id': 879886836,
+                    'adapter_source': 'webui'
+                }
 
-            # logger.server(message, type(message))
-
-            onebot_event = {
-                'self_id': 1000000,
-                'user_id': 111111111,
-                'time': time_now,
-                'message_id': message_id,
-                'real_id': 1253451396,
-                'message_seq': 1253451396,
-                'message_type': 'group',
-                'sender':
-                    {'user_id': 111111111, 'nickname': '主人', 'card': '', 'role': 'member', 'title': ''},
-                'raw_message': "",
-                'font': 14,
-                'sub_type': 'normal',
-                'message': message,
-                'message_format': 'array',
-                'post_type': 'message',
-                'group_id': 879886836}
-
-
-            def send_mes(onebot_event):
                 event_json = json.dumps(onebot_event, ensure_ascii=False)
-
-                # 发送给所有连接的客户端（后端）
                 for client in list(clients):
                     try:
-                        if client != ws:  # 避免回传给前端
+                        if client != ws:
                             client.send(event_json)
                     except Exception:
                         clients.discard(client)
-
-                # logger.server(f"已发送 OneBot v11 事件: {event_json}")
-            send_mes(onebot_event)
     except Exception as e:
         logger.server(f"WebSocket事件: {str(e)}")
         # traceback.print_exc()
@@ -1130,4 +1721,3 @@ def start_webui():
     app.run(host="0.0.0.0", port=5007,threaded=True)
 # 启动Eridanus并捕获输出，反馈到前端。
 # 不会写，不写！
-
