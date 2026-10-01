@@ -27,8 +27,6 @@ _🎊 基于 [OneBot](https://github.com/howmanybots/onebot/blob/master/README.m
   <a href="">参与贡献</a>
 </p>
 
-
-
 # 部署
 [文档](https://eridanus.netlify.app)    
 [备用文档](https://eridanus-doc.netlify.app/)
@@ -42,6 +40,7 @@ telegram群组：[点击加入](https://t.me/+BUcoYoUebgIzMWFl)
 
 # 更新计划
 - [x] 接入telegram
+- [x] Android 悬浮窗助理 App (Eridanus-Android)
 
 
 # 架构与多平台接入 (Architecture & Multi-Platform Hub)
@@ -49,8 +48,7 @@ telegram群组：[点击加入](https://t.me/+BUcoYoUebgIzMWFl)
 Eridanus 采用基于 **OneBot v11 协议标准**与**事件驱动中心 Hub** 的多端统一桥接架构：无需重复启动多份 Bot 核心插件，通过 WebUI 服务端作为 WebSocket Hub 中转，实现 QQ、WebUI、Telegram 以及移动端（如 Android 悬浮窗应用）的无缝接入与共享上下文。
 
 ### 核心架构示意图
-````
-	ext
+```text
  ┌───────────────────────┐          ┌────────────────────────┐
  │   QQ (OneBot v11)     │          │    Telegram Bot API    │
  │ (Snowluma /LLOneBot等) │          │ (长轮询 / sendDocument) │
@@ -90,25 +88,26 @@ Eridanus 采用基于 **OneBot v11 协议标准**与**事件驱动中心 Hub** �
  │    WebUI 前端网页    │               │  Android 悬浮窗应用  │
  │  (Vue / WebSocket)  │               │ (屏幕识别/翻译/建议) │
  └─────────────────────┘               └─────────────────────┘
-````
+```
 
 ### 多端协同与路由设计
 
 1. **统一适配与无缝透传**：
    - 所有的入站消息（QQ、WebUI、Telegram、Android）在进入 Bot 处理流水线前，均被规范化为标准的 OneBot v11 GroupMessageEvent 或 PrivateMessageEvent。
-   - 消息携带统一的 dapter_source（取值 qq、webui、	elegram、ndroid），供业务插件优雅识别终端来源。
+   - 消息携带统一的 `adapter_source`（取值 `qq`、`webui`、`telegram`、`android`），供业务插件优雅识别终端来源。
 2. **免二次启动插件 (Single Instance Multi-Client)**：
    - Eridanus 作为标准 OneBot 客户端连接本地 Hub，所有插件仅在内存中加载一次，无需为每个平台单独拉起 Bot 实例。
 3. **Telegram 增强能力**：
    - **合并转发相册化**：支持 OneBot Node 消息节点，将多个图片合并为单个 Telegram sendMediaGroup 原生相册发出，告别刷屏。
    - **文件原样传输**：针对 JM 漫画、PDF 下载与大文件，直接通过 Telegram sendDocument 接口传输，当目标为 Telegram 时自动绕过加密并免去密码提示。
-   - **上下文绑定**：发送 /bind <QQ号> 即可将 Telegram 会话与对应的 QQ 用户 ID 关联，实现跨端上下文与长期记忆互通。
+   - **上下文绑定**：发送 `/bind <QQ号>` 即可将 Telegram 会话与对应的 QQ 用户 ID 关联，实现跨端上下文与长期记忆互通。
 
 # 派生项目
 - [Achernar](https://github.com/AOrbitron/Achernar) cpolar隧道本地反向代理，kaggle自动切换账号运行指定脚本。(用于在kaggle持久化部署ai绘画等服务)
 - [vits api](https://github.com/avilliai/vits_api) 本地部署vits语音合成服务端，已打包。
 - [Eridanus-dep](https://github.com/AOrbitron/eridanus-dep) 一个轻量化、易于上手的onebot v11 python SDK。
 - [material-dashboard](https://github.com/avilliai/material-dashboard) 基于原版material-dashboard项目修改而成的Eridanus webui。
+- [Eridanus-Android](https://github.com/AOrbitron/Eridanus-Android) Eridanus Android 悬浮窗副驾驶与多模态屏幕翻译助理。
 # 开源协议
 Eridanus is licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) . Everyone is FREE to access, use, modify, and redistribute this project under the same license, but commercial use is strictly prohibited.  
 Unauthorized commercial usage of Eridanus is explicitly forbidden under this license.   
